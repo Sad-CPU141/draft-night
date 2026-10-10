@@ -31,11 +31,12 @@
      timer ends, anything not accepted expires.
    ============================================================ */
 
+// Every optional twist is OFF by default; the other values are what you get when you switch one on.
 const TWIST_DEFAULTS = {
-  chaos: { on: true, count: 2, steal: true, veto: true, double: true, swap: true, freeze: true },
-  mystery: { on: true, every: 8 },
-  rarity: { on: true, rare: 25, legendary: 5 },
-  trades: { on: true, minutes: 3, money: true },
+  chaos: { on: false, count: 2, steal: true, veto: true, double: true, swap: true, freeze: true },
+  mystery: { on: false, every: 8 },
+  rarity: { on: false, rare: 25, legendary: 5 },
+  trades: { on: false, minutes: 3, money: true },
 };
 const CARD_INFO = {
   steal: { name: 'Steal', emoji: '🦹', text: 'Before the first bid: take one item from a rival team. You pay them what they paid + ' },

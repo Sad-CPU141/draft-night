@@ -7,7 +7,7 @@ module.exports = function twistSims(DN, runs) {
   for (let r = 0; r < runs; r++) {
     const topic = ts[r % ts.length];
     const team = r % 3 === 0;
-    const rules = { ...DN.DEFAULT_RULES, slots: topic.slots, ...T.twistRules({}), order: r % 2 ? 'nominate' : 'random' };
+    const rules = { ...DN.DEFAULT_RULES, slots: topic.slots, ...T.twistRules({ chaos: { on: true }, mystery: { on: true }, rarity: { on: true }, trades: { on: true } }), order: r % 2 ? 'nominate' : 'random' };
     let managers;
     if (team) {
       const bots = B.makeBots(6, ['easy', 'medium', 'hard'][r % 3], 'tm' + r, []);

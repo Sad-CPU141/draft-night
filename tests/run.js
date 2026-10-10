@@ -10,16 +10,17 @@ let failures = 0;
 const ok = (cond, msg) => { if (cond) console.log('  ✓ ' + msg); else { failures++; console.log('  ✗ ' + msg); } };
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
-async function boot({ idb = true, fetchImpl, storage, speed, url, fakeAudio, compress, h2c, fb } = {}) {
+async function boot({ idb = true, fetchImpl, storage, speed, url, fakeAudio, compress, h2c, fb, bc } = {}) {
   const dom = new JSDOM(fs.readFileSync(path.join(root, 'index.html'), 'utf8').replace(/<script[^>]*src="[^"]*"[^>]*><\/script>/g, '').replace(/<link[^>]*>/g, ''), {
     url: url || 'https://sad-cpu141.github.io/draft-night/', runScripts: 'outside-only', pretendToBeVisual: true,
   });
   const w = dom.window;
   w.__DN_TEST__ = true;
   w.addEventListener('error', (e) => console.log('    PAGE ERROR:', e.error && (e.error.stack || e.error.message)));
-  const origErr = w.console.error; w.console.error = (...a) => { console.log('    CONSOLE.ERROR:', String(a[0]).slice(0, 600)); };
+  const origErr = w.console.error; w.console.error = (...a) => { console.log('    CONSOLE.ERROR:', String(a[0]).slice(0, 600), (a[0] && a[0].stack ? a[0].stack.slice(0, 900) : ''), String(a[1] || '').slice(0, 900)); };
   if (speed) w.__DN_TEST_SPEED = speed;
   if (fb) w.__DN_FAKE_FB = fb;
+  if (bc) w.BroadcastChannel = globalThis.BroadcastChannel;
   if (fakeAudio) {
     // A pretend speech engine that records what the auctioneer says.
     w.__spoken = []; w.__cancels = 0;
@@ -188,7 +189,9 @@ async function tap(w, el) { el.dispatchEvent(new w.MouseEvent('pointerdown', { b
     ok(!DN.validateBackup({ app: 'draft-night', format: 1, data: { topics: [{ id: 1 }], past: [] } }).ok, 'damaged backups rejected');
     // settings screen renders
     await click(w, btn(d, 'Finish'));
-    await click(w, btn(d, 'Settings, sound'));
+    await click(w, btn(d, 'Rules & settings'));
+    ok(/Default house rules/.test(d.body.textContent) && /Chaos Cards: off/.test(d.body.textContent) && /Mystery items: off/.test(d.body.textContent), 'Rules & settings opens on the house rules, with optional twists off');
+    await click(w, btn(d, 'App & backup'));
     ok(/Export backup/.test(d.body.textContent) && /Import backup/.test(d.body.textContent), 'backup screen shows export and import');
     ok(/Add to Home Screen/.test(d.body.textContent), 'install instructions shown');
   }
@@ -306,10 +309,12 @@ async function tap(w, el) { el.dispatchEvent(new w.MouseEvent('pointerdown', { b
     const mk = (r) => DN.createDraft(topic, [{ id: 'a', name: 'A', color: '#f00', emoji: 'a' }, { id: 'b', name: 'B', color: '#0f0', emoji: 'b' }], { ...DN.DEFAULT_RULES, slots: topic.slots, ...T.twistRules(r) }, { seed: 'fixed' });
     const off = mk({ chaos: { on: false }, mystery: { on: false }, rarity: { on: false }, trades: { on: false } });
     ok(!Object.keys(off.cards).length && !Object.values(off.items).some((i) => i.mystery) && !Object.keys(off.rarity).length, 'with every switch off, no cards, mystery items or rarity');
-    const on = mk({});
-    ok(on.cards.a.length === 2 && on.cards.b.length === 2, '2 Chaos Cards per manager by default');
+    const ALL = { chaos: { on: true }, mystery: { on: true }, rarity: { on: true }, trades: { on: true } };
+    ok(!Object.keys(mk({}).cards).length && !Object.keys(mk({}).rarity || {}).length, 'twists are off unless switched on');
+    const on = mk(ALL);
+    ok(on.cards.a.length === 2 && on.cards.b.length === 2, '2 Chaos Cards per manager when switched on');
     ok(Object.values(on.items).filter((i) => i.mystery).length === Math.floor(topic.items.length / 8), '1 in 8 items is a mystery (' + Object.values(on.items).filter((i) => i.mystery).length + ' of ' + topic.items.length + ')');
-    ok(JSON.stringify(mk({}).rarity) === JSON.stringify(on.rarity), 'rarity is fixed for a draft (same seed, same rarity)');
+    ok(JSON.stringify(mk(ALL).rarity) === JSON.stringify(on.rarity), 'rarity is fixed for a draft (same seed, same rarity)');
     const tiers = Object.values(on.rarity); ok(tiers.includes('common') && tiers.includes('rare'), 'rarity tiers assigned');
     const only = mk({ chaos: { on: true, count: 2, steal: false, veto: false, double: false, swap: false, freeze: true } });
     ok(only.cards.a.every((c) => c === 'freeze'), 'individual card switches respected');
@@ -373,9 +378,15 @@ async function tap(w, el) { el.dispatchEvent(new w.MouseEvent('pointerdown', { b
     ok(inputs.length === 4, '2v2 = 4 player name fields');
     await click(w, btn(d, 'Next: pick a topic'));
     await click(w, btn(d, 'Sports')); await click(w, btn(d, 'Premier League Legends'));
-    await click(w, [...d.querySelectorAll('.rtitle')].find((b) => /Draft flow/.test(b.textContent)));
+    ok(/General/.test(d.body.textContent) && /Auction & bidding/.test(d.body.textContent) && /Chaos & surprises/.test(d.body.textContent) && /Teams & trading/.test(d.body.textContent) && /Winner/.test(d.body.textContent), 'rules are organised into tabs');
     await click(w, [...d.querySelectorAll('.seg button')].find((b) => b.textContent === 'Nomination'));
-    ok(/Team play/.test(d.body.textContent) && /2v2/.test(d.body.textContent), 'rules screen shows the Team play section (2v2)');
+    await click(w, [...d.querySelectorAll('.tab')].find((b) => /Teams & trading/.test(b.textContent)));
+    ok(/2v2/.test(d.body.textContent), 'Teams & trading tab shows the team setup (2v2)');
+    const tradeSw = d.querySelector('[role=switch][aria-label^="Trade window after the draft"]');
+    ok(tradeSw && tradeSw.getAttribute('aria-checked') === 'false', 'the trade window is off until switched on');
+    await click(w, tradeSw);
+    await click(w, [...d.querySelectorAll('.tab')].find((b) => /Review/.test(b.textContent)));
+    ok(/Trade window: 3 min/.test(d.body.textContent) && /Nomination/.test(d.body.textContent) && /Chaos Cards: off/.test(d.body.textContent), 'Review lists the rules in play');
     await click(w, btn(d, 'Start the draft'));
     ok(/Nominating/.test(d.body.textContent), 'nomination mode: first team is asked to nominate');
     let traded = false, guard = 0;
@@ -421,6 +432,126 @@ async function tap(w, el) { el.dispatchEvent(new w.MouseEvent('pointerdown', { b
     await click(w, voters[0]);
     const opts = [...d.querySelectorAll('.modal .votebtn')].map((b) => b.textContent);
     ok(opts.length === 1 && !/Team 1/.test(opts[0]), 'a player only sees the other team as a choice');
+  }
+
+  console.log('Auction: I’m out, early endings, Require every manager to bid');
+  {
+    const { DN } = await boot();
+    const X = DN.auction;
+    const topic = { id: 'tt', name: 'T', emoji: 'x', layout: 'list', art: 'emoji', slots: ['A', 'B'], items: Array.from({ length: 12 }, (_, i) => ({ id: 'i' + i, name: 'Item ' + i, pos: '', desc: '' })) };
+    const ms3 = [{ id: 'a', name: 'A', color: '#f00', emoji: 'a' }, { id: 'b', name: 'B', color: '#0f0', emoji: 'b' }, { id: 'c', name: 'C', color: '#00f', emoji: 'c' }];
+    const fresh = (extra) => DN.createDraft(topic, ms3, { ...DN.DEFAULT_RULES, slots: topic.slots, order: 'saved', ...(extra || {}) }, { seed: 's' });
+    let d = fresh();
+    ok(!(d.rules.chaos && d.rules.chaos.on) && !(d.rules.mystery && d.rules.mystery.on) && !d.rules.mustBid, 'a fresh game has no optional twists and Require-every-manager-to-bid off');
+    d = X.withdraw(d, 'a');
+    ok(X.isOut(d, 'a') && DN.placeBid(d, 'a', 1) === d, 'after “I’m out” that manager’s bid is rejected by the game itself');
+    ok(DN.placeBid(d, 'a', 5, { double: true }) === d, '…including through a Double Bid card');
+    ok(X.withdraw(d, 'a') === d, 'dropping out twice changes nothing');
+    d = DN.placeBid(d, 'b', 1);
+    ok(X.auctionEnd(d) === null, 'not over while another manager (C) can still bid');
+    d = X.withdraw(d, 'c');
+    ok(X.auctionEnd(d) === 'sell', 'only the leader left → the item ends straight away (sells at the leader’s bid)');
+    d = DN.sell(d);
+    ok(!X.isOut(d, 'a') && DN.placeBid(d, 'a', 1) !== d, 'next item: everyone can bid again');
+    let e = DN.placeBid(d, 'a', 1); e = X.withdraw(e, 'a');
+    ok(e.bid && e.bid.leaderId === 'a' && X.isOut(e, 'a'), 'the leader can drop out and their bid still stands');
+    e = X.withdraw(X.withdraw(e, 'b'), 'c');
+    ok(X.auctionEnd(e) === 'sell', '…and wins when everyone else drops out too');
+    let z = X.withdraw(X.withdraw(X.withdraw(d, 'a'), 'b'), 'c');
+    ok(X.auctionEnd(z) === 'skip' && !z.bid, 'nobody left and no bid → the item goes unsold');
+    // Races between a bid and a withdrawal, in either order.
+    const w1 = X.runAction(X.runAction(d, 'withdraw', ['b'], null), 'bid', ['b', 1], null);
+    ok(!w1.bid, 'withdraw then bid (arriving together): the bid is refused');
+    const w2 = X.runAction(X.runAction(d, 'bid', ['b', 1], null), 'withdraw', ['b'], null);
+    ok(w2.bid && w2.bid.leaderId === 'b' && X.isOut(w2, 'b'), 'bid then withdraw: the bid stands, then they’re out');
+    const who = { teams: new Set(['a']), parts: new Set(['a']) };
+    ok(X.runAction(d, 'withdraw', ['b'], who) === d, 'online: a phone can’t drop out someone else’s team');
+    // Require every manager to bid.
+    let m = fresh({ mustBid: true });
+    ok(!!X.withdrawProblem(m, 'a') && X.withdraw(m, 'a') === m, 'Require every manager to bid: you can’t drop out before bidding');
+    ok(X.owing(m).length === 3, 'every eligible manager owes a bid on the new item');
+    m = DN.placeBid(m, 'a', 1);
+    ok(!X.withdrawProblem(m, 'a'), 'after bidding you can drop out');
+    m = X.withdraw(m, 'a'); m = DN.placeBid(m, 'b', 2); m = X.withdraw(m, 'b');
+    ok(X.auctionEnd(m) === null && X.owing(m).map((x) => x.id).join() === 'c', 'the item can’t close while C still owes a bid');
+    const poor = { ...m, managers: m.managers.map((x) => (x.id === 'c' ? { ...x, budget: 2 } : x)) };
+    ok(!X.owing(poor).length && !X.withdrawProblem(poor, 'c') && X.auctionEnd(poor) === 'sell', 'a manager who can’t afford the next bid is excused (and the item can end)');
+    const off = fresh();
+    ok(!X.withdrawProblem(off, 'a'), 'with the rule off you can drop out without bidding');
+    // Engine-only solo drafts with bots: bots drop out when passing, owe bids when the rule is on, nothing gets stuck.
+    let stuck = 0, neg = 0, owedClose = 0, runs = 0;
+    for (const mustBid of [false, true]) {
+      for (let r = 0; r < 40; r++) {
+        const t = DN.starterTopics()[r % 48];
+        const bots = DN.bots.makeBots(3, ['easy', 'medium', 'hard'][r % 3], 'w' + r, []);
+        const humanM = { id: 'you', name: 'You', color: '#3d8bff', emoji: 'x', human: true };
+        let g = DN.createDraft(t, [humanM, ...bots], { ...DN.DEFAULT_RULES, slots: t.slots, mustBid }, { mode: 'solo', solo: { level: 'medium', clock: 8 }, seed: 'w' + r });
+        let steps = 0;
+        while (g.phase !== 'done' && steps++ < 6000) {
+          if (g.phase === 'auction') {
+            const passers = X.botPassers(g); passers.forEach((id) => { g = X.withdraw(g, id); });
+            const plan = DN.bots.nextBotAction(g) || X.botForcedBid(g);
+            const you = g.managers[0];
+            if (!X.isOut(g, 'you') && DN.canBid(g, you, DN.nextAmount(g)) && (X.owesBid(g, you) || (r + steps) % 5 === 0)) { g = DN.placeBid(g, 'you', DN.nextAmount(g)); continue; }
+            if (!X.isOut(g, 'you') && !X.withdrawProblem(g, 'you')) { g = X.withdraw(g, 'you'); continue; }
+            if (plan) { const n = DN.placeBid(g, plan.botId, plan.amount, plan.double ? { double: true } : undefined); if (n !== g) { g = n; continue; } }
+            const end = X.auctionEnd(g);
+            if (mustBid && X.owing(g).length && end) owedClose++;
+            if (end === 'sell') g = DN.sell(g); else if (end === 'skip') g = DN.skipItem(g);
+            else if (!X.owing(g).length) g = g.bid ? DN.sell(g) : DN.skipItem(g); // the clock runs out
+            else { stuck++; break; }
+          } else if (g.phase === 'freepick') { const cp = DN.currentPicker(g); g = DN.freePick(g, g.leftover.find((x) => DN.canTake(g, cp.m, x))); }
+          else if (g.phase === 'trade') g = { ...g, phase: 'done' };
+          else break;
+          if (g.managers.some((x) => x.budget < 0)) neg++;
+        }
+        runs++; if (g.phase !== 'done') stuck++;
+      }
+    }
+    ok(stuck === 0, runs + ' bot drafts (rule off and on) all finish — nobody gets stuck');
+    ok(neg === 0 && owedClose === 0, 'no negative budgets, and with the rule on no item closed while someone still owed a bid');
+    // Old saved house rules with twists switched on by the old defaults are switched off once.
+    const mig = X.migrateSettings({ rulePrefs: { budget: 30, chaos: { on: true, count: 2 }, mystery: { on: true, every: 8 } } });
+    ok(mig.rulePrefs.budget === 30 && !mig.rulePrefs.chaos.on && !mig.rulePrefs.mystery.on && mig.rulesV === 3, 'old saved settings: twists switched off once, other choices kept');
+    const mig2 = X.migrateSettings({ rulesV: 3, rulePrefs: { chaos: { on: true } } });
+    ok(mig2.rulePrefs.chaos.on, 'after that, twists you switch on stay on');
+  }
+
+  console.log('I’m out in the app, and TV mode for local games');
+  {
+    const topic = { id: 'tt', name: 'Tiny', emoji: 'x', layout: 'list', art: 'emoji', slots: ['A', 'B'], items: Array.from({ length: 10 }, (_, i) => ({ id: 'i' + i, name: 'Thing ' + i, pos: '', desc: '' })) };
+    const a0 = await boot();
+    const solo = a0.DN.createDraft(topic, [{ id: 'you', name: 'You', color: '#3d8bff', emoji: 'x', human: true }, ...a0.DN.bots.makeBots(2, 'medium', 'o', [])], { ...a0.DN.DEFAULT_RULES, slots: topic.slots, order: 'saved' }, { mode: 'solo', solo: { level: 'medium', talk: false, clock: 30 }, seed: 'o' });
+    const p1 = await boot({ idb: false, speed: 1, storage: { dn_current_v1: JSON.stringify(solo) } });
+    await click(p1.w, btn(p1.d, 'Resume draft'));
+    await sleep(300);
+    const out = btn(p1.d, 'I’m out');
+    ok(out && !out.disabled, 'solo: “I’m out” is available on a new item');
+    await click(p1.w, out);
+    const cur = p1.DN.store.get('dn_current_v1');
+    ok(cur.out && cur.out.ids.includes('you'), 'tapping it records you as out in the game state');
+    const bidBtn = [...p1.d.querySelectorAll('.actions.duo button')].find((b) => /Out ✋/.test(b.textContent));
+    ok(bidBtn && bidBtn.disabled && /You can’t bid again on this item/.test(p1.d.body.textContent), 'your Bid button is disabled and says why');
+    p1.w.close();
+    // Local game + a TV window in the same browser.
+    const local = a0.DN.createDraft(topic, [{ id: 'm1', name: 'Mo', color: '#ff4f64', emoji: 'a' }, { id: 'm2', name: 'Lu', color: '#3d8bff', emoji: 'b' }], { ...a0.DN.DEFAULT_RULES, slots: topic.slots, order: 'saved' }, { seed: 'l' });
+    const H = await boot({ idb: false, bc: true, storage: { dn_current_v1: JSON.stringify(local) } });
+    await click(H.w, btn(H.d, 'Resume draft'));
+    const TV = await boot({ idb: false, bc: true, url: 'https://sad-cpu141.github.io/draft-night/#tv=local' });
+    const seen = async (re, ms = 2000) => { const t = Date.now(); while (Date.now() - t < ms) { if (re.test(TV.d.body.textContent)) return true; await sleep(20); } return false; };
+    ok(await seen(/Thing 0/), 'local TV window shows the item up for auction');
+    ok(!!TV.d.querySelector('.tvmode') && TV.d.querySelectorAll('.mgr[role=button]').length === 0 && !TV.d.querySelector('.actions:not([hidden])') || TV.d.querySelectorAll('.mgr[role=button]').length === 0, 'the TV window has no bid controls');
+    await tap(H.w, [...H.d.querySelectorAll('.mgr')].find((x) => /Mo/.test(x.textContent)));
+    ok(await seen(/Mo leads/), 'a bid on the host window appears on the TV window');
+    const before = JSON.stringify(H.DN.store.get('dn_current_v1'));
+    await sleep(200);
+    ok(JSON.stringify(H.DN.store.get('dn_current_v1')) === before, 'the TV window never changes the saved game');
+    await click(H.w, H.d.querySelector('.tvfab'));
+    await click(H.w, btn(H.d, 'Show TV view on this screen'));
+    ok(!!H.d.querySelector('.tvmode') && H.d.querySelectorAll('.mgr[role=button]').length === 0 && /Back to controls/.test(H.d.body.textContent), 'host can switch this screen to the TV view (read-only)');
+    await click(H.w, btn(H.d, 'Back to controls'));
+    ok(!H.d.querySelector('.tvmode') && H.d.querySelectorAll('.mgr[role=button]').length > 0, '“Back to controls” returns to the normal host screen');
+    H.w.close(); TV.w.close();
   }
 
   console.log('Solo game in the app (sped-up clock)');
@@ -633,6 +764,14 @@ async function tap(w, el) { el.dispatchEvent(new w.MouseEvent('pointerdown', { b
     ok(sim.modes.flat().every((x) => x.champion && x.bad === 0 && x.emptyTeamSeeded), 'sim and combined brackets: goals/assists only by squad players, results replay identically, teams with no players are left out');
     ok(sim.fair.wins > 300 && sim.fair.upsets > 0 && sim.fair.avgGoals > 1.5 && sim.fair.avgGoals < 5, 'a much stronger team wins most of 400 matches but upsets happen (' + sim.fair.wins + '/400, ' + sim.fair.avgGoals.toFixed(2) + ' goals/game)');
     ok(Object.values(sim.ratings).every(Boolean), 'ratings: deterministic, overrides respected, team rating 1–99, provisional when incomplete');
+    const sy = sim.symmetry;
+    ok(Math.abs(sy.firstWins - sy.secondWins) < 0.035, 'no advantage for being listed first: same team wins ' + (sy.firstWins * 100).toFixed(1) + '% listed first vs ' + (sy.secondWins * 100).toFixed(1) + '% listed second (1,500 matches)');
+    ok(sy.avgGoals > 1.8 && sy.avgGoals < 3.6 && sy.eightPlus < 0.02 && sy.draws > 0.15 && sy.draws < 0.35, 'plausible scores: ' + sy.avgGoals.toFixed(2) + ' goals a game, ' + (sy.draws * 100).toFixed(0) + '% draws, ' + (sy.eightPlus * 100).toFixed(1) + '% with 8+ goals');
+    const an = sim.animation;
+    ok(an.checked > 100 && an.bad === 0, 'animation: in ' + an.checked + ' matches the score on screen only rises on goals and finishes exactly on the recorded result; replays are identical');
+    ok(an.badFrames === 0 && an.frames > 5000, 'animation: every frame (' + an.frames + ' sampled) has every player and the ball on the pitch');
+    ok(an.chainOk, 'every passing move uses only that team’s drafted players, and goals end with the scorer');
+    ok(sim.home.withHome > sim.home.without && sim.home.withHome - sim.home.without < 0.12, 'home advantage (optional) is a modest boost: ' + (sim.home.without * 100).toFixed(1) + '% → ' + (sim.home.withHome * 100).toFixed(1) + '% wins');
     const full = sim.fullDraft;
     const withMode = (d, mode, extra) => ({ ...d, rules: { ...d.rules, finale: { ...F.FINALE_DEFAULTS, mode, speed: 'instant', ...(extra || {}) } }, phase: 'done' });
     // Run a whole finale through the same functions the screens call.

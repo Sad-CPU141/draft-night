@@ -133,6 +133,7 @@ const ownsPart = (who, pid) => !who || who.parts.has(pid);
 const findTrade = (d, id) => (d.trade ? d.trade.proposals.find((t) => t.id === id) : null);
 const NET_ACTIONS = {
   bid: (d, [mid, amt, dbl], who) => (d.phase === 'auction' && owns(who, mid) && typeof amt === 'number' ? placeBid(d, mid, amt, dbl ? { double: true } : undefined) : d),
+  withdraw: (d, [mid], who) => (owns(who, mid) ? withdraw(d, mid) : d),
   card: (d, [by, card, params], who) => (d.phase === 'auction' && owns(who, by) && CARD_INFO[card] ? playCard(d, by, card, params || {}) : d),
   veto: (d, [yes, pid], who) => (d.pending && d.pending.id === pid && owns(who, d.pending.target) ? answerCard(d, !!yes) : d),
   nominate: (d, [id], who) => { const c = d.phase === 'nominate' && currentNominator(d); return c && owns(who, c.m.id) ? nominate(d, id) : d; },
@@ -165,7 +166,7 @@ class Room {
     this.awaySince = {}; this.closed = false; this.onAction = null; this.seen = new Set();
   }
   ref(p) { return this.db.ref(this.base + (p || '')); }
-  get amHost() { return !!(this.meta && this.meta.host === this.uid); }
+  get amHost() { return !this.viewerOnly && !!(this.meta && this.meta.host === this.uid); }
   emit() { this.subs.forEach((f) => { try { f(this); } catch (e) {} }); }
   subscribe(f) { this.subs.add(f); return () => this.subs.delete(f); }
   listen(path, ev, fn) { const r = typeof path === 'string' ? this.ref(path) : path; r.on(ev, fn); this.offs.push(() => r.off(ev, fn)); }
@@ -192,6 +193,9 @@ class Room {
     const players = (await room.ref('players').once('value')).val() || {};
     const me = players[uid];
     room.kind = kind === 'tv' ? 'tv' : 'player';
+    // A TV window opened by someone already in the room (same browser = same id) just watches:
+    // no seat, no presence, so it can't affect the host or their seat.
+    if (room.kind === 'tv' && me && me.kind !== 'tv') { room.viewerOnly = true; await room.start(); return room; }
     if (!me && room.kind === 'player') {
       const people = Object.values(players).filter((p) => p.kind !== 'tv').length;
       if (people >= ONLINE.maxPeople) throw new Error('That room is full (' + ONLINE.maxPeople + ' players).');
@@ -203,11 +207,11 @@ class Room {
     return room;
   }
   async start() {
-    saveLastRoom({ code: this.code, at: Date.now(), kind: this.kind });
+    if (!this.viewerOnly) saveLastRoom({ code: this.code, at: Date.now(), kind: this.kind });
     const me = this.ref('presence/' + this.uid);
     this.listen(this.db.ref('.info/connected'), 'value', (s) => {
       this.connected = s.val() !== false;
-      if (s.val() === true) { me.onDisconnect().remove(); me.set(true); }
+      if (s.val() === true && !this.viewerOnly) { me.onDisconnect().remove(); me.set(true); }
       this.emit();
     });
     const json = (s) => { try { return JSON.parse(s); } catch (e) { return null; } };
@@ -243,7 +247,7 @@ class Room {
   people() { return Object.entries(this.players).map(([uid, p]) => ({ uid, ...p, online: this.online(uid) })).sort((a, b) => (a.joinedAt || 0) - (b.joinedAt || 0)); }
   // Host gone for a few seconds? The earliest-joined player who's online takes over (one winner, via a transaction).
   checkHost() {
-    if (!this.meta || this.meta.status === 'closed' || this.kind === 'tv' || !this.players[this.uid]) return;
+    if (!this.meta || this.meta.status === 'closed' || this.kind === 'tv' || this.viewerOnly || !this.players[this.uid]) return;
     const host = this.meta.host;
     if (host === this.uid || this.online(host)) { clearTimeout(this.hostTimer); this.hostTimer = null; return; }
     if (this.hostTimer) return;
@@ -291,6 +295,7 @@ class Room {
     if (this.closed) return;
     this.closed = true; clearTimeout(this.hostTimer);
     this.offs.forEach((f) => { try { f(); } catch (e) {} }); this.offs = [];
+    if (this.viewerOnly) return;
     this.ref('presence/' + this.uid).remove().catch(() => {});
     if (forget) { saveLastRoom(null); if (!this.state) this.ref('players/' + this.uid).remove().catch(() => {}); }
   }
@@ -302,15 +307,19 @@ const NetCtx = React.createContext(null);
 const useNet = () => React.useContext(NetCtx);
 // online: an online room; isHost: this phone runs the game (always true offline);
 // controls(teamId): may this phone act for that team; runsBots: bots/clock run here.
+// net.display === 'tv': this screen shows the TV view (read-only) — the host keeps running the game.
+// net.passive: a separate TV window for a local game — shows the game, runs nothing.
 function netView(d, net) {
-  const online = !!(d && d.mode === 'online' && net);
-  const isHost = !online || net.role === 'host';
+  const online = !!(d && d.mode === 'online' && net && !net.local);
+  const passive = !!(net && net.passive);
+  const isHost = !passive && (!online || net.role === 'host');
   const who = online ? net.who : null;
+  const tv = !!(net && (net.display === 'tv' || net.role === 'tv'));
   return {
-    online, isHost, who, tv: online && net.role === 'tv', live: online ? (net.live || {}) : {},
+    online, isHost, who, tv, live: online || passive ? (net.live || {}) : {},
     runsBots: !!d && (d.mode === 'solo' || online) && isHost,
-    controls: (teamId) => (!online ? (d.mode === 'solo' ? !!(teamOf(d, teamId) || {}).human : true) : !!who && who.teams.has(teamId)),
-    controlsPart: (pid) => (!online ? true : !!who && who.parts.has(pid)),
+    controls: (teamId) => (tv ? false : !online ? (d.mode === 'solo' ? !!(teamOf(d, teamId) || {}).human : true) : !!who && who.teams.has(teamId)),
+    controlsPart: (pid) => (tv ? false : !online ? true : !!who && who.parts.has(pid)),
   };
 }
 // Player actions: offline they apply straight away; online they go to the host.

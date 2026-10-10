@@ -66,6 +66,52 @@ module.exports = function finaleChecks(DN) {
   out.ratings = { same: JSON.stringify(F.playerRating(it)) === JSON.stringify(F.playerRating(it)), override: F.playerRating({ ...it, rating: 77 }).ovr === 77 && !F.playerRating({ ...it, rating: 77 }).estimated,
     teamRange: dd.managers.every((m) => { const r = F.teamRating(dd, m).rating; return r >= 1 && r <= 99; }),
     provisional: F.teamRating(dd, { ...dd.managers[0], team: dd.managers[0].team.map((t, i) => (i < 2 ? t : null)) }).provisional };
+  // v2 engine: fairness by swapping sides with identical teams, calibration, and the animation agreeing with the result.
+  {
+    const dd2 = fullDraft(2, 'v2');
+    const N = 1500; let firstWins = 0, secondWins = 0, draws = 0, goalsT = 0, big = 0;
+    for (let i = 0; i < N; i++) {
+      const m1 = F.simulateMatch({ ...dd2, seed: 'sym' + i }, dd2.managers[0], dd2.managers[1], 'x', false);
+      const m2 = F.simulateMatch({ ...dd2, seed: 'sym' + i }, dd2.managers[1], dd2.managers[0], 'x', false);
+      // team managers[0] wins as "first listed" in m1 and as "second listed" in m2
+      if (m1.score[0] > m1.score[1]) firstWins++; if (m2.score[1] > m2.score[0]) secondWins++;
+      if (m1.score[0] === m1.score[1]) draws++;
+      goalsT += m1.score[0] + m1.score[1]; if (m1.score[0] + m1.score[1] >= 8) big++;
+    }
+    out.symmetry = { firstWins: firstWins / N, secondWins: secondWins / N, draws: draws / N, avgGoals: goalsT / N, eightPlus: big / N };
+    let bad = 0, checked = 0, frames = 0, badFrames = 0, chainOk = true;
+    for (let i = 0; i < 120; i++) {
+      const dd3 = fullDraft(i % 3 === 0 ? 3 : 2, 'anim' + i);
+      const A = dd3.managers[0], B = dd3.managers[1];
+      const m = F.simulateMatch(dd3, A, B, 'k' + i, i % 2 === 0);
+      if (m.forfeit) continue;
+      checked++;
+      const script = F.matchScript(m);
+      const shown = F.revealedEvents(script, script.total).map((k) => m.events[k]);
+      const g = [0, 1].map((t) => shown.filter((e) => e.type === 'goal' && e.team === t).length);
+      if (g[0] !== m.score[0] || g[1] !== m.score[1]) bad++;
+      // The score shown never goes down and only changes on goals.
+      let prev = [0, 0];
+      for (let t = 0; t <= script.total; t += script.total / 60) {
+        const sh = F.revealedEvents(script, t).map((k) => m.events[k]).filter((e) => e.type === 'goal');
+        const sc = [sh.filter((e) => e.team === 0).length, sh.filter((e) => e.team === 1).length];
+        if (sc[0] < prev[0] || sc[1] < prev[1]) bad++;
+        prev = sc;
+        const L = [F.lineupOf(dd3, A), F.lineupOf(dd3, B)];
+        const fr = F.matchFrame(script, L, t); frames++;
+        if (!isFinite(fr.ball.x) || !isFinite(fr.ball.y) || fr.pos.some((team) => team.some((p) => !p || !isFinite(p.x) || !isFinite(p.y)))) badFrames++;
+      }
+      const roster = [A, B].map((t) => new Set(t.team.filter(Boolean).map((x) => dd3.items[x.itemId].name)));
+      m.seqs.forEach((q) => { if (!q.chain.every((n) => roster[q.team].has(n))) chainOk = false; if (q.kind === 'goal' && q.chain[q.chain.length - 1] !== q.shooter) chainOk = false; });
+      const again = F.simulateMatch(dd3, A, B, 'k' + i, i % 2 === 0);
+      if (JSON.stringify(again) !== JSON.stringify(m)) bad++;
+    }
+    out.animation = { checked, bad, frames, badFrames, chainOk };
+    // Home advantage is optional and small.
+    const dd4 = fullDraft(2, 'home'); let h0 = 0, h1 = 0;
+    for (let i = 0; i < 1500; i++) { const a = F.simulateMatch({ ...dd4, seed: 'h' + i }, dd4.managers[0], dd4.managers[1], 'x', false); const b = F.simulateMatch({ ...dd4, seed: 'h' + i }, dd4.managers[0], dd4.managers[1], 'x', false, { home: 1 }); if (a.score[1] > a.score[0]) h0++; if (b.score[1] > b.score[0]) h1++; }
+    out.home = { without: h0 / 1500, withHome: h1 / 1500 };
+  }
   out.fullDraft = fullDraft;
   return out;
 };

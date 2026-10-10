@@ -13,6 +13,7 @@ function OnlineHome({ profile, setProfile, last, initialCode, onCreate, onJoin, 
     <div className="app">
       <TopBar onBack={onBack} title="Online" />
       <h2 className="display">Play on your own phones</h2>
+      {typeof navigator !== 'undefined' && navigator.onLine === false && <p className="warn">This device is offline. Online rooms need an internet connection; Solo and Local work offline.</p>}
       <p className="muted" style={{ margin: 0 }}>The host makes a room, friends join with the code, and everyone bids from their own phone. A laptop or TV can show the big screen.</p>
       {last && (
         <div className="card row">
@@ -78,7 +79,7 @@ function lobbyProblems(room, cfg) {
   return out;
 }
 function initialLobby(topic, rules) {
-  return { teamMode: false, teamCount: 2, teamSize: 2, fillBots: true, teamNames: TEAM_NAMES.slice(0, 4), bots: 0, level: 'medium', botSeed: uid(), talk: true, clock: ONLINE.clock,
+  return { teamMode: false, teamCount: 2, teamSize: 2, fillBots: true, teamNames: TEAM_NAMES.slice(0, 4), bots: 0, level: 'medium', botSeed: uid(), talk: true, clock: ONLINE.clock, coverAfter: 60,
     topic: topic ? packTopic(onlineTopic(topic), false) : null, topicName: topic ? topic.name : '', topicEmoji: topic ? topic.emoji : '', rules: topic ? { ...rules, slots: [...topic.slots] } : rules };
 }
 
@@ -116,8 +117,10 @@ function PlayerRow({ p, me, host, isHost, teamMode, cfg, room }) {
   );
 }
 
-function Lobby({ room, topics, rulePrefs, onLeave: leaveNow, onStart, tv }) {
+function Lobby({ room, topics, rulePrefs, onLeave: leaveNow, onStart, tv: tvProp }) {
   const isHost = room.amHost;
+  const [tvView, setTvView] = useState(false);
+  const tv = tvProp || tvView;
   const [askLeave, setAskLeave] = useState(false);
   const onLeave = () => (isHost ? setAskLeave(true) : leaveNow());
   const leaveSheet = askLeave && <Confirm title="Close the room?" body="Everyone in the lobby is sent back. You can make a new room any time." yes="Close room" danger onYes={leaveNow} onClose={() => setAskLeave(false)} />;
@@ -145,6 +148,7 @@ function Lobby({ room, topics, rulePrefs, onLeave: leaveNow, onStart, tv }) {
   const fin = (r.finale && r.finale.mode) || 'vote';
   if (tv) return (
     <div className="app tvlobby">
+      <TvExit onExit={tvView ? () => setTvView(false) : null} />
       <RoomCode code={room.code} big />
       <div className="card stack-sm"><h3>{cfg.topicEmoji} {cfg.topicName || 'Topic not picked yet'}</h3><p className="small muted" style={{ margin: 0 }}>{humansOnline} player{humansOnline === 1 ? '' : 's'} in · waiting for the host to start</p></div>
       <div className="tvplayers">{players.map((p) => <span key={p.uid} className={'tvp' + (p.online ? '' : ' away')} style={mStyle({ color: p.color || '#888' })}>{p.emoji} {p.name}</span>)}</div>
@@ -184,18 +188,26 @@ function Lobby({ room, topics, rulePrefs, onLeave: leaveNow, onStart, tv }) {
             <h3>Game</h3>
             <button className="tcard" onClick={() => setView('topic')}><span className="em">{cfg.topicEmoji || '🎲'}</span><span className="meta"><span className="name">{cfg.topicName || 'Pick a topic'}</span><span className="sub">{topicObj ? topicObj.items.length + ' items · ' + topicObj.slots.length + ' slots' : 'Tap to choose'}</span></span><span className="muted" style={{ fontSize: 22 }}>›</span></button>
             <div className="field"><span className="label">Bid clock</span><Seg label="Bid clock" value={cfg.clock} options={ONLINE.clocks.map((c) => [c, c + 's'])} onChange={(v) => set({ clock: v })} /><p className="hint">Restarts on every bid. When it runs out, the item sells (or is skipped if nobody bid).</p></div>
-            <button className="btn" disabled={!topicObj} onClick={() => setView('rules')}>Rules: {money(r.budget || 20)} budget{twistsOn.length ? ' · ' + twistsOn.join(', ') : ''} · winner by {fin === 'vote' ? 'vote' : fin}</button>
+            <button className="btn" disabled={!topicObj} onClick={() => setView('rules')}>Edit rules: {money(r.budget || 20)} budget{twistsOn.length ? ' · ' + twistsOn.join(', ') : ' · no twists'} · winner by {fin === 'vote' ? 'vote' : fin}</button>
+          </div>
+          <div className="card stack">
+            <h3>Room</h3>
+            <div className="field"><span className="label">If someone’s connection drops</span><Seg label="Bot covers after" value={cfg.coverAfter || 60} options={[[30, 'Bot after 30s'], [60, '60s'], [120, '2 min']]} onChange={(v) => set({ coverAfter: v })} />
+              <p className="hint">A bot plays their seat until they’re back, then hands it straight back. They can rejoin from Online on the same phone, or take their seat back from another phone.</p></div>
+            <p className="hint" style={{ margin: 0 }}>Up to {ONLINE.maxTeams} teams ({ONLINE.maxPeople} people in team mode). Only the host can change rules, start, pause and end trading; everyone else controls just their own team. If the host leaves, the next player to join takes over.</p>
           </div>
           {problems.map((p) => <p key={p} className="warn">{p}</p>)}
           <button className="btn btn-gold" disabled={problems.length > 0} onClick={onStart}>Start the draft</button>
-          <p className="hint" style={{ textAlign: 'center' }}>A bot covers anyone who drops out for {ONLINE.coverAfter / 1000}s, and hands their seat back when they return.</p>
+          <p className="hint" style={{ textAlign: 'center' }}>A bot covers anyone who drops out for {cfg.coverAfter || 60}s, and hands their seat back when they return.</p>
           {leaveSheet}
+          <TvSwitch code={room.code} onThisScreen={() => setTvView(true)} />
         </>
       ) : (
         <>
           <div className="card stack-sm">
             <h3>{cfg.topicEmoji} {cfg.topicName || 'The host is picking a topic'}</h3>
             <p className="small muted" style={{ margin: 0 }}>{money(r.budget || 20)} budget · {(r.slots || []).length} slots · {cfg.clock}s bid clock{twistsOn.length ? ' · ' + twistsOn.join(', ') : ''} · winner by {fin === 'vote' ? 'vote' : fin}</p>
+            <details><summary className="label">All rules for this room</summary><RulesSummary rules={{ ...RULE_DEFAULTS(), ...r }} opts={{ teams: cfg.teamMode, clock: cfg.clock }} /><p className="hint" style={{ margin: 0 }}>A bot covers a dropped player after {cfg.coverAfter || 60}s. Only the host can change these.</p></details>
             <p className="small muted" style={{ margin: 0 }}>{cfg.teamMode ? cfg.teamCount + ' teams' + (cfg.fillBots ? ', bots fill empty spots' : '') : 'Everyone for themselves' + (cfg.bots ? ' + ' + cfg.bots + ' bot' + (cfg.bots === 1 ? '' : 's') : '')}</p>
           </div>
           <p className="muted" style={{ textAlign: 'center' }}>Waiting for the host to start…</p>
@@ -210,8 +222,9 @@ function RoomGame({ room, d, setHd, onLeave, onPlayAgain, onFinished, past, sett
   const isHost = room.amHost; const tv = room.kind === 'tv';
   const [flash, setFlash] = useState(null);
   const [askLeave, setAskLeave] = useState(false);
+  const [tvView, setTvView] = useState(false); // the host showing the TV view on this screen
   const who = useMemo(() => ownerInfo(d, room.uid), [d && d.managers, room.uid]);
-  const net = { role: isHost ? 'host' : tv ? 'tv' : 'player', who, live: room.live, send: (n, a) => room.send(n, a), publishLive: (o) => room.publishLive(o) };
+  const net = { role: isHost ? 'host' : tv ? 'tv' : 'player', display: tv || tvView ? 'tv' : 'controls', who, live: room.live, send: (n, a) => room.send(n, a), publishLive: (o) => room.publishLive(o) };
   // Host: show a flash here and on every other screen.
   const onFlash = (info) => { setFlash(info); if (isHost) room.publishLive({ flash: { id: uid(), info } }); };
   const lastFlash = useRef(room.live && room.live.flash ? room.live.flash.id : null);
@@ -238,7 +251,7 @@ function RoomGame({ room, d, setHd, onLeave, onPlayAgain, onFinished, past, sett
   const awaySeats = !seated && !tv ? humanSeats(d).filter((s) => !room.online(s.uid)) : [];
   return (
     <NetCtx.Provider value={net}>
-      <div className={tv ? 'tvmode' : ''}>
+      <div className={tv || tvView ? 'tvmode' : ''}>
         {!room.connected && <div className="netbar" role="status">Reconnecting… your seat is kept.</div>}
         {!seated && !tv && awaySeats.length > 0 && (
           <div className="netbar seat" role="region" aria-label="Take a seat">
@@ -248,6 +261,8 @@ function RoomGame({ room, d, setHd, onLeave, onPlayAgain, onFinished, past, sett
         )}
         {view}
         {flash && <Flash f={flash} onDone={() => setFlash(null)} />}
+        {tv && <TvExit />}
+        {!tv && isHost && (tvView ? <TvExit onExit={() => setTvView(false)} /> : <TvSwitch code={room.code} onThisScreen={() => setTvView(true)} />)}
         {askLeave && <Confirm title="Leave the room?" body={isHost ? 'Another player takes over as host and the game carries on. You can rejoin from Online.' : 'The game carries on. A bot covers your seat after a minute; you can rejoin from Online.'} yes="Leave" onYes={onLeave} onClose={() => setAskLeave(false)} />}
       </div>
     </NetCtx.Provider>
@@ -255,8 +270,10 @@ function RoomGame({ room, d, setHd, onLeave, onPlayAgain, onFinished, past, sett
 }
 
 // Connects, then shows the lobby or the game. Holds the host's copy of the draft.
-function OnlineScreen({ start, profile, topics, rulePrefs, past, settings, onExit, onFinished }) {
+function OnlineScreen({ start, profile, topics, rulePrefs, past, settings, onExit, onFinished, onRetry }) {
   const [room, setRoom] = useState(null);
+  const [slow, setSlow] = useState(false);
+  useEffect(() => { const t = setTimeout(() => setSlow(true), 12000); return () => clearTimeout(t); }, []);
   const [err, setErr] = useState('');
   const [, tick] = useState(0);
   const [hd, setHd] = useState(null);
@@ -271,7 +288,7 @@ function OnlineScreen({ start, profile, topics, rulePrefs, past, settings, onExi
   const amHost = !!(room && room.amHost);
   const status = room && room.meta ? room.meta.status : null;
   // Players' phones stay quiet; the host and the TV play the auctioneer.
-  useEffect(() => { audio.setQuiet(!!room && !amHost && room.kind !== 'tv'); return () => audio.setQuiet(false); }, [room, amHost]);
+  useEffect(() => { audio.setQuiet(!!room && !amHost && room.kind !== 'tv' && !profile.voice); return () => audio.setQuiet(false); }, [room, amHost, profile.voice]);
   // Host: create the lobby once; take over the published game if we became host mid-game.
   useEffect(() => {
     if (!room || !amHost) return;
@@ -309,7 +326,7 @@ function OnlineScreen({ start, profile, topics, rulePrefs, past, settings, onExi
         let n = p;
         humanSeats(p).forEach((s) => {
           if (room.online(s.uid)) { delete room.awaySince[s.uid]; if (s.covered) n = setCover(n, s.uid, false); }
-          else { room.awaySince[s.uid] = room.awaySince[s.uid] || now; if (!s.covered && now - room.awaySince[s.uid] >= ms(ONLINE.coverAfter)) n = setCover(n, s.uid, true); }
+          else { room.awaySince[s.uid] = room.awaySince[s.uid] || now; if (!s.covered && now - room.awaySince[s.uid] >= ms(((p.online && p.online.coverAfter) || 60) * 1000)) n = setCover(n, s.uid, true); }
         });
         return n;
       });
@@ -319,8 +336,8 @@ function OnlineScreen({ start, profile, topics, rulePrefs, past, settings, onExi
   useEffect(() => { if (room && room.players[room.uid]) joined.current = true; });
 
   const leave = (forget) => { if (room) room.leave(forget); onExit(); };
-  if (err) return <div className="app"><TopBar onBack={onExit} title="Online" /><div className="card stack"><b>Couldn’t open the room</b><p className="small" style={{ margin: 0 }}>{err}</p><button className="btn" onClick={onExit}>Back</button></div></div>;
-  if (!room || !room.meta) return <div className="app"><TopBar onBack={onExit} title="Online" /><p className="muted" style={{ textAlign: 'center' }}>Connecting…</p></div>;
+  if (err) return <div className="app"><TopBar onBack={onExit} title="Online" /><div className="card stack"><b>Couldn’t open the room</b><p className="small" style={{ margin: 0 }}>{err}</p><p className="hint" style={{ margin: 0 }}>Solo and Local games still work without internet.</p><button className="btn btn-gold" onClick={onRetry}>Try again</button><button className="btn" onClick={onExit}>Back</button></div></div>;
+  if (!room || !room.meta) return <div className="app"><TopBar onBack={onExit} title="Online" /><p className="muted" style={{ textAlign: 'center' }}>Connecting…</p>{slow && <p className="hint" style={{ textAlign: 'center' }}>This is taking a while. Check your internet connection{typeof navigator !== 'undefined' && navigator.onLine === false ? ' — this device looks offline' : ''}.</p>}</div>;
   if (status === 'closed') return <div className="app"><TopBar onBack={() => leave(true)} title="Online" /><div className="card stack"><b>This room has ended</b><button className="btn" onClick={() => leave(true)}>Back</button></div></div>;
   if (joined.current && !room.players[room.uid]) return <div className="app"><TopBar onBack={() => leave(true)} title="Online" /><div className="card stack"><b>You were removed from the room</b><button className="btn" onClick={() => leave(true)}>Back</button></div></div>;
   if (status === 'lobby') return <Lobby room={room} topics={topics} rulePrefs={rulePrefs} tv={room.kind === 'tv'} onLeave={() => (amHost ? room.close().then(onExit) : leave(true))}
@@ -328,7 +345,7 @@ function OnlineScreen({ start, profile, topics, rulePrefs, past, settings, onExi
       const cfg = room.lobby; const t = unpackTopic(cfg.topic).topic;
       const managers = seatsFromLobby(room, cfg);
       const rules = { ...RULE_DEFAULTS(), ...cfg.rules, slots: [...t.slots] };
-      const d = createDraft(t, managers, rules, { mode: 'online', online: { clock: cfg.clock, code: room.code }, solo: { talk: cfg.talk, level: cfg.level } });
+      const d = createDraft(t, managers, rules, { mode: 'online', online: { clock: cfg.clock, code: room.code, coverAfter: cfg.coverAfter || 60 }, solo: { talk: cfg.talk, level: cfg.level } });
       room.sent = {}; setHd(d); room.publish(d); room.setStatus('game');
     }} />;
   const d = amHost ? hd : room.state;

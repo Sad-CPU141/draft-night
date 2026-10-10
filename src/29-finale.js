@@ -92,67 +92,160 @@ function strength(sq) {
   return { att, def };
 }
 const weighted = (rng, rows, w) => { const tot = rows.reduce((a, x) => a + w(x), 0); let u = rng() * tot; for (const x of rows) { u -= w(x); if (u <= 0) return x; } return rows[rows.length - 1]; };
-// Simulate a match between managers A and B. knockout: must produce a winner.
-function simulateMatch(d, A, B, key, knockout) {
+/* ---------- match engine v2: strength → expected goals → score → timeline ----------
+   1. Strength (averages, never sums, so bigger squads don't win by default):
+      attack from forwards/midfielders' shooting, dribbling and pace; midfield from passing,
+      dribbling and physical; defence from defenders' defending; the keeper's rating. Empty
+      slots weaken a team a little.
+   2. Expected goals: 1.3 × (attack ÷ opponent defence)^1.7 × (midfield ratio)^0.5 × keeper
+      factor, clamped to 0.2–3.6. Optional home advantage: +0.15 to the home side.
+   3. The score is drawn from a Poisson distribution with those means (seeded), so the
+      stronger side usually wins but draws and upsets happen.
+   4. A timeline is built around that fixed score: every goal gets a minute, a scorer and a
+      passing move; chances that are saved, missed or blocked and moves broken up by tackles
+      fill the rest. The animation only plays this timeline, so the shown score always ends
+      on the recorded result. */
+const avgOf = (rows, fn, fallback) => (rows.length ? rows.reduce((a, x) => a + fn(x), 0) / rows.length : fallback);
+function strength2(sq, emptySlots) {
+  const by = (r) => sq.filter((p) => p.role === r);
+  const fwd = by('FWD'), mid = by('MID'), def = by('DEF'), gk = by('GK')[0];
+  const outfield = sq.filter((p) => p.role !== 'GK');
+  const attackers = fwd.length ? [...fwd, ...mid] : mid.length ? mid : outfield;
+  const att = avgOf(attackers, (p) => p.r.attrs.SHO * 0.45 + p.r.attrs.DRI * 0.25 + p.r.attrs.PAC * 0.2 + p.r.attrs.PAS * 0.1, 40);
+  const md = avgOf(mid.length ? mid : outfield, (p) => p.r.attrs.PAS * 0.5 + p.r.attrs.DRI * 0.3 + p.r.attrs.PHY * 0.2, 40);
+  const df = avgOf(def.length ? def : outfield, (p) => p.r.attrs.DEF * 0.6 + p.r.attrs.PHY * 0.25 + p.r.attrs.PAC * 0.15, 40) * (def.length ? 1 : 0.85);
+  const keeper = gk ? gk.r.attrs.DEF : 42;
+  const depth = Math.max(0.7, 1 - 0.05 * (emptySlots || 0));
+  return { att: att * depth, mid: md * depth, def: df * depth, gk: keeper };
+}
+function poisson(rng, lambda) { const L = Math.exp(-lambda); let k = 0, p = 1; do { k++; p *= rng(); } while (p > L && k < 20); return k - 1; }
+function expectedGoals(st, home) {
+  return [0, 1].map((i) => {
+    const o = st[1 - i];
+    let x = 1.3 * Math.pow(st[i].att / o.def, 1.7) * Math.pow(st[i].mid / o.mid, 0.5) * Math.pow(68 / Math.max(30, o.gk), 0.6);
+    if (home === i) x += 0.15;
+    return clamp(x, 0.2, 3.2);
+  });
+}
+// Simulate a match between managers A and B. knockout: must produce a winner. opts.home: 0 or 1.
+function simulateMatch(d, A, B, key, knockout, opts) {
   const rng = seeded(d.seed, 'match', key, A.id, B.id);
   const sq = [squad(d, A), squad(d, B)];
-  const st = sq.map(strength);
+  const empty = [A, B].map((m) => d.rules.slots.length - m.team.filter(Boolean).length);
   const notes = [];
   if (!sq[0].length || !sq[1].length) {
     const w = sq[0].length ? 0 : 1;
-    return { score: [w === 0 ? 3 : 0, w === 1 ? 3 : 0], pens: null, et: false, winner: w, events: [{ min: 0, type: 'note', text: (w === 0 ? B : A).name + ' has no players, so the match is awarded 3–0.' }], stats: { shots: [0, 0], possession: [50, 50] }, notes: ['Walkover: a team had no players.'], forfeit: true };
+    return { v: 2, score: [w === 0 ? 3 : 0, w === 1 ? 3 : 0], pens: null, et: false, winner: w, events: [{ min: 0, type: 'note', text: (w === 0 ? B : A).name + ' has no players, so the match is awarded 3–0.' }], seqs: [], stats: { shots: [0, 0], possession: [50, 50] }, notes: ['Walkover: a team had no players.'], forfeit: true, xg: [0, 0] };
   }
   sq.forEach((s, i) => { if (!s.some((p) => p.role === 'GK')) notes.push((i ? B : A).name + ' has no goalkeeper, so an outfield player goes in goal.'); });
-  const lam = [0, 1].map((i) => clamp(1.35 * Math.pow(st[i].att / st[1 - i].def, 2.2), 0.25, 4.2));
-  const events = [{ min: 0, type: 'kickoff', text: pickLine(rng, 'kickoff') }];
-  const score = [0, 0], shots = [0, 0], cards = [{}, {}]; let reds = [0, 0];
-  const minute = (m, scale) => {
-    for (let i = 0; i < 2; i++) {
-      const l = lam[i] * scale * (reds[i] ? 0.75 : 1) * (reds[1 - i] ? 1.25 : 1);
-      if (rng() < l / 90) {
-        const scorer = weighted(rng, sq[i], (p) => (p.role === 'FWD' ? 3 : p.role === 'MID' ? 1.6 : p.role === 'DEF' ? 0.5 : 0.02) * p.r.attrs.SHO);
-        const others = sq[i].filter((p) => p !== scorer);
-        const assist = others.length && rng() < 0.75 ? weighted(rng, others, (p) => p.r.attrs.PAS * (p.role === 'GK' ? 0.1 : 1)) : null;
-        score[i]++; shots[i] += 1;
-        events.push({ min: m, type: 'goal', team: i, player: scorer.name, assist: assist && assist.name, score: [...score], text: pickLine(rng, 'goal', { p: scorer.name }) + (assist ? pickLine(rng, 'assist', { a: assist.name }) : '') });
-      } else if (rng() < l / 45) { shots[i]++; if (rng() < 0.25) { const p = weighted(rng, sq[i], (x) => x.r.attrs.SHO); events.push({ min: m, type: 'chance', team: i, player: p.name, text: pickLine(rng, 'chance', { p: p.name }) }); } }
-      if (rng() < 0.011) {
-        const p = weighted(rng, sq[i], (x) => x.r.attrs.DEF + 10);
-        if (cards[i][p.name] || rng() < 0.04) { if (!reds[i]) { reds[i]++; events.push({ min: m, type: 'red', team: i, player: p.name, text: pickLine(rng, 'red', { p: p.name }) }); } }
-        else { cards[i][p.name] = 1; events.push({ min: m, type: 'yellow', team: i, player: p.name, text: pickLine(rng, 'yellow', { p: p.name }) }); }
-      }
-    }
-  };
-  for (let m = 1; m <= 45; m++) minute(m, 1);
-  events.push({ min: 45, type: 'half', score: [...score], text: pickLine(rng, 'half') });
+  const st = sq.map((s, i) => strength2(s, empty[i]));
+  const home = opts && (opts.home === 0 || opts.home === 1) ? opts.home : null;
+  const xg = expectedGoals(st, home);
+  const goals = xg.map((x) => poisson(rng, x));
   const stoppage = 1 + Math.floor(rng() * 5);
-  for (let m = 46; m <= 90 + stoppage; m++) minute(m, 1);
-  events.push({ min: 90 + stoppage, type: 'full', score: [...score], text: pickLine(rng, 'full') });
-  let et = false, pens = null;
-  if (knockout && score[0] === score[1]) {
-    et = true; events.push({ min: 91 + stoppage, type: 'et', text: pickLine(rng, 'et') });
-    for (let m = 91; m <= 120; m++) minute(m, 0.33);
-    if (score[0] === score[1]) {
-      events.push({ min: 120, type: 'pens', text: pickLine(rng, 'pens') });
-      pens = [0, 0];
-      const gk = sq.map((s) => (s.find((p) => p.role === 'GK') || { r: { attrs: { DEF: 50 } } }).r.attrs.DEF);
-      const takers = sq.map((s) => [...s].sort((a, b) => b.r.attrs.SHO - a.r.attrs.SHO));
-      for (let k = 0; k < 30; k++) {
-        for (let i = 0; i < 2; i++) {
-          const p = takers[i][k % takers[i].length];
-          const scored = rng() < clamp(0.62 + (p.r.attrs.SHO - gk[1 - i]) / 220, 0.45, 0.9);
-          if (scored) pens[i]++;
-          events.push({ min: 120, type: 'pen', team: i, player: p.name, scored, pens: [...pens], text: p.name + (scored ? ' scores!' : ' misses!') });
-        }
-        if (k >= 4 && pens[0] !== pens[1]) break;
-        if (k < 4) { const left = 4 - k; if (pens[0] > pens[1] + left || pens[1] > pens[0] + left) break; }
+  const seqs = [];
+  const pick = (rows, w) => weighted(rng, rows, w);
+  const shooterW = (p) => (p.role === 'FWD' ? 3 : p.role === 'MID' ? 1.5 : p.role === 'DEF' ? 0.4 : 0.02) * p.r.attrs.SHO;
+  const outfield = (i) => sq[i].filter((p) => p.role !== 'GK').length ? sq[i].filter((p) => p.role !== 'GK') : sq[i];
+  const keeperOf = (i) => (sq[i].find((p) => p.role === 'GK') || [...sq[i]].sort((a, b2) => b2.r.attrs.DEF - a.r.attrs.DEF)[0]).name;
+  // A passing move for team i ending with `last` on the ball.
+  const chainTo = (i, last) => {
+    const pool = outfield(i).filter((p) => p.name !== last.name);
+    const n = Math.min(pool.length, 1 + Math.floor(rng() * 3));
+    const used = new Set([last.name]); const chain = [];
+    for (let k = 0; k < n; k++) {
+      const cand = pool.filter((p) => !used.has(p.name)); if (!cand.length) break;
+      const w = (p) => (k === 0 ? (p.role === 'DEF' ? 2 : p.role === 'MID' ? 2.5 : 0.6) : (p.role === 'MID' ? 2.5 : p.role === 'FWD' ? 1.8 : 0.5)) * p.r.attrs.PAS;
+      const p = pick(cand, w); used.add(p.name); chain.push(p.name);
+    }
+    chain.push(last.name);
+    return chain;
+  };
+  const minutesUsed = new Set();
+  const minuteIn = (lo, hi) => { for (let t = 0; t < 40; t++) { const m = lo + Math.floor(rng() * (hi - lo + 1)); if (!minutesUsed.has(m)) { minutesUsed.add(m); return m; } } return lo + Math.floor(rng() * (hi - lo + 1)); };
+  const addMoves = (lo, hi, gl, scaleChances, inET) => {
+    const start = seqs.length;
+    [0, 1].forEach((i) => {
+      for (let g = 0; g < gl[i]; g++) {
+        const scorer = pick(outfield(i), shooterW);
+        const chain = chainTo(i, scorer);
+        const assist = chain.length > 1 && rng() < 0.8 ? chain[chain.length - 2] : null;
+        seqs.push({ min: minuteIn(lo, hi), team: i, kind: 'goal', chain, shooter: scorer.name, assist, keeper: keeperOf(1 - i), side: rng() < 0.5 ? -1 : 1 });
       }
+      const chances = Math.round((1 + poisson(rng, xg[i] * 2.1)) * scaleChances);
+      for (let c = 0; c < chances; c++) {
+        const shooter = pick(outfield(i), shooterW);
+        const u = rng(); const kind = u < 0.45 ? 'save' : u < 0.8 ? 'miss' : 'block';
+        const blocker = kind === 'block' ? pick(outfield(1 - i), (p) => p.r.attrs.DEF + (p.role === 'DEF' ? 30 : 0)).name : null;
+        seqs.push({ min: minuteIn(lo, hi), team: i, kind, chain: chainTo(i, shooter), shooter: shooter.name, keeper: keeperOf(1 - i), blocker, side: rng() < 0.5 ? -1 : 1 });
+      }
+    });
+    // Moves broken up in midfield: more of them for the side that wins the midfield battle.
+    const breaks = Math.round((4 + Math.floor(rng() * 4)) * scaleChances);
+    for (let k = 0; k < breaks; k++) {
+      const i = rng() < st[0].mid / (st[0].mid + st[1].mid) ? 1 : 0; // team i loses the ball
+      const carrier = pick(outfield(i), (p) => (p.role === 'MID' ? 2 : 1) * p.r.attrs.DRI);
+      const tackler = pick(outfield(1 - i), (p) => (p.role === 'DEF' ? 2 : p.role === 'MID' ? 1.5 : 0.6) * p.r.attrs.DEF);
+      seqs.push({ min: minuteIn(lo, hi), team: i, kind: rng() < 0.5 ? 'tackle' : 'intercept', chain: chainTo(i, carrier), tackler: tackler.name, side: rng() < 0.5 ? -1 : 1 });
+    }
+    if (inET) for (let k = start; k < seqs.length; k++) seqs[k].et = true;
+  };
+  addMoves(1, 90 + stoppage, goals, 1);
+  let et = false, pens = null; const etGoals = [0, 0];
+  if (knockout && goals[0] === goals[1]) {
+    et = true;
+    const extra = xg.map((x) => poisson(rng, x * 0.3));
+    etGoals[0] = extra[0]; etGoals[1] = extra[1];
+    minutesUsed.clear();
+    addMoves(91, 120, extra, 0.35, true);
+  }
+  seqs.sort((a, b2) => (a.et ? 1 : 0) - (b2.et ? 1 : 0) || a.min - b2.min);
+  const score = [goals[0] + etGoals[0], goals[1] + etGoals[1]];
+  // Commentary events, in order, with the running score on goals.
+  const events = [{ min: 0, type: 'kickoff', text: pickLine(rng, 'kickoff') }];
+  const run = [0, 0]; const cards = [{}, {}];
+  const shots = [0, 0];
+  let halfDone = false, fullDone = false, etDone = false;
+  seqs.forEach((q, idx) => {
+    if (!halfDone && q.min > 45) { halfDone = true; events.push({ min: 45, type: 'half', score: [...run], text: pickLine(rng, 'half') }); }
+    if (q.et && !fullDone) { fullDone = true; if (!halfDone) { halfDone = true; events.push({ min: 45, type: 'half', score: [...run], text: pickLine(rng, 'half') }); } events.push({ min: 90 + stoppage, type: 'full', score: [...run], text: pickLine(rng, 'full') }); }
+    if (q.et && !etDone) { etDone = true; events.push({ min: 91, type: 'et', text: pickLine(rng, 'et') }); }
+    q.i = idx;
+    if (q.kind === 'goal') {
+      run[q.team]++; shots[q.team]++;
+      events.push({ min: q.min, type: 'goal', team: q.team, player: q.shooter, assist: q.assist, score: [...run], seq: idx, text: pickLine(rng, 'goal', { p: q.shooter }) + (q.assist ? pickLine(rng, 'assist', { a: q.assist }) : '') });
+    } else if (q.kind === 'save' || q.kind === 'miss' || q.kind === 'block') {
+      shots[q.team]++;
+      const text = q.kind === 'save' ? 'Great save by ' + q.keeper + ' to deny ' + q.shooter + '!' : q.kind === 'miss' ? q.shooter + ' shoots… just wide!' : q.blocker + ' throws himself in front of ' + q.shooter + '’s shot!';
+      events.push({ min: q.min, type: 'chance', team: q.team, player: q.shooter, seq: idx, text });
+    } else {
+      const text = q.kind === 'tackle' ? 'Strong tackle from ' + q.tackler + ' to win it back.' : q.tackler + ' reads the pass and intercepts.';
+      events.push({ min: q.min, type: 'tackle', team: 1 - q.team, player: q.tackler, seq: idx, text });
+      if (rng() < 0.12) { const t = 1 - q.team; const p = q.tackler; if (cards[t][p] || rng() < 0.05) { events.push({ min: q.min, type: 'red', team: t, player: p, text: pickLine(rng, 'red', { p }) }); } else { cards[t][p] = 1; events.push({ min: q.min, type: 'yellow', team: t, player: p, text: pickLine(rng, 'yellow', { p }) }); } }
+    }
+  });
+  if (!halfDone) events.push({ min: 45, type: 'half', score: [0, 1].map((t) => seqs.filter((q) => q.kind === 'goal' && q.team === t && !q.et && q.min <= 45).length), text: pickLine(rng, 'half') });
+  if (!fullDone) events.push({ min: 90 + stoppage, type: 'full', score: [goals[0], goals[1]], text: pickLine(rng, 'full') });
+  if (et && !etDone) events.push({ min: 91, type: 'et', text: pickLine(rng, 'et') });
+  if (et && score[0] === score[1]) {
+    events.push({ min: 120, type: 'pens', text: pickLine(rng, 'pens') });
+    pens = [0, 0];
+    const gkr = sq.map((s) => (s.find((p) => p.role === 'GK') || { r: { attrs: { DEF: 50 } } }).r.attrs.DEF);
+    const takers = sq.map((s) => [...s].sort((a, b2) => b2.r.attrs.SHO - a.r.attrs.SHO));
+    for (let k = 0; k < 30; k++) {
+      for (let i = 0; i < 2; i++) {
+        const p = takers[i][k % takers[i].length];
+        const scored = rng() < clamp(0.62 + (p.r.attrs.SHO - gkr[1 - i]) / 220, 0.45, 0.9);
+        if (scored) pens[i]++;
+        events.push({ min: 120, type: 'pen', team: i, player: p.name, scored, pens: [...pens], keeper: keeperOf(1 - i), side: rng() < 0.5 ? -1 : 1, text: p.name + (scored ? ' scores!' : ' misses!') });
+      }
+      if (k >= 4 && pens[0] !== pens[1]) break;
+      if (k < 4) { const left = 4 - k; if (pens[0] > pens[1] + left || pens[1] > pens[0] + left) break; }
     }
   }
   const winner = score[0] !== score[1] ? (score[0] > score[1] ? 0 : 1) : pens ? (pens[0] > pens[1] ? 0 : 1) : null;
-  const total = shots[0] + shots[1] || 1;
-  const poss0 = clamp(Math.round(50 + (st[0].att - st[1].att) / 2 + (rng() - 0.5) * 8), 30, 70);
-  return { score, et, pens, winner, events, stats: { shots, possession: [poss0, 100 - poss0], shotShare: shots[0] / total }, notes };
+  const poss0 = clamp(Math.round(50 + (st[0].mid - st[1].mid) * 0.8 + (rng() - 0.5) * 6), 30, 70);
+  return { v: 2, score, et, pens, winner, events, seqs, stats: { shots, possession: [poss0, 100 - poss0] }, notes, xg: xg.map((x) => Math.round(x * 100) / 100), stoppage, home };
 }
 
 /* ---------- bracket ---------- */
@@ -245,7 +338,7 @@ function decideMatchup(d, m, mode, fin) {
   return { winner: w.id, why: w.name + ' wins on the combined score (' + Math.round((w === A ? total : 1 - total) * 100) + '%).', detail };
 }
 const finaleMode = (d) => { const f = (d.rules && d.rules.finale) || {}; const m = f.mode || 'vote'; return !isFootball(d.topic) && (m === 'sim' || m === 'combined') ? 'bracket' : m; };
-const FINALE_DEFAULTS = { mode: 'vote', weight: 60, speed: 'normal', commentary: true, tiebreak: 'rating' };
+const FINALE_DEFAULTS = { mode: 'vote', weight: 60, speed: 'normal', commentary: true, tiebreak: 'rating', home: false };
 
 /* ---------- finale state, stored on the draft as d.finale ----------
    { mode, bracket: { rounds, champion }, champion, startedAt }
@@ -294,7 +387,10 @@ const votingDone = (d, m) => matchVoters(d, m).every((p) => hasMatchVote(m, p.id
 function playMatchup(d, r, i) {
   const m = getMatchup(d, r, i);
   if (!m.a || !m.b || m.match || m.winner) return d;
-  return withMatchup(d, r, i, { match: simulateMatch(d, teamOf(d, m.a), teamOf(d, m.b), m.id, true) });
+  const A = teamOf(d, m.a), B = teamOf(d, m.b);
+  let home = null;
+  if (finCfg(d).home) { const ra = teamRating(d, A).rating, rb = teamRating(d, B).rating; home = ra >= rb ? 0 : 1; }
+  return withMatchup(d, r, i, { match: simulateMatch(d, A, B, m.id, true, { home }) });
 }
 function resolveMatchup(d, r, i) {
   const m = getMatchup(d, r, i);

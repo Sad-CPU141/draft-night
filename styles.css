@@ -1,4 +1,4 @@
-/* Draft Night e1729e2c39 — built from src/styles.css */
+/* Draft Night 246f6228cc — built from src/styles.css */
 /* Layout: one phone-width column, a stage-lit backdrop, the auction screen as a full-height console with a sticky gavel bar. */
 :root{
   --ink:#0f0c21; --stage:#19153a; --panel:#221d47; --panel2:#2c2659; --line:#3d3672;
@@ -279,8 +279,12 @@ section.card h3{font-size:21px}
 .mode .ms{font-size:12px;font-weight:700;color:var(--muted);line-height:1.2}
 .mode.solo{border-color:var(--gold);background:linear-gradient(165deg,color-mix(in srgb,var(--gold) 22%,var(--panel)),var(--panel))}
 .mode.local{border-color:#3d8bff;background:linear-gradient(165deg,color-mix(in srgb,#3d8bff 22%,var(--panel)),var(--panel))}
-.mode.online{opacity:.55;border-style:dashed}
-.mode.online .ms{color:var(--gold)}
+.mode.online{border-color:#2fd17c;background:linear-gradient(165deg,color-mix(in srgb,#2fd17c 22%,var(--panel)),var(--panel))}
+.mode{cursor:pointer;transition:transform .12s,box-shadow .15s,filter .15s}
+.mode:hover{filter:brightness(1.12);box-shadow:0 6px 18px rgba(0,0,0,.35)}
+.mode:active{transform:scale(.96);filter:brightness(.95)}
+.mode:focus-visible{outline:3px solid var(--text);outline-offset:3px}
+.mode:disabled,.mode[aria-disabled="true"]{opacity:.45;filter:grayscale(.6);cursor:not-allowed;box-shadow:none}
 .soon{text-align:center;margin:-4px 0 0}
 .botrow{display:flex;align-items:center;gap:10px;padding:8px 10px;border-radius:14px;background:var(--stage);border-left:6px solid var(--c)}
 .botrow .be{font-size:26px;width:36px;text-align:center}
@@ -484,3 +488,41 @@ input[type=range]{width:100%;accent-color:var(--gold);min-height:32px}
 .tvmode .timernum{font-size:48px}
 .tvmode .actions{display:none}
 @media (min-width:900px){.tvmode .auction .paused{display:grid;grid-template-columns:1.2fr 1fr;gap:20px;align-items:center}}
+
+/* ---------- tabs, rules summary, motion ---------- */
+.tabs{display:flex;gap:6px;overflow-x:auto;padding-bottom:4px;scrollbar-width:none;position:sticky;top:0;z-index:5;background:var(--ink);padding-top:4px}
+.tabs::-webkit-scrollbar{display:none}
+.tab{flex:none;min-height:40px;padding:6px 14px;border-radius:999px;border:2px solid var(--line);background:var(--panel);font-family:var(--cond);font-weight:800;font-size:15px;letter-spacing:.03em;display:flex;align-items:center;gap:6px;white-space:nowrap}
+.tab.on{background:var(--gold);color:var(--gold-ink);border-color:var(--gold)}
+.tab:focus-visible{outline:3px solid var(--gold);outline-offset:2px}
+.tabcount{font-size:11px;font-weight:800;background:rgba(0,0,0,.25);border-radius:99px;padding:1px 6px}
+.tab.on .tabcount{background:rgba(0,0,0,.15)}
+.rulelist{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:6px;font-size:14px}
+.rulelist li{display:flex;gap:8px;align-items:flex-start;line-height:1.35}
+.duo-note{grid-column:1/-1;margin:2px 0 0;text-align:center}
+.mgr .outbtn{right:46px}
+html[data-motion="reduce"] *,html[data-motion="reduce"] *::before,html[data-motion="reduce"] *::after{animation:none!important;transition:none!important}
+.tvmode .app{zoom:var(--tvzoom,1)}
+
+/* ---------- animated match ---------- */
+.pitchwrap{border-radius:16px;overflow:hidden;border:2px solid var(--line);background:#1f7a3a}
+.pitchsvg{display:block;width:100%;height:auto}
+.pitchsvg .plabel{opacity:0;paint-order:stroke;stroke:rgba(0,0,0,.6);stroke-width:.5px}
+.pitchsvg .plabel.on{opacity:1}
+@media (min-width:700px){.pitchsvg .plabel{opacity:.85}}
+.tvmode .pitchsvg .plabel{opacity:.9}
+.mctrl{display:flex;flex-wrap:wrap;gap:6px;justify-content:center}
+.mctrl .btn{width:auto;min-width:52px}
+.tvmode .matchview{display:grid;grid-template-columns:2fr 1fr;gap:12px}
+.tvmode .matchview .scoreboard,.tvmode .matchview .mctrl,.tvmode .matchview .msummary{grid-column:1/-1}
+.tvmode .matchview .mfeed{max-height:none}
+
+/* ---------- TV switch ---------- */
+.tvfab{position:fixed;right:12px;bottom:calc(112px + env(safe-area-inset-bottom,0px));z-index:35;width:48px;height:48px;border-radius:50%;border:2px solid var(--line);background:var(--panel);font-size:22px;box-shadow:0 6px 18px rgba(0,0,0,.4)}
+.tvfab:focus-visible{outline:3px solid var(--gold)}
+.tvbar{position:fixed;top:10px;right:10px;z-index:60;display:flex;gap:8px}
+.tvbar .pillbtn{background:rgba(34,29,71,.92)}
+.tvmode .resactions,.tvmode .tvfab{display:none}
+
+.tvmode .topbar button{visibility:hidden}
+.tvmode .tvbar button{visibility:visible}

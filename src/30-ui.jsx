@@ -135,16 +135,46 @@ function maxBid(m, rules) {
 const currentItem = (d) => (d.queue.length ? d.items[d.queue[0]] : null);
 const nextAmount = (d) => (d.bid ? d.bid.amount + d.rules.inc : d.rules.minBid);
 
+/* ---------- dropping out of an item ("I'm out") ----------
+   Withdrawals are part of the game state, keyed to the item on the block (d.reveal),
+   so they reset by themselves when the next item comes up. A withdrawn team can't bid
+   on this item again by any route; a bid it already made still stands.
+   ENDING RULE: an item ends early when nobody except the current leader can still bid
+   (it sells to the leader at their bid), or when nobody at all can bid and there's no
+   bid (it goes unsold). Otherwise the clock / auctioneer decides as before. */
+const outIds = (d) => (d.out && d.out.reveal === d.reveal ? d.out.ids : []);
+const isOut = (d, id) => outIds(d).includes(id);
+const hasBidOnItem = (d, id) => !!((d.bid && d.bid.leaderId === id) || (d.bids || []).some((b) => b && b.leaderId === id));
+const mustBidOn = (d) => !!(d.rules && d.rules.mustBid);
+// "Require every manager to bid": a team that can still afford a bid and hasn't bid on this item owes one.
+function owesBid(d, m) { return mustBidOn(d) && !hasBidOnItem(d, m.id) && canBid(d, m, nextAmount(d)); }
+const owing = (d) => (d.phase === 'auction' && !d.pending ? d.managers.filter((m) => owesBid(d, m)) : []);
+function withdrawProblem(d, id) {
+  const m = d.managers.find((x) => x.id === id);
+  if (!m || d.phase !== 'auction' || !currentItem(d)) return 'There’s no item up right now.';
+  if (isOut(d, id)) return 'Already out on this item.';
+  if (owesBid(d, m)) return 'Require every manager to bid is on: bid at least once on this item before dropping out.';
+  return null;
+}
+function withdraw(d, id) { return withdrawProblem(d, id) ? d : { ...d, out: { reveal: d.reveal, ids: [...outIds(d), id] } }; }
+// 'sell' | 'skip' | null — whether the item should end right now.
+function auctionEnd(d) {
+  if (d.phase !== 'auction' || d.pending || !currentItem(d)) return null;
+  if (d.bid) return d.managers.some((m) => m.id !== d.bid.leaderId && canBid(d, m, nextAmount(d))) ? null : 'sell';
+  return d.managers.some((m) => canBid(d, m, d.rules.minBid)) ? null : 'skip';
+}
+
 // Can this manager bid `amount` on the current item?
 function canBid(d, m, amount) {
   const item = currentItem(d);
-  if (!item || isFull(m) || d.pending || d.phase !== 'auction' || frozenNow(d, m.id)) return false;
+  if (!item || isFull(m) || d.pending || d.phase !== 'auction' || frozenNow(d, m.id) || isOut(d, m.id)) return false;
   if (assignSlot(m, item, d.rules.slots) < 0) return false;
   return amount >= d.rules.minBid && amount <= maxBid(m, d.rules);
 }
 // Why a manager can't bid (for the button label).
 function bidBlocker(d, m) {
   const item = currentItem(d);
+  if (isOut(d, m.id)) return 'Out ✋';
   if (isFull(m)) return 'Team full';
   if (frozenNow(d, m.id)) return 'Frozen 🧊';
   if (item && assignSlot(m, item, d.rules.slots) < 0) return 'No ' + (item.pos || 'open') + ' slot';
@@ -236,6 +266,7 @@ function createDraft(topic, managers, rules, extra) {
 // opts.double: play a Double Bid card — `amount` is what you pay, it counts as twice that.
 function placeBid(d, managerId, amount, opts) {
   const m = d.managers.find((x) => x.id === managerId);
+  if (isOut(d, managerId)) return d; // dropped out of this item: no more bids, by any route
   if (opts && opts.double) {
     if (doubleProblem(d, managerId, amount)) return d;
     return { ...d, cards: removeCard(d.cards, managerId, 'double'), bids: [...d.bids, d.bid], bid: { amount: amount * 2, pay: amount, leaderId: managerId, double: true } };
@@ -466,6 +497,7 @@ function TeamsSheet({ d, onClose }) {
     <Sheet onClose={onClose}>
       <div className="stack">
         <div className="row"><h2 className="display grow" style={{ fontSize: 30 }}>Teams so far</h2><button className="iconbtn" onClick={onClose} aria-label="Close">✕</button></div>
+        <details className="card"><summary className="label">📜 Rules in play</summary><RulesSummary rules={d.rules} opts={{ teams: !!d.teamMode, clock: d.mode === 'online' ? (d.online || {}).clock : d.mode === 'solo' ? (d.solo || {}).clock : 0 }} /><p className="hint" style={{ margin: 0 }}>Rules are locked once a draft starts.</p></details>
         {d.managers.map((m) => (
           <div className="tteam" key={m.id} style={mStyle(m)}>
             <div className="row" style={{ marginBottom: 4 }}>
@@ -518,7 +550,7 @@ function Home({ draft, past, onNew, onSolo, onOnline, onResume, onTopics, onPast
         <button className="btn" onClick={onTopics}>Topics</button>
         <button className="btn" onClick={onPast}>Past drafts{past.length ? ' (' + past.length + ')' : ''}</button>
         <button className="btn" onClick={onPlayers}>Players &amp; stats</button>
-        <button className="btn btn-ghost" onClick={onSettings}>Settings, sound &amp; backup</button>
+        <button className="btn btn-ghost" onClick={onSettings}>Rules &amp; settings</button>
       </div>
       {showInstall && (
         <div className="card row installcard">
@@ -1048,107 +1080,141 @@ function PctField({ id, label, value, onChange, max }) {
   return <div className="field grow"><label htmlFor={id}>{label}</label><Stepper id={id} value={value} min={0} max={max} onChange={onChange} /></div>;
 }
 
-function SetupRules({ topic, managers, rules, setRules, onBack, onStart, startLabel = 'Start the draft', title = '3 · Rules', teamSummary, onEditTeams, onReset }) {
+// Plain-language list of the rules in play. Used on the Review tab, in online lobbies and during a game.
+function rulesLines(rules, opts) {
+  const tw = twistRules(rules); const fin = { ...FINALE_DEFAULTS, ...(rules.finale || {}) };
+  const per = opts && opts.teams ? 'team' : 'manager';
+  const L = [];
+  L.push(['💵', money(rules.budget) + ' budget per ' + per + ' · ' + (rules.slots || []).length + ' slots' + (rules.slots && rules.slots.length ? ' (' + rules.slots.join(', ') + ')' : '')]);
+  L.push(['🔨', 'Bids start at ' + money(rules.minBid) + ', go up by ' + money(rules.inc) + (opts && opts.clock ? ' · ' + opts.clock + 's bid clock' : rules.timer ? ' · ' + rules.timer + 's bid timer' : ' · auctioneer taps Sold')]);
+  L.push(['✋', rules.mustBid ? 'Require every manager to bid: ON — everyone must bid once on each item before dropping out' : 'Anyone can drop out of an item without bidding']);
+  L.push(['🧭', rules.order === 'nominate' ? 'Nomination: teams take turns picking what goes up' : rules.order === 'saved' ? 'Items come up in topic order' : 'Items come up in random order']);
+  L.push(['↩️', rules.noBids === 'back' ? 'Unbid items go to the back of the queue' : 'Unbid items are skipped (leftovers become free picks)']);
+  if (rules.mustFill) L.push(['🧮', 'You must keep enough money to fill your team']);
+  L.push(['🃏', tw.chaos.on ? 'Chaos Cards: ' + tw.chaos.count + ' per ' + per + ' — ' + CARD_TYPES.filter((c) => tw.chaos[c]).map((c) => CARD_INFO[c].name).join(', ') : 'Chaos Cards: off']);
+  L.push(['❓', tw.mystery.on ? 'Mystery items: 1 in ' + tw.mystery.every : 'Mystery items: off']);
+  L.push(['✨', tw.rarity.on ? 'Rarity: ' + (100 - tw.rarity.rare - tw.rarity.legendary) + '% common · ' + tw.rarity.rare + '% rare · ' + tw.rarity.legendary + '% legendary' : 'Rarity: off']);
+  L.push(['🤝', tw.trades.on ? 'Trade window: ' + tw.trades.minutes + ' min' + (tw.trades.money ? ', money allowed' : '') : 'Trade window: off']);
+  L.push(['🏆', 'Winner: ' + { vote: 'group vote', bracket: 'head-to-head vote bracket' + (fin.tiebreak === 'revote' ? ' (ties: vote again once)' : ' (ties: higher-rated team)'), sim: 'match simulator knockout', combined: 'combined finale ' + fin.weight + '% match / ' + (100 - fin.weight) + '% votes' }[fin.mode] + (fin.home && (fin.mode === 'sim' || fin.mode === 'combined') ? ' · home advantage for the higher seed' : '')]);
+  return L;
+}
+function RulesSummary({ rules, opts }) {
+  return <ul className="rulelist">{rulesLines(rules, opts).map(([e, t]) => <li key={t}><span aria-hidden="true">{e}</span> {t}</li>)}</ul>;
+}
+
+const RULE_TABS = [['general', 'General'], ['auction', 'Auction & bidding'], ['chaos', 'Chaos & surprises'], ['teams', 'Teams & trading'], ['winner', 'Winner'], ['review', 'Review']];
+function SetupRules({ topic, managers, rules, setRules, onBack, onStart, startLabel = 'Start the draft', title = '3 · Rules', teamSummary, onEditTeams, onReset, defaultsMode, clockNote }) {
   const [slotTxt, setSlotTxt] = useState(rules.slots.join(', '));
   const [askReset, setAskReset] = useState(false);
+  const [tab, setTab] = useState('general');
   const slots = parseSlots(slotTxt);
   const tw = twistRules(rules);
   const set = (p) => setRules({ ...rules, ...p });
   const setTw = (k, p) => setRules({ ...rules, [k]: { ...tw[k], ...p } });
-  const needed = rules.minBid * slots.length;
+  const needed = rules.minBid * Math.max(1, slots.length);
   const problems = [];
-  if (!slots.length) problems.push('Add at least one slot.');
-  if (rules.budget < needed) problems.push('A budget of ' + money(rules.budget) + " can't fill " + slots.length + ' slots at ' + money(rules.minBid) + ' each. Raise it to at least ' + money(needed) + '.');
+  if (!defaultsMode && !slots.length) problems.push('Add at least one slot.');
+  if (!defaultsMode && rules.budget < needed) problems.push('A budget of ' + money(rules.budget) + " can't fill " + slots.length + ' slots at ' + money(rules.minBid) + ' each. Raise it to at least ' + money(needed) + '.');
   if (tw.chaos.on && !CARD_TYPES.some((c) => tw.chaos[c])) problems.push('Chaos Cards are on but every card type is switched off. Turn one on, or switch Chaos Cards off.');
   if (tw.rarity.on && tw.rarity.rare + tw.rarity.legendary > 100) problems.push('Rare + Legendary can’t be more than 100%.');
-  if (topic.items.length < slots.length * managers.length) problems.push('Heads up: ' + topic.items.length + ' items for ' + slots.length * managers.length + ' slots. Some teams will finish short.');
-  if (tw.mystery.on && topic.items.length < tw.mystery.every) problems.push('Heads up: this topic has fewer than ' + tw.mystery.every + ' items, so there won’t be any mystery items.');
+  if (!defaultsMode && topic.items.length < slots.length * managers.length) problems.push('Heads up: ' + topic.items.length + ' items for ' + slots.length * managers.length + ' slots. Some teams will finish short.');
+  if (!defaultsMode && tw.mystery.on && topic.items.length < tw.mystery.every) problems.push('Heads up: this topic has fewer than ' + tw.mystery.every + ' items, so there won’t be any mystery items.');
   const blocking = problems.filter((p) => !p.startsWith('Heads up'));
-  const posMissing = [...new Set(topic.items.map((i) => i.pos).filter((p) => p && !slots.some((s) => norm(s) === norm(p))))];
+  const posMissing = defaultsMode ? [] : [...new Set(topic.items.map((i) => i.pos).filter((p) => p && !slots.some((s) => norm(s) === norm(p))))];
   const common = 100 - tw.rarity.rare - tw.rarity.legendary;
-  const mysteryCount = tw.mystery.on ? Math.floor(topic.items.length / Math.max(2, tw.mystery.every)) : 0;
+  const mysteryCount = tw.mystery.on && !defaultsMode ? Math.floor(topic.items.length / Math.max(2, tw.mystery.every)) : 0;
+  const teams = !!(teamSummary && teamSummary.teams);
+  const fin = { ...FINALE_DEFAULTS, ...(rules.finale || {}) };
+  const setF = (p) => set({ finale: { ...fin, ...p } });
+  const foot = defaultsMode || isFootball(topic);
+  const onCount = { chaos: [tw.chaos.on, tw.mystery.on, tw.rarity.on].filter(Boolean).length, teams: [tw.trades.on].filter(Boolean).length };
   return (
     <div className="app">
       <TopBar onBack={onBack} title={title} />
-      <div><p className="eyebrow">{topic.emoji} {topic.name}</p><h2 className="display">House rules</h2><p className="hint">Changes apply to new drafts only. A game in progress keeps its rules.</p></div>
+      <div><p className="eyebrow">{defaultsMode ? 'Your defaults for new games' : topic.emoji + ' ' + topic.name}</p><h2 className="display">House rules</h2><p className="hint">{defaultsMode ? 'New games start with these. You can still change them when setting up a game.' : 'Changes apply to this new draft. A game in progress keeps its rules.'} Optional extras are off until you switch them on.</p></div>
+      <div className="tabs" role="tablist" aria-label="Rule sections">
+        {RULE_TABS.map(([k, label]) => <button key={k} role="tab" aria-selected={tab === k} className={'tab' + (tab === k ? ' on' : '')} onClick={() => setTab(k)}>{label}{onCount[k] ? <span className="tabcount">{onCount[k]} on</span> : null}</button>)}
+      </div>
 
-      <RuleSection id="rs-basic" emoji="💵" title="Money & slots" summary={money(rules.budget) + ' budget · min ' + money(rules.minBid) + ' · +' + money(rules.inc) + ' · ' + slots.length + ' slots'} open>
-        <div className="field"><label htmlFor="r-budget">Starting budget{teamSummary && teamSummary.teams ? ' (per team)' : ''}</label><Stepper id="r-budget" prefix="$" value={rules.budget} min={1} max={999} onChange={(v) => set({ budget: v })} /></div>
-        <div className="row"><div className="field grow"><label htmlFor="r-min">Minimum bid</label><Stepper id="r-min" prefix="$" value={rules.minBid} min={1} max={99} onChange={(v) => set({ minBid: v })} /></div></div>
-        <div className="field"><label htmlFor="r-inc">Bid increment</label><Stepper id="r-inc" prefix="$" value={rules.inc} min={1} max={99} onChange={(v) => set({ inc: v })} /></div>
-        <div className="field">
+      {tab === 'general' && <div className="stack" role="tabpanel">
+        <div className="field"><label htmlFor="r-budget">Starting budget{teams ? ' (per team)' : ''}</label><Stepper id="r-budget" prefix="$" value={rules.budget} min={1} max={999} onChange={(v) => set({ budget: v })} /><p className="hint">What each {teams ? 'team' : 'manager'} has to spend on the whole draft.</p></div>
+        {!defaultsMode && <div className="field">
           <label htmlFor="r-slots">Slots per team ({slots.length})</label>
           <input id="r-slots" className="input" value={slotTxt} onChange={(e) => { setSlotTxt(e.target.value); const p = parseSlots(e.target.value); if (p.length) set({ slots: p }); }} />
+          <p className="hint">How many items each team ends up with. FLEX takes anything.</p>
           {posMissing.length > 0 && <p className="hint">No slot for {posMissing.join(', ')}. Those items can go in any open slot.</p>}
-        </div>
-        <div className="field"><span className="label">Bid timer</span><Seg label="Bid timer" value={rules.timer} options={[[0, 'Off'], [10, '10s'], [15, '15s'], [30, '30s']]} onChange={(v) => set({ timer: v })} />
-          {rules.timer > 0 && <p className="hint">Resets on every bid. When it runs out with a leader, the item sells automatically. (Solo always uses its own bid clock.)</p>}</div>
-        <Toggle on={rules.mustFill} onChange={(v) => set({ mustFill: v })} title="Must be able to fill your team" sub={'Max bid keeps ' + money(rules.minBid) + ' for every other empty slot.'} />
-        <div className="field"><span className="label">Items with no bids</span><Seg label="No bids" value={rules.noBids} options={[['skip', 'Skip them'], ['back', 'Back of queue']]} onChange={(v) => set({ noBids: v })} /></div>
-      </RuleSection>
-
-      <RuleSection id="rs-flow" emoji="🧭" title="Draft flow" summary={(rules.order === 'nominate' ? 'Nomination' : rules.order === 'saved' ? 'Topic order' : 'Random order') + ' · trades ' + (tw.trades.on ? tw.trades.minutes + ' min' + (tw.trades.money ? ' + money' : '') : 'off')}>
-        <div className="field"><span className="label">Draft order</span><Seg label="Draft order" value={rules.order} options={[['random', 'Random'], ['nominate', 'Nomination'], ['saved', 'Topic order']]} onChange={(v) => set({ order: v })} />
+        </div>}
+        <div className="field"><span className="label">Item order</span><Seg label="Draft order" value={rules.order} options={[['random', 'Random'], ['nominate', 'Nomination'], ['saved', 'Topic order']]} onChange={(v) => set({ order: v })} />
           <p className="hint">{rules.order === 'nominate' ? 'Teams take turns choosing which item goes up next.' : rules.order === 'saved' ? 'Items come up in the order saved in the topic.' : 'Items come up in a random order.'}</p></div>
-        <Toggle on={tw.trades.on} onChange={(v) => setTw('trades', { on: v })} title="Trade window after the draft" sub="1-for-1 trades. Both teams must accept." />
-        {tw.trades.on && <>
+        <Toggle on={rules.mustFill} onChange={(v) => set({ mustFill: v })} title="Must be able to fill your team" sub={'Your highest bid always leaves ' + money(rules.minBid) + ' for each other empty slot.'} />
+      </div>}
+
+      {tab === 'auction' && <div className="stack" role="tabpanel">
+        <div className="field"><label htmlFor="r-min">Minimum bid</label><Stepper id="r-min" prefix="$" value={rules.minBid} min={1} max={99} onChange={(v) => set({ minBid: v })} /><p className="hint">The opening price for every item.</p></div>
+        <div className="field"><label htmlFor="r-inc">Bid increment</label><Stepper id="r-inc" prefix="$" value={rules.inc} min={1} max={99} onChange={(v) => set({ inc: v })} /><p className="hint">How much each tap raises the price.</p></div>
+        <div className="field"><span className="label">Bid timer (Local games)</span><Seg label="Bid timer" value={rules.timer} options={[[0, 'Off'], [10, '10s'], [15, '15s'], [30, '30s']]} onChange={(v) => set({ timer: v })} />
+          <p className="hint">{rules.timer > 0 ? 'Restarts on every bid. When it runs out the item sells to the leader.' : 'Off: the auctioneer taps Sold.'} {clockNote || 'Solo and Online games always use a bid clock (set on their own setup screens).'}</p></div>
+        <Toggle on={!!rules.mustBid} onChange={(v) => set({ mustBid: v })} title="Require every manager to bid" sub="Everyone who can afford it must bid at least once on each item before they can tap “I’m out”. The item can’t close until they have. Managers who can’t afford the next bid, or have no slot for it, are excused." />
+        <div className="field"><span className="label">Items nobody bids on</span><Seg label="No bids" value={rules.noBids} options={[['skip', 'Skip them'], ['back', 'Back of queue']]} onChange={(v) => set({ noBids: v })} /></div>
+        <div className="card stack-sm" style={{ background: 'var(--stage)' }}>
+          <b className="small">How “I’m out” works</b>
+          <p className="hint" style={{ margin: 0 }}>Tapping “I’m out” drops you out of the current item only: you can’t bid on it again, and you’re back in for the next item. A bid you already made still stands. As soon as nobody but the leader can still bid, the item sells straight away; if nobody can bid at all, it goes unsold. Bots drop out when the price passes what they’ll pay.</p>
+        </div>
+      </div>}
+
+      {tab === 'chaos' && <div className="stack" role="tabpanel">
+        <p className="hint">Optional twists. All off unless you switch them on.</p>
+        <RuleSection id="rs-chaos" emoji="🃏" title="Chaos Cards" on={tw.chaos.on} onToggle={(v) => setTw('chaos', { on: v })} summary={tw.chaos.on ? tw.chaos.count + ' per ' + (teams ? 'team' : 'manager') + ' · ' + CARD_TYPES.filter((c) => tw.chaos[c]).map((c) => CARD_INFO[c].name).join(', ') : 'Off'}>
+          <div className="field"><label htmlFor="r-cards">Cards per {teams ? 'team' : 'manager'}</label><Stepper id="r-cards" value={tw.chaos.count} min={1} max={5} onChange={(v) => setTw('chaos', { count: v })} />
+            {teams ? <p className="hint">In team games, cards belong to the team, not each player.</p> : null}</div>
+          {CARD_TYPES.map((c) => <Toggle key={c} on={tw.chaos[c]} onChange={(v) => setTw('chaos', { [c]: v })} title={CARD_INFO[c].emoji + ' ' + CARD_INFO[c].name} sub={CARD_INFO[c].text + (c === 'steal' ? money(rules.inc) + '.' : '')} />)}
+        </RuleSection>
+        <RuleSection id="rs-mys" emoji="❓" title="Mystery items" on={tw.mystery.on} onToggle={(v) => setTw('mystery', { on: v })} summary={tw.mystery.on ? '1 in ' + tw.mystery.every + (defaultsMode ? '' : ' · ' + mysteryCount + ' in this topic') : 'Off'}>
+          <div className="field"><span className="label">How often</span><Seg label="Mystery frequency" value={tw.mystery.every} options={[[5, '1 in 5'], [8, '1 in 8'], [12, '1 in 12']]} onChange={(v) => setTw('mystery', { every: v })} /></div>
+          <p className="hint">Mystery items are auctioned face down and fit any open slot. You find out what you bought after it sells.</p>
+        </RuleSection>
+        <RuleSection id="rs-rar" emoji="✨" title="Rarity" on={tw.rarity.on} onToggle={(v) => setTw('rarity', { on: v })} summary={tw.rarity.on ? common + '% Common · ' + tw.rarity.rare + '% Rare · ' + tw.rarity.legendary + '% Legendary' : 'Off'}>
+          <div className="row"><PctField id="r-rare" label="Rare %" value={tw.rarity.rare} max={100 - tw.rarity.legendary} onChange={(v) => setTw('rarity', { rare: v })} /><PctField id="r-leg" label="Legendary %" value={tw.rarity.legendary} max={100 - tw.rarity.rare} onChange={(v) => setTw('rarity', { legendary: v })} /></div>
+          <p className="hint">Some items are marked Rare or Legendary, with a special reveal and an award for collecting them. Common is the rest ({common}%). It doesn’t change prices.</p>
+        </RuleSection>
+      </div>}
+
+      {tab === 'teams' && <div className="stack" role="tabpanel">
+        {teamSummary && <div className="card stack-sm"><b>👥 {teamSummary.text}</b><p className="hint" style={{ margin: 0 }}>{teamSummary.detail} Teams share one budget and bid as one.</p>
+          {onEditTeams && <button className="btn btn-sm" style={{ alignSelf: 'flex-start' }} onClick={onEditTeams}>Edit players &amp; teams</button>}</div>}
+        <RuleSection id="rs-trade" emoji="🤝" title="Trade window after the draft" on={tw.trades.on} onToggle={(v) => setTw('trades', { on: v })} summary={tw.trades.on ? tw.trades.minutes + ' min' + (tw.trades.money ? ' · money allowed' : '') : 'Off'}>
           <div className="field"><span className="label">Trade window</span><Seg label="Trade window length" value={tw.trades.minutes} options={[[1, '1 min'], [3, '3 min'], [5, '5 min'], [10, '10 min']]} onChange={(v) => setTw('trades', { minutes: v })} /></div>
           <Toggle on={tw.trades.money} onChange={(v) => setTw('trades', { money: v })} title="Money in trades" sub="A team can add cash to sweeten a 1-for-1 trade." />
-        </>}
-      </RuleSection>
-
-      <RuleSection id="rs-chaos" emoji="🃏" title="Chaos Cards" on={tw.chaos.on} onToggle={(v) => setTw('chaos', { on: v })} summary={tw.chaos.on ? tw.chaos.count + ' per ' + (teamSummary && teamSummary.teams ? 'team' : 'manager') + ' · ' + CARD_TYPES.filter((c) => tw.chaos[c]).map((c) => CARD_INFO[c].name).join(', ') : 'Off'}>
-        <div className="field"><label htmlFor="r-cards">Cards per {teamSummary && teamSummary.teams ? 'team' : 'manager'}</label><Stepper id="r-cards" value={tw.chaos.count} min={1} max={5} onChange={(v) => setTw('chaos', { count: v })} />
-          {teamSummary && teamSummary.teams ? <p className="hint">In team games, cards belong to the team, not each player.</p> : null}</div>
-        {CARD_TYPES.map((c) => (
-          <Toggle key={c} on={tw.chaos[c]} onChange={(v) => setTw('chaos', { [c]: v })} title={CARD_INFO[c].emoji + ' ' + CARD_INFO[c].name} sub={CARD_INFO[c].text + (c === 'steal' ? money(rules.inc) + '.' : '')} />
-        ))}
-      </RuleSection>
-
-      <RuleSection id="rs-mys" emoji="❓" title="Mystery items" on={tw.mystery.on} onToggle={(v) => setTw('mystery', { on: v })} summary={tw.mystery.on ? '1 in ' + tw.mystery.every + ' · ' + mysteryCount + ' in this topic' : 'Off'}>
-        <div className="field"><span className="label">How often</span><Seg label="Mystery frequency" value={tw.mystery.every} options={[[5, '1 in 5'], [8, '1 in 8'], [12, '1 in 12']]} onChange={(v) => setTw('mystery', { every: v })} /></div>
-        <p className="hint">Mystery items are auctioned face down and fit any open slot. You find out what you bought after it sells.</p>
-      </RuleSection>
-
-      <RuleSection id="rs-rar" emoji="✨" title="Rarity" on={tw.rarity.on} onToggle={(v) => setTw('rarity', { on: v })} summary={tw.rarity.on ? common + '% Common · ' + tw.rarity.rare + '% Rare · ' + tw.rarity.legendary + '% Legendary' : 'Off'}>
-        <div className="row"><PctField id="r-rare" label="Rare %" value={tw.rarity.rare} max={100 - tw.rarity.legendary} onChange={(v) => setTw('rarity', { rare: v })} /><PctField id="r-leg" label="Legendary %" value={tw.rarity.legendary} max={100 - tw.rarity.rare} onChange={(v) => setTw('rarity', { legendary: v })} /></div>
-        <p className="hint">Common is the rest ({common}%). Rarity is just for show: it doesn’t change prices.</p>
-      </RuleSection>
-
-      {(() => {
-        const fin = { ...FINALE_DEFAULTS, ...(rules.finale || {}) };
-        const setF = (p) => set({ finale: { ...fin, ...p } });
-        const foot = isFootball(topic);
-        const label = { vote: 'Group vote', bracket: 'Head-to-head bracket', sim: 'Match simulator', combined: 'Combined finale' }[fin.mode];
-        return (
-          <RuleSection id="rs-win" emoji="🏆" title="Winner selection" summary={label + (fin.mode === 'combined' ? ' · ' + fin.weight + '% match / ' + (100 - fin.weight) + '% votes' : '')}>
-            <div className="field"><span className="label">How the champion is chosen</span>
-              <Seg label="Winner selection" value={fin.mode} options={[['vote', 'Vote'], ['bracket', 'Bracket'], ['sim', 'Matches'], ['combined', 'Combined']]} onChange={(v) => setF({ mode: v })} />
-              <p className="hint">{fin.mode === 'vote' ? 'Everyone votes once for the best team (the classic way).' : fin.mode === 'bracket' ? 'Teams meet 1v1 in a knockout bracket. Players not in the matchup vote; you never vote for your own team.' : fin.mode === 'sim' ? 'Every bracket matchup is a simulated football match. Win to go through.' : 'Each matchup has a simulated match and a vote, combined into one score.'}</p>
-              {!foot && (fin.mode === 'sim' || fin.mode === 'combined') && <p className="warn">Matches need a football topic (Pitch layout). For this topic the bracket uses votes instead.</p>}
-            </div>
-            {fin.mode === 'combined' && <div className="field"><span className="label">Weighting</span><Seg label="Weighting" value={fin.weight} options={[[50, '50/50'], [60, '60/40'], [70, '70/30']]} onChange={(v) => setF({ weight: v })} /><p className="hint">Match performance / votes. Goals are turned into a 0–100% share so a 6–5 thriller doesn’t swamp the votes.</p></div>}
-            {fin.mode === 'bracket' && <div className="field"><span className="label">If a vote is tied</span><Seg label="Tiebreaker" value={fin.tiebreak} options={[['rating', 'Higher-rated team'], ['revote', 'Vote again once']]} onChange={(v) => setF({ tiebreak: v })} /></div>}
-            {(fin.mode === 'sim' || fin.mode === 'combined') && <>
-              <div className="field"><span className="label">Match speed</span><Seg label="Match speed" value={fin.speed} options={[['instant', 'Instant'], ['fast', 'Fast (~20s)'], ['normal', 'Normal (~45s)']]} onChange={(v) => setF({ speed: v })} /></div>
-              <Toggle on={fin.commentary} onChange={(v) => setF({ commentary: v })} title="Match commentary" sub="Show the running commentary feed (goals and cards always show)." />
-              <p className="hint">Knockout matches that end level go to extra time, then penalties. Player ratings are estimated game ratings, not official EA Sports FC ratings.</p>
-            </>}
-          </RuleSection>
-        );
-      })()}
-
-      {teamSummary && (
-        <RuleSection id="rs-team" emoji="👥" title="Team play" summary={teamSummary.text}>
-          <p className="hint">{teamSummary.detail}</p>
-          {onEditTeams && <button className="btn btn-sm" style={{ alignSelf: 'flex-start' }} onClick={onEditTeams}>Edit players &amp; teams</button>}
+          <p className="hint">1-for-1 swaps. Both teams must accept, and both items must fit the new team.</p>
         </RuleSection>
-      )}
+        <p className="hint">Nomination (teams taking turns to choose the next item) is under General → Item order.</p>
+      </div>}
+
+      {tab === 'winner' && <div className="stack" role="tabpanel">
+        <div className="field"><span className="label">How the champion is chosen</span>
+          <Seg label="Winner selection" value={fin.mode} options={[['vote', 'Vote'], ['bracket', 'Bracket'], ['sim', 'Matches'], ['combined', 'Combined']]} onChange={(v) => setF({ mode: v })} />
+          <p className="hint">{fin.mode === 'vote' ? 'Everyone votes once for the best team (the classic way).' : fin.mode === 'bracket' ? 'Teams meet 1v1 in a knockout bracket. Players not in the matchup vote; you never vote for your own team.' : fin.mode === 'sim' ? 'Every bracket matchup is an animated football match. Win to go through.' : 'Each matchup has an animated match and a vote, combined into one score.'}</p>
+          {!foot && (fin.mode === 'sim' || fin.mode === 'combined') && <p className="warn">Matches only work for the football topics (Premier League Legends, Current Footballers, Football GOATs). For this topic the bracket uses votes instead.</p>}
+        </div>
+        {fin.mode === 'combined' && <div className="field"><span className="label">Weighting</span><Seg label="Weighting" value={fin.weight} options={[[50, '50/50'], [60, '60/40'], [70, '70/30']]} onChange={(v) => setF({ weight: v })} /><p className="hint">Match performance / votes. Goals become a 0–100% share so a 6–5 thriller doesn’t swamp the votes.</p></div>}
+        {(fin.mode === 'bracket' || fin.mode === 'combined') && <div className="field"><span className="label">If a vote is tied</span><Seg label="Tiebreaker" value={fin.tiebreak} options={[['rating', 'Higher-rated team'], ['revote', 'Vote again once']]} onChange={(v) => setF({ tiebreak: v })} />{fin.mode === 'combined' && <p className="hint">In Combined, a dead-level total is settled by the match (extra time or penalties).</p>}</div>}
+        {(fin.mode === 'sim' || fin.mode === 'combined') && <>
+          <div className="field"><span className="label">Match speed</span><Seg label="Match speed" value={fin.speed} options={[['instant', 'Instant'], ['fast', 'Fast'], ['normal', 'Normal']]} onChange={(v) => setF({ speed: v })} /><p className="hint">How fast matches start playing. Everyone can still pause, change speed or skip while watching.</p></div>
+          <Toggle on={fin.commentary} onChange={(v) => setF({ commentary: v })} title="Match commentary" sub="Show the running commentary feed (goals and cards always show)." />
+          <Toggle on={!!fin.home} onChange={(v) => setF({ home: v })} title="Home advantage" sub="The higher seed plays at home: a small boost to its expected goals (+0.15). Off by default." />
+          <p className="hint">Knockout matches that end level go to extra time, then penalties. Player ratings are estimated game ratings, not official EA Sports FC ratings.</p>
+        </>}
+      </div>}
+
+      {tab === 'review' && <div className="stack" role="tabpanel">
+        <p className="hint">Everything that will be in play{defaultsMode ? ' for new games' : ''}:</p>
+        <RulesSummary rules={{ ...rules, slots: defaultsMode ? [] : slots }} opts={{ teams }} />
+      </div>}
 
       {problems.map((p) => <p key={p} className={p.startsWith('Heads up') ? 'hint' : 'warn'}>{p}</p>)}
-      <button className="btn btn-gold" disabled={blocking.length > 0} onClick={() => onStart({ ...rules, slots })}>{startLabel}</button>
+      <div className="row">{tab !== 'review' && <button className="btn grow" onClick={() => setTab('review')}>Review rules</button>}<button className="btn btn-gold grow" disabled={blocking.length > 0} onClick={() => onStart({ ...rules, slots: defaultsMode ? rules.slots : slots })}>{startLabel}</button></div>
       {onReset && <button className="btn btn-ghost" onClick={() => setAskReset(true)}>Reset rules to defaults</button>}
-      {askReset && <Confirm title="Reset rules?" body="Budget, bids and every twist go back to their defaults. Slots come from the topic." yes="Reset" onYes={() => { onReset(); setSlotTxt(topic.slots.join(', ')); }} onClose={() => setAskReset(false)} />}
+      {askReset && <Confirm title="Reset rules?" body="Budget and bidding go back to the standard rules, and every optional twist is switched off." yes="Reset" onYes={() => { onReset(); if (!defaultsMode) setSlotTxt(topic.slots.join(', ')); }} onClose={() => setAskReset(false)} />}
     </div>
   );
 }
@@ -1156,7 +1222,7 @@ function SetupRules({ topic, managers, rules, setRules, onBack, onStart, startLa
 /* ============================================================
    AUCTION
    ============================================================ */
-function ManagerButton({ d, m, onBid, onCustom, disabledAll, readOnly, bubble, thinking }) {
+function ManagerButton({ d, m, onBid, onCustom, onOut, disabledAll, readOnly, bubble, thinking }) {
   const amt = nextAmount(d);
   const isLead = d.bid && d.bid.leaderId === m.id;
   const blocker = bidBlocker(d, m);
@@ -1184,6 +1250,7 @@ function ManagerButton({ d, m, onBid, onCustom, disabledAll, readOnly, bubble, t
       {m.members && <span className="mem">{m.members.map((p) => p.name).join(' · ')}</span>}
       <span className="money num">{money(m.budget)}{d.cards && d.cards[m.id] && d.cards[m.id].length ? <span className="cardchip" title="Chaos Cards left">🃏{d.cards[m.id].length}</span> : null}</span>
       <span className="st">{status} · {filled}/{d.rules.slots.length}</span>
+      {onOut && <button className="edit outbtn" aria-label={m.name + ' is out on this item'} title="Out on this item" onPointerDown={(e) => e.stopPropagation()} onPointerUp={(e) => e.stopPropagation()} onClick={(e) => { e.stopPropagation(); onOut(); }}>✋</button>}
       {customOk && <button className="edit" aria-label={'Custom bid for ' + m.name} onPointerDown={(e) => e.stopPropagation()} onPointerUp={(e) => e.stopPropagation()} onClick={(e) => { e.stopPropagation(); onCustom(); }}>✎</button>}
     </div>
   );
@@ -1418,7 +1485,6 @@ function Auction({ d, setDraft, goHome, flashing, onFlash }) {
   const paused = nv.isHost ? pausedLocal : !!nv.live.paused;
   const gavel = nv.isHost ? gavelLocal : !!nv.live.gavel;
   const thinking = nv.isHost ? thinkingLocal : nv.live.thinking || null;
-  const [out, setOut] = useState(false); // solo: you tapped "I'm out" for this item
   const [cardsOpen, setCardsOpen] = useState(false);
   const cardTried = useRef(new Set()); // each bot considers a card at most once per item
   const hold = paused || !!d.pending;   // a card waiting for a Veto answer pauses the item
@@ -1431,12 +1497,11 @@ function Auction({ d, setDraft, goHome, flashing, onFlash }) {
   const talk = useBotTalk(d);
   const bubbles = nv.isHost ? talk.bubbles : (nv.live.bubbles || {});
   useEffect(() => {
-    if (online && nv.isHost && net.publishLive) net.publishLive({ left: leftLocal, key: bidKey, paused: pausedLocal, gavel: gavelLocal, thinking: thinkingLocal, bubbles: talk.bubbles });
+    if (nv.isHost && net && net.publishLive) net.publishLive({ left: leftLocal, key: bidKey, paused: pausedLocal, gavel: gavelLocal, thinking: thinkingLocal, bubbles: talk.bubbles });
   }, [online, nv.isHost, leftLocal, bidKey, pausedLocal, gavelLocal, thinkingLocal, talk.bubbles]);
   // Refs let delayed bot actions check the *current* game before acting.
   const live = useRef({}); live.current = { d, paused: hold, flashing, gavel, left };
   useEffect(() => { setLeft(timer); }, [bidKey, timer]);
-  useEffect(() => { setOut(false); }, [d.reveal]);
 
   const leader = d.bid && d.managers.find((m) => m.id === d.bid.leaderId);
   const total = d.processed + d.queue.length;
@@ -1487,13 +1552,21 @@ function Auction({ d, setDraft, goHome, flashing, onFlash }) {
     const t = setInterval(() => setLeft((l) => (l > 0 ? l - 1 : 0)), ms(1000));
     return () => clearInterval(t);
   }, [bidKey, hold, flashing, gavel, timer, nv.isHost]);
+  const owe = owing(d);
   useEffect(() => {
-    if (!nv.isHost || !timer || hold || flashing || gavel || left > 0) return;
+    if (!nv.isHost || !timer || hold || flashing || gavel || left > 0 || owe.length) return;
     if (d.bid) sold(); else if (auto) skip();
-  }, [left, hold, flashing, gavel, timer, nv.isHost]);
+  }, [left, hold, flashing, gavel, timer, nv.isHost, owe.length]);
+  // End the item early when nobody else can bid (see auctionEnd for the rule).
+  const endNow = auctionEnd(d);
+  useEffect(() => {
+    if (!nv.isHost || hold || flashing || gavel || !endNow) return undefined;
+    const t = setTimeout(() => { const cur = live.current; if (cur.paused || cur.flashing || cur.gavel || busy.current || auctionEnd(cur.d) !== endNow) return; if (endNow === 'sell') sold(); else skip(); }, ms(600));
+    return () => clearTimeout(t);
+  }, [endNow, bidKey, hold, flashing, gavel, nv.isHost]);
 
   // Solo: one bot at a time considers the current price, then bids after a short, human-ish delay.
-  const cardKey = bidKey + ':' + JSON.stringify(d.cards || {}) + ':' + ((d.cardLog || []).length);
+  const cardKey = bidKey + ':' + JSON.stringify(d.cards || {}) + ':' + ((d.cardLog || []).length) + ':' + outIds(d).length;
   useEffect(() => {
     if (!nv.runsBots || hold || flashing || gavel || busy.current || d.phase !== 'auction') { setThinking(null); return undefined; }
     // Before the first bid, a bot may play a card (once per item); otherwise the quickest bidder acts.
@@ -1507,12 +1580,19 @@ function Auction({ d, setDraft, goHome, flashing, onFlash }) {
         if (c) { cardPlan = c; break; }
       }
     }
-    const plan = cardPlan || nextBotAction(d);
-    if (!plan) { setThinking(null); return undefined; }
+    const plan = cardPlan || nextBotAction(d) || botForcedBid(d);
+    // Bots that pass at this price drop out, so the item can end as soon as nobody else wants it.
+    const passers = cardPlan ? [] : botPassers(d);
+    const tOut = passers.length ? setTimeout(() => {
+      const cur = live.current;
+      if (cur.paused || cur.flashing || cur.gavel || busy.current) return;
+      setDraft((p) => { const still = new Set(botPassers(p)); return passers.filter((id) => still.has(id)).reduce((n, id) => withdraw(n, id), p); });
+    }, ms(plan ? 450 : 700)) : null;
+    if (!plan) { setThinking(null); return () => clearTimeout(tOut); }
     setThinking(plan.botId);
     const t = setTimeout(() => {
       const cur = live.current;
-      if (cur.paused || cur.flashing || cur.gavel || busy.current || cur.left <= 0 || cur.d.phase !== 'auction') return;
+      if (cur.paused || cur.flashing || cur.gavel || busy.current || (cur.left <= 0 && !owing(cur.d).length) || cur.d.phase !== 'auction') return;
       setThinking(null);
       const speaker = botActors(d).find((a) => a.speaker === plan.speaker) || plan.botId;
       if (plan.card) {
@@ -1523,7 +1603,7 @@ function Auction({ d, setDraft, goHome, flashing, onFlash }) {
       setDraft((p) => (bidKeyOf(p) === bidKey && p.phase === 'auction' ? placeBid(p, plan.botId, plan.amount, plan.double ? { double: true } : undefined) : p));
       talk.say(speaker, plan.event);
     }, ms(plan.delay));
-    return () => clearTimeout(t);
+    return () => { clearTimeout(t); clearTimeout(tOut); };
   }, [cardKey, hold, flashing, gavel, nv.runsBots]);
 
   // A card aimed at a bot team that holds a Veto: the bot answers on its own.
@@ -1601,6 +1681,8 @@ function Auction({ d, setDraft, goHome, flashing, onFlash }) {
   const frozenTeam = d.managers.find((m) => frozenNow(d, m.id));
   const youAmt = you ? nextAmount(d) : 0;
   const youCan = you && !paused && !flashing && !gavel && canBid(d, you, youAmt);
+  const youOutWhy = !you ? 'No team' : withdrawProblem(d, you.id);
+  const outNames = outIds(d).map((id) => (teamOf(d, id) || {}).name).filter(Boolean);
   const going = timer > 0 && d.bid && left <= 2 && left > 0 ? (left === 2 ? 'Going once…' : 'Going twice…') : null;
   const ordered = auto ? [...d.managers].sort((a, b) => (nv.controls(b.id) ? 1 : 0) - (nv.controls(a.id) ? 1 : 0)) : d.managers;
   const vetoHere = d.pending && nv.controls(d.pending.target) && !(nv.runsBots && (isBot(teamOf(d, d.pending.target)) || isBotTeam(teamOf(d, d.pending.target)))) && !(solo && (isBot(teamOf(d, d.pending.target)) || isBotTeam(teamOf(d, d.pending.target))));
@@ -1612,7 +1694,7 @@ function Auction({ d, setDraft, goHome, flashing, onFlash }) {
         <MuteButton />
         {ruleOn(d, 'chaos') && (!online || you) && <button className="pillbtn" onClick={() => setCardsOpen(true)} aria-label="Chaos Cards">🃏</button>}
         <button className="pillbtn" onClick={() => setTeams(true)}>Teams</button>
-        {nv.isHost && <button className="iconbtn" onClick={() => setPaused((p) => !p)} aria-label={paused ? 'Resume' : 'Pause'}>{paused ? '▶' : 'Ⅱ'}</button>}
+        {nv.isHost && !nv.tv && <button className="iconbtn" onClick={() => setPaused((p) => !p)} aria-label={paused ? 'Resume' : 'Pause'}>{paused ? '▶' : 'Ⅱ'}</button>}
       </div>
       <div className="progress"><div className="bar"><i style={{ width: (d.processed / Math.max(1, total)) * 100 + '%' }} /></div><span className="small muted num">{d.queue.length - 1} left</span></div>
 
@@ -1622,7 +1704,7 @@ function Auction({ d, setDraft, goHome, flashing, onFlash }) {
           {timer > 0 && <span className={'timernum num' + (left <= 3 ? ' hot' : '')}>{Math.max(0, left)}</span>}
           <div key={bidKey} className={'amount num' + (leader ? ' pop' : '')}>{money(d.bid ? d.bid.amount : d.rules.minBid)}</div>
           <div className="leader" style={{ color: lc || 'var(--muted)' }}>{leader ? leader.emoji + ' ' + leader.name + ' leads' : timer > 0 && left <= 0 ? "Time's up · no bids" : auto ? 'Opening bid · bid or wait' : 'Opening bid · tap a manager'}</div>
-          <div className="going" aria-live="polite">{d.pending ? '🛑 Waiting for a Veto answer…' : going || (thinker ? '💭 ' + thinker.name + ' is thinking…' : solo && out ? 'You’re out on this one' : frozenTeam ? '🧊 ' + frozenTeam.name + ' is frozen for this item' : ' ')}</div>
+          <div className="going" aria-live="polite">{d.pending ? '🛑 Waiting for a Veto answer…' : owe.length && timer > 0 && left <= 0 ? '⏳ Waiting for ' + owe.map((m) => m.name).join(', ') + ' to bid' : going || (thinker ? '💭 ' + thinker.name + ' is thinking…' : you && isOut(d, you.id) ? '✋ You’re out on this item' : frozenTeam ? '🧊 ' + frozenTeam.name + ' is frozen for this item' : outNames.length ? '✋ Out: ' + outNames.join(', ') : ' ')}</div>
           {timer > 0 && <span className="timer" style={{ width: (Math.max(0, left) / timer) * 100 + '%' }} />}
         </div>
         {paused && (
@@ -1637,34 +1719,37 @@ function Auction({ d, setDraft, goHome, flashing, onFlash }) {
 
       <div className="mgr-grid">
         {ordered.map((m) => (
-          <ManagerButton key={m.id} d={d} m={m} disabledAll={hold || flashing || gavel} readOnly={auto && !nv.controls(m.id)}
+          <ManagerButton key={m.id} d={d} m={m} disabledAll={hold || flashing || gavel} readOnly={(auto || nv.tv) && !nv.controls(m.id)}
             bubble={bubbles[m.id]} thinking={thinking === m.id}
-            onBid={(amt) => { buzz(12); setOut(false); act('bid', m.id, amt); }}
+            onBid={(amt) => { buzz(12); act('bid', m.id, amt); }}
+            onOut={!auto && !nv.tv && !hold && !flashing && !gavel && !withdrawProblem(d, m.id) && !isOut(d, m.id) ? () => { buzz(12); act('withdraw', m.id); } : null}
             onCustom={() => setCustom(m.id)} />
         ))}
       </div>
-      <p className="hint" style={{ textAlign: 'center' }}>{nv.tv ? 'Bid from your phones · it sells when the clock runs out' : online && !you ? 'You’re watching this game.' : auto ? 'Tap Bid to raise +' + money(d.rules.inc) + ' · ✎ on your card for a custom bid · it sells when the clock runs out' : 'Tap to bid +' + money(d.rules.inc) + ' · hold or ✎ for a custom bid'}</p>
+      <p className="hint" style={{ textAlign: 'center' }}>{nv.tv ? (online ? 'Bid from your phones · it sells when the clock runs out' : timer ? 'Live auction · it sells when the clock runs out' : 'Live auction') : online && !you ? 'You’re watching this game.' : auto ? 'Tap Bid to raise +' + money(d.rules.inc) + ' · ✎ on your card for a custom bid · it sells when the clock runs out' : 'Tap to bid +' + money(d.rules.inc) + ' · hold or ✎ for a custom bid'}</p>
 
       {auto ? (you ? (
         <div className="actions duo">
-          <button className="btn" disabled={hold || flashing || out || !(you && canBid(d, you, youAmt))} onClick={() => { setOut(true); if (solo) setLeft((l) => Math.min(l, 3)); }}>I’m out</button>
-          <button className="btn btn-gold sold" disabled={!youCan} onClick={() => { buzz(12); setOut(false); act('bid', you.id, youAmt); }}>
-            {you && isFull(you) ? 'Team full' : you && !canBid(d, you, youAmt) ? 'Can’t bid' : (d.bid && d.bid.leaderId === you.id ? 'Raise to ' : 'Bid ') + money(youAmt)}
+          <button className="btn" disabled={hold || flashing || gavel || !!youOutWhy} title={youOutWhy || ''} onClick={() => { buzz(12); act('withdraw', you.id); }}>{you && isOut(d, you.id) ? 'You’re out' : 'I’m out'}</button>
+          <button className="btn btn-gold sold" disabled={!youCan} onClick={() => { buzz(12); act('bid', you.id, youAmt); }}>
+            {you && isOut(d, you.id) ? 'Out ✋' : you && isFull(you) ? 'Team full' : you && !canBid(d, you, youAmt) ? 'Can’t bid' : (d.bid && d.bid.leaderId === you.id ? 'Raise to ' : 'Bid ') + money(youAmt)}
           </button>
+          {you && owesBid(d, you) && !hold && <p className="hint duo-note">Require every manager to bid is on: bid once before you can drop out.</p>}
+          {you && isOut(d, you.id) && <p className="hint duo-note">You can’t bid again on this item{d.bid && d.bid.leaderId === you.id ? ', but your bid still stands' : ''}. You’re back in on the next one.</p>}
         </div>
       ) : null) : (
         <div className="actions">
           <button className="btn" onClick={() => setDraft((p) => undo(p))} disabled={hold || flashing || (!d.bid && !d.history.length)}>{undoLabel(d)}</button>
-          <button className="btn" onClick={skip} disabled={hold || flashing || !!d.bid}>No bids</button>
-          <button className="btn btn-gold sold" onClick={sold} disabled={hold || flashing || !d.bid}>Sold!</button>
+          <button className="btn" onClick={skip} disabled={hold || flashing || !!d.bid || owe.length > 0}>No bids</button>
+          <button className="btn btn-gold sold" onClick={sold} disabled={hold || flashing || !d.bid || owe.length > 0}>Sold!</button>
         </div>
       )}
       {gavel && <div className="gavel" aria-hidden="true">🔨</div>}
-      {custom && <CustomBid d={d} m={d.managers.find((x) => x.id === custom)} onSet={(n) => { buzz(12); setOut(false); act('bid', custom, n); }} onClose={() => setCustom(null)} />}
+      {custom && <CustomBid d={d} m={d.managers.find((x) => x.id === custom)} onSet={(n) => { buzz(12); act('bid', custom, n); }} onClose={() => setCustom(null)} />}
       {teams && <TeamsSheet d={d} onClose={() => setTeams(false)} />}
       {cardsOpen && <CardSheet d={d} by={auto && you ? you.id : null} onClose={() => setCardsOpen(false)}
         onPlay={(by, card, params) => act('card', by, card, params)}
-        onDouble={(by, pay) => { buzz(20); setOut(false); act('bid', by, pay, true); }} />}
+        onDouble={(by, pay) => { buzz(20); act('bid', by, pay, true); }} />}
       {vetoHere && <VetoSheet d={d} onAnswer={(v) => act('veto', v, d.pending.id)} />}
     </div>
   );
@@ -1983,7 +2068,7 @@ function TeamCard({ d, m, win }) {
 function Confetti({ colors }) {
   const ref = useRef(null);
   useEffect(() => {
-    if (window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+    if (reducedMotion()) return undefined;
     const c = ref.current; const ctx = c && c.getContext ? c.getContext('2d') : null; if (!ctx) return undefined; let raf; const W = (c.width = innerWidth), H = (c.height = innerHeight);
     const ps = Array.from({ length: 160 }, () => ({ x: Math.random() * W, y: -20 - Math.random() * H * 0.6, vx: (Math.random() - 0.5) * 3, vy: 2 + Math.random() * 4, r: Math.random() * 6.28, vr: (Math.random() - 0.5) * 0.3, w: 6 + Math.random() * 8, h: 4 + Math.random() * 6, c: colors[Math.floor(Math.random() * colors.length)] }));
     const start = performance.now();
@@ -2274,7 +2359,7 @@ function Results({ d, past, onChange, onBack, onUndo, onFinish, onPlayAgain, liv
         <p className="exportfoot">DRAFT NIGHT · {(location.host + location.pathname).replace(/\/(index\.html)?$/, '')}</p>
       </div>
 
-      <div className="stack">
+      <div className="stack resactions">
         {!online && !d.votesRevealed && !isFin && <button className="btn btn-gold" onClick={() => setVoting(true)}>{solo ? 'Vote for the best team' : Object.keys(d.votes || {}).length ? 'Continue the vote' : 'Start the secret vote'}</button>}
         {online && !d.votesRevealed && !isFin && <>
           {myOpenVote ? <button className="btn btn-gold" onClick={() => setVoting(true)}>Vote for the best team</button> : <p className="hint" style={{ textAlign: 'center', margin: 0 }}>{nv.tv ? 'Vote on your phones.' : 'Your vote is in.'} {humanVotes} of {humansP.length} players have voted.</p>}
@@ -2389,7 +2474,7 @@ function Flash({ f, onDone }) {
 /* ============================================================
    APP
    ============================================================ */
-const DEFAULT_RULES = { budget: 20, minBid: 1, inc: 1, order: 'random', timer: 0, mustFill: true, noBids: 'skip' };
+const DEFAULT_RULES = { budget: 20, minBid: 1, inc: 1, order: 'random', timer: 0, mustFill: true, noBids: 'skip', mustBid: false };
 // What new players get: the classic rules plus every twist at its default.
 const RULE_DEFAULTS = () => ({ ...DEFAULT_RULES, ...JSON.parse(JSON.stringify(TWIST_DEFAULTS)), finale: { ...FINALE_DEFAULTS } });
 const defaultManagers = () => ['Ash', 'Bilal', 'Cam', 'Dev'].map((name, i) => ({ id: uid(), name, color: COLORS[i], emoji: EMOJIS[i] }));
@@ -2397,6 +2482,16 @@ const stripDraft = (d) => ({ ...d, history: [] });
 
 // Adds new starter topics to an existing install (without bringing back ones the user deleted)
 // and gives older saved starter items their picture data.
+// Before v3 the twists were on by default, so saved house rules carried them switched on
+// without anyone choosing that. Once, switch those off; anything set after this sticks.
+function migrateSettings(st) {
+  const x = { ...(st || {}) };
+  if ((x.rulesV || 0) < 3) {
+    if (x.rulePrefs) { const p = { ...x.rulePrefs }; ['chaos', 'mystery', 'rarity', 'trades'].forEach((k) => { if (p[k]) p[k] = { ...p[k], on: false }; }); x.rulePrefs = p; }
+    x.rulesV = 3;
+  }
+  return x;
+}
 function migrateTopics(stored) {
   const starters = starterTopics();
   const allIds = starters.map((s) => s.id);
@@ -2641,7 +2736,10 @@ function AudioSettings() {
    BACKUP & APP SETTINGS
    ============================================================ */
 const fmtBytes = (n) => (n > 1048576 ? (n / 1048576).toFixed(1) + ' MB' : Math.max(1, Math.round(n / 1024)) + ' KB');
-function SettingsScreen({ onBack, state, onRestore }) {
+const SETTINGS_TABS = [['rules', 'House rules'], ['sound', 'Sound'], ['display', 'Display & access'], ['online', 'Online'], ['app', 'App & backup']];
+function SettingsScreen({ onBack, state, onRestore, settings, setSettings, rulePrefs, saveRulePrefs }) {
+  const [tab, setTab] = useState('rules');
+  const [editRules, setEditRules] = useState(null);
   const app = usePwa();
   const fileRef = useRef(null);
   const [usage, setUsage] = useState(null);
@@ -2683,10 +2781,46 @@ function SettingsScreen({ onBack, state, onRestore }) {
     setPending(null);
   };
   const ios = isIOS();
+  if (editRules) return <SetupRules defaultsMode topic={{ name: '', emoji: '', items: [], slots: [] }} managers={[]} rules={editRules} setRules={setEditRules} title="Default house rules" startLabel="Save as my defaults"
+    onBack={() => setEditRules(null)} onStart={(r) => { saveRulePrefs(r); setEditRules(null); }} onReset={() => setEditRules({ ...RULE_DEFAULTS(), slots: [] })} />;
+  const prefs = { ...rulePrefs(), slots: [] };
+  const setS = (p) => setSettings((x) => ({ ...x, ...p }));
+  const motion = settings.motion || 'system';
+  const prof = settings.online || {};
   return (
     <div className="app">
-      <TopBar onBack={onBack} title="Backup & app" />
+      <TopBar onBack={onBack} title="Rules & settings" />
+      <div className="tabs" role="tablist" aria-label="Settings sections">
+        {SETTINGS_TABS.map(([k, label]) => <button key={k} role="tab" aria-selected={tab === k} className={'tab' + (tab === k ? ' on' : '')} onClick={() => setTab(k)}>{label}</button>)}
+      </div>
 
+      {tab === 'rules' && <section className="card stack" role="tabpanel">
+        <h3>📜 Default house rules</h3>
+        <p className="hint" style={{ margin: 0 }}>New Local, Solo and Online games start with these. Slots come from each topic. Optional twists stay off unless you switch them on.</p>
+        <RulesSummary rules={prefs} />
+        <button className="btn btn-gold" onClick={() => setEditRules(prefs)}>Edit default rules</button>
+        <button className="btn btn-ghost" onClick={() => saveRulePrefs({ ...RULE_DEFAULTS(), slots: [] })}>Reset to standard rules</button>
+      </section>}
+
+      {tab === 'sound' && <div role="tabpanel"><AudioSettings /></div>}
+
+      {tab === 'display' && <section className="card stack" role="tabpanel">
+        <h3>🎞️ Motion</h3>
+        <Seg label="Motion" value={motion} options={[['system', 'Match my device'], ['reduce', 'Reduce motion'], ['full', 'Full animation']]} onChange={(v) => setS({ motion: v })} />
+        <p className="hint" style={{ margin: 0 }}>Reduce motion turns off confetti, card flips and pop-ups, and football matches move step by step instead of sliding.</p>
+        <h3>📺 TV display</h3>
+        <Seg label="TV text size" value={settings.tvZoom || 1} options={[[1, 'Normal'], [1.25, 'Large'], [1.5, 'Extra large']]} onChange={(v) => setS({ tvZoom: v })} />
+        <p className="hint" style={{ margin: 0 }}>How big everything looks when this device shows the TV view.</p>
+      </section>}
+
+      {tab === 'online' && <section className="card stack" role="tabpanel">
+        <h3>🌐 Online</h3>
+        <p className="hint" style={{ margin: 0 }}>Your online name: <b>{prof.emoji} {prof.name || 'not set yet'}</b> (change it on the Online screen).</p>
+        <Toggle on={!!prof.voice} onChange={(v) => setS({ online: { ...prof, voice: v } })} title="Auctioneer voice on my phone" sub="Off by default when you’re a player, so the room doesn’t hear the auctioneer from every phone. The host and the TV always have it." />
+        <p className="hint" style={{ margin: 0 }}>Room rules (seats, bots, bid clock, reconnection) are set by the host in the room’s lobby. Your favourites and settings stay on this device.</p>
+      </section>}
+
+      {tab === 'app' && <>
       <section className="card stack">
         <h3>📲 Install on your phone</h3>
         {app.standalone ? <p className="hint" style={{ color: 'var(--ok)' }}>Draft Night is installed and running as an app.</p> : (
@@ -2701,8 +2835,6 @@ function SettingsScreen({ onBack, state, onRestore }) {
         )}
         <p className="hint">Updates arrive automatically. When a new version is ready you'll see a Reload button.</p>
       </section>
-
-      <AudioSettings />
 
       <section className="card stack">
         <h3>💾 Backup &amp; restore</h3>
@@ -2732,6 +2864,7 @@ function SettingsScreen({ onBack, state, onRestore }) {
       </section>
 
       <p className="hint" style={{ textAlign: 'center' }}>Real photos come from Wikipedia and Wikimedia Commons. Tap “Photo: Wikipedia” on a card to see who took it and its licence.</p>
+      </>}
 
       {confirm && <Confirm title={confirm === 'replace' ? 'Replace everything?' : 'Add the backup?'}
         body={confirm === 'replace' ? 'Your current topics, drafts and history on this device will be overwritten by the backup. Export a backup first if you might want them back.' : 'Topics and past drafts from the backup that you don’t already have will be added. Nothing of yours is deleted.'}
@@ -2742,34 +2875,54 @@ function SettingsScreen({ onBack, state, onRestore }) {
 
 function App() {
   const [topics, setTopics] = useState(() => migrateTopics(store.get(K.topics, null)));
-  const [draft, setDraft] = useState(() => store.get(K.current, null));
+  const [draft, setDraft] = useState(() => { const c = store.get(K.current, null); return c && c.topic && Array.isArray(c.managers) ? c : null; });
   const [past, setPast] = useState(() => store.get(K.past, []));
   const [screen, setScreen] = useState({ name: 'home' });
   const [managers, setManagers] = useState(() => store.get(K.managers, null) || defaultManagers());
   const [topicId, setTopicId] = useState(null);
   const [rules, setRules] = useState({ ...DEFAULT_RULES, slots: [] });
-  const [flash, setFlash] = useState(null);
+  const [flash, setFlashRaw] = useState(null);
   const [toast, setToast] = useState(null);
+  // TV mode for local games: this window can show the TV view, or feed a TV window in this browser.
+  const tvTab = useMemo(() => { const m = (location.hash || '').match(/^#tv=([A-Za-z0-9]+)/); return m ? m[1] : null; }, []);
+  const [localTv, setLocalTv] = useState(false);
+  const chan = useMemo(() => (!tvTab && canChannel() ? new BroadcastChannel(LOCAL_TV) : null), []);
+  const liveRef = useRef({}); const draftRef = useRef(null);
+  const [tvWindows, setTvWindows] = useState(0);
+  const setFlash = (info) => { setFlashRaw(info); if (info && chan) chan.postMessage({ type: 'flash', info }); };
   const [folder, setFolder] = useState(null);
   const [importing, setImporting] = useState(null); // null, '' (blank) or a shared code from a link
   // Opening a share link (#topic=…) shows the import preview; a room link (#room=…) opens Online with the code.
   useEffect(() => {
     const m = (location.hash || '').match(/^#topic=(.+)$/);
     if (m) { setImporting(decodeURIComponent(m[1])); try { history.replaceState(null, '', location.pathname + location.search); } catch (e) {} }
+    const tv = (location.hash || '').match(/^#tv=([A-Za-z0-9]+)/);
+    if (tv) { if (tv[1] === 'local') setScreen({ name: 'tv-local' }); else setScreen({ name: 'online', start: { kind: 'tv', code: cleanCode(tv[1]) }, k: 'tv' }); }
     const r = (location.hash || '').match(/^#room=([A-Za-z0-9]+)/);
     if (r) { setScreen({ name: 'online-home', code: cleanCode(r[1]) }); try { history.replaceState(null, '', location.pathname + location.search); } catch (e) {} }
   }, []);
-  const [settings, setSettings] = useState(() => store.get(K.settings, {}));
+  const [settings, setSettings] = useState(() => migrateSettings(store.get(K.settings, {})));
   const audioCfg = { ...AUDIO_DEFAULTS, ...(settings.audio || {}) };
   const setAudioCfg = (c) => setSettings((x) => ({ ...x, audio: c }));
   useEffect(() => { audio.set(audioCfg); }, [JSON.stringify(audioCfg)]);
+  useEffect(() => { document.documentElement.setAttribute('data-motion', settings.motion || 'system'); document.documentElement.style.setProperty('--tvzoom', String(settings.tvZoom || 1)); }, [settings.motion, settings.tvZoom]);
   const soloCfg = { ...DEFAULT_SOLO, ...(settings.solo || {}) };
   const setSoloCfg = (c) => setSettings((x) => ({ ...x, solo: c }));
   const [soloRules, setSoloRules] = useState(null); // { topicId, rules }
   const warned = useRef(false);
   const app = usePwa();
   useEffect(() => { store.onError = (msg) => { if (!warned.current) { warned.current = true; setToast(msg); } }; }, []);
-  const persist = (k, v) => { if (v === null || v === undefined) store.del(k); else store.set(k, v); };
+  // A TV window only displays: it never saves, so it can't overwrite the game it's showing.
+  const persist = (k, v) => { if (tvTab) return; if (v === null || v === undefined) store.del(k); else store.set(k, v); };
+  useEffect(() => { draftRef.current = draft; if (chan && draft) chan.postMessage({ type: 'draft', draft: stripDraft(draft) }); }, [draft]);
+  useEffect(() => {
+    if (!chan) return undefined;
+    chan.onmessage = (e) => { const m = e.data || {}; if (m.type === 'hello') { setTvWindows((n) => n + 1); if (draftRef.current) chan.postMessage({ type: 'draft', draft: stripDraft(draftRef.current) }); chan.postMessage({ type: 'live', live: liveRef.current }); } else if (m.type === 'bye') setTvWindows((n) => Math.max(0, n - 1)); };
+    return () => { chan.onmessage = null; };
+  }, []);
+  // With a TV window open, the TV is the auctioneer, so this window stays quiet.
+  useEffect(() => { if (!tvTab) audio.setQuiet(tvWindows > 0); }, [tvWindows]);
+  const localNet = { local: true, role: 'host', display: localTv ? 'tv' : 'controls', live: {}, publishLive: (o) => { liveRef.current = { ...liveRef.current, ...o }; if (chan) chan.postMessage({ type: 'live', live: liveRef.current }); } };
   useEffect(() => { persist(K.settings, settings); }, [settings]);
   // Start fetching photos for a draft's items so reveals are instant.
   useEffect(() => { if (draft && draft.topic && draft.topic.photos) wiki.prefetch([...draft.queue, ...draft.leftover].map((id) => wikiTitleFor(draft.items[id], draft.topic)).filter(Boolean)); }, [draft && draft.id]);
@@ -2826,7 +2979,7 @@ function App() {
         onRejoin={(l) => go('online', { start: { kind: l.kind === 'tv' ? 'tv' : 'join', code: l.code }, k: uid() })} />;
       break;
     case 'online':
-      view = <OnlineScreen key={screen.k} start={screen.start} profile={profile} topics={topics} rulePrefs={rulePrefs} past={past} settings={settings} onFinished={fileOnline} onExit={() => go('online-home')} />;
+      view = <OnlineScreen key={screen.k} start={screen.start} onRetry={() => go('online', { start: screen.start, k: uid() })} profile={profile} topics={topics} rulePrefs={rulePrefs} past={past} settings={settings} onFinished={fileOnline} onExit={() => go('online-home')} />;
       break;
     case 'topics':
       view = <TopicsList topics={topics} folder={folder} setFolder={setFolder} onImport={() => setImporting('')} onBack={() => go(screen.from || 'home')} onOpen={(id) => go('topic', { id, from: screen.from })}
@@ -2878,6 +3031,9 @@ function App() {
         onStart={(r) => { saveRulePrefs(r); setDraft(createDraft(t, localPlayers(), r)); go('draft'); }} /> : null;
       break;
     }
+    case 'tv-local':
+      view = <LocalTv past={past} settings={settings} />;
+      break;
     case 'draft':
       if (!draft) { view = null; setTimeout(() => go('home'), 0); break; }
       if (draft.phase === 'auction') view = <Auction d={draft} setDraft={setDraft} goHome={() => go('home')} flashing={!!flash} onFlash={setFlash} />;
@@ -2885,6 +3041,7 @@ function App() {
       else if (draft.phase === 'nominate') view = <Nominate d={draft} setDraft={setDraft} goHome={() => go('home')} />;
       else if (draft.phase === 'trade') view = <TradeWindow d={draft} setDraft={setDraft} goHome={() => go('home')} />;
       else view = <Results d={draft} past={past} showShame={settings.showShame} live onChange={setDraft} onBack={() => go('home')} onUndo={draft.mode === 'solo' ? null : () => setDraft((p) => undo(p))} onFinish={() => { setDraft(null); go('home'); }} onPlayAgain={playAgain} />;
+      view = <NetCtx.Provider value={localNet}><div className={localTv ? 'tvmode' : ''}>{view}{localTv ? <TvExit onExit={() => setLocalTv(false)} /> : <TvSwitch onThisScreen={() => setLocalTv(true)} />}</div></NetCtx.Provider>;
       break;
     case 'past':
       view = <PastList past={past} onBack={() => go('home')} onOpen={(id) => go('past-view', { id })} onDelete={(id) => setPast((p) => p.filter((x) => x.id !== id))} />;
@@ -2904,7 +3061,7 @@ function App() {
       view = <ShameScreen past={past} settings={settings} onBack={() => go('players')} />;
       break;
     case 'settings':
-      view = <SettingsScreen onBack={() => go('home')} state={{ topics, past, draft, managers, settings }}
+      view = <SettingsScreen onBack={() => go('home')} state={{ topics, past, draft, managers, settings }} settings={settings} setSettings={setSettings} rulePrefs={rulePrefs} saveRulePrefs={saveRulePrefs}
         onRestore={(data, mode) => {
           if (mode === 'replace') {
             setTopics(migrateTopics(data.topics)); setPast(data.past); setDraft(data.current || null);
@@ -2954,7 +3111,7 @@ class Boundary extends React.Component {
   }
 }
 
-if (window.__DN_TEST__) window.__DN = { finale: { buildBracket, advanceBracket, nextMatchup, matchVoters, canVoteFor, decideMatchup, simulateMatch, playerRating, teamRating, matchupVoteBot, finaleMode, isFootball, startFinale, castMatchVote, botMatchVotes, playMatchup, resolveMatchup, getMatchup, needsVote, needsMatch, votingDone, finaleStandings, finaleRecord, championStory, goldenBoot, matchVoteProblem, roundName, FINALE_DEFAULTS, validRating }, audio, AUDIO_DEFAULTS, share: { encodeTopic, decodeShared, packTopic, unpackTopic, topicCode, shareLink, MAX_LINK }, stats: { careerStats, computeAwards, computeShame, hallOfShame, humanPlayers }, bots: { makeBots, nextBotAction, botDecision, botFreePickChoice, botVote, teamScore, voteChoices, itemFame, seeded, BOT_LEVELS, BOT_TYPES, botCardPlay, botVeto, botNominate, botTradeDecision, botTradeOffer }, twists: { twistRules, TWIST_DEFAULTS, playCard, answerCard, cardProblem, doubleProblem, nominate, currentNominator, nominationPool, botActors, botAdvisers, participants, visibleItem, isHidden, rarityOf, frozenNow, proposeTrade, acceptTrade, rejectTrade, cancelTrade, closeTrades, tradeProblem, openTrades, hasCard }, DEFAULT_SOLO, isFlex, canBid, createDraft, placeBid, sell, skipItem, undo, freePick, currentPicker, canTake, nextAmount, isDraftOver, draftStats, winsBoard, tally, starterTopics, migrateTopics, validateBackup, makeBackup, wikiTitleFor, PHOTO_TOPICS, store, wiki, DEFAULT_RULES, COLORS, emptyCount, assignSlot, maxBid };
+if (window.__DN_TEST__) window.__DN = { finale: { buildBracket, advanceBracket, nextMatchup, matchVoters, canVoteFor, decideMatchup, simulateMatch, playerRating, teamRating, matchupVoteBot, finaleMode, isFootball, startFinale, castMatchVote, botMatchVotes, playMatchup, resolveMatchup, getMatchup, needsVote, needsMatch, votingDone, finaleStandings, finaleRecord, championStory, goldenBoot, matchVoteProblem, roundName, FINALE_DEFAULTS, validRating, matchScript, revealedEvents, matchFrame, lineupOf, expectedGoals, strength2, squad }, audio, AUDIO_DEFAULTS, share: { encodeTopic, decodeShared, packTopic, unpackTopic, topicCode, shareLink, MAX_LINK }, stats: { careerStats, computeAwards, computeShame, hallOfShame, humanPlayers }, bots: { makeBots, nextBotAction, botDecision, botFreePickChoice, botVote, teamScore, voteChoices, itemFame, seeded, BOT_LEVELS, BOT_TYPES, botCardPlay, botVeto, botNominate, botTradeDecision, botTradeOffer }, twists: { twistRules, TWIST_DEFAULTS, playCard, answerCard, cardProblem, doubleProblem, nominate, currentNominator, nominationPool, botActors, botAdvisers, participants, visibleItem, isHidden, rarityOf, frozenNow, proposeTrade, acceptTrade, rejectTrade, cancelTrade, closeTrades, tradeProblem, openTrades, hasCard }, auction: { withdraw, isOut, auctionEnd, owesBid, withdrawProblem, outIds, owing, botPassers, botForcedBid, runAction, ownerInfo, migrateSettings, rulesLines }, DEFAULT_SOLO, isFlex, canBid, createDraft, placeBid, sell, skipItem, undo, freePick, currentPicker, canTake, nextAmount, isDraftOver, draftStats, winsBoard, tally, starterTopics, migrateTopics, validateBackup, makeBackup, wikiTitleFor, PHOTO_TOPICS, store, wiki, DEFAULT_RULES, COLORS, emptyCount, assignSlot, maxBid };
 store.init().finally(() => {
   ReactDOM.createRoot(document.getElementById('root')).render(<Boundary><App /></Boundary>);
 });

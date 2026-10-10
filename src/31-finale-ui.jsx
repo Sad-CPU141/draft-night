@@ -5,7 +5,8 @@
 
 const EST_LABEL = 'Estimated game rating · not an official EA Sports FC / FIFA rating';
 const ATTR_NAMES = { PAC: 'Pace', SHO: 'Shooting', PAS: 'Passing', DRI: 'Dribbling', DEF: 'Defending', PHY: 'Physical' };
-const reducedMotion = () => !!(window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches);
+// The app's Motion setting wins; "Match my device" follows the phone's reduce-motion setting.
+const reducedMotion = () => { const m = document.documentElement.getAttribute('data-motion'); if (m === 'reduce') return true; if (m === 'full') return false; return !!(window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches); };
 
 // Full rating card for one player: overall, role and six attributes.
 function RatingCard({ item }) {
@@ -276,7 +277,7 @@ function MatchVote({ d, r, i, onChange, onCount, nv, act }) {
 function Finale({ d, onChange, onClose, onChampion }) {
   const fin = d.finale; const cfg = finCfg(d); const mode = fin.mode;
   const nv = netView(d, useNet()); const act = useAct(d, onChange);
-  const host = nv.isHost;
+  const host = nv.isHost && !nv.tv; // the host's TV view shows the finale without the buttons
   const nx = nextMatchup(fin.bracket);
   // Which moment we're at is part of the saved game, so online every phone (and the TV) follows the host.
   const ui = fin.ui || { stage: 'overview', cur: null };
@@ -309,7 +310,7 @@ function Finale({ d, onChange, onClose, onChampion }) {
   else if (stage === 'match' && cm && cm.match) body = (
     <>
       <p className="eyebrow" style={{ textAlign: 'center' }}>{roundName(R, cur.r)}{cur.r === R - 1 ? ' · the big one' : ''}</p>
-      <MatchPlayer key={cm.id} d={d} A={A} B={B} match={cm.match} speed={cfg.speed} commentary={cfg.commentary} label={cm.id} onDone={() => setMatchOver(true)} />
+      <MatchView key={cm.id} d={d} A={A} B={B} match={cm.match} speed={cfg.speed} commentary={cfg.commentary} label={cm.id} onDone={() => setMatchOver(true)} />
       {matchOver && (host ? <button className="btn btn-gold" onClick={finish}>{mode === 'combined' ? 'Combine with the votes' : 'Continue'}</button> : waiting)}
     </>
   );
@@ -398,7 +399,7 @@ function MatchupSheet({ d, at, onClose }) {
       <h2 className="display" style={{ fontSize: 28 }}>{A.name} v {B.name}</h2>
       {m.why && <p className="small" style={{ margin: 0, fontWeight: 700 }}>{m.why}</p>}
       {m.detail && <p className="hint" style={{ margin: 0 }}>{m.detail}</p>}
-      {replay && m.match ? <MatchPlayer d={d} A={A} B={B} match={m.match} speed={cfg.speed === 'instant' ? 'fast' : cfg.speed} commentary={cfg.commentary} label={m.id + ':replay'} />
+      {replay && m.match ? <MatchView d={d} A={A} B={B} match={m.match} speed={cfg.speed === 'instant' ? 'fast' : cfg.speed} commentary={cfg.commentary} label={m.id + ':replay'} />
         : m.match ? <MatchSummary d={d} A={A} B={B} match={m.match} /> : null}
       {m.match && !replay && <button className="btn" onClick={() => setReplay(true)}>▶ Watch again (recorded, same result)</button>}
       <button className="btn btn-ghost" onClick={onClose}>Close</button>
@@ -421,7 +422,7 @@ function FriendlySheet({ d, onClose }) {
       <p className="eyebrow">Exhibition · doesn’t change any result</p>
       <h2 className="display" style={{ fontSize: 28 }}>Friendly match</h2>
       {game ? <>
-        <MatchPlayer key={game.k} d={d} A={game.A} B={game.B} match={game.match} speed={cfg.speed} commentary={cfg.commentary} label={'friendly' + game.k} />
+        <MatchView key={game.k} d={d} A={game.A} B={game.B} match={game.match} speed={cfg.speed} commentary={cfg.commentary} label={'friendly' + game.k} />
         <div className="row"><button className="btn grow" onClick={play}>Rematch</button><button className="btn btn-ghost grow" onClick={() => setGame(null)}>Pick teams</button></div>
       </> : <>
         <div className="field"><label htmlFor="fr-a">Home</label><select id="fr-a" className="input" value={a} onChange={(e) => setA(e.target.value)}>{teams.map((t) => <option key={t.id} value={t.id} disabled={t.id === b}>{t.emoji} {t.name} · {teamRating(d, t).rating}</option>)}</select></div>
@@ -462,3 +463,262 @@ function FinaleResults({ d, onOpen }) {
     </>
   );
 }
+
+/* ============================================================
+   ANIMATED MATCH (v2 matches): a 2D pitch that plays the recorded timeline.
+   Everything on screen is worked out from (match record, time) — nothing random
+   happens while watching — so pausing, skipping, replaying or watching on another
+   phone always shows the same moves and ends on the recorded score.
+   ============================================================ */
+const PITCH = { w: 105, h: 68 };
+const hashU = (...parts) => (hashStr(parts.join('|')) % 10000) / 10000;
+const lerp = (a, b, u) => a + (b - a) * u;
+const ease = (u) => (u <= 0 ? 0 : u >= 1 ? 1 : u * u * (3 - 2 * u));
+const lerpP = (p, q, u) => ({ x: lerp(p.x, q.x, u), y: lerp(p.y, q.y, u) });
+const LINE_X = { GK: 0.04, DEF: 0.2, MID: 0.38, FWD: 0.54 };
+const SEG = 0.85; // seconds per touch in a passing move
+
+// Formation spots from the drafted squad (in "attack" coordinates: 0 = own goal, 1 = opponent's goal).
+function lineupOf(d, m) {
+  const sq = squad(d, m);
+  const hasGK = sq.some((p) => p.role === 'GK');
+  const rows = sq.map((p, i) => ({ ...p, role: !hasGK && i === sq.reduce((bi, q, k) => (q.r.attrs.DEF > sq[bi].r.attrs.DEF ? k : bi), 0) ? 'GK' : p.role }));
+  const out = [];
+  ['GK', 'DEF', 'MID', 'FWD'].forEach((role) => {
+    const line = rows.filter((p) => p.role === role);
+    line.forEach((p, k) => out.push({ name: p.name, role, ovr: p.r.ovr, pac: p.r.attrs.PAC, num: (() => { const it = Object.values(d.items).find((x) => x.name === p.name); return it ? kitNumber(it) : k + 1; })(), base: { x: LINE_X[role], y: line.length === 1 ? 0.5 : 0.18 + (0.64 * k) / (line.length - 1) } }));
+  });
+  return out;
+}
+function matchScript(match) {
+  const beats = []; let t = 0;
+  const add = (b) => { b.t0 = t; t += b.dur; beats.push(b); return b; };
+  add({ type: 'kickoff', dur: 1.4, min: 0, show: [0], reveal: 0.2 });
+  match.events.forEach((e, k) => {
+    if (e.type === 'kickoff') return;
+    if (e.type === 'half' || e.type === 'full' || e.type === 'et' || e.type === 'pens') { add({ type: e.type, dur: e.type === 'half' ? 2 : 1.6, min: e.min, show: [k], reveal: 0.1 }); return; }
+    if (e.type === 'pen') { add({ type: 'pen', dur: 1.8, min: 120, show: [k], reveal: 0.75, pen: e }); return; }
+    if (e.type === 'yellow' || e.type === 'red' || e.type === 'note') { const last = beats[beats.length - 1]; last.show.push(k); return; }
+    if (e.seq == null) return;
+    const q = match.seqs[e.seq]; const n = q.chain.length;
+    const tail = q.kind === 'goal' ? 3.4 : q.kind === 'tackle' || q.kind === 'intercept' ? 1.1 : 1.7;
+    add({ type: 'seq', dur: 0.35 + n * SEG + tail, min: q.min, et: !!q.et, q, show: [k], reveal: 0.35 + n * SEG + (q.kind === 'goal' ? 0.7 : q.kind === 'tackle' || q.kind === 'intercept' ? 0.5 : 0.6) });
+  });
+  return { beats, total: t };
+}
+// Where everyone is at time u (seconds) into one beat.
+function beatFrame(beat, L, prevEnd) {
+  const toPitch = (team, p) => ({ x: (team === 0 ? p.x : 1 - p.x) * PITCH.w, y: p.y * PITCH.h });
+  const base = (team) => L[team].map((pl) => toPitch(team, pl.base));
+  const idx = (team, name) => L[team].findIndex((p) => p.name === name);
+  const frame = (u) => {
+    if (beat.type !== 'seq' && beat.type !== 'pen') return { pos: [base(0), base(1)], ball: { x: PITCH.w / 2, y: PITCH.h / 2 }, holder: null };
+    if (beat.type === 'pen') {
+      const e = beat.pen; const T = e.team; const D = 1 - T;
+      const pos = [0, 1].map((team) => L[team].map((pl, i) => toPitch(T, { x: 0.62, y: 0.2 + (0.6 * (i + team * 3)) / (L[0].length + L[1].length) })));
+      const si = Math.max(0, idx(T, e.player)); const ki = L[D].findIndex((p) => p.role === 'GK');
+      const spot = { x: 0.89, y: 0.5 };
+      pos[T][si] = toPitch(T, { x: 0.86, y: 0.5 });
+      const shotU = ease((u - 0.5) / 0.35);
+      const target = e.scored ? { x: 1.01, y: 0.5 + e.side * 0.05 } : { x: 0.985, y: 0.5 + e.side * 0.04 };
+      const keeperY = e.scored ? 0.5 - e.side * 0.06 : 0.5 + e.side * 0.04;
+      if (ki >= 0) pos[D][ki] = toPitch(T, { x: 0.985, y: lerp(0.5, keeperY, ease((u - 0.5) / 0.3)) });
+      const ball = toPitch(T, lerpP(spot, target, shotU));
+      return { pos, ball, holder: { team: T, i: si } };
+    }
+    const q = beat.q; const T = q.team; const D = 1 - T; const n = q.chain.length;
+    const shot = q.kind === 'goal' || q.kind === 'save' || q.kind === 'miss' || q.kind === 'block';
+    const key = (k) => ({ x: shot ? lerp(0.34, 0.8, n > 1 ? k / (n - 1) : 1) : lerp(0.28, 0.52, n > 1 ? k / (n - 1) : 1), y: Math.min(0.88, Math.max(0.12, 0.5 + (hashU(q.min, q.i, k) - 0.5) * 0.62)) });
+    const uu = u - 0.35; // first 0.35s: move from where the last beat ended
+    let ballA; let holderK = 0;
+    if (uu < 0) { ballA = key(0); holderK = 0; }
+    else if (uu < n * SEG) {
+      const k = Math.min(n - 1, Math.floor(uu / SEG)); const r = (uu - k * SEG) / SEG;
+      holderK = k;
+      if (k < n - 1 && r > 0.6) { ballA = lerpP(key(k), key(k + 1), ease((r - 0.6) / 0.4)); holderK = -1; }
+      else { const carry = { x: key(k).x + 0.03 * Math.min(1, r / 0.6), y: key(k).y }; ballA = carry; }
+    } else ballA = { x: key(n - 1).x + 0.03, y: key(n - 1).y };
+    const tail = uu - n * SEG;
+    // Formation shift: attackers push up with the ball, defenders drop and squeeze towards it.
+    const push = (ballA.x - 0.45) * 0.55;
+    const pos = [[], []];
+    L[T].forEach((pl, i) => {
+      let p = { x: pl.base.x + (pl.role === 'GK' ? 0 : push), y: lerp(pl.base.y, ballA.y, pl.role === 'GK' ? 0 : 0.18) };
+      const ci = q.chain.indexOf(pl.name);
+      if (ci >= 0) { const until = ci * SEG; const pre = ease(1 - Math.max(0, until - Math.max(0, uu)) / (SEG * 1.6)); p = lerpP(p, key(ci), pre); if (ci < n - 1 && uu > (ci + 1) * SEG) p = lerpP(key(ci), { x: key(ci).x + 0.08, y: key(ci).y }, ease((uu - (ci + 1) * SEG) / SEG)); }
+      pos[T][i] = p;
+    });
+    const dA = { x: 1 - ballA.x, y: ballA.y }; // ball in the defenders' attack coordinates
+    const drop = (dA.x - 0.45) * 0.5;
+    let presser = -1, best = 9;
+    L[D].forEach((pl, i) => { if (pl.role === 'GK') return; const p = { x: pl.base.x + drop, y: lerp(pl.base.y, dA.y, 0.3) }; const dist = Math.hypot(p.x - dA.x, p.y - dA.y); if (dist < best) { best = dist; presser = i; } });
+    L[D].forEach((pl, i) => {
+      let p = pl.role === 'GK' ? { x: 0.035, y: lerp(0.5, dA.y, 0.3) } : { x: pl.base.x + drop, y: lerp(pl.base.y, dA.y, 0.3) };
+      if (i === presser) p = lerpP(p, { x: dA.x - 0.05, y: dA.y + 0.03 }, 0.65);
+      pos[D][i] = p;
+    });
+    let ball = toPitch(T, ballA); let holder = holderK >= 0 ? { team: T, i: idx(T, q.chain[holderK]) } : null; let banner = null; let celebrate = null;
+    if (tail >= 0) {
+      const shooterA = { x: key(n - 1).x + 0.03, y: key(n - 1).y };
+      const ki = L[D].findIndex((p) => p.role === 'GK');
+      if (q.kind === 'goal') {
+        const goalPt = { x: 1.015, y: 0.5 + q.side * 0.055 };
+        ballA = lerpP(shooterA, goalPt, ease(tail / 0.7));
+        if (ki >= 0) pos[D][ki] = { x: 0.035, y: lerp(0.5, 0.5 + q.side * 0.12, ease(tail / 0.6)) }; // dives, too late
+        holder = tail < 0.05 ? holder : null;
+        if (tail > 0.7) { banner = 'GOAL!'; const si = idx(T, q.shooter); celebrate = { team: T, i: si }; const corner = { x: 0.9, y: 0.5 + q.side * 0.4 }; pos[T][si] = lerpP(shooterA, corner, ease((tail - 0.7) / 1.4)); L[T].forEach((pl, i) => { if (i !== si && pl.role !== 'GK') pos[T][i] = lerpP(pos[T][i], { x: corner.x - 0.06 - 0.02 * i, y: corner.y - q.side * 0.05 * (i % 3) }, ease((tail - 1.1) / 1.4)); }); }
+      } else if (q.kind === 'save') {
+        const kp = { x: 0.965, y: 0.5 + q.side * 0.07 };
+        if (ki >= 0) pos[D][ki] = { x: 1 - kp.x, y: lerp(0.5, kp.y, ease(tail / 0.45)) };
+        ballA = lerpP(shooterA, kp, ease(tail / 0.6)); holder = tail > 0.6 && ki >= 0 ? { team: D, i: ki } : null;
+        if (tail > 0.6) banner = 'SAVE!';
+      } else if (q.kind === 'miss') {
+        ballA = lerpP(shooterA, { x: 1.03, y: 0.5 + q.side * 0.2 }, ease(tail / 0.8)); holder = null;
+        if (tail > 0.8) banner = 'WIDE!';
+      } else if (q.kind === 'block') {
+        const bi = idx(D, q.blocker); const bp = lerpP(shooterA, { x: 1, y: 0.5 }, 0.35);
+        if (bi >= 0) pos[D][bi] = { x: 1 - bp.x, y: lerp(pos[D][bi].y, bp.y, ease(tail / 0.4)) };
+        ballA = lerpP(shooterA, bp, ease(tail / 0.5)); holder = null;
+        if (tail > 0.5) banner = 'BLOCKED!';
+      } else {
+        const ti = idx(D, q.tackler);
+        const meet = { x: shooterA.x + 0.02, y: shooterA.y };
+        if (ti >= 0) pos[D][ti] = { x: 1 - meet.x, y: lerp(pos[D][ti].y, meet.y, ease(tail / 0.45)) };
+        ballA = tail < 0.5 ? meet : lerpP(meet, { x: meet.x - 0.06, y: meet.y }, ease((tail - 0.5) / 0.5));
+        holder = tail > 0.45 && ti >= 0 ? { team: D, i: ti } : holder;
+        if (tail > 0.45) banner = q.kind === 'tackle' ? 'TACKLE!' : 'INTERCEPTED!';
+      }
+      ball = toPitch(T, ballA);
+    }
+    let out = { pos: [pos[0].map((p) => toPitch(0, p)), pos[1].map((p) => toPitch(1, p))], ball, holder, banner, celebrate };
+    // Each team's spots are in its own attack coordinates: convert the defending side too.
+    out.pos[T] = pos[T].map((p) => toPitch(T, p)); out.pos[D] = pos[D].map((p) => toPitch(D, p));
+    if (u < 0.35 && prevEnd) { const k2 = ease(u / 0.35); out = { ...out, pos: out.pos.map((team, ti) => team.map((p, i) => (prevEnd.pos[ti][i] ? lerpP(prevEnd.pos[ti][i], p, k2) : p))), ball: lerpP(prevEnd.ball, out.ball, k2) }; }
+    return out;
+  };
+  return frame;
+}
+function matchFrame(script, L, t) {
+  const { beats } = script;
+  let bi = beats.findIndex((b) => t < b.t0 + b.dur); if (bi < 0) bi = beats.length - 1;
+  const b = beats[bi];
+  const prev = bi > 0 ? beatFrame(beats[bi - 1], L, null)(beats[bi - 1].dur) : null;
+  const f = beatFrame(b, L, prev)(Math.min(b.dur, Math.max(0, t - b.t0)));
+  const prevMin = bi > 0 ? beats[bi - 1].min : 0;
+  const min = b.type === 'seq' ? Math.round(lerp(b.et ? Math.max(91, prevMin) : Math.min(prevMin, b.min), b.min, Math.min(1, (t - b.t0) / b.dur))) : b.min;
+  return { ...f, beat: b, bi, min };
+}
+function revealedEvents(script, t) {
+  const out = [];
+  script.beats.forEach((b) => b.show.forEach((k, j) => { if (t >= b.t0 + (j === 0 ? b.reveal * (b.type === 'seq' || b.type === 'pen' ? 1 : b.dur) : b.reveal)) out.push(k); }));
+  return out.sort((a, b2) => a - b2);
+}
+
+function PitchMatch({ d, A, B, match, speed, commentary, onDone, label }) {
+  const L = useMemo(() => [lineupOf(d, A), lineupOf(d, B)], [d.id, A.id, B.id]);
+  const script = useMemo(() => matchScript(match), [match]);
+  const base = speed === 'fast' ? 3 : 1.6;
+  const [t, setT] = useState(speed === 'instant' ? script.total : 0);
+  const [playing, setPlaying] = useState(speed !== 'instant');
+  const [mult, setMult] = useState(1);
+  const done = t >= script.total;
+  const fired = useRef(false);
+  const reduced = reducedMotion();
+  useEffect(() => {
+    if (!playing || done) return undefined;
+    let raf; let last = performance.now();
+    const tick = (now) => { const dt = Math.min(0.1, (now - last) / 1000); last = now; setT((x) => Math.min(script.total, x + dt * base * mult / Math.max(0.001, GAME_SPEED))); raf = requestAnimationFrame(tick); };
+    raf = requestAnimationFrame(tick);
+    return () => cancelAnimationFrame(raf);
+  }, [playing, done, mult, base]);
+  useEffect(() => { if (done && !fired.current) { fired.current = true; onDone && onDone(); } }, [done]);
+  // Sounds and the auctioneer, in step with what's on screen.
+  const shown = revealedEvents(script, t);
+  const lastShown = useRef(shown.length);
+  useEffect(() => {
+    if (shown.length > lastShown.current && playing) {
+      shown.slice(lastShown.current).forEach((k) => {
+        const e = match.events[k];
+        if (e.type === 'goal') { audio.play('cheer'); audio.say(callLine('goal', { who: e.player }), 2, d.id + ':' + label + ':g' + k); }
+        else if (e.type === 'half' || e.type === 'full') audio.play('whistle');
+        else if (e.type === 'red') audio.play('buzzer');
+        else if (e.type === 'pen') audio.play(e.scored ? 'bid' : 'buzzer');
+      });
+    }
+    lastShown.current = shown.length;
+  }, [shown.length]);
+  const tq = reduced && !done ? Math.floor(t / 0.7) * 0.7 : t;
+  const fr = matchFrame(script, L, tq);
+  const goalsShown = shown.map((k) => match.events[k]).filter((e) => e.type === 'goal');
+  const score = done ? match.score : [goalsShown.filter((e) => e.team === 0).length, goalsShown.filter((e) => e.team === 1).length];
+  const penEv = shown.map((k) => match.events[k]).filter((e) => e.type === 'pen');
+  const pens = done ? match.pens : penEv.length ? penEv[penEv.length - 1].pens : null;
+  const keyTypes = ['goal', 'red', 'yellow', 'half', 'full', 'et', 'pens', 'pen', 'note', 'kickoff'];
+  const feed = shown.map((k) => match.events[k]).filter((e) => commentary || keyTypes.includes(e.type));
+  const feedRef = useRef(null);
+  useEffect(() => { const f = feedRef.current; if (f) f.scrollTop = f.scrollHeight; }, [feed.length]);
+  const colors = [A, B].map((m) => ({ fill: m.color, text: onColor(m.color) }));
+  const stop = match.stoppage || 0;
+  const clock = done ? (match.pens ? 'FT · pens' : match.et ? 'AET' : 'FT') : fr.beat.type === 'half' ? 'HT' : fr.min > 90 && !fr.beat.et && fr.beat.type !== 'et' && fr.beat.type !== 'pens' && fr.beat.type !== 'pen' ? '90+' + Math.min(stop, fr.min - 90) + '′' : fr.beat.type === 'pen' || fr.beat.type === 'pens' ? 'PENS' : fr.min + '′' + (fr.beat.et ? ' ET' : '');
+  const trA = isFootball(d.topic) ? teamRating(d, A).rating : null, trB = isFootball(d.topic) ? teamRating(d, B).rating : null;
+  const bannerNow = fr.banner || (fr.beat.type === 'half' ? 'HALF-TIME' : fr.beat.type === 'et' ? 'EXTRA TIME' : fr.beat.type === 'pens' ? 'PENALTIES' : fr.beat.type === 'full' && !done ? 'FULL-TIME' : null);
+  const short = (n) => { const w = n.split(' '); const s2 = w[w.length - 1]; return s2.length > 10 ? s2.slice(0, 9) + '.' : s2; };
+  return (
+    <div className="matchview">
+      <div className="scoreboard">
+        <div className="sb-team"><Badge m={A} /><span className="sb-n">{A.name}</span>{trA != null && <span className="sb-r num">{trA}</span>}</div>
+        <div className="sb-mid">
+          <span className="sb-score num" aria-live="polite">{score[0]}–{score[1]}</span>
+          {pens && <span className="sb-pens num">pens {pens[0]}–{pens[1]}</span>}
+          <span className="sb-clock num">{clock}</span>
+        </div>
+        <div className="sb-team"><Badge m={B} /><span className="sb-n">{B.name}</span>{trB != null && <span className="sb-r num">{trB}</span>}</div>
+      </div>
+      <div className="pitchwrap">
+        <svg className="pitchsvg" viewBox={'-3 -3 ' + (PITCH.w + 6) + ' ' + (PITCH.h + 6)} role="img" aria-label={'Football pitch: ' + A.name + ' ' + score[0] + ', ' + B.name + ' ' + score[1] + ', ' + clock}>
+          <rect x="-3" y="-3" width={PITCH.w + 6} height={PITCH.h + 6} fill="#1f7a3a" />
+          {Array.from({ length: 7 }, (_, i) => <rect key={i} x={i * 15} y="0" width="7.5" height={PITCH.h} fill="#23843f" />)}
+          <g fill="none" stroke="rgba(255,255,255,.75)" strokeWidth="0.35">
+            <rect x="0" y="0" width={PITCH.w} height={PITCH.h} />
+            <line x1={PITCH.w / 2} y1="0" x2={PITCH.w / 2} y2={PITCH.h} />
+            <circle cx={PITCH.w / 2} cy={PITCH.h / 2} r="9.15" />
+            <rect x="0" y={PITCH.h / 2 - 20.16} width="16.5" height="40.32" /><rect x={PITCH.w - 16.5} y={PITCH.h / 2 - 20.16} width="16.5" height="40.32" />
+            <rect x="0" y={PITCH.h / 2 - 9.16} width="5.5" height="18.32" /><rect x={PITCH.w - 5.5} y={PITCH.h / 2 - 9.16} width="5.5" height="18.32" />
+          </g>
+          <rect x="-2.2" y={PITCH.h / 2 - 3.66} width="2.2" height="7.32" fill="rgba(255,255,255,.85)" /><rect x={PITCH.w} y={PITCH.h / 2 - 3.66} width="2.2" height="7.32" fill="rgba(255,255,255,.85)" />
+          {[0, 1].map((team) => L[team].map((pl, i) => {
+            const p = fr.pos[team][i]; if (!p) return null;
+            const isHolder = fr.holder && fr.holder.team === team && fr.holder.i === i;
+            const cel = fr.celebrate && fr.celebrate.team === team && fr.celebrate.i === i;
+            return (
+              <g key={team + '-' + i} transform={'translate(' + p.x.toFixed(2) + ' ' + p.y.toFixed(2) + ')'}>
+                <circle r={cel ? 2.6 : 2.1} fill={pl.role === 'GK' ? '#ffd23f' : colors[team].fill} stroke={isHolder || cel ? '#fff' : 'rgba(0,0,0,.55)'} strokeWidth={isHolder || cel ? 0.6 : 0.35} />
+                <text y="0.9" textAnchor="middle" fontSize="2.3" fontWeight="800" fill={pl.role === 'GK' ? '#1b1530' : colors[team].text}>{pl.num}</text>
+                <text className={'plabel' + (isHolder || cel ? ' on' : '')} y="-2.8" textAnchor="middle" fontSize="2.4" fontWeight="700" fill="#fff">{short(pl.name)}</text>
+              </g>
+            );
+          }))}
+          <circle cx={fr.ball.x} cy={fr.ball.y} r="1" fill="#fff" stroke="#111" strokeWidth="0.25" />
+          {bannerNow && !done && <text x={PITCH.w / 2} y={PITCH.h / 2 + 3} textAnchor="middle" fontSize={bannerNow === 'GOAL!' ? 11 : 7} fontWeight="900" fill={bannerNow === 'GOAL!' ? '#ffc83d' : '#fff'} stroke="#0f0c21" strokeWidth="0.6" paintOrder="stroke" className="pbanner">{bannerNow}</text>}
+        </svg>
+      </div>
+      <div className="mctrl" role="group" aria-label="Match controls">
+        {!done && <button className="btn btn-sm" onClick={() => setPlaying((x) => !x)} aria-label={playing ? 'Pause' : 'Play'}>{playing ? '⏸ Pause' : '▶ Play'}</button>}
+        {!done && [1, 2, 4].map((x) => <button key={x} className={'btn btn-sm' + (mult === x ? ' btn-gold' : '')} aria-pressed={mult === x} onClick={() => setMult(x)}>{x}×</button>)}
+        {!done && <button className="btn btn-sm btn-ghost" onClick={() => setT(script.total)}>Skip to result</button>}
+        {done && <button className="btn btn-sm" onClick={() => { fired.current = true; lastShown.current = 0; setT(0); setPlaying(true); }}>↺ Watch again</button>}
+      </div>
+      <div className="mfeed" ref={feedRef} aria-live="polite">
+        {feed.map((e, k) => (
+          <p key={k} className={'mev ' + e.type + (e.team != null ? ' t' + e.team : '')}>
+            <span className="mm num">{e.type === 'pen' || e.type === 'pens' ? 'PEN' : e.type === 'note' ? 'i' : e.min + '′'}</span>
+            <span>{e.type === 'goal' ? '⚽ ' : e.type === 'yellow' ? '🟨 ' : e.type === 'red' ? '🟥 ' : e.type === 'pen' ? (e.scored ? '✅ ' : '❌ ') : e.type === 'tackle' ? '🛡️ ' : e.type === 'chance' ? '🧤 ' : ''}{e.text}{e.team != null && e.type !== 'pen' ? <small> · {(e.team === 0 ? A : B).name}</small> : null}</span>
+          </p>
+        ))}
+      </div>
+      {done && <MatchSummary d={d} A={A} B={B} match={match} />}
+    </div>
+  );
+}
+// Old saved matches (before the pitch) keep their text-only replay.
+function MatchView(props) { return props.match && props.match.v === 2 ? <PitchMatch {...props} /> : <MatchPlayer {...props} />; }

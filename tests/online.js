@@ -107,6 +107,20 @@ module.exports = async function onlineTests({ ok, boot, btn, click, sleep }) {
   ok(forgedDenied && server.rejected.some((r) => r.uid === 'alice' && /state/.test(r.path)), 'the server refuses actions signed as another player and writes to the game state from non-hosts');
   void before;
 
+  // “I’m out” on Alice's phone: recorded by the host, and her later bids are refused.
+  await until(() => { const s0 = state(code); return s0.phase === 'auction' && !s0.pending && fbtn(A, 'I’m out'); }, 6000);
+  const outBtn = fbtn(A, 'I’m out');
+  const outReveal = state(code).reveal;
+  if (outBtn) await click(A.w, outBtn);
+  await until(() => { const s0 = state(code); return (s0.out && s0.out.reveal === outReveal && s0.out.ids.includes(aliceId)) || s0.reveal !== outReveal; }, 3000);
+  const so = state(code);
+  ok(outBtn && ((so.out && so.out.ids.includes(aliceId)) || so.reveal !== outReveal), 'Alice taps “I’m out” → the host records it for everyone');
+  if (so.reveal === outReveal) {
+    A.fb.database().ref('rooms/' + code + '/actions').push({ by: 'alice', json: JSON.stringify({ name: 'bid', args: [aliceId, 19] }) }).catch(() => {});
+    await sleep(150);
+    ok(!published.some((x) => x.reveal === outReveal && x.leader === aliceId && x.amount === 19), 'a late or repeated bid from Alice on that item is refused by the host');
+  } else ok(true, 'item ended before the late-bid check (nobody else could bid)');
+
   // Two players bid at the same moment: the first one wins, the other is ignored.
   // Both tap Bid at the same instant, many times: there's never more than one winner at any price.
   let races = 0;
@@ -118,6 +132,29 @@ module.exports = async function onlineTests({ ok, boot, btn, click, sleep }) {
   await sleep(150);
   const byPrice = {}; published.forEach((x) => { const k = x.reveal + ':' + x.amount; (byPrice[k] = byPrice[k] || new Set()).add(x.leader); });
   ok(races > 0 && Object.values(byPrice).every((set) => set.size === 1), 'simultaneous bids (' + races + ' races): never two accepted bids at the same price');
+
+  // Host TV view on the same phone: still the host, no extra seat, and back to controls.
+  const playersBefore = Object.keys(roomData(code).players || {}).length;
+  await click(H.w, H.d.querySelector('.tvfab'));
+  await click(H.w, btn(H.d, 'Show TV view on this screen'));
+  ok(!!H.d.querySelector('.tvmode') && H.d.querySelectorAll('.mgr[role=button]').length === 0 && roomData(code).meta.host === 'host1', 'host switches to TV view on this phone: read-only, still the host');
+  const procTv = state(code).processed;
+  await until(() => state(code).processed > procTv || state(code).phase !== 'auction', 6000);
+  ok(state(code).processed > procTv || state(code).phase !== 'auction', 'the game keeps running while the host shows the TV view');
+  await click(H.w, btn(H.d, 'Back to controls'));
+  ok(!H.d.querySelector('.tvmode'), 'host returns to controls');
+  // A TV window opened in the host's own browser (same sign-in): watches only.
+  const presenceBefore = JSON.stringify(roomData(code).presence);
+  const Tw = await phone('host1');
+  Tw.w.location.hash = '';
+  await click(Tw.w, btn(Tw.d, 'Online'));
+  await setVal(Tw, Tw.d.querySelector('#on-code'), code);
+  await click(Tw.w, btn(Tw.d, 'Use this screen as the TV'));
+  await until(() => Tw.d.querySelector('.tvmode') || Tw.d.querySelector('.tvlobby'), 3000);
+  ok(!!Tw.d.querySelector('.tvmode') && Object.keys(roomData(code).players || {}).length === playersBefore && roomData(code).players.host1.kind === 'player' && roomData(code).meta.host === 'host1', 'a TV window from the host’s own browser shows the game without adding a player or changing the host');
+  Tw.fb._client.close(); Tw.w.close();
+  await sleep(100);
+  ok(!!(roomData(code).presence || {}).host1 && JSON.stringify(roomData(code).presence) === presenceBefore, 'closing that TV window doesn’t mark the host as gone');
 
   // Bob drops out: after 60s (sped up) a bot covers him; when he's back he gets his seat back.
   const wAway = watch(A, /Away · bot covering/);

@@ -34,10 +34,15 @@ const store = (() => {
     const tx = db.transaction('kv', mode); const st = tx.objectStore('kv'); const r = fn(st);
     tx.oncomplete = () => resolve(r && r.result); tx.onerror = () => reject(tx.error); tx.onabort = () => reject(tx.error || new Error('aborted'));
   });
-  async function idbAll() {
-    const keys = await idbReq('readonly', (st) => st.getAllKeys());
-    const vals = await idbReq('readonly', (st) => st.getAll());
-    const out = {}; (keys || []).forEach((k, i) => { out[k] = vals[i]; }); return out;
+  // Keys and values are read in ONE transaction so another tab (e.g. a TV window) saving
+  // at the same moment can't shift them out of step.
+  function idbAll() {
+    return new Promise((resolve, reject) => {
+      const tx = db.transaction('kv', 'readonly'); const st = tx.objectStore('kv');
+      const kr = st.getAllKeys(); const vr = st.getAll();
+      tx.oncomplete = () => { const out = {}; (kr.result || []).forEach((k, i) => { out[k] = vr.result[i]; }); resolve(out); };
+      tx.onerror = () => reject(tx.error); tx.onabort = () => reject(tx.error || new Error('aborted'));
+    });
   }
   function report(err) {
     const quota = err && (err.name === 'QuotaExceededError' || /quota/i.test(String(err.message || err)));

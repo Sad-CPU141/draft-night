@@ -1,4 +1,4 @@
-/* Draft Night e1729e2c39 — built from src/ by build.js. Edit src/, not this file. */
+/* Draft Night 246f6228cc — built from src/ by build.js. Edit src/, not this file. */
 "use strict";
 (function(){
 function _extends() { return _extends = Object.assign ? Object.assign.bind() : function (n) { for (var e = 1; e < arguments.length; e++) { var t = arguments[e]; for (var r in t) ({}).hasOwnProperty.call(t, r) && (n[r] = t[r]); } return n; }, _extends.apply(null, arguments); }
@@ -58,14 +58,22 @@ const store = (() => {
     tx.onerror = () => reject(tx.error);
     tx.onabort = () => reject(tx.error || new Error('aborted'));
   });
-  async function idbAll() {
-    const keys = await idbReq('readonly', st => st.getAllKeys());
-    const vals = await idbReq('readonly', st => st.getAll());
-    const out = {};
-    (keys || []).forEach((k, i) => {
-      out[k] = vals[i];
+  function idbAll() {
+    return new Promise((resolve, reject) => {
+      const tx = db.transaction('kv', 'readonly');
+      const st = tx.objectStore('kv');
+      const kr = st.getAllKeys();
+      const vr = st.getAll();
+      tx.oncomplete = () => {
+        const out = {};
+        (kr.result || []).forEach((k, i) => {
+          out[k] = vr.result[i];
+        });
+        resolve(out);
+      };
+      tx.onerror = () => reject(tx.error);
+      tx.onabort = () => reject(tx.error || new Error('aborted'));
     });
-    return out;
   }
   function report(err) {
     const quota = err && (err.name === 'QuotaExceededError' || /quota/i.test(String(err.message || err)));
@@ -2679,7 +2687,7 @@ function botLimit(d, bot, item, rng) {
     value
   };
 }
-function botDecision(d, bot) {
+function botDecision(d, bot, opts) {
   const item = d.queue.length ? visibleItem(d, d.queue[0]) : null;
   if (!item || !isBot(bot) || isFull(bot) || d.phase !== 'auction' || d.pending) return null;
   if (d.bid && d.bid.leaderId === bot.id) return null;
@@ -2688,7 +2696,7 @@ function botDecision(d, bot) {
   const rng = seeded(d.seed || d.id, d.reveal, price, bot.id);
   const L = botLevel(bot);
   const type = bot.bot.type;
-  if (rng() < L.miss) return null;
+  if (rng() < L.miss && !(opts && opts.noMiss)) return null;
   const {
     limit,
     value
@@ -2734,6 +2742,31 @@ function botDecision(d, bot) {
     delay: Math.round(delay),
     event: amount > price ? 'jump' : 'bid'
   };
+}
+function botPassers(d) {
+  if (d.phase !== 'auction' || d.pending || !d.queue.length) return [];
+  const byTeam = {};
+  botActors(d).forEach(a => {
+    (byTeam[a.id] = byTeam[a.id] || []).push(a);
+  });
+  return Object.keys(byTeam).filter(id => {
+    const m = d.managers.find(x => x.id === id);
+    if (!m || isOut(d, id) || d.bid && d.bid.leaderId === id || !canBid(d, m, nextAmount(d)) || owesBid(d, m)) return false;
+    return byTeam[id].every(a => !botDecision(d, a, {
+      noMiss: true
+    }));
+  });
+}
+function botForcedBid(d) {
+  if (!mustBidOn(d)) return null;
+  const a = botActors(d).find(x => owesBid(d, d.managers.find(m => m.id === x.id)));
+  return a ? {
+    botId: a.id,
+    speaker: a.speaker || a.id,
+    amount: nextAmount(d),
+    delay: 900,
+    event: 'bid'
+  } : null;
 }
 function nextBotAction(d) {
   return botActors(d).map(b => botDecision(d, b)).filter(Boolean).sort((a, b) => a.delay - b.delay || (a.botId < b.botId ? -1 : 1))[0] || null;
@@ -3056,7 +3089,7 @@ function botTradeOffer(d, bot) {
 }
 const TWIST_DEFAULTS = {
   chaos: {
-    on: true,
+    on: false,
     count: 2,
     steal: true,
     veto: true,
@@ -3065,16 +3098,16 @@ const TWIST_DEFAULTS = {
     freeze: true
   },
   mystery: {
-    on: true,
+    on: false,
     every: 8
   },
   rarity: {
-    on: true,
+    on: false,
     rare: 25,
     legendary: 5
   },
   trades: {
-    on: true,
+    on: false,
     minutes: 3,
     money: true
   }
@@ -4038,14 +4071,54 @@ const weighted = (rng, rows, w) => {
   }
   return rows[rows.length - 1];
 };
-function simulateMatch(d, A, B, key, knockout) {
+const avgOf = (rows, fn, fallback) => rows.length ? rows.reduce((a, x) => a + fn(x), 0) / rows.length : fallback;
+function strength2(sq, emptySlots) {
+  const by = r => sq.filter(p => p.role === r);
+  const fwd = by('FWD'),
+    mid = by('MID'),
+    def = by('DEF'),
+    gk = by('GK')[0];
+  const outfield = sq.filter(p => p.role !== 'GK');
+  const attackers = fwd.length ? [...fwd, ...mid] : mid.length ? mid : outfield;
+  const att = avgOf(attackers, p => p.r.attrs.SHO * 0.45 + p.r.attrs.DRI * 0.25 + p.r.attrs.PAC * 0.2 + p.r.attrs.PAS * 0.1, 40);
+  const md = avgOf(mid.length ? mid : outfield, p => p.r.attrs.PAS * 0.5 + p.r.attrs.DRI * 0.3 + p.r.attrs.PHY * 0.2, 40);
+  const df = avgOf(def.length ? def : outfield, p => p.r.attrs.DEF * 0.6 + p.r.attrs.PHY * 0.25 + p.r.attrs.PAC * 0.15, 40) * (def.length ? 1 : 0.85);
+  const keeper = gk ? gk.r.attrs.DEF : 42;
+  const depth = Math.max(0.7, 1 - 0.05 * (emptySlots || 0));
+  return {
+    att: att * depth,
+    mid: md * depth,
+    def: df * depth,
+    gk: keeper
+  };
+}
+function poisson(rng, lambda) {
+  const L = Math.exp(-lambda);
+  let k = 0,
+    p = 1;
+  do {
+    k++;
+    p *= rng();
+  } while (p > L && k < 20);
+  return k - 1;
+}
+function expectedGoals(st, home) {
+  return [0, 1].map(i => {
+    const o = st[1 - i];
+    let x = 1.3 * Math.pow(st[i].att / o.def, 1.7) * Math.pow(st[i].mid / o.mid, 0.5) * Math.pow(68 / Math.max(30, o.gk), 0.6);
+    if (home === i) x += 0.15;
+    return clamp(x, 0.2, 3.2);
+  });
+}
+function simulateMatch(d, A, B, key, knockout, opts) {
   const rng = seeded(d.seed, 'match', key, A.id, B.id);
   const sq = [squad(d, A), squad(d, B)];
-  const st = sq.map(strength);
+  const empty = [A, B].map(m => d.rules.slots.length - m.team.filter(Boolean).length);
   const notes = [];
   if (!sq[0].length || !sq[1].length) {
     const w = sq[0].length ? 0 : 1;
     return {
+      v: 2,
       score: [w === 0 ? 3 : 0, w === 1 ? 3 : 0],
       pens: null,
       et: false,
@@ -4055,172 +4128,310 @@ function simulateMatch(d, A, B, key, knockout) {
         type: 'note',
         text: (w === 0 ? B : A).name + ' has no players, so the match is awarded 3–0.'
       }],
+      seqs: [],
       stats: {
         shots: [0, 0],
         possession: [50, 50]
       },
       notes: ['Walkover: a team had no players.'],
-      forfeit: true
+      forfeit: true,
+      xg: [0, 0]
     };
   }
   sq.forEach((s, i) => {
     if (!s.some(p => p.role === 'GK')) notes.push((i ? B : A).name + ' has no goalkeeper, so an outfield player goes in goal.');
   });
-  const lam = [0, 1].map(i => clamp(1.35 * Math.pow(st[i].att / st[1 - i].def, 2.2), 0.25, 4.2));
+  const st = sq.map((s, i) => strength2(s, empty[i]));
+  const home = opts && (opts.home === 0 || opts.home === 1) ? opts.home : null;
+  const xg = expectedGoals(st, home);
+  const goals = xg.map(x => poisson(rng, x));
+  const stoppage = 1 + Math.floor(rng() * 5);
+  const seqs = [];
+  const pick = (rows, w) => weighted(rng, rows, w);
+  const shooterW = p => (p.role === 'FWD' ? 3 : p.role === 'MID' ? 1.5 : p.role === 'DEF' ? 0.4 : 0.02) * p.r.attrs.SHO;
+  const outfield = i => sq[i].filter(p => p.role !== 'GK').length ? sq[i].filter(p => p.role !== 'GK') : sq[i];
+  const keeperOf = i => (sq[i].find(p => p.role === 'GK') || [...sq[i]].sort((a, b2) => b2.r.attrs.DEF - a.r.attrs.DEF)[0]).name;
+  const chainTo = (i, last) => {
+    const pool = outfield(i).filter(p => p.name !== last.name);
+    const n = Math.min(pool.length, 1 + Math.floor(rng() * 3));
+    const used = new Set([last.name]);
+    const chain = [];
+    for (let k = 0; k < n; k++) {
+      const cand = pool.filter(p => !used.has(p.name));
+      if (!cand.length) break;
+      const w = p => (k === 0 ? p.role === 'DEF' ? 2 : p.role === 'MID' ? 2.5 : 0.6 : p.role === 'MID' ? 2.5 : p.role === 'FWD' ? 1.8 : 0.5) * p.r.attrs.PAS;
+      const p = pick(cand, w);
+      used.add(p.name);
+      chain.push(p.name);
+    }
+    chain.push(last.name);
+    return chain;
+  };
+  const minutesUsed = new Set();
+  const minuteIn = (lo, hi) => {
+    for (let t = 0; t < 40; t++) {
+      const m = lo + Math.floor(rng() * (hi - lo + 1));
+      if (!minutesUsed.has(m)) {
+        minutesUsed.add(m);
+        return m;
+      }
+    }
+    return lo + Math.floor(rng() * (hi - lo + 1));
+  };
+  const addMoves = (lo, hi, gl, scaleChances, inET) => {
+    const start = seqs.length;
+    [0, 1].forEach(i => {
+      for (let g = 0; g < gl[i]; g++) {
+        const scorer = pick(outfield(i), shooterW);
+        const chain = chainTo(i, scorer);
+        const assist = chain.length > 1 && rng() < 0.8 ? chain[chain.length - 2] : null;
+        seqs.push({
+          min: minuteIn(lo, hi),
+          team: i,
+          kind: 'goal',
+          chain,
+          shooter: scorer.name,
+          assist,
+          keeper: keeperOf(1 - i),
+          side: rng() < 0.5 ? -1 : 1
+        });
+      }
+      const chances = Math.round((1 + poisson(rng, xg[i] * 2.1)) * scaleChances);
+      for (let c = 0; c < chances; c++) {
+        const shooter = pick(outfield(i), shooterW);
+        const u = rng();
+        const kind = u < 0.45 ? 'save' : u < 0.8 ? 'miss' : 'block';
+        const blocker = kind === 'block' ? pick(outfield(1 - i), p => p.r.attrs.DEF + (p.role === 'DEF' ? 30 : 0)).name : null;
+        seqs.push({
+          min: minuteIn(lo, hi),
+          team: i,
+          kind,
+          chain: chainTo(i, shooter),
+          shooter: shooter.name,
+          keeper: keeperOf(1 - i),
+          blocker,
+          side: rng() < 0.5 ? -1 : 1
+        });
+      }
+    });
+    const breaks = Math.round((4 + Math.floor(rng() * 4)) * scaleChances);
+    for (let k = 0; k < breaks; k++) {
+      const i = rng() < st[0].mid / (st[0].mid + st[1].mid) ? 1 : 0;
+      const carrier = pick(outfield(i), p => (p.role === 'MID' ? 2 : 1) * p.r.attrs.DRI);
+      const tackler = pick(outfield(1 - i), p => (p.role === 'DEF' ? 2 : p.role === 'MID' ? 1.5 : 0.6) * p.r.attrs.DEF);
+      seqs.push({
+        min: minuteIn(lo, hi),
+        team: i,
+        kind: rng() < 0.5 ? 'tackle' : 'intercept',
+        chain: chainTo(i, carrier),
+        tackler: tackler.name,
+        side: rng() < 0.5 ? -1 : 1
+      });
+    }
+    if (inET) for (let k = start; k < seqs.length; k++) seqs[k].et = true;
+  };
+  addMoves(1, 90 + stoppage, goals, 1);
+  let et = false,
+    pens = null;
+  const etGoals = [0, 0];
+  if (knockout && goals[0] === goals[1]) {
+    et = true;
+    const extra = xg.map(x => poisson(rng, x * 0.3));
+    etGoals[0] = extra[0];
+    etGoals[1] = extra[1];
+    minutesUsed.clear();
+    addMoves(91, 120, extra, 0.35, true);
+  }
+  seqs.sort((a, b2) => (a.et ? 1 : 0) - (b2.et ? 1 : 0) || a.min - b2.min);
+  const score = [goals[0] + etGoals[0], goals[1] + etGoals[1]];
   const events = [{
     min: 0,
     type: 'kickoff',
     text: pickLine(rng, 'kickoff')
   }];
-  const score = [0, 0],
-    shots = [0, 0],
-    cards = [{}, {}];
-  let reds = [0, 0];
-  const minute = (m, scale) => {
-    for (let i = 0; i < 2; i++) {
-      const l = lam[i] * scale * (reds[i] ? 0.75 : 1) * (reds[1 - i] ? 1.25 : 1);
-      if (rng() < l / 90) {
-        const scorer = weighted(rng, sq[i], p => (p.role === 'FWD' ? 3 : p.role === 'MID' ? 1.6 : p.role === 'DEF' ? 0.5 : 0.02) * p.r.attrs.SHO);
-        const others = sq[i].filter(p => p !== scorer);
-        const assist = others.length && rng() < 0.75 ? weighted(rng, others, p => p.r.attrs.PAS * (p.role === 'GK' ? 0.1 : 1)) : null;
-        score[i]++;
-        shots[i] += 1;
+  const run = [0, 0];
+  const cards = [{}, {}];
+  const shots = [0, 0];
+  let halfDone = false,
+    fullDone = false,
+    etDone = false;
+  seqs.forEach((q, idx) => {
+    if (!halfDone && q.min > 45) {
+      halfDone = true;
+      events.push({
+        min: 45,
+        type: 'half',
+        score: [...run],
+        text: pickLine(rng, 'half')
+      });
+    }
+    if (q.et && !fullDone) {
+      fullDone = true;
+      if (!halfDone) {
+        halfDone = true;
         events.push({
-          min: m,
-          type: 'goal',
-          team: i,
-          player: scorer.name,
-          assist: assist && assist.name,
-          score: [...score],
-          text: pickLine(rng, 'goal', {
-            p: scorer.name
-          }) + (assist ? pickLine(rng, 'assist', {
-            a: assist.name
-          }) : '')
+          min: 45,
+          type: 'half',
+          score: [...run],
+          text: pickLine(rng, 'half')
         });
-      } else if (rng() < l / 45) {
-        shots[i]++;
-        if (rng() < 0.25) {
-          const p = weighted(rng, sq[i], x => x.r.attrs.SHO);
+      }
+      events.push({
+        min: 90 + stoppage,
+        type: 'full',
+        score: [...run],
+        text: pickLine(rng, 'full')
+      });
+    }
+    if (q.et && !etDone) {
+      etDone = true;
+      events.push({
+        min: 91,
+        type: 'et',
+        text: pickLine(rng, 'et')
+      });
+    }
+    q.i = idx;
+    if (q.kind === 'goal') {
+      run[q.team]++;
+      shots[q.team]++;
+      events.push({
+        min: q.min,
+        type: 'goal',
+        team: q.team,
+        player: q.shooter,
+        assist: q.assist,
+        score: [...run],
+        seq: idx,
+        text: pickLine(rng, 'goal', {
+          p: q.shooter
+        }) + (q.assist ? pickLine(rng, 'assist', {
+          a: q.assist
+        }) : '')
+      });
+    } else if (q.kind === 'save' || q.kind === 'miss' || q.kind === 'block') {
+      shots[q.team]++;
+      const text = q.kind === 'save' ? 'Great save by ' + q.keeper + ' to deny ' + q.shooter + '!' : q.kind === 'miss' ? q.shooter + ' shoots… just wide!' : q.blocker + ' throws himself in front of ' + q.shooter + '’s shot!';
+      events.push({
+        min: q.min,
+        type: 'chance',
+        team: q.team,
+        player: q.shooter,
+        seq: idx,
+        text
+      });
+    } else {
+      const text = q.kind === 'tackle' ? 'Strong tackle from ' + q.tackler + ' to win it back.' : q.tackler + ' reads the pass and intercepts.';
+      events.push({
+        min: q.min,
+        type: 'tackle',
+        team: 1 - q.team,
+        player: q.tackler,
+        seq: idx,
+        text
+      });
+      if (rng() < 0.12) {
+        const t = 1 - q.team;
+        const p = q.tackler;
+        if (cards[t][p] || rng() < 0.05) {
           events.push({
-            min: m,
-            type: 'chance',
-            team: i,
-            player: p.name,
-            text: pickLine(rng, 'chance', {
-              p: p.name
+            min: q.min,
+            type: 'red',
+            team: t,
+            player: p,
+            text: pickLine(rng, 'red', {
+              p
             })
           });
-        }
-      }
-      if (rng() < 0.011) {
-        const p = weighted(rng, sq[i], x => x.r.attrs.DEF + 10);
-        if (cards[i][p.name] || rng() < 0.04) {
-          if (!reds[i]) {
-            reds[i]++;
-            events.push({
-              min: m,
-              type: 'red',
-              team: i,
-              player: p.name,
-              text: pickLine(rng, 'red', {
-                p: p.name
-              })
-            });
-          }
         } else {
-          cards[i][p.name] = 1;
+          cards[t][p] = 1;
           events.push({
-            min: m,
+            min: q.min,
             type: 'yellow',
-            team: i,
-            player: p.name,
+            team: t,
+            player: p,
             text: pickLine(rng, 'yellow', {
-              p: p.name
+              p
             })
           });
         }
       }
     }
-  };
-  for (let m = 1; m <= 45; m++) minute(m, 1);
-  events.push({
+  });
+  if (!halfDone) events.push({
     min: 45,
     type: 'half',
-    score: [...score],
+    score: [0, 1].map(t => seqs.filter(q => q.kind === 'goal' && q.team === t && !q.et && q.min <= 45).length),
     text: pickLine(rng, 'half')
   });
-  const stoppage = 1 + Math.floor(rng() * 5);
-  for (let m = 46; m <= 90 + stoppage; m++) minute(m, 1);
-  events.push({
+  if (!fullDone) events.push({
     min: 90 + stoppage,
     type: 'full',
-    score: [...score],
+    score: [goals[0], goals[1]],
     text: pickLine(rng, 'full')
   });
-  let et = false,
-    pens = null;
-  if (knockout && score[0] === score[1]) {
-    et = true;
+  if (et && !etDone) events.push({
+    min: 91,
+    type: 'et',
+    text: pickLine(rng, 'et')
+  });
+  if (et && score[0] === score[1]) {
     events.push({
-      min: 91 + stoppage,
-      type: 'et',
-      text: pickLine(rng, 'et')
+      min: 120,
+      type: 'pens',
+      text: pickLine(rng, 'pens')
     });
-    for (let m = 91; m <= 120; m++) minute(m, 0.33);
-    if (score[0] === score[1]) {
-      events.push({
-        min: 120,
-        type: 'pens',
-        text: pickLine(rng, 'pens')
-      });
-      pens = [0, 0];
-      const gk = sq.map(s => (s.find(p => p.role === 'GK') || {
-        r: {
-          attrs: {
-            DEF: 50
-          }
+    pens = [0, 0];
+    const gkr = sq.map(s => (s.find(p => p.role === 'GK') || {
+      r: {
+        attrs: {
+          DEF: 50
         }
-      }).r.attrs.DEF);
-      const takers = sq.map(s => [...s].sort((a, b) => b.r.attrs.SHO - a.r.attrs.SHO));
-      for (let k = 0; k < 30; k++) {
-        for (let i = 0; i < 2; i++) {
-          const p = takers[i][k % takers[i].length];
-          const scored = rng() < clamp(0.62 + (p.r.attrs.SHO - gk[1 - i]) / 220, 0.45, 0.9);
-          if (scored) pens[i]++;
-          events.push({
-            min: 120,
-            type: 'pen',
-            team: i,
-            player: p.name,
-            scored,
-            pens: [...pens],
-            text: p.name + (scored ? ' scores!' : ' misses!')
-          });
-        }
-        if (k >= 4 && pens[0] !== pens[1]) break;
-        if (k < 4) {
-          const left = 4 - k;
-          if (pens[0] > pens[1] + left || pens[1] > pens[0] + left) break;
-        }
+      }
+    }).r.attrs.DEF);
+    const takers = sq.map(s => [...s].sort((a, b2) => b2.r.attrs.SHO - a.r.attrs.SHO));
+    for (let k = 0; k < 30; k++) {
+      for (let i = 0; i < 2; i++) {
+        const p = takers[i][k % takers[i].length];
+        const scored = rng() < clamp(0.62 + (p.r.attrs.SHO - gkr[1 - i]) / 220, 0.45, 0.9);
+        if (scored) pens[i]++;
+        events.push({
+          min: 120,
+          type: 'pen',
+          team: i,
+          player: p.name,
+          scored,
+          pens: [...pens],
+          keeper: keeperOf(1 - i),
+          side: rng() < 0.5 ? -1 : 1,
+          text: p.name + (scored ? ' scores!' : ' misses!')
+        });
+      }
+      if (k >= 4 && pens[0] !== pens[1]) break;
+      if (k < 4) {
+        const left = 4 - k;
+        if (pens[0] > pens[1] + left || pens[1] > pens[0] + left) break;
       }
     }
   }
   const winner = score[0] !== score[1] ? score[0] > score[1] ? 0 : 1 : pens ? pens[0] > pens[1] ? 0 : 1 : null;
-  const total = shots[0] + shots[1] || 1;
-  const poss0 = clamp(Math.round(50 + (st[0].att - st[1].att) / 2 + (rng() - 0.5) * 8), 30, 70);
+  const poss0 = clamp(Math.round(50 + (st[0].mid - st[1].mid) * 0.8 + (rng() - 0.5) * 6), 30, 70);
   return {
+    v: 2,
     score,
     et,
     pens,
     winner,
     events,
+    seqs,
     stats: {
       shots,
-      possession: [poss0, 100 - poss0],
-      shotShare: shots[0] / total
+      possession: [poss0, 100 - poss0]
     },
-    notes
+    notes,
+    xg: xg.map(x => Math.round(x * 100) / 100),
+    stoppage,
+    home
   };
 }
 function seedTeams(d) {
@@ -4394,7 +4605,8 @@ const FINALE_DEFAULTS = {
   weight: 60,
   speed: 'normal',
   commentary: true,
-  tiebreak: 'rating'
+  tiebreak: 'rating',
+  home: false
 };
 const needsVote = mode => mode === 'bracket' || mode === 'combined';
 const needsMatch = mode => mode === 'sim' || mode === 'combined';
@@ -4472,8 +4684,18 @@ const votingDone = (d, m) => matchVoters(d, m).every(p => hasMatchVote(m, p.id))
 function playMatchup(d, r, i) {
   const m = getMatchup(d, r, i);
   if (!m.a || !m.b || m.match || m.winner) return d;
+  const A = teamOf(d, m.a),
+    B = teamOf(d, m.b);
+  let home = null;
+  if (finCfg(d).home) {
+    const ra = teamRating(d, A).rating,
+      rb = teamRating(d, B).rating;
+    home = ra >= rb ? 0 : 1;
+  }
   return withMatchup(d, r, i, {
-    match: simulateMatch(d, teamOf(d, m.a), teamOf(d, m.b), m.id, true)
+    match: simulateMatch(d, A, B, m.id, true, {
+      home
+    })
   });
 }
 function resolveMatchup(d, r, i) {
@@ -5405,14 +5627,44 @@ function maxBid(m, rules) {
 }
 const currentItem = d => d.queue.length ? d.items[d.queue[0]] : null;
 const nextAmount = d => d.bid ? d.bid.amount + d.rules.inc : d.rules.minBid;
+const outIds = d => d.out && d.out.reveal === d.reveal ? d.out.ids : [];
+const isOut = (d, id) => outIds(d).includes(id);
+const hasBidOnItem = (d, id) => !!(d.bid && d.bid.leaderId === id || (d.bids || []).some(b => b && b.leaderId === id));
+const mustBidOn = d => !!(d.rules && d.rules.mustBid);
+function owesBid(d, m) {
+  return mustBidOn(d) && !hasBidOnItem(d, m.id) && canBid(d, m, nextAmount(d));
+}
+const owing = d => d.phase === 'auction' && !d.pending ? d.managers.filter(m => owesBid(d, m)) : [];
+function withdrawProblem(d, id) {
+  const m = d.managers.find(x => x.id === id);
+  if (!m || d.phase !== 'auction' || !currentItem(d)) return 'There’s no item up right now.';
+  if (isOut(d, id)) return 'Already out on this item.';
+  if (owesBid(d, m)) return 'Require every manager to bid is on: bid at least once on this item before dropping out.';
+  return null;
+}
+function withdraw(d, id) {
+  return withdrawProblem(d, id) ? d : {
+    ...d,
+    out: {
+      reveal: d.reveal,
+      ids: [...outIds(d), id]
+    }
+  };
+}
+function auctionEnd(d) {
+  if (d.phase !== 'auction' || d.pending || !currentItem(d)) return null;
+  if (d.bid) return d.managers.some(m => m.id !== d.bid.leaderId && canBid(d, m, nextAmount(d))) ? null : 'sell';
+  return d.managers.some(m => canBid(d, m, d.rules.minBid)) ? null : 'skip';
+}
 function canBid(d, m, amount) {
   const item = currentItem(d);
-  if (!item || isFull(m) || d.pending || d.phase !== 'auction' || frozenNow(d, m.id)) return false;
+  if (!item || isFull(m) || d.pending || d.phase !== 'auction' || frozenNow(d, m.id) || isOut(d, m.id)) return false;
   if (assignSlot(m, item, d.rules.slots) < 0) return false;
   return amount >= d.rules.minBid && amount <= maxBid(m, d.rules);
 }
 function bidBlocker(d, m) {
   const item = currentItem(d);
+  if (isOut(d, m.id)) return 'Out ✋';
   if (isFull(m)) return 'Team full';
   if (frozenNow(d, m.id)) return 'Frozen 🧊';
   if (item && assignSlot(m, item, d.rules.slots) < 0) return 'No ' + (item.pos || 'open') + ' slot';
@@ -5584,6 +5836,7 @@ function createDraft(topic, managers, rules, extra) {
 }
 function placeBid(d, managerId, amount, opts) {
   const m = d.managers.find(x => x.id === managerId);
+  if (isOut(d, managerId)) return d;
   if (opts && opts.double) {
     if (doubleProblem(d, managerId, amount)) return d;
     return {
@@ -6087,7 +6340,22 @@ function TeamsSheet({
     className: "iconbtn",
     onClick: onClose,
     "aria-label": "Close"
-  }, "\u2715")), d.managers.map(m => React.createElement("div", {
+  }, "\u2715")), React.createElement("details", {
+    className: "card"
+  }, React.createElement("summary", {
+    className: "label"
+  }, "\uD83D\uDCDC Rules in play"), React.createElement(RulesSummary, {
+    rules: d.rules,
+    opts: {
+      teams: !!d.teamMode,
+      clock: d.mode === 'online' ? (d.online || {}).clock : d.mode === 'solo' ? (d.solo || {}).clock : 0
+    }
+  }), React.createElement("p", {
+    className: "hint",
+    style: {
+      margin: 0
+    }
+  }, "Rules are locked once a draft starts.")), d.managers.map(m => React.createElement("div", {
     className: "tteam",
     key: m.id,
     style: mStyle(m)
@@ -6236,7 +6504,7 @@ function Home({
   }, "Players & stats"), React.createElement("button", {
     className: "btn btn-ghost",
     onClick: onSettings
-  }, "Settings, sound & backup")), showInstall && React.createElement("div", {
+  }, "Rules & settings")), showInstall && React.createElement("div", {
     className: "card row installcard"
   }, React.createElement("span", {
     style: {
@@ -7870,6 +8138,45 @@ function PctField({
     onChange: onChange
   }));
 }
+function rulesLines(rules, opts) {
+  const tw = twistRules(rules);
+  const fin = {
+    ...FINALE_DEFAULTS,
+    ...(rules.finale || {})
+  };
+  const per = opts && opts.teams ? 'team' : 'manager';
+  const L = [];
+  L.push(['💵', money(rules.budget) + ' budget per ' + per + ' · ' + (rules.slots || []).length + ' slots' + (rules.slots && rules.slots.length ? ' (' + rules.slots.join(', ') + ')' : '')]);
+  L.push(['🔨', 'Bids start at ' + money(rules.minBid) + ', go up by ' + money(rules.inc) + (opts && opts.clock ? ' · ' + opts.clock + 's bid clock' : rules.timer ? ' · ' + rules.timer + 's bid timer' : ' · auctioneer taps Sold')]);
+  L.push(['✋', rules.mustBid ? 'Require every manager to bid: ON — everyone must bid once on each item before dropping out' : 'Anyone can drop out of an item without bidding']);
+  L.push(['🧭', rules.order === 'nominate' ? 'Nomination: teams take turns picking what goes up' : rules.order === 'saved' ? 'Items come up in topic order' : 'Items come up in random order']);
+  L.push(['↩️', rules.noBids === 'back' ? 'Unbid items go to the back of the queue' : 'Unbid items are skipped (leftovers become free picks)']);
+  if (rules.mustFill) L.push(['🧮', 'You must keep enough money to fill your team']);
+  L.push(['🃏', tw.chaos.on ? 'Chaos Cards: ' + tw.chaos.count + ' per ' + per + ' — ' + CARD_TYPES.filter(c => tw.chaos[c]).map(c => CARD_INFO[c].name).join(', ') : 'Chaos Cards: off']);
+  L.push(['❓', tw.mystery.on ? 'Mystery items: 1 in ' + tw.mystery.every : 'Mystery items: off']);
+  L.push(['✨', tw.rarity.on ? 'Rarity: ' + (100 - tw.rarity.rare - tw.rarity.legendary) + '% common · ' + tw.rarity.rare + '% rare · ' + tw.rarity.legendary + '% legendary' : 'Rarity: off']);
+  L.push(['🤝', tw.trades.on ? 'Trade window: ' + tw.trades.minutes + ' min' + (tw.trades.money ? ', money allowed' : '') : 'Trade window: off']);
+  L.push(['🏆', 'Winner: ' + {
+    vote: 'group vote',
+    bracket: 'head-to-head vote bracket' + (fin.tiebreak === 'revote' ? ' (ties: vote again once)' : ' (ties: higher-rated team)'),
+    sim: 'match simulator knockout',
+    combined: 'combined finale ' + fin.weight + '% match / ' + (100 - fin.weight) + '% votes'
+  }[fin.mode] + (fin.home && (fin.mode === 'sim' || fin.mode === 'combined') ? ' · home advantage for the higher seed' : '')]);
+  return L;
+}
+function RulesSummary({
+  rules,
+  opts
+}) {
+  return React.createElement("ul", {
+    className: "rulelist"
+  }, rulesLines(rules, opts).map(([e, t]) => React.createElement("li", {
+    key: t
+  }, React.createElement("span", {
+    "aria-hidden": "true"
+  }, e), " ", t)));
+}
+const RULE_TABS = [['general', 'General'], ['auction', 'Auction & bidding'], ['chaos', 'Chaos & surprises'], ['teams', 'Teams & trading'], ['winner', 'Winner'], ['review', 'Review']];
 function SetupRules({
   topic,
   managers,
@@ -7881,10 +8188,13 @@ function SetupRules({
   title = '3 · Rules',
   teamSummary,
   onEditTeams,
-  onReset
+  onReset,
+  defaultsMode,
+  clockNote
 }) {
   const [slotTxt, setSlotTxt] = useState(rules.slots.join(', '));
   const [askReset, setAskReset] = useState(false);
+  const [tab, setTab] = useState('general');
   const slots = parseSlots(slotTxt);
   const tw = twistRules(rules);
   const set = p => setRules({
@@ -7898,18 +8208,34 @@ function SetupRules({
       ...p
     }
   });
-  const needed = rules.minBid * slots.length;
+  const needed = rules.minBid * Math.max(1, slots.length);
   const problems = [];
-  if (!slots.length) problems.push('Add at least one slot.');
-  if (rules.budget < needed) problems.push('A budget of ' + money(rules.budget) + " can't fill " + slots.length + ' slots at ' + money(rules.minBid) + ' each. Raise it to at least ' + money(needed) + '.');
+  if (!defaultsMode && !slots.length) problems.push('Add at least one slot.');
+  if (!defaultsMode && rules.budget < needed) problems.push('A budget of ' + money(rules.budget) + " can't fill " + slots.length + ' slots at ' + money(rules.minBid) + ' each. Raise it to at least ' + money(needed) + '.');
   if (tw.chaos.on && !CARD_TYPES.some(c => tw.chaos[c])) problems.push('Chaos Cards are on but every card type is switched off. Turn one on, or switch Chaos Cards off.');
   if (tw.rarity.on && tw.rarity.rare + tw.rarity.legendary > 100) problems.push('Rare + Legendary can’t be more than 100%.');
-  if (topic.items.length < slots.length * managers.length) problems.push('Heads up: ' + topic.items.length + ' items for ' + slots.length * managers.length + ' slots. Some teams will finish short.');
-  if (tw.mystery.on && topic.items.length < tw.mystery.every) problems.push('Heads up: this topic has fewer than ' + tw.mystery.every + ' items, so there won’t be any mystery items.');
+  if (!defaultsMode && topic.items.length < slots.length * managers.length) problems.push('Heads up: ' + topic.items.length + ' items for ' + slots.length * managers.length + ' slots. Some teams will finish short.');
+  if (!defaultsMode && tw.mystery.on && topic.items.length < tw.mystery.every) problems.push('Heads up: this topic has fewer than ' + tw.mystery.every + ' items, so there won’t be any mystery items.');
   const blocking = problems.filter(p => !p.startsWith('Heads up'));
-  const posMissing = [...new Set(topic.items.map(i => i.pos).filter(p => p && !slots.some(s => norm(s) === norm(p))))];
+  const posMissing = defaultsMode ? [] : [...new Set(topic.items.map(i => i.pos).filter(p => p && !slots.some(s => norm(s) === norm(p))))];
   const common = 100 - tw.rarity.rare - tw.rarity.legendary;
-  const mysteryCount = tw.mystery.on ? Math.floor(topic.items.length / Math.max(2, tw.mystery.every)) : 0;
+  const mysteryCount = tw.mystery.on && !defaultsMode ? Math.floor(topic.items.length / Math.max(2, tw.mystery.every)) : 0;
+  const teams = !!(teamSummary && teamSummary.teams);
+  const fin = {
+    ...FINALE_DEFAULTS,
+    ...(rules.finale || {})
+  };
+  const setF = p => set({
+    finale: {
+      ...fin,
+      ...p
+    }
+  });
+  const foot = defaultsMode || isFootball(topic);
+  const onCount = {
+    chaos: [tw.chaos.on, tw.mystery.on, tw.rarity.on].filter(Boolean).length,
+    teams: [tw.trades.on].filter(Boolean).length
+  };
   return React.createElement("div", {
     className: "app"
   }, React.createElement(TopBar, {
@@ -7917,21 +8243,30 @@ function SetupRules({
     title: title
   }), React.createElement("div", null, React.createElement("p", {
     className: "eyebrow"
-  }, topic.emoji, " ", topic.name), React.createElement("h2", {
+  }, defaultsMode ? 'Your defaults for new games' : topic.emoji + ' ' + topic.name), React.createElement("h2", {
     className: "display"
   }, "House rules"), React.createElement("p", {
     className: "hint"
-  }, "Changes apply to new drafts only. A game in progress keeps its rules.")), React.createElement(RuleSection, {
-    id: "rs-basic",
-    emoji: "\uD83D\uDCB5",
-    title: "Money & slots",
-    summary: money(rules.budget) + ' budget · min ' + money(rules.minBid) + ' · +' + money(rules.inc) + ' · ' + slots.length + ' slots',
-    open: true
+  }, defaultsMode ? 'New games start with these. You can still change them when setting up a game.' : 'Changes apply to this new draft. A game in progress keeps its rules.', " Optional extras are off until you switch them on.")), React.createElement("div", {
+    className: "tabs",
+    role: "tablist",
+    "aria-label": "Rule sections"
+  }, RULE_TABS.map(([k, label]) => React.createElement("button", {
+    key: k,
+    role: "tab",
+    "aria-selected": tab === k,
+    className: 'tab' + (tab === k ? ' on' : ''),
+    onClick: () => setTab(k)
+  }, label, onCount[k] ? React.createElement("span", {
+    className: "tabcount"
+  }, onCount[k], " on") : null))), tab === 'general' && React.createElement("div", {
+    className: "stack",
+    role: "tabpanel"
   }, React.createElement("div", {
     className: "field"
   }, React.createElement("label", {
     htmlFor: "r-budget"
-  }, "Starting budget", teamSummary && teamSummary.teams ? ' (per team)' : ''), React.createElement(Stepper, {
+  }, "Starting budget", teams ? ' (per team)' : ''), React.createElement(Stepper, {
     id: "r-budget",
     prefix: "$",
     value: rules.budget,
@@ -7940,35 +8275,9 @@ function SetupRules({
     onChange: v => set({
       budget: v
     })
-  })), React.createElement("div", {
-    className: "row"
-  }, React.createElement("div", {
-    className: "field grow"
-  }, React.createElement("label", {
-    htmlFor: "r-min"
-  }, "Minimum bid"), React.createElement(Stepper, {
-    id: "r-min",
-    prefix: "$",
-    value: rules.minBid,
-    min: 1,
-    max: 99,
-    onChange: v => set({
-      minBid: v
-    })
-  }))), React.createElement("div", {
-    className: "field"
-  }, React.createElement("label", {
-    htmlFor: "r-inc"
-  }, "Bid increment"), React.createElement(Stepper, {
-    id: "r-inc",
-    prefix: "$",
-    value: rules.inc,
-    min: 1,
-    max: 99,
-    onChange: v => set({
-      inc: v
-    })
-  })), React.createElement("div", {
+  }), React.createElement("p", {
+    className: "hint"
+  }, "What each ", teams ? 'team' : 'manager', " has to spend on the whole draft.")), !defaultsMode && React.createElement("div", {
     className: "field"
   }, React.createElement("label", {
     htmlFor: "r-slots"
@@ -7983,49 +8292,15 @@ function SetupRules({
         slots: p
       });
     }
-  }), posMissing.length > 0 && React.createElement("p", {
+  }), React.createElement("p", {
+    className: "hint"
+  }, "How many items each team ends up with. FLEX takes anything."), posMissing.length > 0 && React.createElement("p", {
     className: "hint"
   }, "No slot for ", posMissing.join(', '), ". Those items can go in any open slot.")), React.createElement("div", {
     className: "field"
   }, React.createElement("span", {
     className: "label"
-  }, "Bid timer"), React.createElement(Seg, {
-    label: "Bid timer",
-    value: rules.timer,
-    options: [[0, 'Off'], [10, '10s'], [15, '15s'], [30, '30s']],
-    onChange: v => set({
-      timer: v
-    })
-  }), rules.timer > 0 && React.createElement("p", {
-    className: "hint"
-  }, "Resets on every bid. When it runs out with a leader, the item sells automatically. (Solo always uses its own bid clock.)")), React.createElement(Toggle, {
-    on: rules.mustFill,
-    onChange: v => set({
-      mustFill: v
-    }),
-    title: "Must be able to fill your team",
-    sub: 'Max bid keeps ' + money(rules.minBid) + ' for every other empty slot.'
-  }), React.createElement("div", {
-    className: "field"
-  }, React.createElement("span", {
-    className: "label"
-  }, "Items with no bids"), React.createElement(Seg, {
-    label: "No bids",
-    value: rules.noBids,
-    options: [['skip', 'Skip them'], ['back', 'Back of queue']],
-    onChange: v => set({
-      noBids: v
-    })
-  }))), React.createElement(RuleSection, {
-    id: "rs-flow",
-    emoji: "\uD83E\uDDED",
-    title: "Draft flow",
-    summary: (rules.order === 'nominate' ? 'Nomination' : rules.order === 'saved' ? 'Topic order' : 'Random order') + ' · trades ' + (tw.trades.on ? tw.trades.minutes + ' min' + (tw.trades.money ? ' + money' : '') : 'off')
-  }, React.createElement("div", {
-    className: "field"
-  }, React.createElement("span", {
-    className: "label"
-  }, "Draft order"), React.createElement(Seg, {
+  }, "Item order"), React.createElement(Seg, {
     label: "Draft order",
     value: rules.order,
     options: [['random', 'Random'], ['nominate', 'Nomination'], ['saved', 'Topic order']],
@@ -8035,31 +8310,94 @@ function SetupRules({
   }), React.createElement("p", {
     className: "hint"
   }, rules.order === 'nominate' ? 'Teams take turns choosing which item goes up next.' : rules.order === 'saved' ? 'Items come up in the order saved in the topic.' : 'Items come up in a random order.')), React.createElement(Toggle, {
-    on: tw.trades.on,
-    onChange: v => setTw('trades', {
-      on: v
+    on: rules.mustFill,
+    onChange: v => set({
+      mustFill: v
     }),
-    title: "Trade window after the draft",
-    sub: "1-for-1 trades. Both teams must accept."
-  }), tw.trades.on && React.createElement(React.Fragment, null, React.createElement("div", {
+    title: "Must be able to fill your team",
+    sub: 'Your highest bid always leaves ' + money(rules.minBid) + ' for each other empty slot.'
+  })), tab === 'auction' && React.createElement("div", {
+    className: "stack",
+    role: "tabpanel"
+  }, React.createElement("div", {
+    className: "field"
+  }, React.createElement("label", {
+    htmlFor: "r-min"
+  }, "Minimum bid"), React.createElement(Stepper, {
+    id: "r-min",
+    prefix: "$",
+    value: rules.minBid,
+    min: 1,
+    max: 99,
+    onChange: v => set({
+      minBid: v
+    })
+  }), React.createElement("p", {
+    className: "hint"
+  }, "The opening price for every item.")), React.createElement("div", {
+    className: "field"
+  }, React.createElement("label", {
+    htmlFor: "r-inc"
+  }, "Bid increment"), React.createElement(Stepper, {
+    id: "r-inc",
+    prefix: "$",
+    value: rules.inc,
+    min: 1,
+    max: 99,
+    onChange: v => set({
+      inc: v
+    })
+  }), React.createElement("p", {
+    className: "hint"
+  }, "How much each tap raises the price.")), React.createElement("div", {
     className: "field"
   }, React.createElement("span", {
     className: "label"
-  }, "Trade window"), React.createElement(Seg, {
-    label: "Trade window length",
-    value: tw.trades.minutes,
-    options: [[1, '1 min'], [3, '3 min'], [5, '5 min'], [10, '10 min']],
-    onChange: v => setTw('trades', {
-      minutes: v
+  }, "Bid timer (Local games)"), React.createElement(Seg, {
+    label: "Bid timer",
+    value: rules.timer,
+    options: [[0, 'Off'], [10, '10s'], [15, '15s'], [30, '30s']],
+    onChange: v => set({
+      timer: v
     })
-  })), React.createElement(Toggle, {
-    on: tw.trades.money,
-    onChange: v => setTw('trades', {
-      money: v
+  }), React.createElement("p", {
+    className: "hint"
+  }, rules.timer > 0 ? 'Restarts on every bid. When it runs out the item sells to the leader.' : 'Off: the auctioneer taps Sold.', " ", clockNote || 'Solo and Online games always use a bid clock (set on their own setup screens).')), React.createElement(Toggle, {
+    on: !!rules.mustBid,
+    onChange: v => set({
+      mustBid: v
     }),
-    title: "Money in trades",
-    sub: "A team can add cash to sweeten a 1-for-1 trade."
-  }))), React.createElement(RuleSection, {
+    title: "Require every manager to bid",
+    sub: "Everyone who can afford it must bid at least once on each item before they can tap \u201CI\u2019m out\u201D. The item can\u2019t close until they have. Managers who can\u2019t afford the next bid, or have no slot for it, are excused."
+  }), React.createElement("div", {
+    className: "field"
+  }, React.createElement("span", {
+    className: "label"
+  }, "Items nobody bids on"), React.createElement(Seg, {
+    label: "No bids",
+    value: rules.noBids,
+    options: [['skip', 'Skip them'], ['back', 'Back of queue']],
+    onChange: v => set({
+      noBids: v
+    })
+  })), React.createElement("div", {
+    className: "card stack-sm",
+    style: {
+      background: 'var(--stage)'
+    }
+  }, React.createElement("b", {
+    className: "small"
+  }, "How \u201CI\u2019m out\u201D works"), React.createElement("p", {
+    className: "hint",
+    style: {
+      margin: 0
+    }
+  }, "Tapping \u201CI\u2019m out\u201D drops you out of the current item only: you can\u2019t bid on it again, and you\u2019re back in for the next item. A bid you already made still stands. As soon as nobody but the leader can still bid, the item sells straight away; if nobody can bid at all, it goes unsold. Bots drop out when the price passes what they\u2019ll pay."))), tab === 'chaos' && React.createElement("div", {
+    className: "stack",
+    role: "tabpanel"
+  }, React.createElement("p", {
+    className: "hint"
+  }, "Optional twists. All off unless you switch them on."), React.createElement(RuleSection, {
     id: "rs-chaos",
     emoji: "\uD83C\uDCCF",
     title: "Chaos Cards",
@@ -8067,12 +8405,12 @@ function SetupRules({
     onToggle: v => setTw('chaos', {
       on: v
     }),
-    summary: tw.chaos.on ? tw.chaos.count + ' per ' + (teamSummary && teamSummary.teams ? 'team' : 'manager') + ' · ' + CARD_TYPES.filter(c => tw.chaos[c]).map(c => CARD_INFO[c].name).join(', ') : 'Off'
+    summary: tw.chaos.on ? tw.chaos.count + ' per ' + (teams ? 'team' : 'manager') + ' · ' + CARD_TYPES.filter(c => tw.chaos[c]).map(c => CARD_INFO[c].name).join(', ') : 'Off'
   }, React.createElement("div", {
     className: "field"
   }, React.createElement("label", {
     htmlFor: "r-cards"
-  }, "Cards per ", teamSummary && teamSummary.teams ? 'team' : 'manager'), React.createElement(Stepper, {
+  }, "Cards per ", teams ? 'team' : 'manager'), React.createElement(Stepper, {
     id: "r-cards",
     value: tw.chaos.count,
     min: 1,
@@ -8080,7 +8418,7 @@ function SetupRules({
     onChange: v => setTw('chaos', {
       count: v
     })
-  }), teamSummary && teamSummary.teams ? React.createElement("p", {
+  }), teams ? React.createElement("p", {
     className: "hint"
   }, "In team games, cards belong to the team, not each player.") : null), CARD_TYPES.map(c => React.createElement(Toggle, {
     key: c,
@@ -8098,7 +8436,7 @@ function SetupRules({
     onToggle: v => setTw('mystery', {
       on: v
     }),
-    summary: tw.mystery.on ? '1 in ' + tw.mystery.every + ' · ' + mysteryCount + ' in this topic' : 'Off'
+    summary: tw.mystery.on ? '1 in ' + tw.mystery.every + (defaultsMode ? '' : ' · ' + mysteryCount + ' in this topic') : 'Off'
   }, React.createElement("div", {
     className: "field"
   }, React.createElement("span", {
@@ -8141,122 +8479,164 @@ function SetupRules({
     })
   })), React.createElement("p", {
     className: "hint"
-  }, "Common is the rest (", common, "%). Rarity is just for show: it doesn\u2019t change prices.")), (() => {
-    const fin = {
-      ...FINALE_DEFAULTS,
-      ...(rules.finale || {})
-    };
-    const setF = p => set({
-      finale: {
-        ...fin,
-        ...p
-      }
-    });
-    const foot = isFootball(topic);
-    const label = {
-      vote: 'Group vote',
-      bracket: 'Head-to-head bracket',
-      sim: 'Match simulator',
-      combined: 'Combined finale'
-    }[fin.mode];
-    return React.createElement(RuleSection, {
-      id: "rs-win",
-      emoji: "\uD83C\uDFC6",
-      title: "Winner selection",
-      summary: label + (fin.mode === 'combined' ? ' · ' + fin.weight + '% match / ' + (100 - fin.weight) + '% votes' : '')
-    }, React.createElement("div", {
-      className: "field"
-    }, React.createElement("span", {
-      className: "label"
-    }, "How the champion is chosen"), React.createElement(Seg, {
-      label: "Winner selection",
-      value: fin.mode,
-      options: [['vote', 'Vote'], ['bracket', 'Bracket'], ['sim', 'Matches'], ['combined', 'Combined']],
-      onChange: v => setF({
-        mode: v
-      })
-    }), React.createElement("p", {
-      className: "hint"
-    }, fin.mode === 'vote' ? 'Everyone votes once for the best team (the classic way).' : fin.mode === 'bracket' ? 'Teams meet 1v1 in a knockout bracket. Players not in the matchup vote; you never vote for your own team.' : fin.mode === 'sim' ? 'Every bracket matchup is a simulated football match. Win to go through.' : 'Each matchup has a simulated match and a vote, combined into one score.'), !foot && (fin.mode === 'sim' || fin.mode === 'combined') && React.createElement("p", {
-      className: "warn"
-    }, "Matches need a football topic (Pitch layout). For this topic the bracket uses votes instead.")), fin.mode === 'combined' && React.createElement("div", {
-      className: "field"
-    }, React.createElement("span", {
-      className: "label"
-    }, "Weighting"), React.createElement(Seg, {
-      label: "Weighting",
-      value: fin.weight,
-      options: [[50, '50/50'], [60, '60/40'], [70, '70/30']],
-      onChange: v => setF({
-        weight: v
-      })
-    }), React.createElement("p", {
-      className: "hint"
-    }, "Match performance / votes. Goals are turned into a 0\u2013100% share so a 6\u20135 thriller doesn\u2019t swamp the votes.")), fin.mode === 'bracket' && React.createElement("div", {
-      className: "field"
-    }, React.createElement("span", {
-      className: "label"
-    }, "If a vote is tied"), React.createElement(Seg, {
-      label: "Tiebreaker",
-      value: fin.tiebreak,
-      options: [['rating', 'Higher-rated team'], ['revote', 'Vote again once']],
-      onChange: v => setF({
-        tiebreak: v
-      })
-    })), (fin.mode === 'sim' || fin.mode === 'combined') && React.createElement(React.Fragment, null, React.createElement("div", {
-      className: "field"
-    }, React.createElement("span", {
-      className: "label"
-    }, "Match speed"), React.createElement(Seg, {
-      label: "Match speed",
-      value: fin.speed,
-      options: [['instant', 'Instant'], ['fast', 'Fast (~20s)'], ['normal', 'Normal (~45s)']],
-      onChange: v => setF({
-        speed: v
-      })
-    })), React.createElement(Toggle, {
-      on: fin.commentary,
-      onChange: v => setF({
-        commentary: v
-      }),
-      title: "Match commentary",
-      sub: "Show the running commentary feed (goals and cards always show)."
-    }), React.createElement("p", {
-      className: "hint"
-    }, "Knockout matches that end level go to extra time, then penalties. Player ratings are estimated game ratings, not official EA Sports FC ratings.")));
-  })(), teamSummary && React.createElement(RuleSection, {
-    id: "rs-team",
-    emoji: "\uD83D\uDC65",
-    title: "Team play",
-    summary: teamSummary.text
-  }, React.createElement("p", {
-    className: "hint"
-  }, teamSummary.detail), onEditTeams && React.createElement("button", {
+  }, "Some items are marked Rare or Legendary, with a special reveal and an award for collecting them. Common is the rest (", common, "%). It doesn\u2019t change prices."))), tab === 'teams' && React.createElement("div", {
+    className: "stack",
+    role: "tabpanel"
+  }, teamSummary && React.createElement("div", {
+    className: "card stack-sm"
+  }, React.createElement("b", null, "\uD83D\uDC65 ", teamSummary.text), React.createElement("p", {
+    className: "hint",
+    style: {
+      margin: 0
+    }
+  }, teamSummary.detail, " Teams share one budget and bid as one."), onEditTeams && React.createElement("button", {
     className: "btn btn-sm",
     style: {
       alignSelf: 'flex-start'
     },
     onClick: onEditTeams
-  }, "Edit players & teams")), problems.map(p => React.createElement("p", {
+  }, "Edit players & teams")), React.createElement(RuleSection, {
+    id: "rs-trade",
+    emoji: "\uD83E\uDD1D",
+    title: "Trade window after the draft",
+    on: tw.trades.on,
+    onToggle: v => setTw('trades', {
+      on: v
+    }),
+    summary: tw.trades.on ? tw.trades.minutes + ' min' + (tw.trades.money ? ' · money allowed' : '') : 'Off'
+  }, React.createElement("div", {
+    className: "field"
+  }, React.createElement("span", {
+    className: "label"
+  }, "Trade window"), React.createElement(Seg, {
+    label: "Trade window length",
+    value: tw.trades.minutes,
+    options: [[1, '1 min'], [3, '3 min'], [5, '5 min'], [10, '10 min']],
+    onChange: v => setTw('trades', {
+      minutes: v
+    })
+  })), React.createElement(Toggle, {
+    on: tw.trades.money,
+    onChange: v => setTw('trades', {
+      money: v
+    }),
+    title: "Money in trades",
+    sub: "A team can add cash to sweeten a 1-for-1 trade."
+  }), React.createElement("p", {
+    className: "hint"
+  }, "1-for-1 swaps. Both teams must accept, and both items must fit the new team.")), React.createElement("p", {
+    className: "hint"
+  }, "Nomination (teams taking turns to choose the next item) is under General \u2192 Item order.")), tab === 'winner' && React.createElement("div", {
+    className: "stack",
+    role: "tabpanel"
+  }, React.createElement("div", {
+    className: "field"
+  }, React.createElement("span", {
+    className: "label"
+  }, "How the champion is chosen"), React.createElement(Seg, {
+    label: "Winner selection",
+    value: fin.mode,
+    options: [['vote', 'Vote'], ['bracket', 'Bracket'], ['sim', 'Matches'], ['combined', 'Combined']],
+    onChange: v => setF({
+      mode: v
+    })
+  }), React.createElement("p", {
+    className: "hint"
+  }, fin.mode === 'vote' ? 'Everyone votes once for the best team (the classic way).' : fin.mode === 'bracket' ? 'Teams meet 1v1 in a knockout bracket. Players not in the matchup vote; you never vote for your own team.' : fin.mode === 'sim' ? 'Every bracket matchup is an animated football match. Win to go through.' : 'Each matchup has an animated match and a vote, combined into one score.'), !foot && (fin.mode === 'sim' || fin.mode === 'combined') && React.createElement("p", {
+    className: "warn"
+  }, "Matches only work for the football topics (Premier League Legends, Current Footballers, Football GOATs). For this topic the bracket uses votes instead.")), fin.mode === 'combined' && React.createElement("div", {
+    className: "field"
+  }, React.createElement("span", {
+    className: "label"
+  }, "Weighting"), React.createElement(Seg, {
+    label: "Weighting",
+    value: fin.weight,
+    options: [[50, '50/50'], [60, '60/40'], [70, '70/30']],
+    onChange: v => setF({
+      weight: v
+    })
+  }), React.createElement("p", {
+    className: "hint"
+  }, "Match performance / votes. Goals become a 0\u2013100% share so a 6\u20135 thriller doesn\u2019t swamp the votes.")), (fin.mode === 'bracket' || fin.mode === 'combined') && React.createElement("div", {
+    className: "field"
+  }, React.createElement("span", {
+    className: "label"
+  }, "If a vote is tied"), React.createElement(Seg, {
+    label: "Tiebreaker",
+    value: fin.tiebreak,
+    options: [['rating', 'Higher-rated team'], ['revote', 'Vote again once']],
+    onChange: v => setF({
+      tiebreak: v
+    })
+  }), fin.mode === 'combined' && React.createElement("p", {
+    className: "hint"
+  }, "In Combined, a dead-level total is settled by the match (extra time or penalties).")), (fin.mode === 'sim' || fin.mode === 'combined') && React.createElement(React.Fragment, null, React.createElement("div", {
+    className: "field"
+  }, React.createElement("span", {
+    className: "label"
+  }, "Match speed"), React.createElement(Seg, {
+    label: "Match speed",
+    value: fin.speed,
+    options: [['instant', 'Instant'], ['fast', 'Fast'], ['normal', 'Normal']],
+    onChange: v => setF({
+      speed: v
+    })
+  }), React.createElement("p", {
+    className: "hint"
+  }, "How fast matches start playing. Everyone can still pause, change speed or skip while watching.")), React.createElement(Toggle, {
+    on: fin.commentary,
+    onChange: v => setF({
+      commentary: v
+    }),
+    title: "Match commentary",
+    sub: "Show the running commentary feed (goals and cards always show)."
+  }), React.createElement(Toggle, {
+    on: !!fin.home,
+    onChange: v => setF({
+      home: v
+    }),
+    title: "Home advantage",
+    sub: "The higher seed plays at home: a small boost to its expected goals (+0.15). Off by default."
+  }), React.createElement("p", {
+    className: "hint"
+  }, "Knockout matches that end level go to extra time, then penalties. Player ratings are estimated game ratings, not official EA Sports FC ratings."))), tab === 'review' && React.createElement("div", {
+    className: "stack",
+    role: "tabpanel"
+  }, React.createElement("p", {
+    className: "hint"
+  }, "Everything that will be in play", defaultsMode ? ' for new games' : '', ":"), React.createElement(RulesSummary, {
+    rules: {
+      ...rules,
+      slots: defaultsMode ? [] : slots
+    },
+    opts: {
+      teams
+    }
+  })), problems.map(p => React.createElement("p", {
     key: p,
     className: p.startsWith('Heads up') ? 'hint' : 'warn'
-  }, p)), React.createElement("button", {
-    className: "btn btn-gold",
+  }, p)), React.createElement("div", {
+    className: "row"
+  }, tab !== 'review' && React.createElement("button", {
+    className: "btn grow",
+    onClick: () => setTab('review')
+  }, "Review rules"), React.createElement("button", {
+    className: "btn btn-gold grow",
     disabled: blocking.length > 0,
     onClick: () => onStart({
       ...rules,
-      slots
+      slots: defaultsMode ? rules.slots : slots
     })
-  }, startLabel), onReset && React.createElement("button", {
+  }, startLabel)), onReset && React.createElement("button", {
     className: "btn btn-ghost",
     onClick: () => setAskReset(true)
   }, "Reset rules to defaults"), askReset && React.createElement(Confirm, {
     title: "Reset rules?",
-    body: "Budget, bids and every twist go back to their defaults. Slots come from the topic.",
+    body: "Budget and bidding go back to the standard rules, and every optional twist is switched off.",
     yes: "Reset",
     onYes: () => {
       onReset();
-      setSlotTxt(topic.slots.join(', '));
+      if (!defaultsMode) setSlotTxt(topic.slots.join(', '));
     },
     onClose: () => setAskReset(false)
   }));
@@ -8266,6 +8646,7 @@ function ManagerButton({
   m,
   onBid,
   onCustom,
+  onOut,
   disabledAll,
   readOnly,
   bubble,
@@ -8339,7 +8720,17 @@ function ManagerButton({
     title: "Chaos Cards left"
   }, "\uD83C\uDCCF", d.cards[m.id].length) : null), React.createElement("span", {
     className: "st"
-  }, status, " \xB7 ", filled, "/", d.rules.slots.length), customOk && React.createElement("button", {
+  }, status, " \xB7 ", filled, "/", d.rules.slots.length), onOut && React.createElement("button", {
+    className: "edit outbtn",
+    "aria-label": m.name + ' is out on this item',
+    title: "Out on this item",
+    onPointerDown: e => e.stopPropagation(),
+    onPointerUp: e => e.stopPropagation(),
+    onClick: e => {
+      e.stopPropagation();
+      onOut();
+    }
+  }, "\u270B"), customOk && React.createElement("button", {
     className: "edit",
     "aria-label": 'Custom bid for ' + m.name,
     onPointerDown: e => e.stopPropagation(),
@@ -8808,7 +9199,6 @@ function Auction({
   const paused = nv.isHost ? pausedLocal : !!nv.live.paused;
   const gavel = nv.isHost ? gavelLocal : !!nv.live.gavel;
   const thinking = nv.isHost ? thinkingLocal : nv.live.thinking || null;
-  const [out, setOut] = useState(false);
   const [cardsOpen, setCardsOpen] = useState(false);
   const cardTried = useRef(new Set());
   const hold = paused || !!d.pending;
@@ -8820,7 +9210,7 @@ function Auction({
   const talk = useBotTalk(d);
   const bubbles = nv.isHost ? talk.bubbles : nv.live.bubbles || {};
   useEffect(() => {
-    if (online && nv.isHost && net.publishLive) net.publishLive({
+    if (nv.isHost && net && net.publishLive) net.publishLive({
       left: leftLocal,
       key: bidKey,
       paused: pausedLocal,
@@ -8840,9 +9230,6 @@ function Auction({
   useEffect(() => {
     setLeft(timer);
   }, [bidKey, timer]);
-  useEffect(() => {
-    setOut(false);
-  }, [d.reveal]);
   const leader = d.bid && d.managers.find(m => m.id === d.bid.leaderId);
   const total = d.processed + d.queue.length;
   const you = solo ? d.managers.find(m => m.human) : online ? d.managers.find(m => nv.controls(m.id)) : null;
@@ -8919,11 +9306,22 @@ function Auction({
     const t = setInterval(() => setLeft(l => l > 0 ? l - 1 : 0), ms(1000));
     return () => clearInterval(t);
   }, [bidKey, hold, flashing, gavel, timer, nv.isHost]);
+  const owe = owing(d);
   useEffect(() => {
-    if (!nv.isHost || !timer || hold || flashing || gavel || left > 0) return;
+    if (!nv.isHost || !timer || hold || flashing || gavel || left > 0 || owe.length) return;
     if (d.bid) sold();else if (auto) skip();
-  }, [left, hold, flashing, gavel, timer, nv.isHost]);
-  const cardKey = bidKey + ':' + JSON.stringify(d.cards || {}) + ':' + (d.cardLog || []).length;
+  }, [left, hold, flashing, gavel, timer, nv.isHost, owe.length]);
+  const endNow = auctionEnd(d);
+  useEffect(() => {
+    if (!nv.isHost || hold || flashing || gavel || !endNow) return undefined;
+    const t = setTimeout(() => {
+      const cur = live.current;
+      if (cur.paused || cur.flashing || cur.gavel || busy.current || auctionEnd(cur.d) !== endNow) return;
+      if (endNow === 'sell') sold();else skip();
+    }, ms(600));
+    return () => clearTimeout(t);
+  }, [endNow, bidKey, hold, flashing, gavel, nv.isHost]);
+  const cardKey = bidKey + ':' + JSON.stringify(d.cards || {}) + ':' + (d.cardLog || []).length + ':' + outIds(d).length;
   useEffect(() => {
     if (!nv.runsBots || hold || flashing || gavel || busy.current || d.phase !== 'auction') {
       setThinking(null);
@@ -8942,15 +9340,24 @@ function Auction({
         }
       }
     }
-    const plan = cardPlan || nextBotAction(d);
+    const plan = cardPlan || nextBotAction(d) || botForcedBid(d);
+    const passers = cardPlan ? [] : botPassers(d);
+    const tOut = passers.length ? setTimeout(() => {
+      const cur = live.current;
+      if (cur.paused || cur.flashing || cur.gavel || busy.current) return;
+      setDraft(p => {
+        const still = new Set(botPassers(p));
+        return passers.filter(id => still.has(id)).reduce((n, id) => withdraw(n, id), p);
+      });
+    }, ms(plan ? 450 : 700)) : null;
     if (!plan) {
       setThinking(null);
-      return undefined;
+      return () => clearTimeout(tOut);
     }
     setThinking(plan.botId);
     const t = setTimeout(() => {
       const cur = live.current;
-      if (cur.paused || cur.flashing || cur.gavel || busy.current || cur.left <= 0 || cur.d.phase !== 'auction') return;
+      if (cur.paused || cur.flashing || cur.gavel || busy.current || cur.left <= 0 && !owing(cur.d).length || cur.d.phase !== 'auction') return;
       setThinking(null);
       const speaker = botActors(d).find(a => a.speaker === plan.speaker) || plan.botId;
       if (plan.card) {
@@ -8963,7 +9370,10 @@ function Auction({
       } : undefined) : p);
       talk.say(speaker, plan.event);
     }, ms(plan.delay));
-    return () => clearTimeout(t);
+    return () => {
+      clearTimeout(t);
+      clearTimeout(tOut);
+    };
   }, [cardKey, hold, flashing, gavel, nv.runsBots]);
   useEffect(() => {
     if (!d.pending) return undefined;
@@ -9074,6 +9484,8 @@ function Auction({
   const frozenTeam = d.managers.find(m => frozenNow(d, m.id));
   const youAmt = you ? nextAmount(d) : 0;
   const youCan = you && !paused && !flashing && !gavel && canBid(d, you, youAmt);
+  const youOutWhy = !you ? 'No team' : withdrawProblem(d, you.id);
+  const outNames = outIds(d).map(id => (teamOf(d, id) || {}).name).filter(Boolean);
   const going = timer > 0 && d.bid && left <= 2 && left > 0 ? left === 2 ? 'Going once…' : 'Going twice…' : null;
   const ordered = auto ? [...d.managers].sort((a, b) => (nv.controls(b.id) ? 1 : 0) - (nv.controls(a.id) ? 1 : 0)) : d.managers;
   const vetoHere = d.pending && nv.controls(d.pending.target) && !(nv.runsBots && (isBot(teamOf(d, d.pending.target)) || isBotTeam(teamOf(d, d.pending.target)))) && !(solo && (isBot(teamOf(d, d.pending.target)) || isBotTeam(teamOf(d, d.pending.target))));
@@ -9094,7 +9506,7 @@ function Auction({
   }, "\uD83C\uDCCF"), React.createElement("button", {
     className: "pillbtn",
     onClick: () => setTeams(true)
-  }, "Teams"), nv.isHost && React.createElement("button", {
+  }, "Teams"), nv.isHost && !nv.tv && React.createElement("button", {
     className: "iconbtn",
     onClick: () => setPaused(p => !p),
     "aria-label": paused ? 'Resume' : 'Pause'
@@ -9136,7 +9548,7 @@ function Auction({
   }, leader ? leader.emoji + ' ' + leader.name + ' leads' : timer > 0 && left <= 0 ? "Time's up · no bids" : auto ? 'Opening bid · bid or wait' : 'Opening bid · tap a manager'), React.createElement("div", {
     className: "going",
     "aria-live": "polite"
-  }, d.pending ? '🛑 Waiting for a Veto answer…' : going || (thinker ? '💭 ' + thinker.name + ' is thinking…' : solo && out ? 'You’re out on this one' : frozenTeam ? '🧊 ' + frozenTeam.name + ' is frozen for this item' : ' ')), timer > 0 && React.createElement("span", {
+  }, d.pending ? '🛑 Waiting for a Veto answer…' : owe.length && timer > 0 && left <= 0 ? '⏳ Waiting for ' + owe.map(m => m.name).join(', ') + ' to bid' : going || (thinker ? '💭 ' + thinker.name + ' is thinking…' : you && isOut(d, you.id) ? '✋ You’re out on this item' : frozenTeam ? '🧊 ' + frozenTeam.name + ' is frozen for this item' : outNames.length ? '✋ Out: ' + outNames.join(', ') : ' ')), timer > 0 && React.createElement("span", {
     className: "timer",
     style: {
       width: Math.max(0, left) / timer * 100 + '%'
@@ -9172,38 +9584,45 @@ function Auction({
     d: d,
     m: m,
     disabledAll: hold || flashing || gavel,
-    readOnly: auto && !nv.controls(m.id),
+    readOnly: (auto || nv.tv) && !nv.controls(m.id),
     bubble: bubbles[m.id],
     thinking: thinking === m.id,
     onBid: amt => {
       buzz(12);
-      setOut(false);
       act('bid', m.id, amt);
     },
+    onOut: !auto && !nv.tv && !hold && !flashing && !gavel && !withdrawProblem(d, m.id) && !isOut(d, m.id) ? () => {
+      buzz(12);
+      act('withdraw', m.id);
+    } : null,
     onCustom: () => setCustom(m.id)
   }))), React.createElement("p", {
     className: "hint",
     style: {
       textAlign: 'center'
     }
-  }, nv.tv ? 'Bid from your phones · it sells when the clock runs out' : online && !you ? 'You’re watching this game.' : auto ? 'Tap Bid to raise +' + money(d.rules.inc) + ' · ✎ on your card for a custom bid · it sells when the clock runs out' : 'Tap to bid +' + money(d.rules.inc) + ' · hold or ✎ for a custom bid'), auto ? you ? React.createElement("div", {
+  }, nv.tv ? online ? 'Bid from your phones · it sells when the clock runs out' : timer ? 'Live auction · it sells when the clock runs out' : 'Live auction' : online && !you ? 'You’re watching this game.' : auto ? 'Tap Bid to raise +' + money(d.rules.inc) + ' · ✎ on your card for a custom bid · it sells when the clock runs out' : 'Tap to bid +' + money(d.rules.inc) + ' · hold or ✎ for a custom bid'), auto ? you ? React.createElement("div", {
     className: "actions duo"
   }, React.createElement("button", {
     className: "btn",
-    disabled: hold || flashing || out || !(you && canBid(d, you, youAmt)),
+    disabled: hold || flashing || gavel || !!youOutWhy,
+    title: youOutWhy || '',
     onClick: () => {
-      setOut(true);
-      if (solo) setLeft(l => Math.min(l, 3));
+      buzz(12);
+      act('withdraw', you.id);
     }
-  }, "I\u2019m out"), React.createElement("button", {
+  }, you && isOut(d, you.id) ? 'You’re out' : 'I’m out'), React.createElement("button", {
     className: "btn btn-gold sold",
     disabled: !youCan,
     onClick: () => {
       buzz(12);
-      setOut(false);
       act('bid', you.id, youAmt);
     }
-  }, you && isFull(you) ? 'Team full' : you && !canBid(d, you, youAmt) ? 'Can’t bid' : (d.bid && d.bid.leaderId === you.id ? 'Raise to ' : 'Bid ') + money(youAmt))) : null : React.createElement("div", {
+  }, you && isOut(d, you.id) ? 'Out ✋' : you && isFull(you) ? 'Team full' : you && !canBid(d, you, youAmt) ? 'Can’t bid' : (d.bid && d.bid.leaderId === you.id ? 'Raise to ' : 'Bid ') + money(youAmt)), you && owesBid(d, you) && !hold && React.createElement("p", {
+    className: "hint duo-note"
+  }, "Require every manager to bid is on: bid once before you can drop out."), you && isOut(d, you.id) && React.createElement("p", {
+    className: "hint duo-note"
+  }, "You can\u2019t bid again on this item", d.bid && d.bid.leaderId === you.id ? ', but your bid still stands' : '', ". You\u2019re back in on the next one.")) : null : React.createElement("div", {
     className: "actions"
   }, React.createElement("button", {
     className: "btn",
@@ -9212,11 +9631,11 @@ function Auction({
   }, undoLabel(d)), React.createElement("button", {
     className: "btn",
     onClick: skip,
-    disabled: hold || flashing || !!d.bid
+    disabled: hold || flashing || !!d.bid || owe.length > 0
   }, "No bids"), React.createElement("button", {
     className: "btn btn-gold sold",
     onClick: sold,
-    disabled: hold || flashing || !d.bid
+    disabled: hold || flashing || !d.bid || owe.length > 0
   }, "Sold!")), gavel && React.createElement("div", {
     className: "gavel",
     "aria-hidden": "true"
@@ -9225,7 +9644,6 @@ function Auction({
     m: d.managers.find(x => x.id === custom),
     onSet: n => {
       buzz(12);
-      setOut(false);
       act('bid', custom, n);
     },
     onClose: () => setCustom(null)
@@ -9239,7 +9657,6 @@ function Auction({
     onPlay: (by, card, params) => act('card', by, card, params),
     onDouble: (by, pay) => {
       buzz(20);
-      setOut(false);
       act('bid', by, pay, true);
     }
   }), vetoHere && React.createElement(VetoSheet, {
@@ -9970,7 +10387,7 @@ function Confetti({
 }) {
   const ref = useRef(null);
   useEffect(() => {
-    if (window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+    if (reducedMotion()) return undefined;
     const c = ref.current;
     const ctx = c && c.getContext ? c.getContext('2d') : null;
     if (!ctx) return undefined;
@@ -10666,7 +11083,7 @@ function Results({
   }, CARD_INFO[e.card].emoji, " ", e.result === 'vetoed' ? teamOf(d, e.by).name + '’s ' + CARD_INFO[e.card].name + ' was vetoed' : e.result === 'fizzled' ? teamOf(d, e.by).name + '’s ' + CARD_INFO[e.card].name + ' fizzled' : e.detail))), React.createElement("p", {
     className: "exportfoot"
   }, "DRAFT NIGHT \xB7 ", (location.host + location.pathname).replace(/\/(index\.html)?$/, ''))), React.createElement("div", {
-    className: "stack"
+    className: "stack resactions"
   }, !online && !d.votesRevealed && !isFin && React.createElement("button", {
     className: "btn btn-gold",
     onClick: () => setVoting(true)
@@ -11005,7 +11422,8 @@ const DEFAULT_RULES = {
   order: 'random',
   timer: 0,
   mustFill: true,
-  noBids: 'skip'
+  noBids: 'skip',
+  mustBid: false
 };
 const RULE_DEFAULTS = () => ({
   ...DEFAULT_RULES,
@@ -11024,6 +11442,27 @@ const stripDraft = d => ({
   ...d,
   history: []
 });
+function migrateSettings(st) {
+  const x = {
+    ...(st || {})
+  };
+  if ((x.rulesV || 0) < 3) {
+    if (x.rulePrefs) {
+      const p = {
+        ...x.rulePrefs
+      };
+      ['chaos', 'mystery', 'rarity', 'trades'].forEach(k => {
+        if (p[k]) p[k] = {
+          ...p[k],
+          on: false
+        };
+      });
+      x.rulePrefs = p;
+    }
+    x.rulesV = 3;
+  }
+  return x;
+}
 function migrateTopics(stored) {
   const starters = starterTopics();
   const allIds = starters.map(s => s.id);
@@ -11736,11 +12175,18 @@ function AudioSettings() {
   }, "Test sound"));
 }
 const fmtBytes = n => n > 1048576 ? (n / 1048576).toFixed(1) + ' MB' : Math.max(1, Math.round(n / 1024)) + ' KB';
+const SETTINGS_TABS = [['rules', 'House rules'], ['sound', 'Sound'], ['display', 'Display & access'], ['online', 'Online'], ['app', 'App & backup']];
 function SettingsScreen({
   onBack,
   state,
-  onRestore
+  onRestore,
+  settings,
+  setSettings,
+  rulePrefs,
+  saveRulePrefs
 }) {
+  const [tab, setTab] = useState('rules');
+  const [editRules, setEditRules] = useState(null);
   const app = usePwa();
   const fileRef = useRef(null);
   const [usage, setUsage] = useState(null);
@@ -11835,12 +12281,126 @@ function SettingsScreen({
     setPending(null);
   };
   const ios = isIOS();
+  if (editRules) return React.createElement(SetupRules, {
+    defaultsMode: true,
+    topic: {
+      name: '',
+      emoji: '',
+      items: [],
+      slots: []
+    },
+    managers: [],
+    rules: editRules,
+    setRules: setEditRules,
+    title: "Default house rules",
+    startLabel: "Save as my defaults",
+    onBack: () => setEditRules(null),
+    onStart: r => {
+      saveRulePrefs(r);
+      setEditRules(null);
+    },
+    onReset: () => setEditRules({
+      ...RULE_DEFAULTS(),
+      slots: []
+    })
+  });
+  const prefs = {
+    ...rulePrefs(),
+    slots: []
+  };
+  const setS = p => setSettings(x => ({
+    ...x,
+    ...p
+  }));
+  const motion = settings.motion || 'system';
+  const prof = settings.online || {};
   return React.createElement("div", {
     className: "app"
   }, React.createElement(TopBar, {
     onBack: onBack,
-    title: "Backup & app"
-  }), React.createElement("section", {
+    title: "Rules & settings"
+  }), React.createElement("div", {
+    className: "tabs",
+    role: "tablist",
+    "aria-label": "Settings sections"
+  }, SETTINGS_TABS.map(([k, label]) => React.createElement("button", {
+    key: k,
+    role: "tab",
+    "aria-selected": tab === k,
+    className: 'tab' + (tab === k ? ' on' : ''),
+    onClick: () => setTab(k)
+  }, label))), tab === 'rules' && React.createElement("section", {
+    className: "card stack",
+    role: "tabpanel"
+  }, React.createElement("h3", null, "\uD83D\uDCDC Default house rules"), React.createElement("p", {
+    className: "hint",
+    style: {
+      margin: 0
+    }
+  }, "New Local, Solo and Online games start with these. Slots come from each topic. Optional twists stay off unless you switch them on."), React.createElement(RulesSummary, {
+    rules: prefs
+  }), React.createElement("button", {
+    className: "btn btn-gold",
+    onClick: () => setEditRules(prefs)
+  }, "Edit default rules"), React.createElement("button", {
+    className: "btn btn-ghost",
+    onClick: () => saveRulePrefs({
+      ...RULE_DEFAULTS(),
+      slots: []
+    })
+  }, "Reset to standard rules")), tab === 'sound' && React.createElement("div", {
+    role: "tabpanel"
+  }, React.createElement(AudioSettings, null)), tab === 'display' && React.createElement("section", {
+    className: "card stack",
+    role: "tabpanel"
+  }, React.createElement("h3", null, "\uD83C\uDF9E\uFE0F Motion"), React.createElement(Seg, {
+    label: "Motion",
+    value: motion,
+    options: [['system', 'Match my device'], ['reduce', 'Reduce motion'], ['full', 'Full animation']],
+    onChange: v => setS({
+      motion: v
+    })
+  }), React.createElement("p", {
+    className: "hint",
+    style: {
+      margin: 0
+    }
+  }, "Reduce motion turns off confetti, card flips and pop-ups, and football matches move step by step instead of sliding."), React.createElement("h3", null, "\uD83D\uDCFA TV display"), React.createElement(Seg, {
+    label: "TV text size",
+    value: settings.tvZoom || 1,
+    options: [[1, 'Normal'], [1.25, 'Large'], [1.5, 'Extra large']],
+    onChange: v => setS({
+      tvZoom: v
+    })
+  }), React.createElement("p", {
+    className: "hint",
+    style: {
+      margin: 0
+    }
+  }, "How big everything looks when this device shows the TV view.")), tab === 'online' && React.createElement("section", {
+    className: "card stack",
+    role: "tabpanel"
+  }, React.createElement("h3", null, "\uD83C\uDF10 Online"), React.createElement("p", {
+    className: "hint",
+    style: {
+      margin: 0
+    }
+  }, "Your online name: ", React.createElement("b", null, prof.emoji, " ", prof.name || 'not set yet'), " (change it on the Online screen)."), React.createElement(Toggle, {
+    on: !!prof.voice,
+    onChange: v => setS({
+      online: {
+        ...prof,
+        voice: v
+      }
+    }),
+    title: "Auctioneer voice on my phone",
+    sub: "Off by default when you\u2019re a player, so the room doesn\u2019t hear the auctioneer from every phone. The host and the TV always have it."
+  }), React.createElement("p", {
+    className: "hint",
+    style: {
+      margin: 0
+    }
+  }, "Room rules (seats, bots, bid clock, reconnection) are set by the host in the room\u2019s lobby. Your favourites and settings stay on this device.")), tab === 'app' && React.createElement(React.Fragment, null, React.createElement("section", {
     className: "card stack"
   }, React.createElement("h3", null, "\uD83D\uDCF2 Install on your phone"), app.standalone ? React.createElement("p", {
     className: "hint",
@@ -11858,7 +12418,7 @@ function SettingsScreen({
     className: "hint"
   }, "On iPhone this only works in Safari, not inside other apps' browsers."))), React.createElement("p", {
     className: "hint"
-  }, "Updates arrive automatically. When a new version is ready you'll see a Reload button.")), React.createElement(AudioSettings, null), React.createElement("section", {
+  }, "Updates arrive automatically. When a new version is ready you'll see a Reload button.")), React.createElement("section", {
     className: "card stack"
   }, React.createElement("h3", null, "\uD83D\uDCBE Backup & restore"), React.createElement("p", {
     className: "hint"
@@ -11923,7 +12483,7 @@ function SettingsScreen({
     style: {
       textAlign: 'center'
     }
-  }, "Real photos come from Wikipedia and Wikimedia Commons. Tap \u201CPhoto: Wikipedia\u201D on a card to see who took it and its licence."), confirm && React.createElement(Confirm, {
+  }, "Real photos come from Wikipedia and Wikimedia Commons. Tap \u201CPhoto: Wikipedia\u201D on a card to see who took it and its licence.")), confirm && React.createElement(Confirm, {
     title: confirm === 'replace' ? 'Replace everything?' : 'Add the backup?',
     body: confirm === 'replace' ? 'Your current topics, drafts and history on this device will be overwritten by the backup. Export a backup first if you might want them back.' : 'Topics and past drafts from the backup that you don’t already have will be added. Nothing of yours is deleted.',
     yes: confirm === 'replace' ? 'Replace' : 'Add',
@@ -11934,7 +12494,10 @@ function SettingsScreen({
 }
 function App() {
   const [topics, setTopics] = useState(() => migrateTopics(store.get(K.topics, null)));
-  const [draft, setDraft] = useState(() => store.get(K.current, null));
+  const [draft, setDraft] = useState(() => {
+    const c = store.get(K.current, null);
+    return c && c.topic && Array.isArray(c.managers) ? c : null;
+  });
   const [past, setPast] = useState(() => store.get(K.past, []));
   const [screen, setScreen] = useState({
     name: 'home'
@@ -11945,8 +12508,24 @@ function App() {
     ...DEFAULT_RULES,
     slots: []
   });
-  const [flash, setFlash] = useState(null);
+  const [flash, setFlashRaw] = useState(null);
   const [toast, setToast] = useState(null);
+  const tvTab = useMemo(() => {
+    const m = (location.hash || '').match(/^#tv=([A-Za-z0-9]+)/);
+    return m ? m[1] : null;
+  }, []);
+  const [localTv, setLocalTv] = useState(false);
+  const chan = useMemo(() => !tvTab && canChannel() ? new BroadcastChannel(LOCAL_TV) : null, []);
+  const liveRef = useRef({});
+  const draftRef = useRef(null);
+  const [tvWindows, setTvWindows] = useState(0);
+  const setFlash = info => {
+    setFlashRaw(info);
+    if (info && chan) chan.postMessage({
+      type: 'flash',
+      info
+    });
+  };
   const [folder, setFolder] = useState(null);
   const [importing, setImporting] = useState(null);
   useEffect(() => {
@@ -11956,6 +12535,19 @@ function App() {
       try {
         history.replaceState(null, '', location.pathname + location.search);
       } catch (e) {}
+    }
+    const tv = (location.hash || '').match(/^#tv=([A-Za-z0-9]+)/);
+    if (tv) {
+      if (tv[1] === 'local') setScreen({
+        name: 'tv-local'
+      });else setScreen({
+        name: 'online',
+        start: {
+          kind: 'tv',
+          code: cleanCode(tv[1])
+        },
+        k: 'tv'
+      });
     }
     const r = (location.hash || '').match(/^#room=([A-Za-z0-9]+)/);
     if (r) {
@@ -11968,7 +12560,7 @@ function App() {
       } catch (e) {}
     }
   }, []);
-  const [settings, setSettings] = useState(() => store.get(K.settings, {}));
+  const [settings, setSettings] = useState(() => migrateSettings(store.get(K.settings, {})));
   const audioCfg = {
     ...AUDIO_DEFAULTS,
     ...(settings.audio || {})
@@ -11980,6 +12572,10 @@ function App() {
   useEffect(() => {
     audio.set(audioCfg);
   }, [JSON.stringify(audioCfg)]);
+  useEffect(() => {
+    document.documentElement.setAttribute('data-motion', settings.motion || 'system');
+    document.documentElement.style.setProperty('--tvzoom', String(settings.tvZoom || 1));
+  }, [settings.motion, settings.tvZoom]);
   const soloCfg = {
     ...DEFAULT_SOLO,
     ...(settings.solo || {})
@@ -12000,7 +12596,54 @@ function App() {
     };
   }, []);
   const persist = (k, v) => {
+    if (tvTab) return;
     if (v === null || v === undefined) store.del(k);else store.set(k, v);
+  };
+  useEffect(() => {
+    draftRef.current = draft;
+    if (chan && draft) chan.postMessage({
+      type: 'draft',
+      draft: stripDraft(draft)
+    });
+  }, [draft]);
+  useEffect(() => {
+    if (!chan) return undefined;
+    chan.onmessage = e => {
+      const m = e.data || {};
+      if (m.type === 'hello') {
+        setTvWindows(n => n + 1);
+        if (draftRef.current) chan.postMessage({
+          type: 'draft',
+          draft: stripDraft(draftRef.current)
+        });
+        chan.postMessage({
+          type: 'live',
+          live: liveRef.current
+        });
+      } else if (m.type === 'bye') setTvWindows(n => Math.max(0, n - 1));
+    };
+    return () => {
+      chan.onmessage = null;
+    };
+  }, []);
+  useEffect(() => {
+    if (!tvTab) audio.setQuiet(tvWindows > 0);
+  }, [tvWindows]);
+  const localNet = {
+    local: true,
+    role: 'host',
+    display: localTv ? 'tv' : 'controls',
+    live: {},
+    publishLive: o => {
+      liveRef.current = {
+        ...liveRef.current,
+        ...o
+      };
+      if (chan) chan.postMessage({
+        type: 'live',
+        live: liveRef.current
+      });
+    }
   };
   useEffect(() => {
     persist(K.settings, settings);
@@ -12204,6 +12847,10 @@ function App() {
       view = React.createElement(OnlineScreen, {
         key: screen.k,
         start: screen.start,
+        onRetry: () => go('online', {
+          start: screen.start,
+          k: uid()
+        }),
         profile: profile,
         topics: topics,
         rulePrefs: rulePrefs,
@@ -12416,6 +13063,12 @@ function App() {
         }) : null;
         break;
       }
+    case 'tv-local':
+      view = React.createElement(LocalTv, {
+        past: past,
+        settings: settings
+      });
+      break;
     case 'draft':
       if (!draft) {
         view = null;
@@ -12456,6 +13109,15 @@ function App() {
         },
         onPlayAgain: playAgain
       });
+      view = React.createElement(NetCtx.Provider, {
+        value: localNet
+      }, React.createElement("div", {
+        className: localTv ? 'tvmode' : ''
+      }, view, localTv ? React.createElement(TvExit, {
+        onExit: () => setLocalTv(false)
+      }) : React.createElement(TvSwitch, {
+        onThisScreen: () => setLocalTv(true)
+      })));
       break;
     case 'past':
       view = React.createElement(PastList, {
@@ -12526,6 +13188,10 @@ function App() {
           managers,
           settings
         },
+        settings: settings,
+        setSettings: setSettings,
+        rulePrefs: rulePrefs,
+        saveRulePrefs: saveRulePrefs,
         onRestore: (data, mode) => {
           if (mode === 'replace') {
             setTopics(migrateTopics(data.topics));
@@ -12672,7 +13338,14 @@ if (window.__DN_TEST__) window.__DN = {
     matchVoteProblem,
     roundName,
     FINALE_DEFAULTS,
-    validRating
+    validRating,
+    matchScript,
+    revealedEvents,
+    matchFrame,
+    lineupOf,
+    expectedGoals,
+    strength2,
+    squad
   },
   audio,
   AUDIO_DEFAULTS,
@@ -12736,6 +13409,21 @@ if (window.__DN_TEST__) window.__DN = {
     openTrades,
     hasCard
   },
+  auction: {
+    withdraw,
+    isOut,
+    auctionEnd,
+    owesBid,
+    withdrawProblem,
+    outIds,
+    owing,
+    botPassers,
+    botForcedBid,
+    runAction,
+    ownerInfo,
+    migrateSettings,
+    rulesLines
+  },
   DEFAULT_SOLO,
   isFlex,
   canBid,
@@ -12778,7 +13466,12 @@ const ATTR_NAMES = {
   DEF: 'Defending',
   PHY: 'Physical'
 };
-const reducedMotion = () => !!(window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches);
+const reducedMotion = () => {
+  const m = document.documentElement.getAttribute('data-motion');
+  if (m === 'reduce') return true;
+  if (m === 'full') return false;
+  return !!(window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches);
+};
 function RatingCard({
   item
 }) {
@@ -13352,7 +14045,7 @@ function Finale({
   const mode = fin.mode;
   const nv = netView(d, useNet());
   const act = useAct(d, onChange);
-  const host = nv.isHost;
+  const host = nv.isHost && !nv.tv;
   const nx = nextMatchup(fin.bracket);
   const ui = fin.ui || {
     stage: 'overview',
@@ -13442,7 +14135,7 @@ function Finale({
     style: {
       textAlign: 'center'
     }
-  }, roundName(R, cur.r), cur.r === R - 1 ? ' · the big one' : ''), React.createElement(MatchPlayer, {
+  }, roundName(R, cur.r), cur.r === R - 1 ? ' · the big one' : ''), React.createElement(MatchView, {
     key: cm.id,
     d: d,
     A: A,
@@ -13676,7 +14369,7 @@ function MatchupSheet({
     style: {
       margin: 0
     }
-  }, m.detail), replay && m.match ? React.createElement(MatchPlayer, {
+  }, m.detail), replay && m.match ? React.createElement(MatchView, {
     d: d,
     A: A,
     B: B,
@@ -13741,7 +14434,7 @@ function FriendlySheet({
     style: {
       fontSize: 28
     }
-  }, "Friendly match"), game ? React.createElement(React.Fragment, null, React.createElement(MatchPlayer, {
+  }, "Friendly match"), game ? React.createElement(React.Fragment, null, React.createElement(MatchView, {
     key: game.k,
     d: d,
     A: game.A,
@@ -13870,6 +14563,673 @@ function FinaleResults({
       fontSize: 18
     }
   }, teamRating(d, s.team).rating)))));
+}
+const PITCH = {
+  w: 105,
+  h: 68
+};
+const hashU = (...parts) => hashStr(parts.join('|')) % 10000 / 10000;
+const lerp = (a, b, u) => a + (b - a) * u;
+const ease = u => u <= 0 ? 0 : u >= 1 ? 1 : u * u * (3 - 2 * u);
+const lerpP = (p, q, u) => ({
+  x: lerp(p.x, q.x, u),
+  y: lerp(p.y, q.y, u)
+});
+const LINE_X = {
+  GK: 0.04,
+  DEF: 0.2,
+  MID: 0.38,
+  FWD: 0.54
+};
+const SEG = 0.85;
+function lineupOf(d, m) {
+  const sq = squad(d, m);
+  const hasGK = sq.some(p => p.role === 'GK');
+  const rows = sq.map((p, i) => ({
+    ...p,
+    role: !hasGK && i === sq.reduce((bi, q, k) => q.r.attrs.DEF > sq[bi].r.attrs.DEF ? k : bi, 0) ? 'GK' : p.role
+  }));
+  const out = [];
+  ['GK', 'DEF', 'MID', 'FWD'].forEach(role => {
+    const line = rows.filter(p => p.role === role);
+    line.forEach((p, k) => out.push({
+      name: p.name,
+      role,
+      ovr: p.r.ovr,
+      pac: p.r.attrs.PAC,
+      num: (() => {
+        const it = Object.values(d.items).find(x => x.name === p.name);
+        return it ? kitNumber(it) : k + 1;
+      })(),
+      base: {
+        x: LINE_X[role],
+        y: line.length === 1 ? 0.5 : 0.18 + 0.64 * k / (line.length - 1)
+      }
+    }));
+  });
+  return out;
+}
+function matchScript(match) {
+  const beats = [];
+  let t = 0;
+  const add = b => {
+    b.t0 = t;
+    t += b.dur;
+    beats.push(b);
+    return b;
+  };
+  add({
+    type: 'kickoff',
+    dur: 1.4,
+    min: 0,
+    show: [0],
+    reveal: 0.2
+  });
+  match.events.forEach((e, k) => {
+    if (e.type === 'kickoff') return;
+    if (e.type === 'half' || e.type === 'full' || e.type === 'et' || e.type === 'pens') {
+      add({
+        type: e.type,
+        dur: e.type === 'half' ? 2 : 1.6,
+        min: e.min,
+        show: [k],
+        reveal: 0.1
+      });
+      return;
+    }
+    if (e.type === 'pen') {
+      add({
+        type: 'pen',
+        dur: 1.8,
+        min: 120,
+        show: [k],
+        reveal: 0.75,
+        pen: e
+      });
+      return;
+    }
+    if (e.type === 'yellow' || e.type === 'red' || e.type === 'note') {
+      const last = beats[beats.length - 1];
+      last.show.push(k);
+      return;
+    }
+    if (e.seq == null) return;
+    const q = match.seqs[e.seq];
+    const n = q.chain.length;
+    const tail = q.kind === 'goal' ? 3.4 : q.kind === 'tackle' || q.kind === 'intercept' ? 1.1 : 1.7;
+    add({
+      type: 'seq',
+      dur: 0.35 + n * SEG + tail,
+      min: q.min,
+      et: !!q.et,
+      q,
+      show: [k],
+      reveal: 0.35 + n * SEG + (q.kind === 'goal' ? 0.7 : q.kind === 'tackle' || q.kind === 'intercept' ? 0.5 : 0.6)
+    });
+  });
+  return {
+    beats,
+    total: t
+  };
+}
+function beatFrame(beat, L, prevEnd) {
+  const toPitch = (team, p) => ({
+    x: (team === 0 ? p.x : 1 - p.x) * PITCH.w,
+    y: p.y * PITCH.h
+  });
+  const base = team => L[team].map(pl => toPitch(team, pl.base));
+  const idx = (team, name) => L[team].findIndex(p => p.name === name);
+  const frame = u => {
+    if (beat.type !== 'seq' && beat.type !== 'pen') return {
+      pos: [base(0), base(1)],
+      ball: {
+        x: PITCH.w / 2,
+        y: PITCH.h / 2
+      },
+      holder: null
+    };
+    if (beat.type === 'pen') {
+      const e = beat.pen;
+      const T = e.team;
+      const D = 1 - T;
+      const pos = [0, 1].map(team => L[team].map((pl, i) => toPitch(T, {
+        x: 0.62,
+        y: 0.2 + 0.6 * (i + team * 3) / (L[0].length + L[1].length)
+      })));
+      const si = Math.max(0, idx(T, e.player));
+      const ki = L[D].findIndex(p => p.role === 'GK');
+      const spot = {
+        x: 0.89,
+        y: 0.5
+      };
+      pos[T][si] = toPitch(T, {
+        x: 0.86,
+        y: 0.5
+      });
+      const shotU = ease((u - 0.5) / 0.35);
+      const target = e.scored ? {
+        x: 1.01,
+        y: 0.5 + e.side * 0.05
+      } : {
+        x: 0.985,
+        y: 0.5 + e.side * 0.04
+      };
+      const keeperY = e.scored ? 0.5 - e.side * 0.06 : 0.5 + e.side * 0.04;
+      if (ki >= 0) pos[D][ki] = toPitch(T, {
+        x: 0.985,
+        y: lerp(0.5, keeperY, ease((u - 0.5) / 0.3))
+      });
+      const ball = toPitch(T, lerpP(spot, target, shotU));
+      return {
+        pos,
+        ball,
+        holder: {
+          team: T,
+          i: si
+        }
+      };
+    }
+    const q = beat.q;
+    const T = q.team;
+    const D = 1 - T;
+    const n = q.chain.length;
+    const shot = q.kind === 'goal' || q.kind === 'save' || q.kind === 'miss' || q.kind === 'block';
+    const key = k => ({
+      x: shot ? lerp(0.34, 0.8, n > 1 ? k / (n - 1) : 1) : lerp(0.28, 0.52, n > 1 ? k / (n - 1) : 1),
+      y: Math.min(0.88, Math.max(0.12, 0.5 + (hashU(q.min, q.i, k) - 0.5) * 0.62))
+    });
+    const uu = u - 0.35;
+    let ballA;
+    let holderK = 0;
+    if (uu < 0) {
+      ballA = key(0);
+      holderK = 0;
+    } else if (uu < n * SEG) {
+      const k = Math.min(n - 1, Math.floor(uu / SEG));
+      const r = (uu - k * SEG) / SEG;
+      holderK = k;
+      if (k < n - 1 && r > 0.6) {
+        ballA = lerpP(key(k), key(k + 1), ease((r - 0.6) / 0.4));
+        holderK = -1;
+      } else {
+        const carry = {
+          x: key(k).x + 0.03 * Math.min(1, r / 0.6),
+          y: key(k).y
+        };
+        ballA = carry;
+      }
+    } else ballA = {
+      x: key(n - 1).x + 0.03,
+      y: key(n - 1).y
+    };
+    const tail = uu - n * SEG;
+    const push = (ballA.x - 0.45) * 0.55;
+    const pos = [[], []];
+    L[T].forEach((pl, i) => {
+      let p = {
+        x: pl.base.x + (pl.role === 'GK' ? 0 : push),
+        y: lerp(pl.base.y, ballA.y, pl.role === 'GK' ? 0 : 0.18)
+      };
+      const ci = q.chain.indexOf(pl.name);
+      if (ci >= 0) {
+        const until = ci * SEG;
+        const pre = ease(1 - Math.max(0, until - Math.max(0, uu)) / (SEG * 1.6));
+        p = lerpP(p, key(ci), pre);
+        if (ci < n - 1 && uu > (ci + 1) * SEG) p = lerpP(key(ci), {
+          x: key(ci).x + 0.08,
+          y: key(ci).y
+        }, ease((uu - (ci + 1) * SEG) / SEG));
+      }
+      pos[T][i] = p;
+    });
+    const dA = {
+      x: 1 - ballA.x,
+      y: ballA.y
+    };
+    const drop = (dA.x - 0.45) * 0.5;
+    let presser = -1,
+      best = 9;
+    L[D].forEach((pl, i) => {
+      if (pl.role === 'GK') return;
+      const p = {
+        x: pl.base.x + drop,
+        y: lerp(pl.base.y, dA.y, 0.3)
+      };
+      const dist = Math.hypot(p.x - dA.x, p.y - dA.y);
+      if (dist < best) {
+        best = dist;
+        presser = i;
+      }
+    });
+    L[D].forEach((pl, i) => {
+      let p = pl.role === 'GK' ? {
+        x: 0.035,
+        y: lerp(0.5, dA.y, 0.3)
+      } : {
+        x: pl.base.x + drop,
+        y: lerp(pl.base.y, dA.y, 0.3)
+      };
+      if (i === presser) p = lerpP(p, {
+        x: dA.x - 0.05,
+        y: dA.y + 0.03
+      }, 0.65);
+      pos[D][i] = p;
+    });
+    let ball = toPitch(T, ballA);
+    let holder = holderK >= 0 ? {
+      team: T,
+      i: idx(T, q.chain[holderK])
+    } : null;
+    let banner = null;
+    let celebrate = null;
+    if (tail >= 0) {
+      const shooterA = {
+        x: key(n - 1).x + 0.03,
+        y: key(n - 1).y
+      };
+      const ki = L[D].findIndex(p => p.role === 'GK');
+      if (q.kind === 'goal') {
+        const goalPt = {
+          x: 1.015,
+          y: 0.5 + q.side * 0.055
+        };
+        ballA = lerpP(shooterA, goalPt, ease(tail / 0.7));
+        if (ki >= 0) pos[D][ki] = {
+          x: 0.035,
+          y: lerp(0.5, 0.5 + q.side * 0.12, ease(tail / 0.6))
+        };
+        holder = tail < 0.05 ? holder : null;
+        if (tail > 0.7) {
+          banner = 'GOAL!';
+          const si = idx(T, q.shooter);
+          celebrate = {
+            team: T,
+            i: si
+          };
+          const corner = {
+            x: 0.9,
+            y: 0.5 + q.side * 0.4
+          };
+          pos[T][si] = lerpP(shooterA, corner, ease((tail - 0.7) / 1.4));
+          L[T].forEach((pl, i) => {
+            if (i !== si && pl.role !== 'GK') pos[T][i] = lerpP(pos[T][i], {
+              x: corner.x - 0.06 - 0.02 * i,
+              y: corner.y - q.side * 0.05 * (i % 3)
+            }, ease((tail - 1.1) / 1.4));
+          });
+        }
+      } else if (q.kind === 'save') {
+        const kp = {
+          x: 0.965,
+          y: 0.5 + q.side * 0.07
+        };
+        if (ki >= 0) pos[D][ki] = {
+          x: 1 - kp.x,
+          y: lerp(0.5, kp.y, ease(tail / 0.45))
+        };
+        ballA = lerpP(shooterA, kp, ease(tail / 0.6));
+        holder = tail > 0.6 && ki >= 0 ? {
+          team: D,
+          i: ki
+        } : null;
+        if (tail > 0.6) banner = 'SAVE!';
+      } else if (q.kind === 'miss') {
+        ballA = lerpP(shooterA, {
+          x: 1.03,
+          y: 0.5 + q.side * 0.2
+        }, ease(tail / 0.8));
+        holder = null;
+        if (tail > 0.8) banner = 'WIDE!';
+      } else if (q.kind === 'block') {
+        const bi = idx(D, q.blocker);
+        const bp = lerpP(shooterA, {
+          x: 1,
+          y: 0.5
+        }, 0.35);
+        if (bi >= 0) pos[D][bi] = {
+          x: 1 - bp.x,
+          y: lerp(pos[D][bi].y, bp.y, ease(tail / 0.4))
+        };
+        ballA = lerpP(shooterA, bp, ease(tail / 0.5));
+        holder = null;
+        if (tail > 0.5) banner = 'BLOCKED!';
+      } else {
+        const ti = idx(D, q.tackler);
+        const meet = {
+          x: shooterA.x + 0.02,
+          y: shooterA.y
+        };
+        if (ti >= 0) pos[D][ti] = {
+          x: 1 - meet.x,
+          y: lerp(pos[D][ti].y, meet.y, ease(tail / 0.45))
+        };
+        ballA = tail < 0.5 ? meet : lerpP(meet, {
+          x: meet.x - 0.06,
+          y: meet.y
+        }, ease((tail - 0.5) / 0.5));
+        holder = tail > 0.45 && ti >= 0 ? {
+          team: D,
+          i: ti
+        } : holder;
+        if (tail > 0.45) banner = q.kind === 'tackle' ? 'TACKLE!' : 'INTERCEPTED!';
+      }
+      ball = toPitch(T, ballA);
+    }
+    let out = {
+      pos: [pos[0].map(p => toPitch(0, p)), pos[1].map(p => toPitch(1, p))],
+      ball,
+      holder,
+      banner,
+      celebrate
+    };
+    out.pos[T] = pos[T].map(p => toPitch(T, p));
+    out.pos[D] = pos[D].map(p => toPitch(D, p));
+    if (u < 0.35 && prevEnd) {
+      const k2 = ease(u / 0.35);
+      out = {
+        ...out,
+        pos: out.pos.map((team, ti) => team.map((p, i) => prevEnd.pos[ti][i] ? lerpP(prevEnd.pos[ti][i], p, k2) : p)),
+        ball: lerpP(prevEnd.ball, out.ball, k2)
+      };
+    }
+    return out;
+  };
+  return frame;
+}
+function matchFrame(script, L, t) {
+  const {
+    beats
+  } = script;
+  let bi = beats.findIndex(b => t < b.t0 + b.dur);
+  if (bi < 0) bi = beats.length - 1;
+  const b = beats[bi];
+  const prev = bi > 0 ? beatFrame(beats[bi - 1], L, null)(beats[bi - 1].dur) : null;
+  const f = beatFrame(b, L, prev)(Math.min(b.dur, Math.max(0, t - b.t0)));
+  const prevMin = bi > 0 ? beats[bi - 1].min : 0;
+  const min = b.type === 'seq' ? Math.round(lerp(b.et ? Math.max(91, prevMin) : Math.min(prevMin, b.min), b.min, Math.min(1, (t - b.t0) / b.dur))) : b.min;
+  return {
+    ...f,
+    beat: b,
+    bi,
+    min
+  };
+}
+function revealedEvents(script, t) {
+  const out = [];
+  script.beats.forEach(b => b.show.forEach((k, j) => {
+    if (t >= b.t0 + (j === 0 ? b.reveal * (b.type === 'seq' || b.type === 'pen' ? 1 : b.dur) : b.reveal)) out.push(k);
+  }));
+  return out.sort((a, b2) => a - b2);
+}
+function PitchMatch({
+  d,
+  A,
+  B,
+  match,
+  speed,
+  commentary,
+  onDone,
+  label
+}) {
+  const L = useMemo(() => [lineupOf(d, A), lineupOf(d, B)], [d.id, A.id, B.id]);
+  const script = useMemo(() => matchScript(match), [match]);
+  const base = speed === 'fast' ? 3 : 1.6;
+  const [t, setT] = useState(speed === 'instant' ? script.total : 0);
+  const [playing, setPlaying] = useState(speed !== 'instant');
+  const [mult, setMult] = useState(1);
+  const done = t >= script.total;
+  const fired = useRef(false);
+  const reduced = reducedMotion();
+  useEffect(() => {
+    if (!playing || done) return undefined;
+    let raf;
+    let last = performance.now();
+    const tick = now => {
+      const dt = Math.min(0.1, (now - last) / 1000);
+      last = now;
+      setT(x => Math.min(script.total, x + dt * base * mult / Math.max(0.001, GAME_SPEED)));
+      raf = requestAnimationFrame(tick);
+    };
+    raf = requestAnimationFrame(tick);
+    return () => cancelAnimationFrame(raf);
+  }, [playing, done, mult, base]);
+  useEffect(() => {
+    if (done && !fired.current) {
+      fired.current = true;
+      onDone && onDone();
+    }
+  }, [done]);
+  const shown = revealedEvents(script, t);
+  const lastShown = useRef(shown.length);
+  useEffect(() => {
+    if (shown.length > lastShown.current && playing) {
+      shown.slice(lastShown.current).forEach(k => {
+        const e = match.events[k];
+        if (e.type === 'goal') {
+          audio.play('cheer');
+          audio.say(callLine('goal', {
+            who: e.player
+          }), 2, d.id + ':' + label + ':g' + k);
+        } else if (e.type === 'half' || e.type === 'full') audio.play('whistle');else if (e.type === 'red') audio.play('buzzer');else if (e.type === 'pen') audio.play(e.scored ? 'bid' : 'buzzer');
+      });
+    }
+    lastShown.current = shown.length;
+  }, [shown.length]);
+  const tq = reduced && !done ? Math.floor(t / 0.7) * 0.7 : t;
+  const fr = matchFrame(script, L, tq);
+  const goalsShown = shown.map(k => match.events[k]).filter(e => e.type === 'goal');
+  const score = done ? match.score : [goalsShown.filter(e => e.team === 0).length, goalsShown.filter(e => e.team === 1).length];
+  const penEv = shown.map(k => match.events[k]).filter(e => e.type === 'pen');
+  const pens = done ? match.pens : penEv.length ? penEv[penEv.length - 1].pens : null;
+  const keyTypes = ['goal', 'red', 'yellow', 'half', 'full', 'et', 'pens', 'pen', 'note', 'kickoff'];
+  const feed = shown.map(k => match.events[k]).filter(e => commentary || keyTypes.includes(e.type));
+  const feedRef = useRef(null);
+  useEffect(() => {
+    const f = feedRef.current;
+    if (f) f.scrollTop = f.scrollHeight;
+  }, [feed.length]);
+  const colors = [A, B].map(m => ({
+    fill: m.color,
+    text: onColor(m.color)
+  }));
+  const stop = match.stoppage || 0;
+  const clock = done ? match.pens ? 'FT · pens' : match.et ? 'AET' : 'FT' : fr.beat.type === 'half' ? 'HT' : fr.min > 90 && !fr.beat.et && fr.beat.type !== 'et' && fr.beat.type !== 'pens' && fr.beat.type !== 'pen' ? '90+' + Math.min(stop, fr.min - 90) + '′' : fr.beat.type === 'pen' || fr.beat.type === 'pens' ? 'PENS' : fr.min + '′' + (fr.beat.et ? ' ET' : '');
+  const trA = isFootball(d.topic) ? teamRating(d, A).rating : null,
+    trB = isFootball(d.topic) ? teamRating(d, B).rating : null;
+  const bannerNow = fr.banner || (fr.beat.type === 'half' ? 'HALF-TIME' : fr.beat.type === 'et' ? 'EXTRA TIME' : fr.beat.type === 'pens' ? 'PENALTIES' : fr.beat.type === 'full' && !done ? 'FULL-TIME' : null);
+  const short = n => {
+    const w = n.split(' ');
+    const s2 = w[w.length - 1];
+    return s2.length > 10 ? s2.slice(0, 9) + '.' : s2;
+  };
+  return React.createElement("div", {
+    className: "matchview"
+  }, React.createElement("div", {
+    className: "scoreboard"
+  }, React.createElement("div", {
+    className: "sb-team"
+  }, React.createElement(Badge, {
+    m: A
+  }), React.createElement("span", {
+    className: "sb-n"
+  }, A.name), trA != null && React.createElement("span", {
+    className: "sb-r num"
+  }, trA)), React.createElement("div", {
+    className: "sb-mid"
+  }, React.createElement("span", {
+    className: "sb-score num",
+    "aria-live": "polite"
+  }, score[0], "\u2013", score[1]), pens && React.createElement("span", {
+    className: "sb-pens num"
+  }, "pens ", pens[0], "\u2013", pens[1]), React.createElement("span", {
+    className: "sb-clock num"
+  }, clock)), React.createElement("div", {
+    className: "sb-team"
+  }, React.createElement(Badge, {
+    m: B
+  }), React.createElement("span", {
+    className: "sb-n"
+  }, B.name), trB != null && React.createElement("span", {
+    className: "sb-r num"
+  }, trB))), React.createElement("div", {
+    className: "pitchwrap"
+  }, React.createElement("svg", {
+    className: "pitchsvg",
+    viewBox: '-3 -3 ' + (PITCH.w + 6) + ' ' + (PITCH.h + 6),
+    role: "img",
+    "aria-label": 'Football pitch: ' + A.name + ' ' + score[0] + ', ' + B.name + ' ' + score[1] + ', ' + clock
+  }, React.createElement("rect", {
+    x: "-3",
+    y: "-3",
+    width: PITCH.w + 6,
+    height: PITCH.h + 6,
+    fill: "#1f7a3a"
+  }), Array.from({
+    length: 7
+  }, (_, i) => React.createElement("rect", {
+    key: i,
+    x: i * 15,
+    y: "0",
+    width: "7.5",
+    height: PITCH.h,
+    fill: "#23843f"
+  })), React.createElement("g", {
+    fill: "none",
+    stroke: "rgba(255,255,255,.75)",
+    strokeWidth: "0.35"
+  }, React.createElement("rect", {
+    x: "0",
+    y: "0",
+    width: PITCH.w,
+    height: PITCH.h
+  }), React.createElement("line", {
+    x1: PITCH.w / 2,
+    y1: "0",
+    x2: PITCH.w / 2,
+    y2: PITCH.h
+  }), React.createElement("circle", {
+    cx: PITCH.w / 2,
+    cy: PITCH.h / 2,
+    r: "9.15"
+  }), React.createElement("rect", {
+    x: "0",
+    y: PITCH.h / 2 - 20.16,
+    width: "16.5",
+    height: "40.32"
+  }), React.createElement("rect", {
+    x: PITCH.w - 16.5,
+    y: PITCH.h / 2 - 20.16,
+    width: "16.5",
+    height: "40.32"
+  }), React.createElement("rect", {
+    x: "0",
+    y: PITCH.h / 2 - 9.16,
+    width: "5.5",
+    height: "18.32"
+  }), React.createElement("rect", {
+    x: PITCH.w - 5.5,
+    y: PITCH.h / 2 - 9.16,
+    width: "5.5",
+    height: "18.32"
+  })), React.createElement("rect", {
+    x: "-2.2",
+    y: PITCH.h / 2 - 3.66,
+    width: "2.2",
+    height: "7.32",
+    fill: "rgba(255,255,255,.85)"
+  }), React.createElement("rect", {
+    x: PITCH.w,
+    y: PITCH.h / 2 - 3.66,
+    width: "2.2",
+    height: "7.32",
+    fill: "rgba(255,255,255,.85)"
+  }), [0, 1].map(team => L[team].map((pl, i) => {
+    const p = fr.pos[team][i];
+    if (!p) return null;
+    const isHolder = fr.holder && fr.holder.team === team && fr.holder.i === i;
+    const cel = fr.celebrate && fr.celebrate.team === team && fr.celebrate.i === i;
+    return React.createElement("g", {
+      key: team + '-' + i,
+      transform: 'translate(' + p.x.toFixed(2) + ' ' + p.y.toFixed(2) + ')'
+    }, React.createElement("circle", {
+      r: cel ? 2.6 : 2.1,
+      fill: pl.role === 'GK' ? '#ffd23f' : colors[team].fill,
+      stroke: isHolder || cel ? '#fff' : 'rgba(0,0,0,.55)',
+      strokeWidth: isHolder || cel ? 0.6 : 0.35
+    }), React.createElement("text", {
+      y: "0.9",
+      textAnchor: "middle",
+      fontSize: "2.3",
+      fontWeight: "800",
+      fill: pl.role === 'GK' ? '#1b1530' : colors[team].text
+    }, pl.num), React.createElement("text", {
+      className: 'plabel' + (isHolder || cel ? ' on' : ''),
+      y: "-2.8",
+      textAnchor: "middle",
+      fontSize: "2.4",
+      fontWeight: "700",
+      fill: "#fff"
+    }, short(pl.name)));
+  })), React.createElement("circle", {
+    cx: fr.ball.x,
+    cy: fr.ball.y,
+    r: "1",
+    fill: "#fff",
+    stroke: "#111",
+    strokeWidth: "0.25"
+  }), bannerNow && !done && React.createElement("text", {
+    x: PITCH.w / 2,
+    y: PITCH.h / 2 + 3,
+    textAnchor: "middle",
+    fontSize: bannerNow === 'GOAL!' ? 11 : 7,
+    fontWeight: "900",
+    fill: bannerNow === 'GOAL!' ? '#ffc83d' : '#fff',
+    stroke: "#0f0c21",
+    strokeWidth: "0.6",
+    paintOrder: "stroke",
+    className: "pbanner"
+  }, bannerNow))), React.createElement("div", {
+    className: "mctrl",
+    role: "group",
+    "aria-label": "Match controls"
+  }, !done && React.createElement("button", {
+    className: "btn btn-sm",
+    onClick: () => setPlaying(x => !x),
+    "aria-label": playing ? 'Pause' : 'Play'
+  }, playing ? '⏸ Pause' : '▶ Play'), !done && [1, 2, 4].map(x => React.createElement("button", {
+    key: x,
+    className: 'btn btn-sm' + (mult === x ? ' btn-gold' : ''),
+    "aria-pressed": mult === x,
+    onClick: () => setMult(x)
+  }, x, "\xD7")), !done && React.createElement("button", {
+    className: "btn btn-sm btn-ghost",
+    onClick: () => setT(script.total)
+  }, "Skip to result"), done && React.createElement("button", {
+    className: "btn btn-sm",
+    onClick: () => {
+      fired.current = true;
+      lastShown.current = 0;
+      setT(0);
+      setPlaying(true);
+    }
+  }, "\u21BA Watch again")), React.createElement("div", {
+    className: "mfeed",
+    ref: feedRef,
+    "aria-live": "polite"
+  }, feed.map((e, k) => React.createElement("p", {
+    key: k,
+    className: 'mev ' + e.type + (e.team != null ? ' t' + e.team : '')
+  }, React.createElement("span", {
+    className: "mm num"
+  }, e.type === 'pen' || e.type === 'pens' ? 'PEN' : e.type === 'note' ? 'i' : e.min + '′'), React.createElement("span", null, e.type === 'goal' ? '⚽ ' : e.type === 'yellow' ? '🟨 ' : e.type === 'red' ? '🟥 ' : e.type === 'pen' ? e.scored ? '✅ ' : '❌ ' : e.type === 'tackle' ? '🛡️ ' : e.type === 'chance' ? '🧤 ' : '', e.text, e.team != null && e.type !== 'pen' ? React.createElement("small", null, " \xB7 ", (e.team === 0 ? A : B).name) : null)))), done && React.createElement(MatchSummary, {
+    d: d,
+    A: A,
+    B: B,
+    match: match
+  }));
+}
+function MatchView(props) {
+  return props.match && props.match.v === 2 ? React.createElement(PitchMatch, props) : React.createElement(MatchPlayer, props);
 }
 const FB_CONFIG = {
   apiKey: 'AIzaSyCjw0jMkbljpMKol013HCe_l_h8nzNLtCY',
@@ -14088,6 +15448,7 @@ const NET_ACTIONS = {
   bid: (d, [mid, amt, dbl], who) => d.phase === 'auction' && owns(who, mid) && typeof amt === 'number' ? placeBid(d, mid, amt, dbl ? {
     double: true
   } : undefined) : d,
+  withdraw: (d, [mid], who) => owns(who, mid) ? withdraw(d, mid) : d,
   card: (d, [by, card, params], who) => d.phase === 'auction' && owns(who, by) && CARD_INFO[card] ? playCard(d, by, card, params || {}) : d,
   veto: (d, [yes, pid], who) => d.pending && d.pending.id === pid && owns(who, d.pending.target) ? answerCard(d, !!yes) : d,
   nominate: (d, [id], who) => {
@@ -14167,7 +15528,7 @@ class Room {
     return this.db.ref(this.base + (p || ''));
   }
   get amHost() {
-    return !!(this.meta && this.meta.host === this.uid);
+    return !this.viewerOnly && !!(this.meta && this.meta.host === this.uid);
   }
   emit() {
     this.subs.forEach(f => {
@@ -14236,6 +15597,11 @@ class Room {
     const players = (await room.ref('players').once('value')).val() || {};
     const me = players[uid];
     room.kind = kind === 'tv' ? 'tv' : 'player';
+    if (room.kind === 'tv' && me && me.kind !== 'tv') {
+      room.viewerOnly = true;
+      await room.start();
+      return room;
+    }
     if (!me && room.kind === 'player') {
       const people = Object.values(players).filter(p => p.kind !== 'tv').length;
       if (people >= ONLINE.maxPeople) throw new Error('That room is full (' + ONLINE.maxPeople + ' players).');
@@ -14262,7 +15628,7 @@ class Room {
     return room;
   }
   async start() {
-    saveLastRoom({
+    if (!this.viewerOnly) saveLastRoom({
       code: this.code,
       at: Date.now(),
       kind: this.kind
@@ -14270,7 +15636,7 @@ class Room {
     const me = this.ref('presence/' + this.uid);
     this.listen(this.db.ref('.info/connected'), 'value', s => {
       this.connected = s.val() !== false;
-      if (s.val() === true) {
+      if (s.val() === true && !this.viewerOnly) {
         me.onDisconnect().remove();
         me.set(true);
       }
@@ -14377,7 +15743,7 @@ class Room {
     })).sort((a, b) => (a.joinedAt || 0) - (b.joinedAt || 0));
   }
   checkHost() {
-    if (!this.meta || this.meta.status === 'closed' || this.kind === 'tv' || !this.players[this.uid]) return;
+    if (!this.meta || this.meta.status === 'closed' || this.kind === 'tv' || this.viewerOnly || !this.players[this.uid]) return;
     const host = this.meta.host;
     if (host === this.uid || this.online(host)) {
       clearTimeout(this.hostTimer);
@@ -14481,6 +15847,7 @@ class Room {
       } catch (e) {}
     });
     this.offs = [];
+    if (this.viewerOnly) return;
     this.ref('presence/' + this.uid).remove().catch(() => {});
     if (forget) {
       saveLastRoom(null);
@@ -14497,18 +15864,20 @@ class Room {
 const NetCtx = React.createContext(null);
 const useNet = () => React.useContext(NetCtx);
 function netView(d, net) {
-  const online = !!(d && d.mode === 'online' && net);
-  const isHost = !online || net.role === 'host';
+  const online = !!(d && d.mode === 'online' && net && !net.local);
+  const passive = !!(net && net.passive);
+  const isHost = !passive && (!online || net.role === 'host');
   const who = online ? net.who : null;
+  const tv = !!(net && (net.display === 'tv' || net.role === 'tv'));
   return {
     online,
     isHost,
     who,
-    tv: online && net.role === 'tv',
-    live: online ? net.live || {} : {},
+    tv,
+    live: online || passive ? net.live || {} : {},
     runsBots: !!d && (d.mode === 'solo' || online) && isHost,
-    controls: teamId => !online ? d.mode === 'solo' ? !!(teamOf(d, teamId) || {}).human : true : !!who && who.teams.has(teamId),
-    controlsPart: pid => !online ? true : !!who && who.parts.has(pid)
+    controls: teamId => tv ? false : !online ? d.mode === 'solo' ? !!(teamOf(d, teamId) || {}).human : true : !!who && who.teams.has(teamId),
+    controlsPart: pid => tv ? false : !online ? true : !!who && who.parts.has(pid)
   };
 }
 function useAct(d, setDraft) {
@@ -14547,7 +15916,9 @@ function OnlineHome({
     title: "Online"
   }), React.createElement("h2", {
     className: "display"
-  }, "Play on your own phones"), React.createElement("p", {
+  }, "Play on your own phones"), typeof navigator !== 'undefined' && navigator.onLine === false && React.createElement("p", {
+    className: "warn"
+  }, "This device is offline. Online rooms need an internet connection; Solo and Local work offline."), React.createElement("p", {
     className: "muted",
     style: {
       margin: 0
@@ -14727,6 +16098,7 @@ function initialLobby(topic, rules) {
     botSeed: uid(),
     talk: true,
     clock: ONLINE.clock,
+    coverAfter: 60,
     topic: topic ? packTopic(onlineTopic(topic), false) : null,
     topicName: topic ? topic.name : '',
     topicEmoji: topic ? topic.emoji : '',
@@ -14828,9 +16200,11 @@ function Lobby({
   rulePrefs,
   onLeave: leaveNow,
   onStart,
-  tv
+  tv: tvProp
 }) {
   const isHost = room.amHost;
+  const [tvView, setTvView] = useState(false);
+  const tv = tvProp || tvView;
   const [askLeave, setAskLeave] = useState(false);
   const onLeave = () => isHost ? setAskLeave(true) : leaveNow();
   const leaveSheet = askLeave && React.createElement(Confirm, {
@@ -14928,7 +16302,9 @@ function Lobby({
   const fin = r.finale && r.finale.mode || 'vote';
   if (tv) return React.createElement("div", {
     className: "app tvlobby"
-  }, React.createElement(RoomCode, {
+  }, React.createElement(TvExit, {
+    onExit: tvView ? () => setTvView(false) : null
+  }), React.createElement(RoomCode, {
     code: room.code,
     big: true
   }), React.createElement("div", {
@@ -15085,7 +16461,27 @@ function Lobby({
     className: "btn",
     disabled: !topicObj,
     onClick: () => setView('rules')
-  }, "Rules: ", money(r.budget || 20), " budget", twistsOn.length ? ' · ' + twistsOn.join(', ') : '', " \xB7 winner by ", fin === 'vote' ? 'vote' : fin)), problems.map(p => React.createElement("p", {
+  }, "Edit rules: ", money(r.budget || 20), " budget", twistsOn.length ? ' · ' + twistsOn.join(', ') : ' · no twists', " \xB7 winner by ", fin === 'vote' ? 'vote' : fin)), React.createElement("div", {
+    className: "card stack"
+  }, React.createElement("h3", null, "Room"), React.createElement("div", {
+    className: "field"
+  }, React.createElement("span", {
+    className: "label"
+  }, "If someone\u2019s connection drops"), React.createElement(Seg, {
+    label: "Bot covers after",
+    value: cfg.coverAfter || 60,
+    options: [[30, 'Bot after 30s'], [60, '60s'], [120, '2 min']],
+    onChange: v => set({
+      coverAfter: v
+    })
+  }), React.createElement("p", {
+    className: "hint"
+  }, "A bot plays their seat until they\u2019re back, then hands it straight back. They can rejoin from Online on the same phone, or take their seat back from another phone.")), React.createElement("p", {
+    className: "hint",
+    style: {
+      margin: 0
+    }
+  }, "Up to ", ONLINE.maxTeams, " teams (", ONLINE.maxPeople, " people in team mode). Only the host can change rules, start, pause and end trading; everyone else controls just their own team. If the host leaves, the next player to join takes over.")), problems.map(p => React.createElement("p", {
     key: p,
     className: "warn"
   }, p)), React.createElement("button", {
@@ -15097,14 +16493,33 @@ function Lobby({
     style: {
       textAlign: 'center'
     }
-  }, "A bot covers anyone who drops out for ", ONLINE.coverAfter / 1000, "s, and hands their seat back when they return."), leaveSheet) : React.createElement(React.Fragment, null, React.createElement("div", {
+  }, "A bot covers anyone who drops out for ", cfg.coverAfter || 60, "s, and hands their seat back when they return."), leaveSheet, React.createElement(TvSwitch, {
+    code: room.code,
+    onThisScreen: () => setTvView(true)
+  })) : React.createElement(React.Fragment, null, React.createElement("div", {
     className: "card stack-sm"
   }, React.createElement("h3", null, cfg.topicEmoji, " ", cfg.topicName || 'The host is picking a topic'), React.createElement("p", {
     className: "small muted",
     style: {
       margin: 0
     }
-  }, money(r.budget || 20), " budget \xB7 ", (r.slots || []).length, " slots \xB7 ", cfg.clock, "s bid clock", twistsOn.length ? ' · ' + twistsOn.join(', ') : '', " \xB7 winner by ", fin === 'vote' ? 'vote' : fin), React.createElement("p", {
+  }, money(r.budget || 20), " budget \xB7 ", (r.slots || []).length, " slots \xB7 ", cfg.clock, "s bid clock", twistsOn.length ? ' · ' + twistsOn.join(', ') : '', " \xB7 winner by ", fin === 'vote' ? 'vote' : fin), React.createElement("details", null, React.createElement("summary", {
+    className: "label"
+  }, "All rules for this room"), React.createElement(RulesSummary, {
+    rules: {
+      ...RULE_DEFAULTS(),
+      ...r
+    },
+    opts: {
+      teams: cfg.teamMode,
+      clock: cfg.clock
+    }
+  }), React.createElement("p", {
+    className: "hint",
+    style: {
+      margin: 0
+    }
+  }, "A bot covers a dropped player after ", cfg.coverAfter || 60, "s. Only the host can change these.")), React.createElement("p", {
     className: "small muted",
     style: {
       margin: 0
@@ -15130,9 +16545,11 @@ function RoomGame({
   const tv = room.kind === 'tv';
   const [flash, setFlash] = useState(null);
   const [askLeave, setAskLeave] = useState(false);
+  const [tvView, setTvView] = useState(false);
   const who = useMemo(() => ownerInfo(d, room.uid), [d && d.managers, room.uid]);
   const net = {
     role: isHost ? 'host' : tv ? 'tv' : 'player',
+    display: tv || tvView ? 'tv' : 'controls',
     who,
     live: room.live,
     send: (n, a) => room.send(n, a),
@@ -15206,7 +16623,7 @@ function RoomGame({
   return React.createElement(NetCtx.Provider, {
     value: net
   }, React.createElement("div", {
-    className: tv ? 'tvmode' : ''
+    className: tv || tvView ? 'tvmode' : ''
   }, !room.connected && React.createElement("div", {
     className: "netbar",
     role: "status"
@@ -15221,7 +16638,12 @@ function RoomGame({
   }, s.name))), view, flash && React.createElement(Flash, {
     f: flash,
     onDone: () => setFlash(null)
-  }), askLeave && React.createElement(Confirm, {
+  }), tv && React.createElement(TvExit, null), !tv && isHost && (tvView ? React.createElement(TvExit, {
+    onExit: () => setTvView(false)
+  }) : React.createElement(TvSwitch, {
+    code: room.code,
+    onThisScreen: () => setTvView(true)
+  })), askLeave && React.createElement(Confirm, {
     title: "Leave the room?",
     body: isHost ? 'Another player takes over as host and the game carries on. You can rejoin from Online.' : 'The game carries on. A bot covers your seat after a minute; you can rejoin from Online.',
     yes: "Leave",
@@ -15237,9 +16659,15 @@ function OnlineScreen({
   past,
   settings,
   onExit,
-  onFinished
+  onFinished,
+  onRetry
 }) {
   const [room, setRoom] = useState(null);
+  const [slow, setSlow] = useState(false);
+  useEffect(() => {
+    const t = setTimeout(() => setSlow(true), 12000);
+    return () => clearTimeout(t);
+  }, []);
   const [err, setErr] = useState('');
   const [, tick] = useState(0);
   const [hd, setHd] = useState(null);
@@ -15270,9 +16698,9 @@ function OnlineScreen({
   const amHost = !!(room && room.amHost);
   const status = room && room.meta ? room.meta.status : null;
   useEffect(() => {
-    audio.setQuiet(!!room && !amHost && room.kind !== 'tv');
+    audio.setQuiet(!!room && !amHost && room.kind !== 'tv' && !profile.voice);
     return () => audio.setQuiet(false);
-  }, [room, amHost]);
+  }, [room, amHost, profile.voice]);
   useEffect(() => {
     if (!room || !amHost) return;
     if (!room.lobby && status === 'lobby') {
@@ -15350,7 +16778,7 @@ function OnlineScreen({
             if (s.covered) n = setCover(n, s.uid, false);
           } else {
             room.awaySince[s.uid] = room.awaySince[s.uid] || now;
-            if (!s.covered && now - room.awaySince[s.uid] >= ms(ONLINE.coverAfter)) n = setCover(n, s.uid, true);
+            if (!s.covered && now - room.awaySince[s.uid] >= ms((p.online && p.online.coverAfter || 60) * 1000)) n = setCover(n, s.uid, true);
           }
         });
         return n;
@@ -15377,7 +16805,15 @@ function OnlineScreen({
     style: {
       margin: 0
     }
-  }, err), React.createElement("button", {
+  }, err), React.createElement("p", {
+    className: "hint",
+    style: {
+      margin: 0
+    }
+  }, "Solo and Local games still work without internet."), React.createElement("button", {
+    className: "btn btn-gold",
+    onClick: onRetry
+  }, "Try again"), React.createElement("button", {
     className: "btn",
     onClick: onExit
   }, "Back")));
@@ -15391,7 +16827,12 @@ function OnlineScreen({
     style: {
       textAlign: 'center'
     }
-  }, "Connecting\u2026"));
+  }, "Connecting\u2026"), slow && React.createElement("p", {
+    className: "hint",
+    style: {
+      textAlign: 'center'
+    }
+  }, "This is taking a while. Check your internet connection", typeof navigator !== 'undefined' && navigator.onLine === false ? ' — this device looks offline' : '', "."));
   if (status === 'closed') return React.createElement("div", {
     className: "app"
   }, React.createElement(TopBar, {
@@ -15433,7 +16874,8 @@ function OnlineScreen({
         mode: 'online',
         online: {
           clock: cfg.clock,
-          code: room.code
+          code: room.code,
+          coverAfter: cfg.coverAfter || 60
         },
         solo: {
           talk: cfg.talk,
@@ -15465,5 +16907,215 @@ function OnlineScreen({
       });
     }
   });
+}
+const LOCAL_TV = 'dn-local-tv';
+const tvUrl = code => location.origin + location.pathname + '#tv=' + (code || 'local');
+const canChannel = () => typeof window !== 'undefined' && 'BroadcastChannel' in window;
+function goFullscreen() {
+  try {
+    const el = document.documentElement;
+    if (!document.fullscreenElement && el.requestFullscreen) el.requestFullscreen().catch(() => {});
+  } catch (e) {}
+}
+function TvSwitch({
+  code,
+  onThisScreen
+}) {
+  const [open, setOpen] = useState(false);
+  const [msg, setMsg] = useState('');
+  const newWindow = () => {
+    if (!code && !canChannel()) {
+      setMsg('This browser can’t link a second window. Use “On this screen” instead.');
+      return;
+    }
+    const w = window.open(tvUrl(code), '_blank');
+    if (!w) setMsg('The browser blocked the new window. Allow pop-ups for this site, or use “On this screen”.');else setOpen(false);
+  };
+  return React.createElement(React.Fragment, null, React.createElement("button", {
+    className: "tvfab",
+    onClick: () => setOpen(true),
+    "aria-label": "TV mode",
+    title: "TV mode"
+  }, "\uD83D\uDCFA"), open && React.createElement(Sheet, {
+    center: true,
+    onClose: () => setOpen(false)
+  }, React.createElement("h2", {
+    className: "display",
+    style: {
+      fontSize: 30
+    }
+  }, "TV mode"), React.createElement("p", {
+    className: "hint"
+  }, "A big-screen view of the auction, bids, clock, teams and matches. It never bids, votes or spends."), React.createElement("button", {
+    className: "btn btn-gold",
+    onClick: () => {
+      setOpen(false);
+      onThisScreen();
+    }
+  }, "Show TV view on this screen"), React.createElement("p", {
+    className: "hint",
+    style: {
+      margin: 0
+    }
+  }, "You stay the host. Tap \u201CBack to controls\u201D (or press Esc) to return."), React.createElement("button", {
+    className: "btn",
+    onClick: newWindow
+  }, "Open TV in a new window"), React.createElement("p", {
+    className: "hint",
+    style: {
+      margin: 0
+    }
+  }, "Drag that window onto the TV (or cast it) and keep controlling the game here.", code ? '' : ' Works in this browser on this computer.'), code && React.createElement("p", {
+    className: "hint",
+    style: {
+      margin: 0
+    }
+  }, "Another device: open Draft Night \u2192 Online \u2192 enter ", React.createElement("b", null, code), " \u2192 \u201CUse this screen as the TV\u201D. It doesn\u2019t take a seat."), msg && React.createElement("p", {
+    className: "warn"
+  }, msg), React.createElement("button", {
+    className: "btn btn-ghost",
+    onClick: () => setOpen(false)
+  }, "Close")));
+}
+function TvExit({
+  onExit
+}) {
+  useEffect(() => {
+    if (!onExit) return undefined;
+    const k = e => {
+      if (e.key === 'Escape' && !document.fullscreenElement) onExit();
+    };
+    window.addEventListener('keydown', k);
+    return () => window.removeEventListener('keydown', k);
+  }, [onExit]);
+  return React.createElement("div", {
+    className: "tvbar"
+  }, React.createElement("button", {
+    className: "pillbtn",
+    onClick: goFullscreen
+  }, "\u26F6 Full screen"), onExit && React.createElement("button", {
+    className: "pillbtn",
+    onClick: onExit
+  }, "\u2190 Back to controls"));
+}
+function TvGame({
+  d,
+  net,
+  flash,
+  setFlash,
+  past,
+  settings
+}) {
+  const noop = () => {};
+  let view;
+  if (d.phase === 'auction') view = React.createElement(Auction, {
+    d: d,
+    setDraft: noop,
+    goHome: noop,
+    flashing: !!flash,
+    onFlash: noop
+  });else if (d.phase === 'freepick') view = React.createElement(FreePick, {
+    d: d,
+    setDraft: noop,
+    goHome: noop,
+    flashing: !!flash,
+    onFlash: noop
+  });else if (d.phase === 'nominate') view = React.createElement(Nominate, {
+    d: d,
+    setDraft: noop,
+    goHome: noop
+  });else if (d.phase === 'trade') view = React.createElement(TradeWindow, {
+    d: d,
+    setDraft: noop,
+    goHome: noop
+  });else view = React.createElement(Results, {
+    d: d,
+    past: past,
+    showShame: settings.showShame,
+    onChange: noop,
+    onBack: noop
+  });
+  return React.createElement(NetCtx.Provider, {
+    value: net
+  }, React.createElement("div", {
+    className: "tvmode"
+  }, view, flash && React.createElement(Flash, {
+    f: flash,
+    onDone: () => setFlash(null)
+  })));
+}
+function LocalTv({
+  past,
+  settings
+}) {
+  const [d, setD] = useState(null);
+  const [live, setLive] = useState({});
+  const [flash, setFlash] = useState(null);
+  useEffect(() => {
+    if (!canChannel()) return undefined;
+    const ch = new BroadcastChannel(LOCAL_TV);
+    ch.onmessage = e => {
+      const m = e.data || {};
+      if (m.type === 'draft') setD(m.draft);else if (m.type === 'live') setLive(m.live || {});else if (m.type === 'flash' && m.info && m.info.kind !== 'card') {
+        setFlash(m.info);
+        if (m.info.kind === 'sold') audio.play(m.info.big ? 'big' : 'gavel');
+      }
+    };
+    ch.postMessage({
+      type: 'hello'
+    });
+    const bye = () => {
+      try {
+        ch.postMessage({
+          type: 'bye'
+        });
+      } catch (e) {}
+    };
+    window.addEventListener('beforeunload', bye);
+    return () => {
+      bye();
+      window.removeEventListener('beforeunload', bye);
+      ch.close();
+    };
+  }, []);
+  if (!canChannel()) return React.createElement("div", {
+    className: "app"
+  }, React.createElement("div", {
+    className: "card stack"
+  }, React.createElement("b", null, "TV window not supported here"), React.createElement("p", {
+    className: "hint",
+    style: {
+      margin: 0
+    }
+  }, "This browser can\u2019t link windows. Use \u201CShow TV view on this screen\u201D in the game instead.")));
+  if (!d) return React.createElement("div", {
+    className: "app tvlobby"
+  }, React.createElement("div", {
+    className: "card stack",
+    style: {
+      textAlign: 'center'
+    }
+  }, React.createElement("h2", {
+    className: "display"
+  }, "\uD83D\uDCFA Draft Night TV"), React.createElement("p", {
+    className: "muted",
+    style: {
+      margin: 0
+    }
+  }, "Waiting for a game\u2026 Start or resume a Local or Solo game in the other Draft Night window on this computer.")), React.createElement(TvExit, null));
+  return React.createElement(React.Fragment, null, React.createElement(TvGame, {
+    d: d,
+    net: {
+      passive: true,
+      local: true,
+      display: 'tv',
+      role: 'tv',
+      live
+    },
+    flash: flash,
+    setFlash: setFlash,
+    past: past,
+    settings: settings
+  }), React.createElement(TvExit, null));
 }
 })();

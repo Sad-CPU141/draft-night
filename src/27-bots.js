@@ -124,7 +124,8 @@ function botLimit(d, bot, item, rng) {
 
 /* ---------- auction decisions ---------- */
 // Returns { botId, amount, delay, event } for one bot, or null to stay quiet.
-function botDecision(d, bot) {
+// opts.noMiss: ignore the "not paying attention" roll (used to decide whether a bot drops out).
+function botDecision(d, bot, opts) {
   const item = d.queue.length ? visibleItem(d, d.queue[0]) : null; // bots never see a hidden mystery item
   if (!item || !isBot(bot) || isFull(bot) || d.phase !== 'auction' || d.pending) return null;
   if (d.bid && d.bid.leaderId === bot.id) return null;
@@ -132,7 +133,7 @@ function botDecision(d, bot) {
   if (!canBid(d, bot, price)) return null;
   const rng = seeded(d.seed || d.id, d.reveal, price, bot.id);
   const L = botLevel(bot); const type = bot.bot.type;
-  if (rng() < L.miss) return null; // not paying attention
+  if (rng() < L.miss && !(opts && opts.noMiss)) return null; // not paying attention
   const { limit, value } = botLimit(d, bot, item, rng);
   if (price > limit) {
     // Out of normal range: a Double Bid (pay half, counts double) can still win it.
@@ -167,6 +168,26 @@ function botDecision(d, bot) {
 }
 // Which bot (if any) acts next: the quickest one that wants in. On an all-bot team every
 // member weighs in for the team; they share the team's money, so they never bid each other up.
+// Bot teams that don't want the item at the current price drop out ("I'm out"). Prices only
+// go up, so a bot that passes now would pass later too. A team of bots drops out only when
+// every bot on it passes; nobody drops out while they still owe a bid under "Require every
+// manager to bid".
+function botPassers(d) {
+  if (d.phase !== 'auction' || d.pending || !d.queue.length) return [];
+  const byTeam = {};
+  botActors(d).forEach((a) => { (byTeam[a.id] = byTeam[a.id] || []).push(a); });
+  return Object.keys(byTeam).filter((id) => {
+    const m = d.managers.find((x) => x.id === id);
+    if (!m || isOut(d, id) || (d.bid && d.bid.leaderId === id) || !canBid(d, m, nextAmount(d)) || owesBid(d, m)) return false;
+    return byTeam[id].every((a) => !botDecision(d, a, { noMiss: true }));
+  });
+}
+// A bot that owes a bid places one at the asking price.
+function botForcedBid(d) {
+  if (!mustBidOn(d)) return null;
+  const a = botActors(d).find((x) => owesBid(d, d.managers.find((m) => m.id === x.id)));
+  return a ? { botId: a.id, speaker: a.speaker || a.id, amount: nextAmount(d), delay: 900, event: 'bid' } : null;
+}
 function nextBotAction(d) {
   return botActors(d).map((b) => botDecision(d, b)).filter(Boolean).sort((a, b) => a.delay - b.delay || (a.botId < b.botId ? -1 : 1))[0] || null;
 }
