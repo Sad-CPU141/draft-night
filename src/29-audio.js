@@ -74,6 +74,7 @@ const audio = (() => {
     card: (t) => [1047, 1319, 1568, 2093].forEach((f, i) => tone('sine', f, 0, t + i * 0.06, 0.18, 0.12)),
     trade: (t) => { tone('triangle', 660, 0, t, 0.2, 0.2); tone('triangle', 990, 0, t + 0.14, 0.3, 0.2); },
     fanfare: (t) => [392, 523, 659, 784, 1047].forEach((f, i) => tone('square', f, 0, t + i * 0.12, i === 4 ? 0.6 : 0.16, 0.08)),
+    whistle: (t) => { tone('sine', 2100, 2300, t, 0.25, 0.18); tone('sine', 2100, 2300, t + 0.32, 0.5, 0.18); },
     big: (t) => { SFX.gavel(t); [392, 494, 587, 784].forEach((f, i) => tone('sawtooth', f, 0, t + 0.3 + i * 0.07, 0.5, 0.06)); },
   };
   function play(name) {
@@ -167,6 +168,8 @@ const CALLS = {
   tradeOffer: ['We’ve got a trade on the table!'],
   tradeDone: ['Deal done! That could be a game-changer!'],
   winner: ['And the winner is… {who}!'],
+  goal: ['GOAL! {who}!', 'It’s in! {who} scores!'],
+  champion: ['And your champions are… {who}!'],
   tie: ['It’s a tie! {who}!'],
 };
 const callLine = (k, vars) => { const ls = CALLS[k]; const l = ls[Math.floor(Math.random() * ls.length)]; return l.replace(/\{(\w+)\}/g, (_, v) => (vars && vars[v] != null ? vars[v] : '')); };

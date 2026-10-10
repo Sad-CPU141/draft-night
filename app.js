@@ -1,4 +1,4 @@
-/* Draft Night 0978476ab2 — built from src/ by build.js. Edit src/, not this file. */
+/* Draft Night e2b33c1069 — built from src/ by build.js. Edit src/, not this file. */
 "use strict";
 (function(){
 function _extends() { return _extends = Object.assign ? Object.assign.bind() : function (n) { for (var e = 1; e < arguments.length; e++) { var t = arguments[e]; for (var r in t) ({}).hasOwnProperty.call(t, r) && (n[r] = t[r]); } return n; }, _extends.apply(null, arguments); }
@@ -3694,6 +3694,10 @@ const audio = (() => {
       tone('triangle', 990, 0, t + 0.14, 0.3, 0.2);
     },
     fanfare: t => [392, 523, 659, 784, 1047].forEach((f, i) => tone('square', f, 0, t + i * 0.12, i === 4 ? 0.6 : 0.16, 0.08)),
+    whistle: t => {
+      tone('sine', 2100, 2300, t, 0.25, 0.18);
+      tone('sine', 2100, 2300, t + 0.32, 0.5, 0.18);
+    },
     big: t => {
       SFX.gavel(t);
       [392, 494, 587, 784].forEach((f, i) => tone('sawtooth', f, 0, t + 0.3 + i * 0.07, 0.5, 0.06));
@@ -3861,6 +3865,8 @@ const CALLS = {
   tradeOffer: ['We’ve got a trade on the table!'],
   tradeDone: ['Deal done! That could be a game-changer!'],
   winner: ['And the winner is… {who}!'],
+  goal: ['GOAL! {who}!', 'It’s in! {who} scores!'],
+  champion: ['And your champions are… {who}!'],
   tie: ['It’s a tie! {who}!']
 };
 const callLine = (k, vars) => {
@@ -3868,6 +3874,716 @@ const callLine = (k, vars) => {
   const l = ls[Math.floor(Math.random() * ls.length)];
   return l.replace(/\{(\w+)\}/g, (_, v) => vars && vars[v] != null ? vars[v] : '');
 };
+const isFootball = topic => !!topic && topic.layout === 'pitch';
+const ATTRS = ['PAC', 'SHO', 'PAS', 'DRI', 'DEF', 'PHY'];
+const ROLE_SHAPE = {
+  GK: {
+    PAC: 0.55,
+    SHO: 0.25,
+    PAS: 0.65,
+    DRI: 0.45,
+    DEF: 1.02,
+    PHY: 0.88
+  },
+  DEF: {
+    PAC: 0.82,
+    SHO: 0.52,
+    PAS: 0.76,
+    DRI: 0.72,
+    DEF: 1.02,
+    PHY: 0.97
+  },
+  MID: {
+    PAC: 0.86,
+    SHO: 0.84,
+    PAS: 1.02,
+    DRI: 0.97,
+    DEF: 0.72,
+    PHY: 0.82
+  },
+  FWD: {
+    PAC: 0.97,
+    SHO: 1.03,
+    PAS: 0.82,
+    DRI: 0.98,
+    DEF: 0.42,
+    PHY: 0.82
+  }
+};
+const roleOf = (item, slot) => ROW_OF[norm(item && item.pos)] || ROW_OF[norm(slot)] || 'MID';
+const validRating = v => v != null && v !== '' && !isNaN(+v) && +v >= 1 && +v <= 99;
+function playerRating(item) {
+  const fixed = validRating(item.rating);
+  const ovr = fixed ? clamp(Math.round(+item.rating), 1, 99) : clamp(Math.round(68 + itemFame(item) * 27 + (unit('ovr', item.name) - 0.5) * 6), 55, 97);
+  const shape = ROLE_SHAPE[roleOf(item)];
+  const attrs = {};
+  ATTRS.forEach(a => {
+    attrs[a] = clamp(Math.round(ovr * shape[a] + (unit('attr', item.name, a) - 0.5) * 10), 20, 99);
+  });
+  return {
+    ovr,
+    attrs,
+    role: roleOf(item),
+    estimated: !fixed
+  };
+}
+function teamRating(d, m) {
+  const slots = d.rules.slots;
+  const players = m.team.map((t, i) => t ? {
+    item: d.items[t.itemId],
+    slot: slots[i],
+    r: playerRating(d.items[t.itemId])
+  } : null).filter(Boolean);
+  const ovrs = [...players.map(p => p.r.ovr), ...slots.slice(players.length).map(() => 40)].sort((a, b) => b - a);
+  let wsum = 0,
+    vsum = 0;
+  ovrs.forEach((o, i) => {
+    const w = Math.pow(0.92, i);
+    wsum += w;
+    vsum += w * o;
+  });
+  const base = ovrs.length ? vsum / wsum : 40;
+  const lines = new Set(players.map(p => roleOf(p.item, p.slot)));
+  const reasons = [];
+  let coverage = 0;
+  if (!lines.has('GK')) {
+    coverage -= 4;
+    reasons.push('No goalkeeper (−4)');
+  }
+  ['DEF', 'MID', 'FWD'].forEach(l => {
+    if (!lines.has(l)) {
+      coverage -= 2;
+      reasons.push('No ' + l + ' (−2)');
+    }
+  });
+  let chem = 0;
+  if (['GK', 'DEF', 'MID', 'FWD'].every(l => lines.has(l))) {
+    chem += 1;
+    reasons.push('Every line covered (+1)');
+  }
+  const ties = {};
+  players.forEach(p => {
+    const k = KIT_RX.filter(([, rx]) => rx.test((p.item.desc || '') + ' ' + p.item.name)).map(([k2]) => k2)[0];
+    if (k) ties[k] = (ties[k] || 0) + 1;
+  });
+  const link = Object.entries(ties).find(([, n]) => n >= 2);
+  if (link) {
+    chem += 1;
+    reasons.push('Shared club/country: ' + link[0].replace(/\b\w/g, c => c.toUpperCase()) + ' (+1)');
+  }
+  const provisional = players.length < slots.length || !lines.has('GK');
+  if (players.length < slots.length) reasons.push(slots.length - players.length + ' empty slot' + (slots.length - players.length === 1 ? '' : 's') + ' count as 40-rated');
+  return {
+    rating: clamp(Math.round(base + coverage + chem), 1, 99),
+    base: Math.round(base * 10) / 10,
+    coverage,
+    chem,
+    provisional,
+    reasons,
+    players
+  };
+}
+const COMMENT = {
+  goal: ['GOAL! {p} finds the net!', 'What a finish from {p}!', '{p} buries it!', 'It’s in! {p} with the goal!', '{p} scores — the crowd erupts!'],
+  assist: [' Lovely ball from {a}.', ' {a} with the assist.', ' Set up beautifully by {a}.'],
+  yellow: ['Yellow card for {p}.', '{p} goes into the book.'],
+  red: ['RED CARD! {p} is sent off!'],
+  chance: ['{p} goes close!', 'Big chance for {p}… just wide!', 'Great save to deny {p}!'],
+  kickoff: ['And we’re under way!'],
+  half: ['Half-time.'],
+  full: ['Full-time!'],
+  et: ['We’re going to extra time!'],
+  pens: ['It’s going to penalties!']
+};
+const pickLine = (rng, k, vars) => {
+  const ls = COMMENT[k];
+  return ls[Math.floor(rng() * ls.length)].replace(/\{(\w)\}/g, (_, v) => vars && vars[v] || '');
+};
+function squad(d, m) {
+  const rows = m.team.map((t, i) => t ? {
+    name: d.items[t.itemId].name,
+    role: roleOf(d.items[t.itemId], d.rules.slots[i]),
+    r: playerRating(d.items[t.itemId])
+  } : null).filter(Boolean);
+  return rows;
+}
+function strength(sq) {
+  if (!sq.length) return {
+    att: 1,
+    def: 1
+  };
+  const avg = (rows, fn) => rows.length ? rows.reduce((a, x) => a + fn(x), 0) / rows.length : 40;
+  const out = sq.filter(p => p.role !== 'GK');
+  const att = avg(out, p => (p.r.attrs.SHO * 1.1 + p.r.attrs.DRI + p.r.attrs.PAS * 0.8 + p.r.attrs.PAC * 0.6) / 3.5);
+  const gk = sq.find(p => p.role === 'GK');
+  const def = avg(sq.filter(p => p.role !== 'FWD'), p => (p.r.attrs.DEF * 1.1 + p.r.attrs.PHY * 0.7) / 1.8) * 0.75 + (gk ? gk.r.attrs.DEF : 45) * 0.25;
+  return {
+    att,
+    def
+  };
+}
+const weighted = (rng, rows, w) => {
+  const tot = rows.reduce((a, x) => a + w(x), 0);
+  let u = rng() * tot;
+  for (const x of rows) {
+    u -= w(x);
+    if (u <= 0) return x;
+  }
+  return rows[rows.length - 1];
+};
+function simulateMatch(d, A, B, key, knockout) {
+  const rng = seeded(d.seed, 'match', key, A.id, B.id);
+  const sq = [squad(d, A), squad(d, B)];
+  const st = sq.map(strength);
+  const notes = [];
+  if (!sq[0].length || !sq[1].length) {
+    const w = sq[0].length ? 0 : 1;
+    return {
+      score: [w === 0 ? 3 : 0, w === 1 ? 3 : 0],
+      pens: null,
+      et: false,
+      winner: w,
+      events: [{
+        min: 0,
+        type: 'note',
+        text: (w === 0 ? B : A).name + ' has no players, so the match is awarded 3–0.'
+      }],
+      stats: {
+        shots: [0, 0],
+        possession: [50, 50]
+      },
+      notes: ['Walkover: a team had no players.'],
+      forfeit: true
+    };
+  }
+  sq.forEach((s, i) => {
+    if (!s.some(p => p.role === 'GK')) notes.push((i ? B : A).name + ' has no goalkeeper, so an outfield player goes in goal.');
+  });
+  const lam = [0, 1].map(i => clamp(1.35 * Math.pow(st[i].att / st[1 - i].def, 2.2), 0.25, 4.2));
+  const events = [{
+    min: 0,
+    type: 'kickoff',
+    text: pickLine(rng, 'kickoff')
+  }];
+  const score = [0, 0],
+    shots = [0, 0],
+    cards = [{}, {}];
+  let reds = [0, 0];
+  const minute = (m, scale) => {
+    for (let i = 0; i < 2; i++) {
+      const l = lam[i] * scale * (reds[i] ? 0.75 : 1) * (reds[1 - i] ? 1.25 : 1);
+      if (rng() < l / 90) {
+        const scorer = weighted(rng, sq[i], p => (p.role === 'FWD' ? 3 : p.role === 'MID' ? 1.6 : p.role === 'DEF' ? 0.5 : 0.02) * p.r.attrs.SHO);
+        const others = sq[i].filter(p => p !== scorer);
+        const assist = others.length && rng() < 0.75 ? weighted(rng, others, p => p.r.attrs.PAS * (p.role === 'GK' ? 0.1 : 1)) : null;
+        score[i]++;
+        shots[i] += 1;
+        events.push({
+          min: m,
+          type: 'goal',
+          team: i,
+          player: scorer.name,
+          assist: assist && assist.name,
+          score: [...score],
+          text: pickLine(rng, 'goal', {
+            p: scorer.name
+          }) + (assist ? pickLine(rng, 'assist', {
+            a: assist.name
+          }) : '')
+        });
+      } else if (rng() < l / 45) {
+        shots[i]++;
+        if (rng() < 0.25) {
+          const p = weighted(rng, sq[i], x => x.r.attrs.SHO);
+          events.push({
+            min: m,
+            type: 'chance',
+            team: i,
+            player: p.name,
+            text: pickLine(rng, 'chance', {
+              p: p.name
+            })
+          });
+        }
+      }
+      if (rng() < 0.011) {
+        const p = weighted(rng, sq[i], x => x.r.attrs.DEF + 10);
+        if (cards[i][p.name] || rng() < 0.04) {
+          if (!reds[i]) {
+            reds[i]++;
+            events.push({
+              min: m,
+              type: 'red',
+              team: i,
+              player: p.name,
+              text: pickLine(rng, 'red', {
+                p: p.name
+              })
+            });
+          }
+        } else {
+          cards[i][p.name] = 1;
+          events.push({
+            min: m,
+            type: 'yellow',
+            team: i,
+            player: p.name,
+            text: pickLine(rng, 'yellow', {
+              p: p.name
+            })
+          });
+        }
+      }
+    }
+  };
+  for (let m = 1; m <= 45; m++) minute(m, 1);
+  events.push({
+    min: 45,
+    type: 'half',
+    score: [...score],
+    text: pickLine(rng, 'half')
+  });
+  const stoppage = 1 + Math.floor(rng() * 5);
+  for (let m = 46; m <= 90 + stoppage; m++) minute(m, 1);
+  events.push({
+    min: 90 + stoppage,
+    type: 'full',
+    score: [...score],
+    text: pickLine(rng, 'full')
+  });
+  let et = false,
+    pens = null;
+  if (knockout && score[0] === score[1]) {
+    et = true;
+    events.push({
+      min: 91 + stoppage,
+      type: 'et',
+      text: pickLine(rng, 'et')
+    });
+    for (let m = 91; m <= 120; m++) minute(m, 0.33);
+    if (score[0] === score[1]) {
+      events.push({
+        min: 120,
+        type: 'pens',
+        text: pickLine(rng, 'pens')
+      });
+      pens = [0, 0];
+      const gk = sq.map(s => (s.find(p => p.role === 'GK') || {
+        r: {
+          attrs: {
+            DEF: 50
+          }
+        }
+      }).r.attrs.DEF);
+      const takers = sq.map(s => [...s].sort((a, b) => b.r.attrs.SHO - a.r.attrs.SHO));
+      for (let k = 0; k < 30; k++) {
+        for (let i = 0; i < 2; i++) {
+          const p = takers[i][k % takers[i].length];
+          const scored = rng() < clamp(0.62 + (p.r.attrs.SHO - gk[1 - i]) / 220, 0.45, 0.9);
+          if (scored) pens[i]++;
+          events.push({
+            min: 120,
+            type: 'pen',
+            team: i,
+            player: p.name,
+            scored,
+            pens: [...pens],
+            text: p.name + (scored ? ' scores!' : ' misses!')
+          });
+        }
+        if (k >= 4 && pens[0] !== pens[1]) break;
+        if (k < 4) {
+          const left = 4 - k;
+          if (pens[0] > pens[1] + left || pens[1] > pens[0] + left) break;
+        }
+      }
+    }
+  }
+  const winner = score[0] !== score[1] ? score[0] > score[1] ? 0 : 1 : pens ? pens[0] > pens[1] ? 0 : 1 : null;
+  const total = shots[0] + shots[1] || 1;
+  const poss0 = clamp(Math.round(50 + (st[0].att - st[1].att) / 2 + (rng() - 0.5) * 8), 30, 70);
+  return {
+    score,
+    et,
+    pens,
+    winner,
+    events,
+    stats: {
+      shots,
+      possession: [poss0, 100 - poss0],
+      shotShare: shots[0] / total
+    },
+    notes
+  };
+}
+function seedTeams(d) {
+  const score = m => isFootball(d.topic) ? teamRating(d, m).rating : teamScore(d, m, null);
+  return [...d.managers].filter(m => m.team.some(Boolean)).sort((a, b) => score(b) - score(a) || (a.id < b.id ? -1 : 1));
+}
+function buildBracket(d) {
+  const seeds = seedTeams(d);
+  let size = 1;
+  while (size < seeds.length) size *= 2;
+  let order = [1];
+  while (order.length < size) order = order.flatMap(s => [s, order.length * 2 + 1 - s]);
+  const slot = n => n <= seeds.length ? seeds[n - 1].id : null;
+  const first = [];
+  for (let i = 0; i < size; i += 2) first.push({
+    id: 'r0m' + i / 2,
+    a: slot(order[i]),
+    b: slot(order[i + 1])
+  });
+  const rounds = [first];
+  while (rounds[rounds.length - 1].length > 1) {
+    const prev = rounds[rounds.length - 1];
+    const next = [];
+    for (let i = 0; i < prev.length; i += 2) next.push({
+      id: 'r' + rounds.length + 'm' + i / 2,
+      a: null,
+      b: null
+    });
+    rounds.push(next);
+  }
+  return advanceBracket({
+    rounds: rounds.map(r => r.map(m => ({
+      ...m,
+      winner: null,
+      votes: {},
+      match: null,
+      why: ''
+    })))
+  });
+}
+function advanceBracket(b) {
+  const rounds = b.rounds.map(r => r.map(m => ({
+    ...m
+  })));
+  for (let r = 0; r < rounds.length; r++) {
+    rounds[r].forEach((m, i) => {
+      let ready = true;
+      if (r > 0) {
+        const f1 = rounds[r - 1][i * 2],
+          f2 = rounds[r - 1][i * 2 + 1];
+        ready = !!(f1.winner && f2.winner);
+        m.a = f1.winner && f1.winner !== 'none' ? f1.winner : null;
+        m.b = f2.winner && f2.winner !== 'none' ? f2.winner : null;
+      }
+      if (m.winner || !ready) return;
+      if (m.a && !m.b) {
+        m.winner = m.a;
+        m.why = 'Bye';
+      } else if (m.b && !m.a) {
+        m.winner = m.b;
+        m.why = 'Bye';
+      } else if (!m.a && !m.b) m.winner = 'none';
+    });
+  }
+  const final = rounds[rounds.length - 1][0];
+  return {
+    ...b,
+    rounds,
+    champion: final.winner && final.winner !== 'none' ? final.winner : null
+  };
+}
+function nextMatchup(b) {
+  for (let r = 0; r < b.rounds.length; r++) for (let i = 0; i < b.rounds[r].length; i++) {
+    const m = b.rounds[r][i];
+    if (!m.winner && m.a && m.b) return {
+      r,
+      i,
+      m
+    };
+  }
+  return null;
+}
+function matchVoters(d, m) {
+  const ppl = participants(d);
+  const neutral = ppl.filter(p => p.teamId !== m.a && p.teamId !== m.b);
+  return neutral.length ? neutral : ppl;
+}
+const canVoteFor = (p, teamId) => p.teamId !== teamId;
+function matchupVoteBot(d, p, m) {
+  const choices = [m.a, m.b].filter(id => canVoteFor(p, id)).map(id => teamOf(d, id));
+  if (choices.length < 2) return choices[0] ? choices[0].id : null;
+  const judge = {
+    ...teamOf(d, p.teamId),
+    name: p.name,
+    bot: p.bot,
+    speaker: p.id
+  };
+  const rng = seeded(d.seed, 'mvote', m.id, p.id, m.revoted ? 'again' : '');
+  const sc = t => (isFootball(d.topic) ? teamRating(d, t).rating * 3 : 0) + teamScore(d, t, judge) * (1 + (rng() - 0.5) * 0.25);
+  return sc(choices[0]) >= sc(choices[1]) ? choices[0].id : choices[1].id;
+}
+function decideMatchup(d, m, mode, fin) {
+  const va = Object.values(m.votes || {}).filter(v => v === m.a).length,
+    vb = Object.values(m.votes || {}).filter(v => v === m.b).length;
+  const A = teamOf(d, m.a),
+    B = teamOf(d, m.b);
+  const rating = t => isFootball(d.topic) ? teamRating(d, t).rating : Math.round(teamScore(d, t, null));
+  const tieBreak = () => {
+    const ra = rating(A),
+      rb = rating(B);
+    if (ra !== rb) return ra > rb ? A : B;
+    return unit('coin', d.seed, m.id) < 0.5 ? A : B;
+  };
+  if (mode === 'bracket') {
+    if (va === vb && fin && fin.tiebreak === 'revote' && !m.revoted) return {
+      revote: true,
+      why: 'Tied ' + va + '–' + vb + '. Vote again!'
+    };
+    if (va !== vb) {
+      const w = va > vb ? A : B;
+      return {
+        winner: w.id,
+        why: w.name + ' won the vote ' + Math.max(va, vb) + '–' + Math.min(va, vb) + '.'
+      };
+    }
+    const w = tieBreak();
+    return {
+      winner: w.id,
+      why: 'Tied ' + va + '–' + vb + ' on votes; ' + w.name + ' goes through as the higher-rated team.'
+    };
+  }
+  const mt = m.match;
+  if (mode === 'sim') {
+    const w = mt.winner === 0 ? A : B;
+    if (mt.pens) return {
+      winner: w.id,
+      why: 'It finished ' + mt.score[0] + '–' + mt.score[1] + ' after extra time; ' + w.name + ' won ' + Math.max(...mt.pens) + '–' + Math.min(...mt.pens) + ' on penalties.'
+    };
+    return {
+      winner: w.id,
+      why: w.name + ' won ' + mt.score[mt.winner] + '–' + mt.score[1 - mt.winner] + (mt.et ? ' after extra time' : '') + '.'
+    };
+  }
+  const wMatch = clamp((fin.weight != null ? fin.weight : 60) / 100, 0, 1);
+  const perfA = (mt.score[0] + 0.5) / (mt.score[0] + mt.score[1] + 1);
+  const voteA = va + vb ? va / (va + vb) : 0.5;
+  const total = wMatch * perfA + (1 - wMatch) * voteA;
+  const detail = 'Match ' + Math.round(perfA * 100) + '% × ' + Math.round(wMatch * 100) + '% + votes ' + Math.round(voteA * 100) + '% × ' + Math.round((1 - wMatch) * 100) + '% = ' + Math.round(total * 100) + '% for ' + A.name;
+  if (Math.abs(total - 0.5) < 1e-9) {
+    const w = mt.winner === 0 ? A : B;
+    return {
+      winner: w.id,
+      why: 'Dead level on the combined score, so the match result decides: ' + w.name + (mt.pens ? ' on penalties.' : mt.et ? ' after extra time.' : ' won the match.'),
+      detail
+    };
+  }
+  const w = total > 0.5 ? A : B;
+  return {
+    winner: w.id,
+    why: w.name + ' wins on the combined score (' + Math.round((w === A ? total : 1 - total) * 100) + '%).',
+    detail
+  };
+}
+const finaleMode = d => {
+  const f = d.rules && d.rules.finale || {};
+  const m = f.mode || 'vote';
+  return !isFootball(d.topic) && (m === 'sim' || m === 'combined') ? 'bracket' : m;
+};
+const FINALE_DEFAULTS = {
+  mode: 'vote',
+  weight: 60,
+  speed: 'normal',
+  commentary: true,
+  tiebreak: 'rating'
+};
+const needsVote = mode => mode === 'bracket' || mode === 'combined';
+const needsMatch = mode => mode === 'sim' || mode === 'combined';
+const finCfg = d => ({
+  ...FINALE_DEFAULTS,
+  ...(d.rules && d.rules.finale || {})
+});
+const getMatchup = (d, r, i) => d.finale.bracket.rounds[r][i];
+function withMatchup(d, r, i, patch) {
+  const rounds = d.finale.bracket.rounds.map((row, ri) => ri === r ? row.map((m, mi) => mi === i ? {
+    ...m,
+    ...patch
+  } : m) : row);
+  const bracket = advanceBracket({
+    ...d.finale.bracket,
+    rounds
+  });
+  const champion = bracket.champion || null;
+  return {
+    ...d,
+    finale: {
+      ...d.finale,
+      bracket,
+      champion
+    },
+    votesRevealed: champion ? true : !!d.votesRevealed
+  };
+}
+function startFinale(d) {
+  if (d.finale && d.finale.bracket) return d;
+  const bracket = buildBracket(d);
+  const champion = bracket.champion || null;
+  return {
+    ...d,
+    votes: {},
+    finale: {
+      mode: finaleMode(d),
+      bracket,
+      champion,
+      startedAt: Date.now()
+    },
+    votesRevealed: !!champion
+  };
+}
+const hasMatchVote = (m, id) => Object.prototype.hasOwnProperty.call(m.votes || {}, id);
+function matchVoteProblem(d, m, voterId, teamId) {
+  if (!m || m.winner) return 'This matchup is already decided.';
+  if (!m.a || !m.b) return 'This matchup isn’t ready yet.';
+  const v = matchVoters(d, m).find(p => p.id === voterId);
+  if (!v) return 'That player doesn’t vote on this matchup.';
+  if (hasMatchVote(m, voterId)) return 'Already voted.';
+  if (teamId !== m.a && teamId !== m.b) return 'That team isn’t in this matchup.';
+  if (!canVoteFor(v, teamId)) return 'You can’t vote for your own team.';
+  return null;
+}
+function castMatchVote(d, r, i, voterId, teamId) {
+  const m = getMatchup(d, r, i);
+  if (matchVoteProblem(d, m, voterId, teamId)) return d;
+  return withMatchup(d, r, i, {
+    votes: {
+      ...(m.votes || {}),
+      [voterId]: teamId
+    }
+  });
+}
+function botMatchVotes(d, r, i) {
+  let n = d;
+  matchVoters(d, getMatchup(d, r, i)).filter(p => p.bot).forEach(p => {
+    const m = getMatchup(n, r, i);
+    if (!hasMatchVote(m, p.id)) n = castMatchVote(n, r, i, p.id, matchupVoteBot(n, p, m));
+  });
+  return n;
+}
+const votingDone = (d, m) => matchVoters(d, m).every(p => hasMatchVote(m, p.id));
+function playMatchup(d, r, i) {
+  const m = getMatchup(d, r, i);
+  if (!m.a || !m.b || m.match || m.winner) return d;
+  return withMatchup(d, r, i, {
+    match: simulateMatch(d, teamOf(d, m.a), teamOf(d, m.b), m.id, true)
+  });
+}
+function resolveMatchup(d, r, i) {
+  const m = getMatchup(d, r, i);
+  const mode = d.finale.mode;
+  if (m.winner || !m.a || !m.b) return d;
+  if (needsMatch(mode) && !m.match) return d;
+  const res = decideMatchup(d, m, mode, finCfg(d));
+  if (res.revote) return withMatchup(d, r, i, {
+    votes: {},
+    revoted: true,
+    note: res.why
+  });
+  return withMatchup(d, r, i, {
+    winner: res.winner,
+    why: res.why,
+    detail: res.detail || ''
+  });
+}
+function roundName(total, r) {
+  const left = total - r;
+  return left === 1 ? 'Final' : left === 2 ? 'Semi-finals' : left === 3 ? 'Quarter-finals' : 'Round of ' + Math.pow(2, left);
+}
+const playedMatchups = b => b.rounds.flatMap((row, r) => row.map((m, i) => ({
+  m,
+  r,
+  i
+}))).filter(x => x.m.a && x.m.b && x.m.winner && x.m.winner !== 'none');
+function finaleStandings(d) {
+  const b = d.finale.bracket;
+  const R = b.rounds.length;
+  const out = {};
+  d.managers.forEach(t => {
+    out[t.id] = {
+      team: t,
+      label: t.team.some(Boolean) ? 'Still in' : 'No players',
+      rank: t.team.some(Boolean) ? R : -1
+    };
+  });
+  b.rounds.forEach((row, r) => row.forEach(m => {
+    if (!m.winner || m.winner === 'none' || !m.a || !m.b) return;
+    const loser = m.winner === m.a ? m.b : m.a;
+    out[loser] = {
+      ...out[loser],
+      label: r === R - 1 ? 'Runner-up' : 'Out in the ' + roundName(R, r),
+      rank: r
+    };
+  }));
+  if (d.finale.champion && out[d.finale.champion]) out[d.finale.champion] = {
+    ...out[d.finale.champion],
+    label: 'Champion',
+    rank: R + 1
+  };
+  return Object.values(out).sort((a, b2) => b2.rank - a.rank);
+}
+function finaleRecord(d, teamId) {
+  const rec = {
+    played: 0,
+    won: 0,
+    gf: 0,
+    ga: 0
+  };
+  if (!d.finale || !d.finale.bracket) return rec;
+  playedMatchups(d.finale.bracket).forEach(({
+    m
+  }) => {
+    if (m.a !== teamId && m.b !== teamId) return;
+    rec.played++;
+    if (m.winner === teamId) rec.won++;
+    if (m.match) {
+      const k = m.a === teamId ? 0 : 1;
+      rec.gf += m.match.score[k];
+      rec.ga += m.match.score[1 - k];
+    }
+  });
+  return rec;
+}
+function championStory(d) {
+  const f = d.finale;
+  if (!f || !f.champion) return '';
+  const champ = teamOf(d, f.champion);
+  const games = playedMatchups(f.bracket).filter(({
+    m
+  }) => m.a === champ.id || m.b === champ.id);
+  if (!games.length) return champ.name + ' was the only team with players, so they win by default.';
+  const bits = [];
+  const rec = finaleRecord(d, champ.id);
+  if (needsMatch(f.mode)) bits.push('Won ' + rec.won + ' of ' + rec.played + ' match' + (rec.played === 1 ? '' : 'es') + ', scoring ' + rec.gf + ' and conceding ' + rec.ga + '.');else bits.push('Won ' + rec.won + ' head-to-head vote' + (rec.won === 1 ? '' : 's') + '.');
+  if (isFootball(d.topic)) {
+    const tr = teamRating(d, champ);
+    const all = d.managers.filter(m => m.team.some(Boolean)).map(m => teamRating(d, m).rating).sort((a, b) => b - a);
+    const pos = all.indexOf(tr.rating) + 1;
+    bits.push('Team rating ' + tr.rating + (pos === 1 ? ', the highest in the draft.' : ', ranked ' + pos + ' of ' + all.length + (pos > 1 ? ' — an upset run.' : '.')));
+  }
+  const fin = games[games.length - 1].m;
+  if (fin.why) bits.push('Final: ' + fin.why);
+  return bits.join(' ');
+}
+function goldenBoot(d) {
+  if (!d.finale || !d.finale.bracket) return null;
+  const g = {};
+  playedMatchups(d.finale.bracket).forEach(({
+    m
+  }) => (m.match ? m.match.events : []).forEach(e => {
+    if (e.type === 'goal') {
+      const team = e.team === 0 ? m.a : m.b;
+      const k = team + '|' + e.player;
+      g[k] = (g[k] || 0) + 1;
+    }
+  }));
+  const top = Object.entries(g).sort((a, b) => b[1] - a[1])[0];
+  return top ? {
+    teamId: top[0].split('|')[0],
+    player: top[0].slice(top[0].indexOf('|') + 1),
+    goals: top[1]
+  } : null;
+}
 const SHARE_PREFIX = 'DN1.';
 const SHARE_PREFIX_RAW = 'DN0.';
 const MAX_LINK = 7000;
@@ -3905,6 +4621,10 @@ function packTopic(t, withPhotos) {
     i: t.items.map(it => {
       const r = [it.name, it.pos || '', it.desc || '', it.emoji || '', it.imageUrl || '', it.wiki || '', it.kit || null, it.photosOff ? 1 : 0];
       if (withPhotos && it.photo) r.push(it.photo);
+      if (validRating(it.rating)) {
+        while (r.length < 9) r.push('');
+        r[9] = Math.round(+it.rating);
+      }
       return r;
     })
   };
@@ -3939,6 +4659,7 @@ function unpackTopic(o) {
     if (r[5]) it.wiki = clip(r[5], 120);
     if (Array.isArray(r[6]) && goodColor(r[6][0]) && goodColor(r[6][1])) it.kit = [goodColor(r[6][0]), goodColor(r[6][1])];
     if (r[7]) it.photosOff = true;
+    if (validRating(r[9])) it.rating = Math.round(+r[9]);
     return it;
   });
   if (!items.length) return {
@@ -4104,7 +4825,35 @@ function computeAwards(d) {
   }));
   const top = spends.reduce((a, x) => x.s > a.s ? x : a);
   if (top.s > 0) add('spender', '🤑', 'Big Spender', top.m, 'Spent ' + money(top.s) + ', the most of anyone.');
-  if (d.votesRevealed) {
+  if (d.finale && d.finale.champion) {
+    const champ = teamOf(d, d.finale.champion);
+    if (champ.budget > 0) add('pincher', '🪙', 'Penny Pincher', champ, 'Won the title and still kept ' + money(champ.budget) + '.');
+    const games = playedMatchups(d.finale.bracket);
+    const last = games[games.length - 1];
+    if (last && last.m.winner === champ.id) {
+      const lm = last.m;
+      const loser = teamOf(d, lm.winner === lm.a ? lm.b : lm.a);
+      const va = Object.values(lm.votes || {}).filter(v => v === lm.winner).length,
+        vb = Object.values(lm.votes || {}).length - va;
+      if (lm.match && lm.match.pens) add('robbed', '😤', 'Most Robbed', loser, 'Lost the final on penalties.');else if (lm.match && Math.abs(lm.match.score[0] - lm.match.score[1]) === 1 && d.finale.mode === 'sim') add('robbed', '😤', 'Most Robbed', loser, 'Lost the final by a single goal.');else if (d.finale.mode === 'bracket' && va - vb === 1) add('robbed', '😤', 'Most Robbed', loser, 'Lost the final by a single vote.');
+    }
+    if (isFootball(d.topic)) {
+      const giant = games.map(({
+        m
+      }) => {
+        const w = teamOf(d, m.winner),
+          l = teamOf(d, m.winner === m.a ? m.b : m.a);
+        return {
+          w,
+          l,
+          gap: teamRating(d, l).rating - teamRating(d, w).rating
+        };
+      }).filter(x => x.gap >= 3).sort((a, b) => b.gap - a.gap)[0];
+      if (giant) add('giant', '🪓', 'Giant Killer', giant.w, 'Knocked out ' + giant.l.name + ', rated ' + giant.gap + ' higher.');
+    }
+    const boot = goldenBoot(d);
+    if (boot) add('boot', '👟', 'Golden Boot', teamOf(d, boot.teamId), boot.player + ' scored ' + boot.goals + ' goal' + (boot.goals === 1 ? '' : 's') + ' in the finale.');
+  } else if (d.votesRevealed) {
     const {
       counts,
       winners
@@ -4170,7 +4919,18 @@ function computeShame(d) {
     price: disaster.price,
     why: 'Spent ' + Math.round(disaster.price / d.rules.budget * 100) + '% of the whole budget on one item.'
   });
-  if (d.votesRevealed) {
+  if (d.finale && d.finale.champion) {
+    const regret = buys.filter(b => finaleRecord(d, b.m.id).won === 0 && b.price >= d.rules.budget / d.rules.slots.length).sort((a, b) => b.price - a.price)[0];
+    if (regret) out.push({
+      id: 'regret',
+      emoji: '🙈',
+      title: 'Most Regrettable Buy',
+      team: regret.m.name,
+      item: regret.item.name,
+      price: regret.price,
+      why: 'The priciest item on a team that didn’t win a single matchup.'
+    });
+  } else if (d.votesRevealed) {
     const {
       counts
     } = tally(d);
@@ -4229,7 +4989,12 @@ function careerStats(past, settings) {
         legendary: 0,
         trades: 0,
         cardsUsed: 0,
-        lastAt: 0
+        lastAt: 0,
+        titles: 0,
+        matches: 0,
+        matchWins: 0,
+        goals: 0,
+        topRating: null
       });
       const team = d.managers.find(m => m.id === p.teamId);
       if (!team) return;
@@ -4261,14 +5026,40 @@ function careerStats(past, settings) {
       awards.filter(a => a.teamId === team.id).forEach(a => {
         r.awards[a.title] = (r.awards[a.title] || 0) + 1;
       });
-      const share = (counts[team.id] || 0) / Math.max(1, Object.keys(d.votes || {}).length);
-      if (won && (!r.best || share > r.best.share)) r.best = {
-        share,
-        votes: counts[team.id],
-        topic: d.topic.name,
-        date: d.createdAt,
-        team: team.name
-      };
+      if (d.finale && d.finale.champion) {
+        const rec = finaleRecord(d, team.id);
+        if (won) r.titles++;
+        if (needsMatch(d.finale.mode)) {
+          r.matches += rec.played;
+          r.matchWins += rec.won;
+          r.goals += rec.gf;
+        }
+        if (won && (!r.best || r.best.votes != null)) r.best = {
+          share: 1,
+          votes: null,
+          how: 'Won the ' + (needsMatch(d.finale.mode) ? 'knockout' : 'bracket') + ' (' + rec.won + ' win' + (rec.won === 1 ? '' : 's') + ')',
+          topic: d.topic.name,
+          date: d.createdAt,
+          team: team.name
+        };
+      } else {
+        const share = (counts[team.id] || 0) / Math.max(1, Object.keys(d.votes || {}).length);
+        if (won && (!r.best || r.best.votes != null && share > r.best.share)) r.best = {
+          share,
+          votes: counts[team.id],
+          topic: d.topic.name,
+          date: d.createdAt,
+          team: team.name
+        };
+      }
+      if (isFootball(d.topic)) {
+        const tr = teamRating(d, team).rating;
+        if (r.topRating == null || tr > r.topRating.rating) r.topRating = {
+          rating: tr,
+          team: team.name,
+          topic: d.topic.name
+        };
+      }
       if ((d.createdAt || 0) >= r.lastAt) {
         r.lastAt = d.createdAt || 0;
         r.name = p.name;
@@ -4897,7 +5688,8 @@ function undo(d) {
     bids: [],
     reveal: (d.reveal || 0) + 1,
     votes: {},
-    votesRevealed: false
+    votesRevealed: false,
+    finale: null
   };
 }
 const undoLabel = d => d.bid ? 'Undo bid' : d.history.length ? d.history[d.history.length - 1].label : 'Undo';
@@ -5005,6 +5797,19 @@ function Leaderboard({
   }, "Wins / drafts played. Counted by name, so keep names the same each time."));
 }
 function tally(d) {
+  if (d.finale && d.finale.champion) {
+    const counts = {};
+    d.managers.forEach(m => {
+      counts[m.id] = 0;
+    });
+    Object.values(d.votes || {}).forEach(t => {
+      if (counts[t] !== undefined) counts[t]++;
+    });
+    return {
+      counts,
+      winners: d.managers.filter(m => m.id === d.finale.champion)
+    };
+  }
   const counts = {};
   d.managers.forEach(m => {
     counts[m.id] = 0;
@@ -5305,6 +6110,9 @@ function TeamsSheet({
       color: 'var(--gold)'
     }
   }, money(m.budget), " left")), React.createElement(TeamList, {
+    d: d,
+    m: m
+  }), React.createElement(TeamRatingPanel, {
     d: d,
     m: m
   })))));
@@ -5726,7 +6534,35 @@ function ItemEditor({
       pos: e.target.value
     }),
     placeholder: "Position name"
-  })), React.createElement("div", {
+  })), isFootball(topic) && React.createElement("div", {
+    className: "field"
+  }, React.createElement("label", {
+    htmlFor: "it-rating"
+  }, "Rating override (1\u201399)"), React.createElement("input", {
+    id: "it-rating",
+    className: "input",
+    type: "number",
+    inputMode: "numeric",
+    min: 1,
+    max: 99,
+    value: f.rating == null ? '' : f.rating,
+    placeholder: 'Estimated: ' + playerRating({
+      ...f,
+      rating: null
+    }).ovr,
+    onChange: e => {
+      const v = e.target.value;
+      setF(x => {
+        const n = {
+          ...x
+        };
+        if (v === '') delete n.rating;else n.rating = clamp(Math.round(+v) || 1, 1, 99);
+        return n;
+      });
+    }
+  }), React.createElement("p", {
+    className: "hint"
+  }, "Leave empty to use Draft Night\u2019s estimated game rating. This isn\u2019t an official EA Sports FC rating either way.")), React.createElement("div", {
     className: "field"
   }, React.createElement("label", {
     htmlFor: "it-desc"
@@ -7299,7 +8135,90 @@ function SetupRules({
     })
   })), React.createElement("p", {
     className: "hint"
-  }, "Common is the rest (", common, "%). Rarity is just for show: it doesn\u2019t change prices.")), teamSummary && React.createElement(RuleSection, {
+  }, "Common is the rest (", common, "%). Rarity is just for show: it doesn\u2019t change prices.")), (() => {
+    const fin = {
+      ...FINALE_DEFAULTS,
+      ...(rules.finale || {})
+    };
+    const setF = p => set({
+      finale: {
+        ...fin,
+        ...p
+      }
+    });
+    const foot = isFootball(topic);
+    const label = {
+      vote: 'Group vote',
+      bracket: 'Head-to-head bracket',
+      sim: 'Match simulator',
+      combined: 'Combined finale'
+    }[fin.mode];
+    return React.createElement(RuleSection, {
+      id: "rs-win",
+      emoji: "\uD83C\uDFC6",
+      title: "Winner selection",
+      summary: label + (fin.mode === 'combined' ? ' · ' + fin.weight + '% match / ' + (100 - fin.weight) + '% votes' : '')
+    }, React.createElement("div", {
+      className: "field"
+    }, React.createElement("span", {
+      className: "label"
+    }, "How the champion is chosen"), React.createElement(Seg, {
+      label: "Winner selection",
+      value: fin.mode,
+      options: [['vote', 'Vote'], ['bracket', 'Bracket'], ['sim', 'Matches'], ['combined', 'Combined']],
+      onChange: v => setF({
+        mode: v
+      })
+    }), React.createElement("p", {
+      className: "hint"
+    }, fin.mode === 'vote' ? 'Everyone votes once for the best team (the classic way).' : fin.mode === 'bracket' ? 'Teams meet 1v1 in a knockout bracket. Players not in the matchup vote; you never vote for your own team.' : fin.mode === 'sim' ? 'Every bracket matchup is a simulated football match. Win to go through.' : 'Each matchup has a simulated match and a vote, combined into one score.'), !foot && (fin.mode === 'sim' || fin.mode === 'combined') && React.createElement("p", {
+      className: "warn"
+    }, "Matches need a football topic (Pitch layout). For this topic the bracket uses votes instead.")), fin.mode === 'combined' && React.createElement("div", {
+      className: "field"
+    }, React.createElement("span", {
+      className: "label"
+    }, "Weighting"), React.createElement(Seg, {
+      label: "Weighting",
+      value: fin.weight,
+      options: [[50, '50/50'], [60, '60/40'], [70, '70/30']],
+      onChange: v => setF({
+        weight: v
+      })
+    }), React.createElement("p", {
+      className: "hint"
+    }, "Match performance / votes. Goals are turned into a 0\u2013100% share so a 6\u20135 thriller doesn\u2019t swamp the votes.")), fin.mode === 'bracket' && React.createElement("div", {
+      className: "field"
+    }, React.createElement("span", {
+      className: "label"
+    }, "If a vote is tied"), React.createElement(Seg, {
+      label: "Tiebreaker",
+      value: fin.tiebreak,
+      options: [['rating', 'Higher-rated team'], ['revote', 'Vote again once']],
+      onChange: v => setF({
+        tiebreak: v
+      })
+    })), (fin.mode === 'sim' || fin.mode === 'combined') && React.createElement(React.Fragment, null, React.createElement("div", {
+      className: "field"
+    }, React.createElement("span", {
+      className: "label"
+    }, "Match speed"), React.createElement(Seg, {
+      label: "Match speed",
+      value: fin.speed,
+      options: [['instant', 'Instant'], ['fast', 'Fast (~20s)'], ['normal', 'Normal (~45s)']],
+      onChange: v => setF({
+        speed: v
+      })
+    })), React.createElement(Toggle, {
+      on: fin.commentary,
+      onChange: v => setF({
+        commentary: v
+      }),
+      title: "Match commentary",
+      sub: "Show the running commentary feed (goals and cards always show)."
+    }), React.createElement("p", {
+      className: "hint"
+    }, "Knockout matches that end level go to extra time, then penalties. Player ratings are estimated game ratings, not official EA Sports FC ratings.")));
+  })(), teamSummary && React.createElement(RuleSection, {
     id: "rs-team",
     emoji: "\uD83D\uDC65",
     title: "Team play",
@@ -7612,6 +8531,8 @@ function ItemCard({
     className: "pos"
   }, item.pos), React.createElement(RarityTag, {
     r: rar
+  }), isFootball(d.topic) && React.createElement(RatingChip, {
+    item: item
   })), React.createElement("div", {
     className: "nm"
   }, item.name), item.desc && React.createElement("div", {
@@ -8985,6 +9906,9 @@ function TeamCard({
   }) : React.createElement(TeamList, {
     d: d,
     m: m
+  }), React.createElement(TeamRatingPanel, {
+    d: d,
+    m: m
   })));
 }
 function Confetti({
@@ -9241,7 +10165,7 @@ function ExportCard({
       className: "exmem"
     }, w.members.map(p => p.name).join(' · ')), React.createElement("span", {
       className: "exvotes"
-    }, counts[w.id], " vote", counts[w.id] === 1 ? '' : 's', " \xB7 ", money(d.rules.budget - w.budget), " spent \xB7 ", money(w.budget), " left")), React.createElement("div", {
+    }, d.finale && d.finale.champion ? (needsMatch(d.finale.mode) ? 'Won the knockout' : 'Won the bracket') + (isFootball(d.topic) ? ' · rating ' + teamRating(d, w).rating : '') : counts[w.id] + ' vote' + (counts[w.id] === 1 ? '' : 's'), " \xB7 ", money(d.rules.budget - w.budget), " spent \xB7 ", money(w.budget), " left")), React.createElement("div", {
       className: "exroster"
     }, d.rules.slots.map((sl, i) => {
       const t = w.team[i];
@@ -9272,6 +10196,38 @@ function ExportCard({
   }
   const awards = computeAwards(d);
   const shame = showShame ? computeShame(d) : [];
+  if (d.finale && d.finale.champion) return React.createElement(React.Fragment, null, head, React.createElement("div", {
+    className: "board"
+  }, React.createElement("h3", null, "\uD83C\uDFC6 Final standings"), finaleStandings(d).map((s, i) => React.createElement("div", {
+    key: s.team.id,
+    className: "brow",
+    style: mStyle(s.team)
+  }, React.createElement("span", {
+    className: "rk num"
+  }, i + 1), React.createElement("span", {
+    className: "bn"
+  }, s.team.emoji, " ", s.team.name), React.createElement("span", {
+    className: "bw",
+    style: {
+      fontSize: 15
+    }
+  }, s.label, isFootball(d.topic) ? ' · ' + teamRating(d, s.team).rating : '')))), awards.length > 0 && React.createElement("div", {
+    className: "board"
+  }, React.createElement("h3", null, "\uD83C\uDF96\uFE0F Awards"), awards.map((a, i) => React.createElement("p", {
+    key: a.id + i,
+    className: "award"
+  }, React.createElement("b", null, a.emoji, " ", a.title, ": ", a.team), React.createElement("br", null), React.createElement("span", {
+    className: "small"
+  }, a.why)))), shame.length > 0 && React.createElement("div", {
+    className: "board"
+  }, React.createElement("h3", null, "\uD83D\uDE48 Hall of Shame"), shame.map(a => React.createElement("p", {
+    key: a.id,
+    className: "award"
+  }, React.createElement("b", null, a.emoji, " ", a.title, ": ", a.team), React.createElement("br", null), React.createElement("span", {
+    className: "small"
+  }, a.item, " for ", money(a.price), ". ", a.why)))), React.createElement("p", {
+    className: "exportfoot"
+  }, "DRAFT NIGHT \xB7 ", (location.host + location.pathname).replace(/\/(index\.html)?$/, '')));
   return React.createElement(React.Fragment, null, head, React.createElement("div", {
     className: "board"
   }, React.createElement("h3", null, d.votesRevealed ? '🗳️ Final standings' : '💰 Teams'), ranked.map((m, i) => React.createElement("div", {
@@ -9322,6 +10278,12 @@ function Results({
   const [imgBusy, setImgBusy] = useState(false);
   const [imgErr, setImgErr] = useState('');
   const [party, setParty] = useState(0);
+  const [showFinale, setShowFinale] = useState(false);
+  const [friendly, setFriendly] = useState(false);
+  const [viewMatch, setViewMatch] = useState(null);
+  const fmode = d.finale ? d.finale.mode : finaleMode(d);
+  const isFin = fmode !== 'vote';
+  const finDone = !!(d.finale && d.finale.champion);
   const stats = useMemo(() => draftStats(d), [d]);
   const {
     counts,
@@ -9345,13 +10307,23 @@ function Results({
     }, 1100);
   };
   useEffect(() => {
-    if (!revealed) return;
+    if (!revealed || showFinale) return;
+    if (finDone) {
+      audio.say(callLine('champion', {
+        who: winners[0].name
+      }), 3, d.id + ':champion');
+      return;
+    }
     audio.say(winners.length > 1 ? callLine('tie', {
       who: winners.map(w => w.name).join(' and ')
     }) : callLine('winner', {
       who: winners[0].name
     }), 3, d.id + ':winner:' + Object.keys(d.votes || {}).length);
-  }, [revealed]);
+  }, [revealed, showFinale]);
+  const openFinale = () => {
+    if (!d.finale) onChange(startFinale(d));
+    setShowFinale(true);
+  };
   const soloVote = target => {
     setTimeout(() => {
       const votes = {
@@ -9458,7 +10430,7 @@ function Results({
     onBack: onBack,
     backLabel: "\u2302",
     title: "Results",
-    right: live && onUndo && d.history.length && !d.votesRevealed ? React.createElement("button", {
+    right: live && onUndo && d.history.length && !d.votesRevealed && !d.finale ? React.createElement("button", {
       className: "pillbtn",
       onClick: onUndo
     }, "Undo") : React.createElement(MuteButton, null)
@@ -9474,14 +10446,17 @@ function Results({
     style: {
       fontSize: 46
     }
-  }, revealed ? 'We have a winner' : 'Final teams')), noVotes && React.createElement("div", {
+  }, finDone ? 'Champions!' : revealed ? 'We have a winner' : 'Final teams')), finDone && React.createElement(FinaleResults, {
+    d: d,
+    onOpen: setViewMatch
+  }), noVotes && React.createElement("div", {
     className: "card"
   }, React.createElement("b", null, "No votes were cast"), React.createElement("p", {
     className: "hint",
     style: {
       margin: '4px 0 0'
     }
-  }, "Nobody had a team they could vote for, so there's no winner this time.")), revealed && React.createElement("div", {
+  }, "Nobody had a team they could vote for, so there's no winner this time.")), revealed && !finDone && React.createElement("div", {
     className: "winner"
   }, React.createElement("p", {
     className: "eyebrow",
@@ -9545,7 +10520,7 @@ function Results({
     className: "v num"
   }, money(stats.cheapest.s)), React.createElement("span", {
     className: "d"
-  }, stats.cheapest.m.emoji, " ", stats.cheapest.m.name))), d.votesRevealed && !noVotes && React.createElement("div", {
+  }, stats.cheapest.m.emoji, " ", stats.cheapest.m.name))), d.votesRevealed && !noVotes && !finDone && React.createElement("div", {
     className: "board"
   }, React.createElement("h3", null, "\uD83D\uDDF3\uFE0F Vote tally", solo ? ' · final standings' : ''), ordered.map(m => React.createElement("div", {
     key: m.id,
@@ -9561,7 +10536,7 @@ function Results({
     }
   })), React.createElement("span", {
     className: "bw num"
-  }, counts[m.id])))), d.votesRevealed && !noVotes && React.createElement("p", {
+  }, counts[m.id])))), d.votesRevealed && !noVotes && !finDone && React.createElement("p", {
     className: "hint",
     style: {
       textAlign: 'center'
@@ -9596,10 +10571,26 @@ function Results({
     className: "exportfoot"
   }, "DRAFT NIGHT \xB7 ", (location.host + location.pathname).replace(/\/(index\.html)?$/, ''))), React.createElement("div", {
     className: "stack"
-  }, !d.votesRevealed && React.createElement("button", {
+  }, !d.votesRevealed && !isFin && React.createElement("button", {
     className: "btn btn-gold",
     onClick: () => setVoting(true)
-  }, solo ? 'Vote for the best team' : Object.keys(d.votes || {}).length ? 'Continue the vote' : 'Start the secret vote'), live && onPlayAgain && d.votesRevealed && React.createElement("button", {
+  }, solo ? 'Vote for the best team' : Object.keys(d.votes || {}).length ? 'Continue the vote' : 'Start the secret vote'), !d.votesRevealed && isFin && React.createElement("button", {
+    className: "btn btn-gold",
+    onClick: openFinale
+  }, d.finale ? '🏆 Continue the finale' : '🏆 Start the finale'), !d.votesRevealed && isFin && !d.finale && React.createElement("p", {
+    className: "hint",
+    style: {
+      textAlign: 'center',
+      margin: 0
+    }
+  }, {
+    bracket: 'Head-to-head bracket: teams meet 1v1 and the players not involved vote.',
+    sim: 'Match simulator: every matchup is a simulated football match.',
+    combined: 'Combined finale: each matchup is a match plus a vote (' + finCfg(d).weight + '/' + (100 - finCfg(d).weight) + ').'
+  }[fmode], d.rules.finale && d.rules.finale.mode !== fmode ? ' (Matches need a football topic, so this topic uses the vote bracket.)' : ''), isFootball(d.topic) && React.createElement("button", {
+    className: "btn",
+    onClick: () => setFriendly(true)
+  }, "\u26BD Friendly match", finDone ? ' / rematch' : ''), live && onPlayAgain && d.votesRevealed && React.createElement("button", {
     className: "btn btn-gold",
     onClick: onPlayAgain
   }, "Play again"), React.createElement("button", {
@@ -9608,7 +10599,7 @@ function Results({
     disabled: imgBusy
   }, imgBusy ? 'Making image…' : 'Save as image'), imgErr && React.createElement("p", {
     className: "warn"
-  }, imgErr), d.votesRevealed && React.createElement("button", {
+  }, imgErr), d.votesRevealed && !d.finale && React.createElement("button", {
     className: "btn btn-ghost",
     onClick: () => onChange({
       ...d,
@@ -9646,6 +10637,21 @@ function Results({
       doReveal();
     },
     onClose: () => setVoting(false)
+  }), showFinale && d.finale && React.createElement(Finale, {
+    d: d,
+    onChange: onChange,
+    onClose: () => setShowFinale(false),
+    onChampion: () => {
+      setShowFinale(false);
+      doReveal();
+    }
+  }), friendly && React.createElement(FriendlySheet, {
+    d: d,
+    onClose: () => setFriendly(false)
+  }), viewMatch && d.finale && React.createElement(MatchupSheet, {
+    d: d,
+    at: viewMatch,
+    onClose: () => setViewMatch(null)
   }), party > 0 && revealed && React.createElement(Confetti, {
     key: party,
     colors: [...winners.map(w => w.color), '#ffc83d', '#ffffff']
@@ -9663,7 +10669,7 @@ function Results({
     disabled: !revealed
   }, "\uD83C\uDFC6 Winner card"), !revealed && React.createElement("p", {
     className: "hint"
-  }, "Reveal the vote first to make a winner card."), React.createElement("button", {
+  }, isFin ? 'Finish the finale first to make a winner card.' : 'Reveal the vote first to make a winner card.'), React.createElement("button", {
     className: "btn",
     onClick: () => makeImage('full')
   }, "\uD83D\uDCCB Full results"), React.createElement("button", {
@@ -9870,7 +10876,10 @@ const DEFAULT_RULES = {
 };
 const RULE_DEFAULTS = () => ({
   ...DEFAULT_RULES,
-  ...JSON.parse(JSON.stringify(TWIST_DEFAULTS))
+  ...JSON.parse(JSON.stringify(TWIST_DEFAULTS)),
+  finale: {
+    ...FINALE_DEFAULTS
+  }
 });
 const defaultManagers = () => ['Ash', 'Bilal', 'Cam', 'Dev'].map((name, i) => ({
   id: uid(),
@@ -10310,6 +11319,18 @@ function ProfileView({
     k: "Trades done",
     v: r.trades,
     d: r.topCard ? 'Favourite card: ' + CARD_INFO[r.topCard].name : null
+  }), r.titles > 0 && React.createElement(Stat, {
+    k: "Finale titles",
+    v: r.titles,
+    d: "brackets & knockouts won"
+  }), r.matches > 0 && React.createElement(Stat, {
+    k: "Match record",
+    v: r.matchWins + '–' + (r.matches - r.matchWins),
+    d: r.goals + ' goal' + (r.goals === 1 ? '' : 's') + ' scored'
+  }), r.topRating && React.createElement(Stat, {
+    k: "Best team rating",
+    v: r.topRating.rating,
+    d: r.topRating.team + ' · ' + r.topRating.topic
   })), React.createElement("div", {
     className: "board"
   }, React.createElement("h3", null, "\u2764\uFE0F Favourite picks"), r.favourites.length ? r.favourites.map(([n, c]) => React.createElement("p", {
@@ -10357,7 +11378,7 @@ function ProfileView({
     style: {
       margin: 0
     }
-  }, r.best.team, " \xB7 ", r.best.topic, " \xB7 ", r.best.votes, " vote", r.best.votes === 1 ? '' : 's', " (", pct(r.best.share), ") \xB7 ", new Date(r.best.date).toLocaleDateString())), React.createElement("div", {
+  }, r.best.team, " \xB7 ", r.best.topic, " \xB7 ", r.best.votes == null ? r.best.how : r.best.votes + ' vote' + (r.best.votes === 1 ? '' : 's') + ' (' + pct(r.best.share) + ')', " \xB7 ", new Date(r.best.date).toLocaleDateString())), React.createElement("div", {
     className: "board"
   }, React.createElement("h3", null, "\uD83C\uDF96\uFE0F Awards"), Object.keys(r.awards).length ? Object.entries(r.awards).sort((a, b) => b[1] - a[1]).map(([t, n]) => React.createElement("p", {
     key: t,
@@ -11236,7 +12257,8 @@ function App() {
             if (draft && draft.id === nd.id) setDraft({
               ...draft,
               votes: nd.votes,
-              votesRevealed: nd.votesRevealed
+              votesRevealed: nd.votesRevealed,
+              finale: nd.finale
             });
           },
           onBack: () => go('past')
@@ -11398,6 +12420,37 @@ class Boundary extends React.Component {
   }
 }
 if (window.__DN_TEST__) window.__DN = {
+  finale: {
+    buildBracket,
+    advanceBracket,
+    nextMatchup,
+    matchVoters,
+    canVoteFor,
+    decideMatchup,
+    simulateMatch,
+    playerRating,
+    teamRating,
+    matchupVoteBot,
+    finaleMode,
+    isFootball,
+    startFinale,
+    castMatchVote,
+    botMatchVotes,
+    playMatchup,
+    resolveMatchup,
+    getMatchup,
+    needsVote,
+    needsMatch,
+    votingDone,
+    finaleStandings,
+    finaleRecord,
+    championStory,
+    goldenBoot,
+    matchVoteProblem,
+    roundName,
+    FINALE_DEFAULTS,
+    validRating
+  },
   audio,
   AUDIO_DEFAULTS,
   share: {
@@ -11493,4 +12546,1045 @@ if (window.__DN_TEST__) window.__DN = {
 store.init().finally(() => {
   ReactDOM.createRoot(document.getElementById('root')).render(React.createElement(Boundary, null, React.createElement(App, null)));
 });
+const EST_LABEL = 'Estimated game rating · not an official EA Sports FC / FIFA rating';
+const ATTR_NAMES = {
+  PAC: 'Pace',
+  SHO: 'Shooting',
+  PAS: 'Passing',
+  DRI: 'Dribbling',
+  DEF: 'Defending',
+  PHY: 'Physical'
+};
+const reducedMotion = () => !!(window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches);
+function RatingCard({
+  item
+}) {
+  const r = playerRating(item);
+  return React.createElement("div", {
+    className: "ratingcard"
+  }, React.createElement("div", {
+    className: "rc-top"
+  }, React.createElement("span", {
+    className: "rc-ovr num"
+  }, r.ovr), React.createElement("span", {
+    className: "rc-role"
+  }, r.role), React.createElement("span", {
+    className: "rc-name"
+  }, item.name)), React.createElement("div", {
+    className: "rc-attrs"
+  }, ATTRS.map(a => React.createElement("div", {
+    key: a,
+    className: "rc-attr"
+  }, React.createElement("span", {
+    className: "k",
+    title: ATTR_NAMES[a]
+  }, a), React.createElement("span", {
+    className: "bar"
+  }, React.createElement("i", {
+    style: {
+      width: r.attrs[a] + '%'
+    }
+  })), React.createElement("span", {
+    className: "v num"
+  }, r.attrs[a])))), React.createElement("p", {
+    className: "hint",
+    style: {
+      margin: 0
+    }
+  }, r.estimated ? EST_LABEL + '. Worked out from the card’s position and accolades; the same player always gets the same numbers.' : 'Overall set by the topic (manual override). Attributes are estimated from it.'));
+}
+function RatingChip({
+  item
+}) {
+  const [open, setOpen] = useState(false);
+  const r = playerRating(item);
+  return React.createElement(React.Fragment, null, React.createElement("button", {
+    type: "button",
+    className: "ratingchip",
+    onClick: () => setOpen(true),
+    "aria-label": 'Rating ' + r.ovr + (r.estimated ? ', estimated' : '') + '. Show details'
+  }, React.createElement("b", {
+    className: "num"
+  }, r.ovr), r.estimated ? ' est.' : ''), open && React.createElement(Sheet, {
+    center: true,
+    onClose: () => setOpen(false)
+  }, React.createElement(RatingCard, {
+    item: item
+  }), React.createElement("button", {
+    className: "btn btn-ghost",
+    onClick: () => setOpen(false)
+  }, "Close")));
+}
+function TeamRatingPanel({
+  d,
+  m
+}) {
+  if (!isFootball(d.topic)) return null;
+  const tr = teamRating(d, m);
+  const players = [...tr.players].sort((a, b) => b.r.ovr - a.r.ovr);
+  const weights = players.map((_, i) => Math.pow(0.92, i));
+  return React.createElement("details", {
+    className: "teamrating"
+  }, React.createElement("summary", null, React.createElement("span", {
+    className: "tr-num num"
+  }, tr.rating), React.createElement("span", {
+    className: "tr-lbl"
+  }, "Team rating", tr.provisional ? ' · provisional' : ''), React.createElement("span", {
+    className: "tr-more"
+  }, "How? \u25BE")), React.createElement("div", {
+    className: "tr-body"
+  }, React.createElement("p", {
+    className: "small",
+    style: {
+      margin: 0
+    }
+  }, "Weighted average of the squad, best player first (each next player counts a little less, so one superstar can\u2019t carry a team alone):"), players.map((p, i) => {
+    const flex = !ROW_OF[norm(p.slot)];
+    return React.createElement("div", {
+      key: p.item.id || p.item.name,
+      className: "tr-row"
+    }, React.createElement("span", {
+      className: "k"
+    }, p.slot, flex ? ' (flex)' : ''), React.createElement("span", {
+      className: "n"
+    }, p.item.name), React.createElement("span", {
+      className: "v num"
+    }, p.r.ovr), React.createElement("span", {
+      className: "w num"
+    }, "\xD7", weights[i].toFixed(2)));
+  }), React.createElement("p", {
+    className: "small",
+    style: {
+      margin: 0
+    }
+  }, "Squad average ", React.createElement("b", {
+    className: "num"
+  }, tr.base), tr.coverage ? React.createElement(React.Fragment, null, " \xB7 coverage ", React.createElement("b", {
+    className: "num"
+  }, tr.coverage)) : null, tr.chem ? React.createElement(React.Fragment, null, " \xB7 chemistry ", React.createElement("b", {
+    className: "num"
+  }, "+", tr.chem)) : null, " = ", React.createElement("b", {
+    className: "num"
+  }, tr.rating)), tr.reasons.map(x => React.createElement("p", {
+    key: x,
+    className: "hint",
+    style: {
+      margin: 0
+    }
+  }, "\u2022 ", x)), tr.provisional && React.createElement("p", {
+    className: "hint",
+    style: {
+      margin: 0
+    }
+  }, "Provisional: ", tr.players.length < d.rules.slots.length ? 'the squad isn’t full' : 'there’s no goalkeeper', ", so matches use a simplified line-up."), React.createElement("p", {
+    className: "hint",
+    style: {
+      margin: 0
+    }
+  }, "Player ratings are estimated game ratings, not official ones.")));
+}
+function Badge({
+  m,
+  size = 44
+}) {
+  return React.createElement("span", {
+    className: "badge",
+    style: {
+      ...mStyle(m),
+      width: size,
+      height: size,
+      fontSize: size * 0.5
+    },
+    "aria-hidden": "true"
+  }, m.emoji);
+}
+function BracketView({
+  d,
+  onOpen,
+  current
+}) {
+  const b = d.finale.bracket;
+  const R = b.rounds.length;
+  const name = id => {
+    const t = id && teamOf(d, id);
+    return t ? t : null;
+  };
+  return React.createElement("div", {
+    className: "bracket",
+    role: "list",
+    "aria-label": "Tournament bracket"
+  }, b.rounds.map((row, r) => React.createElement("div", {
+    key: r,
+    className: "bcol",
+    role: "listitem"
+  }, React.createElement("p", {
+    className: "eyebrow"
+  }, roundName(R, r)), row.map((m, i) => {
+    const A = name(m.a),
+      B = name(m.b);
+    const bye = m.why === 'Bye';
+    const isCur = current && current.r === r && current.i === i;
+    const played = m.winner && m.winner !== 'none' && !bye;
+    const sc = m.match ? m.match.score : null;
+    const line = (T, k) => React.createElement("div", {
+      className: 'bteam' + (m.winner && T && m.winner === T.id ? ' won' : m.winner && T ? ' lost' : ''),
+      style: T ? mStyle(T) : null
+    }, React.createElement("span", {
+      className: "bt-n"
+    }, T ? T.emoji + ' ' + T.name : bye ? 'Bye' : '—'), sc && React.createElement("span", {
+      className: "bt-s num"
+    }, sc[k], m.match.pens ? React.createElement("small", null, "(", m.match.pens[k], ")") : null));
+    if (m.winner === 'none') return React.createElement("div", {
+      key: m.id,
+      className: "bmatch empty"
+    }, React.createElement("span", {
+      className: "hint"
+    }, "\u2014"));
+    return React.createElement("button", {
+      key: m.id,
+      type: "button",
+      className: 'bmatch' + (isCur ? ' cur' : '') + (played ? ' done' : ''),
+      disabled: !played || !onOpen,
+      onClick: () => onOpen && onOpen({
+        r,
+        i
+      }),
+      "aria-label": (A ? A.name : 'TBD') + ' versus ' + (B ? B.name : bye ? 'bye' : 'TBD') + (played ? ', decided' : isCur ? ', up next' : '')
+    }, line(A, 0), line(B, 1), isCur && React.createElement("span", {
+      className: "bm-tag"
+    }, "Up next"), played && React.createElement("span", {
+      className: "bm-tag ok"
+    }, "Decided \u2713"));
+  }))));
+}
+const clockText = (min, et, stop) => et ? min + '′ ET' : min > 90 ? '90+' + (min - 90) + '′' : min > 45 && !stop ? min + '′' : min + '′';
+function MatchPlayer({
+  d,
+  A,
+  B,
+  match,
+  speed,
+  commentary,
+  onDone,
+  label
+}) {
+  const instant = speed === 'instant';
+  const perMin = speed === 'fast' ? 190 : 430;
+  const ev = match.events;
+  const [pos, setPos] = useState(instant ? ev.length : 0);
+  const [clock, setClock] = useState(instant ? (ev[ev.length - 1] || {
+    min: 90
+  }).min : 0);
+  const [et, setEt] = useState(instant ? !!match.et : false);
+  const [wait, setWait] = useState(0);
+  const [pause, setPause] = useState(null);
+  const done = pos >= ev.length;
+  const feedRef = useRef(null);
+  const fired = useRef(false);
+  useEffect(() => {
+    if (done) {
+      if (!fired.current) {
+        fired.current = true;
+        if (!instant) audio.play('whistle');
+        onDone && onDone();
+      }
+      return undefined;
+    }
+    const t = setTimeout(() => {
+      setPause(null);
+      const next = ev[pos];
+      if (next.type === 'pen' || next.type === 'note' || next.min <= clock) {
+        setPos(pos + 1);
+        let w = 260;
+        if (next.type === 'goal') {
+          w = 1500;
+          setPause('goal');
+          audio.play('cheer');
+          audio.say(callLine('goal', {
+            who: next.player
+          }), 2, d.id + ':' + label + ':g' + pos);
+        } else if (next.type === 'half') {
+          w = 1800;
+          setPause('half');
+          audio.play('whistle');
+        } else if (next.type === 'kickoff') {
+          audio.play('whistle');
+          w = 500;
+        } else if (next.type === 'red') {
+          audio.play('buzzer');
+          w = 900;
+        } else if (next.type === 'et') {
+          setEt(true);
+          setClock(90);
+          w = 1200;
+        } else if (next.type === 'pens') w = 1200;else if (next.type === 'pen') {
+          audio.play(next.scored ? 'bid' : 'buzzer');
+          w = 800;
+        }
+        setWait(ms(w));
+      } else {
+        setClock(clock + 1);
+        setWait(ms(perMin));
+      }
+    }, wait);
+    return () => clearTimeout(t);
+  }, [pos, clock, done]);
+  useEffect(() => {
+    const f = feedRef.current;
+    if (f) f.scrollTop = f.scrollHeight;
+  }, [pos]);
+  const shown = ev.slice(0, pos);
+  const lastScore = [...shown].reverse().find(e => e.score);
+  const score = done ? match.score : lastScore ? lastScore.score : [0, 0];
+  const lastPen = [...shown].reverse().find(e => e.pens);
+  const pens = done ? match.pens : lastPen ? lastPen.pens : null;
+  const keyTypes = ['goal', 'red', 'yellow', 'half', 'full', 'et', 'pens', 'pen', 'note', 'kickoff'];
+  const feed = shown.filter(e => commentary || keyTypes.includes(e.type));
+  const trA = isFootball(d.topic) ? teamRating(d, A).rating : null,
+    trB = isFootball(d.topic) ? teamRating(d, B).rating : null;
+  return React.createElement("div", {
+    className: "matchview"
+  }, React.createElement("div", {
+    className: "scoreboard"
+  }, React.createElement("div", {
+    className: "sb-team"
+  }, React.createElement(Badge, {
+    m: A
+  }), React.createElement("span", {
+    className: "sb-n"
+  }, A.name), trA != null && React.createElement("span", {
+    className: "sb-r num"
+  }, trA)), React.createElement("div", {
+    className: "sb-mid"
+  }, React.createElement("span", {
+    className: "sb-score num",
+    "aria-live": "polite"
+  }, score[0], "\u2013", score[1]), pens && React.createElement("span", {
+    className: "sb-pens num"
+  }, "pens ", pens[0], "\u2013", pens[1]), React.createElement("span", {
+    className: "sb-clock num"
+  }, done ? match.pens ? 'FT · pens' : match.et ? 'AET' : 'FT' : clockText(clock, et))), React.createElement("div", {
+    className: "sb-team"
+  }, React.createElement(Badge, {
+    m: B
+  }), React.createElement("span", {
+    className: "sb-n"
+  }, B.name), trB != null && React.createElement("span", {
+    className: "sb-r num"
+  }, trB))), !done && React.createElement("div", {
+    className: "sb-progress"
+  }, React.createElement("i", {
+    style: {
+      width: Math.min(100, clock / (et ? 120 : 95) * 100) + '%'
+    }
+  })), pause === 'half' && !done && React.createElement("div", {
+    className: "mbanner"
+  }, "HALF-TIME \xB7 ", score[0], "\u2013", score[1]), pause === 'goal' && !done && React.createElement("div", {
+    className: 'mbanner goal' + (reducedMotion() ? '' : ' pop')
+  }, "GOAL!"), React.createElement("div", {
+    className: "mfeed",
+    ref: feedRef,
+    "aria-live": "polite"
+  }, feed.map((e, k) => React.createElement("p", {
+    key: k,
+    className: 'mev ' + e.type + (e.team != null ? ' t' + e.team : '')
+  }, React.createElement("span", {
+    className: "mm num"
+  }, e.type === 'pen' || e.type === 'pens' ? 'PEN' : e.type === 'note' ? 'i' : e.min + '′'), React.createElement("span", null, e.type === 'goal' ? '⚽ ' : e.type === 'yellow' ? '🟨 ' : e.type === 'red' ? '🟥 ' : e.type === 'pen' ? e.scored ? '✅ ' : '❌ ' : '', e.text, e.team != null && e.type !== 'pen' ? React.createElement("small", null, " \xB7 ", (e.team === 0 ? A : B).name) : null)))), !done && React.createElement("button", {
+    type: "button",
+    className: "btn btn-ghost btn-sm",
+    onClick: () => {
+      setPos(ev.length);
+      setClock(ev[ev.length - 1].min);
+    }
+  }, "Skip to full-time"), done && React.createElement(MatchSummary, {
+    d: d,
+    A: A,
+    B: B,
+    match: match
+  }));
+}
+function MatchSummary({
+  d,
+  A,
+  B,
+  match
+}) {
+  const goals = [0, 1].map(k => match.events.filter(e => e.type === 'goal' && e.team === k));
+  const cards = match.events.filter(e => e.type === 'yellow' || e.type === 'red');
+  const incomplete = [A, B].filter(t => isFootball(d.topic) && teamRating(d, t).provisional);
+  return React.createElement("div", {
+    className: "board msummary"
+  }, React.createElement("h3", null, "\uD83D\uDCCB Match summary"), React.createElement("p", {
+    className: "small",
+    style: {
+      margin: 0
+    }
+  }, React.createElement("b", null, A.name, " ", match.score[0], "\u2013", match.score[1], " ", B.name), match.et ? ' · after extra time' : '', match.pens ? ' · ' + (match.pens[0] > match.pens[1] ? A.name : B.name) + ' win ' + Math.max(...match.pens) + '–' + Math.min(...match.pens) + ' on penalties' : ''), [A, B].map((t, k) => React.createElement("p", {
+    key: t.id,
+    className: "small",
+    style: {
+      margin: 0
+    }
+  }, "\u26BD ", t.name, ": ", goals[k].length ? goals[k].map(g => g.player + ' ' + g.min + '′' + (g.assist ? ' (assist ' + g.assist + ')' : '')).join(', ') : 'no goals')), cards.length > 0 && React.createElement("p", {
+    className: "small",
+    style: {
+      margin: 0
+    }
+  }, cards.map(c => (c.type === 'red' ? '🟥 ' : '🟨 ') + c.player + ' ' + c.min + '′').join(' · ')), !match.forfeit && React.createElement("div", {
+    className: "mstats"
+  }, React.createElement("span", null, "Shots"), React.createElement("b", {
+    className: "num"
+  }, match.stats.shots[0]), React.createElement("b", {
+    className: "num"
+  }, match.stats.shots[1]), React.createElement("span", null, "Possession"), React.createElement("b", {
+    className: "num"
+  }, match.stats.possession[0], "%"), React.createElement("b", {
+    className: "num"
+  }, match.stats.possession[1], "%")), match.notes.map(n => React.createElement("p", {
+    key: n,
+    className: "hint",
+    style: {
+      margin: 0
+    }
+  }, "\u2139\uFE0F ", n)), incomplete.map(t => React.createElement("p", {
+    key: t.id,
+    className: "hint",
+    style: {
+      margin: 0
+    }
+  }, "\u2139\uFE0F ", t.name, "\u2019s squad is incomplete, so empty slots count as weak players (simplified simulation).")), React.createElement("p", {
+    className: "hint",
+    style: {
+      margin: 0
+    }
+  }, "A game simulation from the drafted squads and estimated ratings. It doesn\u2019t predict real results."));
+}
+function MatchVote({
+  d,
+  r,
+  i,
+  onChange,
+  onCount
+}) {
+  const m = getMatchup(d, r, i);
+  const A = teamOf(d, m.a),
+    B = teamOf(d, m.b);
+  const solo = d.mode === 'solo';
+  const voters = matchVoters(d, m);
+  const humans = voters.filter(p => !p.bot);
+  const [voter, setVoter] = useState(solo && humans[0] && !hasMatchVote(m, humans[0].id) ? humans[0].id : null);
+  const [choice, setChoice] = useState(null);
+  const [locked, setLocked] = useState(false);
+  const nVoted = voters.filter(p => hasMatchVote(m, p.id)).length;
+  const allIn = votingDone(d, m);
+  const neutral = voters.every(p => p.teamId !== m.a && p.teamId !== m.b);
+  if (locked) return React.createElement("div", {
+    className: "card stack-sm",
+    style: {
+      textAlign: 'center'
+    }
+  }, React.createElement("h2", {
+    className: "display",
+    style: {
+      fontSize: 34
+    }
+  }, "Vote locked \uD83D\uDD12"), solo ? React.createElement("p", {
+    className: "muted",
+    style: {
+      margin: 0
+    }
+  }, "\uD83E\uDD16 The bots have voted too.") : React.createElement("p", {
+    className: "muted",
+    style: {
+      margin: 0
+    }
+  }, "Pass the phone to the next voter."), React.createElement("button", {
+    className: "btn btn-gold",
+    onClick: () => {
+      setLocked(false);
+      setVoter(null);
+      setChoice(null);
+      if (solo) onCount();
+    }
+  }, solo ? 'Count the votes' : 'Next voter'));
+  if (voter) {
+    const v = voters.find(p => p.id === voter);
+    return React.createElement("div", {
+      className: "stack-sm"
+    }, React.createElement("p", {
+      className: "eyebrow"
+    }, "Secret vote \xB7 ", A.name, " v ", B.name), React.createElement("h2", {
+      className: "display",
+      style: {
+        fontSize: 30,
+        color: v.color
+      }
+    }, v.emoji, " ", v.name, ", who\u2019s stronger?"), React.createElement("p", {
+      className: "hint"
+    }, "You can\u2019t vote for your own team."), [A, B].map(t => {
+      const own = !canVoteFor(v, t.id);
+      return React.createElement("button", {
+        key: t.id,
+        className: "votebtn",
+        style: {
+          ...mStyle(t),
+          alignItems: 'stretch',
+          textAlign: 'left'
+        },
+        disabled: own,
+        "aria-pressed": choice === t.id,
+        onClick: () => setChoice(t.id)
+      }, React.createElement("span", null, t.emoji, " ", t.name, own ? ' · your team' : '', isFootball(d.topic) ? React.createElement("small", null, " \xB7 rating ", teamRating(d, t).rating) : null), React.createElement("span", {
+        className: "teamtxt"
+      }, t.team.filter(Boolean).map(x => d.items[x.itemId].name).join(', ')));
+    }), React.createElement("div", {
+      className: "row"
+    }, !solo && React.createElement("button", {
+      type: "button",
+      className: "btn btn-ghost grow",
+      onClick: () => {
+        setVoter(null);
+        setChoice(null);
+      }
+    }, "Back"), React.createElement("button", {
+      type: "button",
+      className: "btn btn-gold grow",
+      disabled: !choice,
+      onClick: () => {
+        buzz(30);
+        onChange(castMatchVote(d, r, i, voter, choice));
+        setLocked(true);
+      }
+    }, choice ? 'Lock in ' + teamOf(d, choice).name : 'Pick a team')));
+  }
+  return React.createElement("div", {
+    className: "stack-sm"
+  }, React.createElement("p", {
+    className: "eyebrow"
+  }, "Matchup vote \xB7 ", nVoted, " of ", voters.length, " in"), React.createElement("h2", {
+    className: "display",
+    style: {
+      fontSize: 30
+    }
+  }, A.emoji, " ", A.name, " v ", B.emoji, " ", B.name), React.createElement("p", {
+    className: "hint"
+  }, neutral ? 'Players who aren’t in this matchup vote. ' : 'Everyone is on one of these teams, so everyone votes — never for their own team. ', m.revoted ? 'This is the revote after a tie.' : 'Votes stay secret until they’re counted.'), m.note && React.createElement("p", {
+    className: "warn"
+  }, m.note), !humans.length && React.createElement("p", {
+    className: "hint"
+  }, "Only bots vote on this one. They\u2019ve voted."), humans.length > 0 && React.createElement("div", {
+    className: "votegrid"
+  }, humans.map(p => {
+    const done = hasMatchVote(m, p.id);
+    return React.createElement("button", {
+      key: p.id,
+      className: "votebtn",
+      style: mStyle(p),
+      disabled: done,
+      onClick: () => setVoter(p.id)
+    }, React.createElement("span", {
+      style: {
+        fontSize: 24
+      }
+    }, done ? '✅' : p.emoji), p.name, p.teamName ? React.createElement("small", null, p.teamName) : null);
+  })), React.createElement("button", {
+    className: "btn btn-gold",
+    disabled: !allIn && !nVoted,
+    onClick: onCount
+  }, allIn ? 'Count the votes' : 'Count now (' + nVoted + '/' + voters.length + ')'));
+}
+function Finale({
+  d,
+  onChange,
+  onClose,
+  onChampion
+}) {
+  const fin = d.finale;
+  const cfg = finCfg(d);
+  const mode = fin.mode;
+  const nx = nextMatchup(fin.bracket);
+  const [stage, setStage] = useState('overview');
+  const [cur, setCur] = useState(null);
+  const [matchOver, setMatchOver] = useState(false);
+  const [view, setView] = useState(null);
+  const R = fin.bracket.rounds.length;
+  const modeName = {
+    bracket: 'Head-to-head bracket',
+    sim: 'Match simulator',
+    combined: 'Combined finale'
+  }[mode];
+  const begin = () => {
+    const at = {
+      r: nx.r,
+      i: nx.i
+    };
+    setCur(at);
+    setMatchOver(false);
+    if (needsVote(mode)) {
+      onChange(botMatchVotes(d, at.r, at.i));
+      setStage('vote');
+    } else {
+      onChange(playMatchup(d, at.r, at.i));
+      setStage('match');
+    }
+  };
+  const finish = () => {
+    let n = resolveMatchup(d, cur.r, cur.i);
+    const m = getMatchup(n, cur.r, cur.i);
+    if (!m.winner && m.revoted) {
+      n = botMatchVotes(n, cur.r, cur.i);
+      onChange(n);
+      setStage('vote');
+      return;
+    }
+    onChange(n);
+    setStage('result');
+    if (m.winner) audio.play(n.finale.champion ? 'fanfare' : 'gavel');
+  };
+  const counted = () => {
+    if (needsMatch(mode)) {
+      setMatchOver(false);
+      onChange(playMatchup(d, cur.r, cur.i));
+      setStage('match');
+    } else finish();
+  };
+  const cm = cur && getMatchup(d, cur.r, cur.i);
+  const A = cm && cm.a && teamOf(d, cm.a),
+    B = cm && cm.b && teamOf(d, cm.b);
+  let body;
+  if (stage === 'vote' && cm && !cm.winner) body = React.createElement(MatchVote, {
+    key: cm.id + (cm.revoted ? 'r' : ''),
+    d: d,
+    r: cur.r,
+    i: cur.i,
+    onChange: onChange,
+    onCount: counted
+  });else if (stage === 'match' && cm && cm.match) body = React.createElement(React.Fragment, null, React.createElement("p", {
+    className: "eyebrow",
+    style: {
+      textAlign: 'center'
+    }
+  }, roundName(R, cur.r), cur.r === R - 1 ? ' · the big one' : ''), React.createElement(MatchPlayer, {
+    key: cm.id,
+    d: d,
+    A: A,
+    B: B,
+    match: cm.match,
+    speed: cfg.speed,
+    commentary: cfg.commentary,
+    label: cm.id,
+    onDone: () => setMatchOver(true)
+  }), matchOver && React.createElement("button", {
+    className: "btn btn-gold",
+    onClick: finish
+  }, mode === 'combined' ? 'Combine with the votes' : 'Continue'));else if (stage === 'result' && cm && cm.winner) body = React.createElement(MatchupResult, {
+    d: d,
+    m: cm,
+    r: cur.r,
+    final: cur.r === R - 1,
+    onNext: () => {
+      if (d.finale.champion) onChampion();else {
+        setStage('overview');
+        setCur(null);
+      }
+    }
+  });else body = React.createElement(React.Fragment, null, React.createElement("div", {
+    className: "card stack-sm"
+  }, React.createElement("p", {
+    className: "eyebrow"
+  }, modeName), nx ? React.createElement(React.Fragment, null, React.createElement("h2", {
+    className: "display",
+    style: {
+      fontSize: 30
+    }
+  }, roundName(R, nx.r), nx.r === R - 1 ? ' 🏆' : ''), React.createElement("div", {
+    className: "vsrow"
+  }, [nx.m.a, nx.m.b].map((id, k) => {
+    const t = teamOf(d, id);
+    return React.createElement(React.Fragment, {
+      key: id
+    }, k === 1 && React.createElement("span", {
+      className: "vs"
+    }, "VS"), React.createElement("div", {
+      className: "vsteam"
+    }, React.createElement(Badge, {
+      m: t,
+      size: 52
+    }), React.createElement("b", null, t.name), isFootball(d.topic) && React.createElement("span", {
+      className: "small num"
+    }, "Rating ", teamRating(d, t).rating, teamRating(d, t).provisional ? ' (prov.)' : '')));
+  })), React.createElement("button", {
+    className: "btn btn-gold",
+    onClick: begin
+  }, needsVote(mode) ? mode === 'combined' ? 'Vote, then kick off' : 'Vote on this matchup' : 'Kick off')) : fin.champion ? React.createElement(React.Fragment, null, React.createElement("h2", {
+    className: "display",
+    style: {
+      fontSize: 30
+    }
+  }, "We have a champion"), React.createElement("button", {
+    className: "btn btn-gold",
+    onClick: onChampion
+  }, "\uD83C\uDFC6 Reveal the champion")) : React.createElement(React.Fragment, null, React.createElement("h2", {
+    className: "display",
+    style: {
+      fontSize: 28
+    }
+  }, "No matchups to play"), React.createElement("p", {
+    className: "hint",
+    style: {
+      margin: 0
+    }
+  }, "No team has any players, so there\u2019s nobody to crown."))), React.createElement(BracketView, {
+    d: d,
+    current: nx,
+    onOpen: setView
+  }), mode === 'combined' && React.createElement("p", {
+    className: "hint"
+  }, "Combined score: ", cfg.weight, "% match performance + ", 100 - cfg.weight, "% votes. If it\u2019s dead level, the match result (extra time or penalties) decides."));
+  return React.createElement("div", {
+    className: "finale",
+    role: "dialog",
+    "aria-modal": "true",
+    "aria-label": "Finale"
+  }, React.createElement("div", {
+    className: "app"
+  }, React.createElement(TopBar, {
+    onBack: onClose,
+    backLabel: "\u2715",
+    title: "Finale",
+    right: React.createElement(MuteButton, null)
+  }), body), view && React.createElement(MatchupSheet, {
+    d: d,
+    at: view,
+    onClose: () => setView(null)
+  }));
+}
+function MatchupResult({
+  d,
+  m,
+  r,
+  final,
+  onNext
+}) {
+  const W = teamOf(d, m.winner);
+  const L = teamOf(d, m.winner === m.a ? m.b : m.a);
+  const A = teamOf(d, m.a),
+    B = teamOf(d, m.b);
+  const va = Object.values(m.votes || {}).filter(v => v === m.a).length,
+    vb = Object.values(m.votes || {}).filter(v => v === m.b).length;
+  const mode = d.finale.mode;
+  const cfg = finCfg(d);
+  const perfA = m.match ? (m.match.score[0] + 0.5) / (m.match.score[0] + m.match.score[1] + 1) : null;
+  const voteA = va + vb ? va / (va + vb) : 0.5;
+  return React.createElement("div", {
+    className: "stack"
+  }, React.createElement("div", {
+    className: "winner"
+  }, React.createElement("p", {
+    className: "eyebrow",
+    style: {
+      color: 'var(--gold-ink)'
+    }
+  }, final ? 'Winner of the final' : 'Through to the next round'), React.createElement("div", {
+    className: "display"
+  }, W.emoji, " ", W.name), React.createElement("p", {
+    className: "small",
+    style: {
+      margin: '4px 0 0',
+      fontWeight: 700
+    }
+  }, m.why)), needsVote(mode) && React.createElement("div", {
+    className: "board"
+  }, React.createElement("h3", null, "\uD83D\uDDF3\uFE0F Votes"), React.createElement("div", {
+    className: "brow",
+    style: mStyle(A)
+  }, React.createElement("span", {
+    className: "bn"
+  }, A.emoji, " ", A.name), React.createElement("span", {
+    className: "bw num"
+  }, va)), React.createElement("div", {
+    className: "brow",
+    style: mStyle(B)
+  }, React.createElement("span", {
+    className: "bn"
+  }, B.emoji, " ", B.name), React.createElement("span", {
+    className: "bw num"
+  }, vb)), React.createElement("p", {
+    className: "hint",
+    style: {
+      margin: 0
+    }
+  }, Object.entries(m.votes || {}).map(([pid, t]) => {
+    const p = participants(d).find(x => x.id === pid);
+    return (p ? p.name : '?') + ' → ' + teamOf(d, t).name;
+  }).join(' · ') || 'No votes were cast.')), mode === 'combined' && m.match && React.createElement("div", {
+    className: "board"
+  }, React.createElement("h3", null, "\uD83E\uDDEE How it was decided"), [[A, perfA, voteA], [B, 1 - perfA, 1 - voteA]].map(([t, p, v]) => React.createElement("div", {
+    key: t.id,
+    className: "combo"
+  }, React.createElement("span", {
+    className: "bn"
+  }, t.emoji, " ", t.name), React.createElement("span", {
+    className: "cbar"
+  }, React.createElement("i", {
+    className: "m",
+    style: {
+      width: p * cfg.weight + '%'
+    }
+  }), React.createElement("i", {
+    className: "v",
+    style: {
+      width: v * (100 - cfg.weight) + '%'
+    }
+  })), React.createElement("b", {
+    className: "num"
+  }, Math.round(p * cfg.weight + v * (100 - cfg.weight)), "%"))), React.createElement("p", {
+    className: "hint",
+    style: {
+      margin: 0
+    }
+  }, React.createElement("span", {
+    className: "key m"
+  }), " match ", cfg.weight, "% \xB7 ", React.createElement("span", {
+    className: "key v"
+  }), " votes ", 100 - cfg.weight, "%. ", m.detail, ". Match share = (goals + \xBD) \xF7 (total goals + 1), so a 6\u20135 isn\u2019t worth more than a 2\u20131 swing.")), m.match && React.createElement(MatchSummary, {
+    d: d,
+    A: A,
+    B: B,
+    match: m.match
+  }), React.createElement("p", {
+    className: "hint"
+  }, L.name, " ", final ? 'finish as runners-up.' : 'are knocked out.'), React.createElement("button", {
+    className: "btn btn-gold",
+    onClick: onNext
+  }, d.finale.champion ? '🏆 Reveal the champion' : 'Back to the bracket'));
+}
+function MatchupSheet({
+  d,
+  at,
+  onClose
+}) {
+  const m = getMatchup(d, at.r, at.i);
+  const [replay, setReplay] = useState(false);
+  if (!m || !m.a || !m.b) return null;
+  const A = teamOf(d, m.a),
+    B = teamOf(d, m.b);
+  const cfg = finCfg(d);
+  return React.createElement(Sheet, {
+    center: true,
+    onClose: onClose
+  }, React.createElement("p", {
+    className: "eyebrow"
+  }, roundName(d.finale.bracket.rounds.length, at.r)), React.createElement("h2", {
+    className: "display",
+    style: {
+      fontSize: 28
+    }
+  }, A.name, " v ", B.name), m.why && React.createElement("p", {
+    className: "small",
+    style: {
+      margin: 0,
+      fontWeight: 700
+    }
+  }, m.why), m.detail && React.createElement("p", {
+    className: "hint",
+    style: {
+      margin: 0
+    }
+  }, m.detail), replay && m.match ? React.createElement(MatchPlayer, {
+    d: d,
+    A: A,
+    B: B,
+    match: m.match,
+    speed: cfg.speed === 'instant' ? 'fast' : cfg.speed,
+    commentary: cfg.commentary,
+    label: m.id + ':replay'
+  }) : m.match ? React.createElement(MatchSummary, {
+    d: d,
+    A: A,
+    B: B,
+    match: m.match
+  }) : null, m.match && !replay && React.createElement("button", {
+    className: "btn",
+    onClick: () => setReplay(true)
+  }, "\u25B6 Watch again (recorded, same result)"), React.createElement("button", {
+    className: "btn btn-ghost",
+    onClick: onClose
+  }, "Close"));
+}
+function FriendlySheet({
+  d,
+  onClose
+}) {
+  const teams = d.managers.filter(m => m.team.some(Boolean));
+  const [a, setA] = useState(teams[0] ? teams[0].id : null);
+  const [b, setB] = useState(teams[1] ? teams[1].id : null);
+  const [game, setGame] = useState(null);
+  const [n, setN] = useState(0);
+  const cfg = finCfg(d);
+  if (teams.length < 2) return React.createElement(Sheet, {
+    center: true,
+    onClose: onClose
+  }, React.createElement("h2", {
+    className: "display",
+    style: {
+      fontSize: 28
+    }
+  }, "Friendly match"), React.createElement("p", {
+    className: "hint"
+  }, "You need two teams with players."), React.createElement("button", {
+    className: "btn btn-ghost",
+    onClick: onClose
+  }, "Close"));
+  const play = () => {
+    const k = n + 1;
+    setN(k);
+    setGame({
+      A: teamOf(d, a),
+      B: teamOf(d, b),
+      match: simulateMatch(d, teamOf(d, a), teamOf(d, b), 'friendly:' + Date.now() + ':' + k, false),
+      k
+    });
+  };
+  return React.createElement(Sheet, {
+    center: true,
+    onClose: onClose
+  }, React.createElement("p", {
+    className: "eyebrow"
+  }, "Exhibition \xB7 doesn\u2019t change any result"), React.createElement("h2", {
+    className: "display",
+    style: {
+      fontSize: 28
+    }
+  }, "Friendly match"), game ? React.createElement(React.Fragment, null, React.createElement(MatchPlayer, {
+    key: game.k,
+    d: d,
+    A: game.A,
+    B: game.B,
+    match: game.match,
+    speed: cfg.speed,
+    commentary: cfg.commentary,
+    label: 'friendly' + game.k
+  }), React.createElement("div", {
+    className: "row"
+  }, React.createElement("button", {
+    className: "btn grow",
+    onClick: play
+  }, "Rematch"), React.createElement("button", {
+    className: "btn btn-ghost grow",
+    onClick: () => setGame(null)
+  }, "Pick teams"))) : React.createElement(React.Fragment, null, React.createElement("div", {
+    className: "field"
+  }, React.createElement("label", {
+    htmlFor: "fr-a"
+  }, "Home"), React.createElement("select", {
+    id: "fr-a",
+    className: "input",
+    value: a,
+    onChange: e => setA(e.target.value)
+  }, teams.map(t => React.createElement("option", {
+    key: t.id,
+    value: t.id,
+    disabled: t.id === b
+  }, t.emoji, " ", t.name, " \xB7 ", teamRating(d, t).rating)))), React.createElement("div", {
+    className: "field"
+  }, React.createElement("label", {
+    htmlFor: "fr-b"
+  }, "Away"), React.createElement("select", {
+    id: "fr-b",
+    className: "input",
+    value: b,
+    onChange: e => setB(e.target.value)
+  }, teams.map(t => React.createElement("option", {
+    key: t.id,
+    value: t.id,
+    disabled: t.id === a
+  }, t.emoji, " ", t.name, " \xB7 ", teamRating(d, t).rating)))), React.createElement("button", {
+    className: "btn btn-gold",
+    disabled: !a || !b || a === b,
+    onClick: play
+  }, "Kick off"), React.createElement("p", {
+    className: "hint"
+  }, "Friendlies can end in a draw. Each kick-off is a new random game.")), React.createElement("button", {
+    className: "btn btn-ghost",
+    onClick: onClose
+  }, "Close"));
+}
+function FinaleResults({
+  d,
+  onOpen
+}) {
+  const f = d.finale;
+  const champ = teamOf(d, f.champion);
+  const games = playedMatchups(f.bracket);
+  const last = games[games.length - 1];
+  const final = last && last.m.winner === champ.id ? last.m : null;
+  const ru = final ? teamOf(d, final.a === champ.id ? final.b : final.a) : null;
+  const tr = isFootball(d.topic) ? teamRating(d, champ) : null;
+  const sc = final && final.match ? final.a === champ.id ? final.match.score : [...final.match.score].reverse() : null;
+  return React.createElement(React.Fragment, null, React.createElement("div", {
+    className: "winner"
+  }, React.createElement("p", {
+    className: "eyebrow",
+    style: {
+      color: 'var(--gold-ink)'
+    }
+  }, "Champion \xB7 ", needsMatch(f.mode) ? 'won the knockout' : 'won the bracket'), React.createElement("div", {
+    className: "display"
+  }, champ.emoji, " ", champ.name), champ.members && React.createElement("p", {
+    className: "small",
+    style: {
+      margin: 0,
+      fontWeight: 700
+    }
+  }, champ.members.map(p => p.name).join(' · ')), React.createElement("p", {
+    className: "small",
+    style: {
+      margin: '6px 0 0',
+      fontWeight: 700
+    }
+  }, ru ? 'Beat ' + ru.name + ' in the final' + (sc ? ' ' + sc[0] + '–' + sc[1] + (final.match.pens ? ' (pens)' : final.match.et ? ' (AET)' : '') : '') : 'Walked through', tr ? ' · team rating ' + tr.rating : ''), d.mode === 'solo' && champ.human && React.createElement("p", {
+    className: "small",
+    style: {
+      margin: '4px 0 0',
+      fontWeight: 700
+    }
+  }, "You beat the bots!")), React.createElement("div", {
+    className: "board"
+  }, React.createElement("h3", null, "\uD83E\uDDE0 Why they won"), React.createElement("p", {
+    className: "small",
+    style: {
+      margin: 0
+    }
+  }, championStory(d))), React.createElement("div", {
+    className: "board"
+  }, React.createElement("h3", null, "\uD83D\uDDC2\uFE0F Bracket"), React.createElement(BracketView, {
+    d: d,
+    onOpen: onOpen
+  }), React.createElement("p", {
+    className: "hint",
+    style: {
+      margin: 0
+    }
+  }, "Tap a decided matchup to see how it went.")), React.createElement("div", {
+    className: "board"
+  }, React.createElement("h3", null, "\uD83D\uDCCA Final standings"), finaleStandings(d).map(s => React.createElement("div", {
+    key: s.team.id,
+    className: 'brow' + (s.label === 'Champion' ? ' hl' : ''),
+    style: mStyle(s.team)
+  }, React.createElement("span", {
+    className: "bn"
+  }, s.team.emoji, " ", s.team.name), React.createElement("span", {
+    className: "small",
+    style: {
+      fontWeight: 700
+    }
+  }, s.label), isFootball(d.topic) && React.createElement("span", {
+    className: "bw num",
+    style: {
+      fontSize: 18
+    }
+  }, teamRating(d, s.team).rating)))));
+}
 })();

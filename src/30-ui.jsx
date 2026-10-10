@@ -292,7 +292,7 @@ function undo(d) {
   if (!d.history.length) return d;
   const h = d.history[d.history.length - 1];
   const s = JSON.parse(h.s);
-  return { ...d, ...s, history: d.history.slice(0, -1), bid: null, bids: [], reveal: (d.reveal || 0) + 1, votes: {}, votesRevealed: false };
+  return { ...d, ...s, history: d.history.slice(0, -1), bid: null, bids: [], reveal: (d.reveal || 0) + 1, votes: {}, votesRevealed: false, finale: null };
 }
 const undoLabel = (d) => (d.bid ? 'Undo bid' : d.history.length ? d.history[d.history.length - 1].label : 'Undo');
 
@@ -357,6 +357,11 @@ function Leaderboard({ rows, highlight = [] }) {
 }
 
 function tally(d) {
+  if (d.finale && d.finale.champion) {
+    const counts = {}; d.managers.forEach((m) => { counts[m.id] = 0; });
+    Object.values(d.votes || {}).forEach((t) => { if (counts[t] !== undefined) counts[t]++; });
+    return { counts, winners: d.managers.filter((m) => m.id === d.finale.champion) };
+  }
   const counts = {}; d.managers.forEach((m) => { counts[m.id] = 0; });
   Object.values(d.votes || {}).forEach((t) => { if (counts[t] !== undefined) counts[t]++; });
   const top = Math.max(0, ...Object.values(counts));
@@ -468,6 +473,7 @@ function TeamsSheet({ d, onClose }) {
               <span className="num" style={{ fontFamily: 'var(--display)', fontSize: 22, color: 'var(--gold)' }}>{money(m.budget)} left</span>
             </div>
             <TeamList d={d} m={m} />
+            <TeamRatingPanel d={d} m={m} />
           </div>
         ))}
       </div>
@@ -626,6 +632,13 @@ function ItemEditor({ item, slots, topic, onSave, onDelete, onClose }) {
         </select>
         {hasCustom && <input id="it-pos-custom" className="input" value={f.pos.trim()} onChange={(e) => setF({ ...f, pos: e.target.value })} placeholder="Position name" />}
       </div>
+      {isFootball(topic) && (
+        <div className="field">
+          <label htmlFor="it-rating">Rating override (1–99)</label>
+          <input id="it-rating" className="input" type="number" inputMode="numeric" min={1} max={99} value={f.rating == null ? '' : f.rating} placeholder={'Estimated: ' + playerRating({ ...f, rating: null }).ovr} onChange={(e) => { const v = e.target.value; setF((x) => { const n = { ...x }; if (v === '') delete n.rating; else n.rating = clamp(Math.round(+v) || 1, 1, 99); return n; }); }} />
+          <p className="hint">Leave empty to use Draft Night’s estimated game rating. This isn’t an official EA Sports FC rating either way.</p>
+        </div>
+      )}
       <div className="field"><label htmlFor="it-desc">Short description</label><input id="it-desc" className="input" value={f.desc} onChange={(e) => setF({ ...f, desc: e.target.value })} placeholder="Club, era, stat…" /></div>
       {artOf(topic) === 'emoji' ? (
         <div className="field"><label htmlFor="it-emoji">Picture emoji</label><input id="it-emoji" className="input" style={{ fontSize: 26 }} value={f.emoji || ''} onChange={(e) => setF({ ...f, emoji: [...e.target.value].slice(-2).join('') })} placeholder={topic.emoji} /></div>
@@ -1104,6 +1117,29 @@ function SetupRules({ topic, managers, rules, setRules, onBack, onStart, startLa
         <p className="hint">Common is the rest ({common}%). Rarity is just for show: it doesn’t change prices.</p>
       </RuleSection>
 
+      {(() => {
+        const fin = { ...FINALE_DEFAULTS, ...(rules.finale || {}) };
+        const setF = (p) => set({ finale: { ...fin, ...p } });
+        const foot = isFootball(topic);
+        const label = { vote: 'Group vote', bracket: 'Head-to-head bracket', sim: 'Match simulator', combined: 'Combined finale' }[fin.mode];
+        return (
+          <RuleSection id="rs-win" emoji="🏆" title="Winner selection" summary={label + (fin.mode === 'combined' ? ' · ' + fin.weight + '% match / ' + (100 - fin.weight) + '% votes' : '')}>
+            <div className="field"><span className="label">How the champion is chosen</span>
+              <Seg label="Winner selection" value={fin.mode} options={[['vote', 'Vote'], ['bracket', 'Bracket'], ['sim', 'Matches'], ['combined', 'Combined']]} onChange={(v) => setF({ mode: v })} />
+              <p className="hint">{fin.mode === 'vote' ? 'Everyone votes once for the best team (the classic way).' : fin.mode === 'bracket' ? 'Teams meet 1v1 in a knockout bracket. Players not in the matchup vote; you never vote for your own team.' : fin.mode === 'sim' ? 'Every bracket matchup is a simulated football match. Win to go through.' : 'Each matchup has a simulated match and a vote, combined into one score.'}</p>
+              {!foot && (fin.mode === 'sim' || fin.mode === 'combined') && <p className="warn">Matches need a football topic (Pitch layout). For this topic the bracket uses votes instead.</p>}
+            </div>
+            {fin.mode === 'combined' && <div className="field"><span className="label">Weighting</span><Seg label="Weighting" value={fin.weight} options={[[50, '50/50'], [60, '60/40'], [70, '70/30']]} onChange={(v) => setF({ weight: v })} /><p className="hint">Match performance / votes. Goals are turned into a 0–100% share so a 6–5 thriller doesn’t swamp the votes.</p></div>}
+            {fin.mode === 'bracket' && <div className="field"><span className="label">If a vote is tied</span><Seg label="Tiebreaker" value={fin.tiebreak} options={[['rating', 'Higher-rated team'], ['revote', 'Vote again once']]} onChange={(v) => setF({ tiebreak: v })} /></div>}
+            {(fin.mode === 'sim' || fin.mode === 'combined') && <>
+              <div className="field"><span className="label">Match speed</span><Seg label="Match speed" value={fin.speed} options={[['instant', 'Instant'], ['fast', 'Fast (~20s)'], ['normal', 'Normal (~45s)']]} onChange={(v) => setF({ speed: v })} /></div>
+              <Toggle on={fin.commentary} onChange={(v) => setF({ commentary: v })} title="Match commentary" sub="Show the running commentary feed (goals and cards always show)." />
+              <p className="hint">Knockout matches that end level go to extra time, then penalties. Player ratings are estimated game ratings, not official EA Sports FC ratings.</p>
+            </>}
+          </RuleSection>
+        );
+      })()}
+
       {teamSummary && (
         <RuleSection id="rs-team" emoji="👥" title="Team play" summary={teamSummary.text}>
           <p className="hint">{teamSummary.detail}</p>
@@ -1238,7 +1274,7 @@ function ItemCard({ item: real, d }) {
         <div className={'face itemcard' + (rar ? ' r-' + rar : '')}>
           <div className="ph"><ItemArt item={item} topic={d.topic} size={104} radius={16} /></div>
           <div className="info">
-            <span className="row" style={{ gap: 6, flexWrap: 'wrap' }}>{item.pos && <span className="pos">{item.pos}</span>}<RarityTag r={rar} /></span>
+            <span className="row" style={{ gap: 6, flexWrap: 'wrap' }}>{item.pos && <span className="pos">{item.pos}</span>}<RarityTag r={rar} />{isFootball(d.topic) && <RatingChip item={item} />}</span>
             <div className="nm">{item.name}</div>
             {item.desc && <div className="ds">{item.desc}</div>}
             <div className="fits">{inTemplate ? 'Fills a ' + item.pos + ' slot' + (hasFlex ? ' or FLEX' : '') : 'Fills any open slot'}</div>
@@ -1920,7 +1956,7 @@ function TeamCard({ d, m, win }) {
         <span className="mo">spent<b className="num">{money(spent(d, m))}</b></span>
         <span className="mo">left<b className="num">{money(m.budget)}</b></span>
       </div>
-      <div className="tb">{d.topic.layout === 'pitch' ? <Pitch d={d} m={m} /> : <TeamList d={d} m={m} />}</div>
+      <div className="tb">{d.topic.layout === 'pitch' ? <Pitch d={d} m={m} /> : <TeamList d={d} m={m} />}<TeamRatingPanel d={d} m={m} /></div>
     </div>
   );
 }
@@ -2028,7 +2064,7 @@ function ExportCard({ d, kind, showShame }) {
           <span className="exlabel">{winners.length > 1 ? 'JOINT CHAMPIONS' : 'CHAMPION'}</span>
           <span className="exname">{winners.map((x) => x.emoji + ' ' + x.name).join(' & ')}</span>
           {w.members && <span className="exmem">{w.members.map((p) => p.name).join(' · ')}</span>}
-          <span className="exvotes">{counts[w.id]} vote{counts[w.id] === 1 ? '' : 's'} · {money(d.rules.budget - w.budget)} spent · {money(w.budget)} left</span>
+          <span className="exvotes">{d.finale && d.finale.champion ? (needsMatch(d.finale.mode) ? 'Won the knockout' : 'Won the bracket') + (isFootball(d.topic) ? ' · rating ' + teamRating(d, w).rating : '') : counts[w.id] + ' vote' + (counts[w.id] === 1 ? '' : 's')} · {money(d.rules.budget - w.budget)} spent · {money(w.budget)} left</span>
         </div>
         <div className="exroster">
           {d.rules.slots.map((sl, i) => { const t = w.team[i]; const it = t && d.items[t.itemId]; const r = t && rarityOf(d, t.itemId); return (
@@ -2044,6 +2080,18 @@ function ExportCard({ d, kind, showShame }) {
     );
   }
   const awards = computeAwards(d); const shame = showShame ? computeShame(d) : [];
+  if (d.finale && d.finale.champion) return (
+    <>
+      {head}
+      <div className="board">
+        <h3>🏆 Final standings</h3>
+        {finaleStandings(d).map((s, i) => <div key={s.team.id} className="brow" style={mStyle(s.team)}><span className="rk num">{i + 1}</span><span className="bn">{s.team.emoji} {s.team.name}</span><span className="bw" style={{ fontSize: 15 }}>{s.label}{isFootball(d.topic) ? ' · ' + teamRating(d, s.team).rating : ''}</span></div>)}
+      </div>
+      {awards.length > 0 && <div className="board"><h3>🎖️ Awards</h3>{awards.map((a, i) => <p key={a.id + i} className="award"><b>{a.emoji} {a.title}: {a.team}</b><br /><span className="small">{a.why}</span></p>)}</div>}
+      {shame.length > 0 && <div className="board"><h3>🙈 Hall of Shame</h3>{shame.map((a) => <p key={a.id} className="award"><b>{a.emoji} {a.title}: {a.team}</b><br /><span className="small">{a.item} for {money(a.price)}. {a.why}</span></p>)}</div>}
+      <p className="exportfoot">DRAFT NIGHT · {(location.host + location.pathname).replace(/\/(index\.html)?$/, '')}</p>
+    </>
+  );
   return (
     <>
       {head}
@@ -2065,6 +2113,12 @@ function Results({ d, past, onChange, onBack, onUndo, onFinish, onPlayAgain, liv
   const [imgBusy, setImgBusy] = useState(false);
   const [imgErr, setImgErr] = useState('');
   const [party, setParty] = useState(0);
+  const [showFinale, setShowFinale] = useState(false);
+  const [friendly, setFriendly] = useState(false);
+  const [viewMatch, setViewMatch] = useState(null);
+  const fmode = d.finale ? d.finale.mode : finaleMode(d);
+  const isFin = fmode !== 'vote';
+  const finDone = !!(d.finale && d.finale.champion);
   const stats = useMemo(() => draftStats(d), [d]);
   const { counts, winners } = tally(d);
   const revealed = d.votesRevealed && winners.length > 0;
@@ -2075,9 +2129,11 @@ function Results({ d, past, onChange, onBack, onUndo, onFinish, onPlayAgain, liv
     setTimeout(() => { setParty((x) => x + 1); buzz([60, 40, 60, 40, 200]); audio.play('fanfare'); setTimeout(() => audio.play('cheer'), 400); window.scrollTo({ top: 0, behavior: 'smooth' }); }, 1100);
   };
   useEffect(() => {
-    if (!revealed) return;
+    if (!revealed || showFinale) return;
+    if (finDone) { audio.say(callLine('champion', { who: winners[0].name }), 3, d.id + ':champion'); return; }
     audio.say(winners.length > 1 ? callLine('tie', { who: winners.map((w) => w.name).join(' and ') }) : callLine('winner', { who: winners[0].name }), 3, d.id + ':winner:' + Object.keys(d.votes || {}).length);
-  }, [revealed]);
+  }, [revealed, showFinale]);
+  const openFinale = () => { if (!d.finale) onChange(startFinale(d)); setShowFinale(true); };
   // Solo: your vote, then every bot votes for the team it rates highest (never its own), all revealed together.
   const soloVote = (target) => {
     setTimeout(() => {
@@ -2133,14 +2189,15 @@ function Results({ d, past, onChange, onBack, onUndo, onFinish, onPlayAgain, liv
   const doDownload = () => { downloadBlob(img.blob, img.name); setImgNote(isIOS() ? 'On iPhone, check the Downloads folder in the Files app. To put it in Photos, press and hold the picture instead.' : 'Saved to your downloads.'); };
   return (
     <div className="app">
-      <TopBar onBack={onBack} backLabel="⌂" title="Results" right={live && onUndo && d.history.length && !d.votesRevealed ? <button className="pillbtn" onClick={onUndo}>Undo</button> : <MuteButton />} />
+      <TopBar onBack={onBack} backLabel="⌂" title="Results" right={live && onUndo && d.history.length && !d.votesRevealed && !d.finale ? <button className="pillbtn" onClick={onUndo}>Undo</button> : <MuteButton />} />
       <div ref={ref} className="resultwrap">
         <div className="rhead">
           <p className="eyebrow">{d.topic.emoji} {d.topic.name} · {new Date(d.createdAt).toLocaleDateString()}</p>
-          <h2 className="display" style={{ fontSize: 46 }}>{revealed ? 'We have a winner' : 'Final teams'}</h2>
+          <h2 className="display" style={{ fontSize: 46 }}>{finDone ? 'Champions!' : revealed ? 'We have a winner' : 'Final teams'}</h2>
         </div>
+        {finDone && <FinaleResults d={d} onOpen={setViewMatch} />}
         {noVotes && <div className="card"><b>No votes were cast</b><p className="hint" style={{ margin: '4px 0 0' }}>Nobody had a team they could vote for, so there's no winner this time.</p></div>}
-        {revealed && (
+        {revealed && !finDone && (
           <div className="winner">
             <p className="eyebrow" style={{ color: 'var(--gold-ink)' }}>Best team · {counts[winners[0].id]} vote{counts[winners[0].id] === 1 ? '' : 's'}</p>
             <div className="display">{winners.map((w) => w.emoji + ' ' + w.name).join(' & ')}</div>
@@ -2155,7 +2212,7 @@ function Results({ d, past, onChange, onBack, onUndo, onFinish, onPlayAgain, liv
           <div className="stat"><span className="k">Biggest spender</span><span className="v num">{money(stats.spender.s)}</span><span className="d">{stats.spender.m.emoji} {stats.spender.m.name}</span></div>
           <div className="stat"><span className="k">Cheapest team</span><span className="v num">{money(stats.cheapest.s)}</span><span className="d">{stats.cheapest.m.emoji} {stats.cheapest.m.name}</span></div>
         </div>
-        {d.votesRevealed && !noVotes && (
+        {d.votesRevealed && !noVotes && !finDone && (
           <div className="board">
             <h3>🗳️ Vote tally{solo ? ' · final standings' : ''}</h3>
             {ordered.map((m) => (
@@ -2167,7 +2224,7 @@ function Results({ d, past, onChange, onBack, onUndo, onFinish, onPlayAgain, liv
             ))}
           </div>
         )}
-        {d.votesRevealed && !noVotes && (
+        {d.votesRevealed && !noVotes && !finDone && (
           <p className="hint" style={{ textAlign: 'center' }}>{participants(d).map((m) => { const t = d.votes && d.votes[m.id]; const to = t && d.managers.find((x) => x.id === t); return m.name + ' → ' + (to ? to.name : 'no vote'); }).join(' · ')}</p>
         )}
         <AwardsBoard d={d} showShame={showShame !== false} />
@@ -2182,11 +2239,14 @@ function Results({ d, past, onChange, onBack, onUndo, onFinish, onPlayAgain, liv
       </div>
 
       <div className="stack">
-        {!d.votesRevealed && <button className="btn btn-gold" onClick={() => setVoting(true)}>{solo ? 'Vote for the best team' : Object.keys(d.votes || {}).length ? 'Continue the vote' : 'Start the secret vote'}</button>}
+        {!d.votesRevealed && !isFin && <button className="btn btn-gold" onClick={() => setVoting(true)}>{solo ? 'Vote for the best team' : Object.keys(d.votes || {}).length ? 'Continue the vote' : 'Start the secret vote'}</button>}
+        {!d.votesRevealed && isFin && <button className="btn btn-gold" onClick={openFinale}>{d.finale ? '🏆 Continue the finale' : '🏆 Start the finale'}</button>}
+        {!d.votesRevealed && isFin && !d.finale && <p className="hint" style={{ textAlign: 'center', margin: 0 }}>{{ bracket: 'Head-to-head bracket: teams meet 1v1 and the players not involved vote.', sim: 'Match simulator: every matchup is a simulated football match.', combined: 'Combined finale: each matchup is a match plus a vote (' + finCfg(d).weight + '/' + (100 - finCfg(d).weight) + ').' }[fmode]}{(d.rules.finale && d.rules.finale.mode !== fmode) ? ' (Matches need a football topic, so this topic uses the vote bracket.)' : ''}</p>}
+        {isFootball(d.topic) && <button className="btn" onClick={() => setFriendly(true)}>⚽ Friendly match{finDone ? ' / rematch' : ''}</button>}
         {live && onPlayAgain && d.votesRevealed && <button className="btn btn-gold" onClick={onPlayAgain}>Play again</button>}
         <button className="btn" onClick={() => setPickFormat(true)} disabled={imgBusy}>{imgBusy ? 'Making image…' : 'Save as image'}</button>
         {imgErr && <p className="warn">{imgErr}</p>}
-        {d.votesRevealed && <button className="btn btn-ghost" onClick={() => onChange({ ...d, votes: {}, votesRevealed: false })}>Redo the vote</button>}
+        {d.votesRevealed && !d.finale && <button className="btn btn-ghost" onClick={() => onChange({ ...d, votes: {}, votesRevealed: false })}>Redo the vote</button>}
         {live && onPlayAgain && !d.votesRevealed && <button className="btn btn-ghost" onClick={onPlayAgain}>Play again</button>}
         {live && <button className="btn btn-ghost" onClick={onFinish}>Finish · back to home</button>}
         <p className="hint" style={{ textAlign: 'center' }}>{live ? 'This draft is saved in Past Drafts.' : 'Saved in Past Drafts.'}</p>
@@ -2196,12 +2256,15 @@ function Results({ d, past, onChange, onBack, onUndo, onFinish, onPlayAgain, liv
         onVote={(v, t) => { if (!hasVoted(d, v)) onChange({ ...d, votes: { ...(d.votes || {}), [v]: t } }); }}
         onReveal={() => { onChange({ ...d, votesRevealed: true }); doReveal(); }}
         onClose={() => setVoting(false)} />}
+      {showFinale && d.finale && <Finale d={d} onChange={onChange} onClose={() => setShowFinale(false)} onChampion={() => { setShowFinale(false); doReveal(); }} />}
+      {friendly && <FriendlySheet d={d} onClose={() => setFriendly(false)} />}
+      {viewMatch && d.finale && <MatchupSheet d={d} at={viewMatch} onClose={() => setViewMatch(null)} />}
       {party > 0 && revealed && <Confetti key={party} colors={[...winners.map((w) => w.color), '#ffc83d', '#ffffff']} />}
       {pickFormat && (
         <Sheet center onClose={() => setPickFormat(false)}>
           <h2 className="display" style={{ fontSize: 30 }}>Which picture?</h2>
           <button className="btn btn-gold" onClick={() => makeImage('winner')} disabled={!revealed}>🏆 Winner card</button>
-          {!revealed && <p className="hint">Reveal the vote first to make a winner card.</p>}
+          {!revealed && <p className="hint">{isFin ? 'Finish the finale first to make a winner card.' : 'Reveal the vote first to make a winner card.'}</p>}
           <button className="btn" onClick={() => makeImage('full')}>📋 Full results</button>
           <button className="btn" onClick={() => makeImage('awards')}>🎖️ Awards & standings</button>
           <button className="btn btn-ghost" onClick={() => setPickFormat(false)}>Cancel</button>
@@ -2287,7 +2350,7 @@ function Flash({ f, onDone }) {
    ============================================================ */
 const DEFAULT_RULES = { budget: 20, minBid: 1, inc: 1, order: 'random', timer: 0, mustFill: true, noBids: 'skip' };
 // What new players get: the classic rules plus every twist at its default.
-const RULE_DEFAULTS = () => ({ ...DEFAULT_RULES, ...JSON.parse(JSON.stringify(TWIST_DEFAULTS)) });
+const RULE_DEFAULTS = () => ({ ...DEFAULT_RULES, ...JSON.parse(JSON.stringify(TWIST_DEFAULTS)), finale: { ...FINALE_DEFAULTS } });
 const defaultManagers = () => ['Ash', 'Bilal', 'Cam', 'Dev'].map((name, i) => ({ id: uid(), name, color: COLORS[i], emoji: EMOJIS[i] }));
 const stripDraft = (d) => ({ ...d, history: [] });
 
@@ -2442,6 +2505,9 @@ function ProfileView({ past, settings, setSettings, pkey, onBack }) {
         <Stat k="Money spent" v={money(Math.round(r.spent))} d={r.teamGames ? 'team spending split evenly' : null} />
         <Stat k="Legendaries" v={r.legendary} />
         <Stat k="Trades done" v={r.trades} d={r.topCard ? 'Favourite card: ' + CARD_INFO[r.topCard].name : null} />
+        {r.titles > 0 && <Stat k="Finale titles" v={r.titles} d="brackets & knockouts won" />}
+        {r.matches > 0 && <Stat k="Match record" v={r.matchWins + '–' + (r.matches - r.matchWins)} d={r.goals + ' goal' + (r.goals === 1 ? '' : 's') + ' scored'} />}
+        {r.topRating && <Stat k="Best team rating" v={r.topRating.rating} d={r.topRating.team + ' · ' + r.topRating.topic} />}
       </div>
       <div className="board">
         <h3>❤️ Favourite picks</h3>
@@ -2453,7 +2519,7 @@ function ProfileView({ past, settings, setSettings, pkey, onBack }) {
         {r.overpay ? <p className="small" style={{ margin: 0 }}>Overpay: {r.overpay.name} for {money(r.overpay.price)} (usually {money(Math.round(r.overpay.avg))}) · {r.overpay.topic}</p> : <p className="hint" style={{ margin: 0 }}>No overpay on record yet.</p>}
         <p className="hint" style={{ margin: 0 }}>How it’s worked out: each price is compared with the average that same item sold for across your saved drafts. Items need at least 2 sales to compare, so nothing is guessed.</p>
       </div>
-      {r.best && <div className="board"><h3>🏆 Best win</h3><p className="small" style={{ margin: 0 }}>{r.best.team} · {r.best.topic} · {r.best.votes} vote{r.best.votes === 1 ? '' : 's'} ({pct(r.best.share)}) · {new Date(r.best.date).toLocaleDateString()}</p></div>}
+      {r.best && <div className="board"><h3>🏆 Best win</h3><p className="small" style={{ margin: 0 }}>{r.best.team} · {r.best.topic} · {r.best.votes == null ? r.best.how : r.best.votes + ' vote' + (r.best.votes === 1 ? '' : 's') + ' (' + pct(r.best.share) + ')'} · {new Date(r.best.date).toLocaleDateString()}</p></div>}
       <div className="board"><h3>🎖️ Awards</h3>{Object.keys(r.awards).length ? Object.entries(r.awards).sort((a, b) => b[1] - a[1]).map(([t, n]) => <p key={t} className="small" style={{ margin: 0 }}>{t} × {n}</p>) : <p className="hint" style={{ margin: 0 }}>No awards yet.</p>}</div>
     </div>
   );
@@ -2767,7 +2833,7 @@ function App() {
       break;
     case 'past-view': {
       const p = past.find((x) => x.id === screen.id);
-      view = p ? <Results d={p} past={past} showShame={settings.showShame} onChange={(nd) => { setPast((ps) => ps.map((x) => (x.id === nd.id ? nd : x))); if (draft && draft.id === nd.id) setDraft({ ...draft, votes: nd.votes, votesRevealed: nd.votesRevealed }); }} onBack={() => go('past')} /> : null;
+      view = p ? <Results d={p} past={past} showShame={settings.showShame} onChange={(nd) => { setPast((ps) => ps.map((x) => (x.id === nd.id ? nd : x))); if (draft && draft.id === nd.id) setDraft({ ...draft, votes: nd.votes, votesRevealed: nd.votesRevealed, finale: nd.finale }); }} onBack={() => go('past')} /> : null;
       break;
     }
     case 'players':
@@ -2829,7 +2895,7 @@ class Boundary extends React.Component {
   }
 }
 
-if (window.__DN_TEST__) window.__DN = { audio, AUDIO_DEFAULTS, share: { encodeTopic, decodeShared, packTopic, unpackTopic, topicCode, shareLink, MAX_LINK }, stats: { careerStats, computeAwards, computeShame, hallOfShame, humanPlayers }, bots: { makeBots, nextBotAction, botDecision, botFreePickChoice, botVote, teamScore, voteChoices, itemFame, seeded, BOT_LEVELS, BOT_TYPES, botCardPlay, botVeto, botNominate, botTradeDecision, botTradeOffer }, twists: { twistRules, TWIST_DEFAULTS, playCard, answerCard, cardProblem, doubleProblem, nominate, currentNominator, nominationPool, botActors, botAdvisers, participants, visibleItem, isHidden, rarityOf, frozenNow, proposeTrade, acceptTrade, rejectTrade, cancelTrade, closeTrades, tradeProblem, openTrades, hasCard }, DEFAULT_SOLO, isFlex, canBid, createDraft, placeBid, sell, skipItem, undo, freePick, currentPicker, canTake, nextAmount, isDraftOver, draftStats, winsBoard, tally, starterTopics, migrateTopics, validateBackup, makeBackup, wikiTitleFor, PHOTO_TOPICS, store, wiki, DEFAULT_RULES, COLORS, emptyCount, assignSlot, maxBid };
+if (window.__DN_TEST__) window.__DN = { finale: { buildBracket, advanceBracket, nextMatchup, matchVoters, canVoteFor, decideMatchup, simulateMatch, playerRating, teamRating, matchupVoteBot, finaleMode, isFootball, startFinale, castMatchVote, botMatchVotes, playMatchup, resolveMatchup, getMatchup, needsVote, needsMatch, votingDone, finaleStandings, finaleRecord, championStory, goldenBoot, matchVoteProblem, roundName, FINALE_DEFAULTS, validRating }, audio, AUDIO_DEFAULTS, share: { encodeTopic, decodeShared, packTopic, unpackTopic, topicCode, shareLink, MAX_LINK }, stats: { careerStats, computeAwards, computeShame, hallOfShame, humanPlayers }, bots: { makeBots, nextBotAction, botDecision, botFreePickChoice, botVote, teamScore, voteChoices, itemFame, seeded, BOT_LEVELS, BOT_TYPES, botCardPlay, botVeto, botNominate, botTradeDecision, botTradeOffer }, twists: { twistRules, TWIST_DEFAULTS, playCard, answerCard, cardProblem, doubleProblem, nominate, currentNominator, nominationPool, botActors, botAdvisers, participants, visibleItem, isHidden, rarityOf, frozenNow, proposeTrade, acceptTrade, rejectTrade, cancelTrade, closeTrades, tradeProblem, openTrades, hasCard }, DEFAULT_SOLO, isFlex, canBid, createDraft, placeBid, sell, skipItem, undo, freePick, currentPicker, canTake, nextAmount, isDraftOver, draftStats, winsBoard, tally, starterTopics, migrateTopics, validateBackup, makeBackup, wikiTitleFor, PHOTO_TOPICS, store, wiki, DEFAULT_RULES, COLORS, emptyCount, assignSlot, maxBid };
 store.init().finally(() => {
   ReactDOM.createRoot(document.getElementById('root')).render(<Boundary><App /></Boundary>);
 });

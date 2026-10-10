@@ -620,6 +620,225 @@ async function tap(w, el) { el.dispatchEvent(new w.MouseEvent('pointerdown', { b
     ok(/standings|Teams/i.test(w.__captured || '') && !!btn(d, 'Download'), 'awards picture is made and offered for download/share');
   }
 
+  console.log('Step 6: brackets, ratings, simulator, winner modes');
+  {
+    const { DN } = await boot();
+    const F = DN.finale;
+    const sim = require('./finale-sim.js')(DN);
+    ok(sim.sizes.every((x) => x.champion && x.uniqueTeams), 'brackets for 2, 3, 4, 5, 8 and 16 teams each crown one champion with every team placed once');
+    ok(sim.sizes.map((x) => x.byes).join(',') === '0,1,0,3,0,0', 'byes go to top seeds when the count isn’t a power of two (3→1 bye, 5→3 byes): ' + sim.sizes.map((x) => x.n + ':' + x.byes).join(' '));
+    ok(sim.sizes.every((x) => x.matches === x.n - 1), 'every bracket plays exactly teams − 1 matchups (byes aren’t matches)');
+    ok(sim.modes.flat().every((x) => x.champion && x.bad === 0 && x.emptyTeamSeeded), 'sim and combined brackets: goals/assists only by squad players, results replay identically, teams with no players are left out');
+    ok(sim.fair.wins > 300 && sim.fair.upsets > 0 && sim.fair.avgGoals > 1.5 && sim.fair.avgGoals < 5, 'a much stronger team wins most of 400 matches but upsets happen (' + sim.fair.wins + '/400, ' + sim.fair.avgGoals.toFixed(2) + ' goals/game)');
+    ok(Object.values(sim.ratings).every(Boolean), 'ratings: deterministic, overrides respected, team rating 1–99, provisional when incomplete');
+    const full = sim.fullDraft;
+    const withMode = (d, mode, extra) => ({ ...d, rules: { ...d.rules, finale: { ...F.FINALE_DEFAULTS, mode, speed: 'instant', ...(extra || {}) } }, phase: 'done' });
+    // Run a whole finale through the same functions the screens call.
+    const runFinale = (d0) => {
+      let d = F.startFinale(d0); const issues = []; let guard = 0;
+      while (!d.finale.champion && guard++ < 60) {
+        const nx = F.nextMatchup(d.finale.bracket); if (!nx) { issues.push('stuck'); break; }
+        const { r, i } = nx; const mode = d.finale.mode;
+        if (F.needsVote(mode)) {
+          d = F.botMatchVotes(d, r, i);
+          F.matchVoters(d, F.getMatchup(d, r, i)).forEach((p) => {
+            const m = F.getMatchup(d, r, i);
+            const own = [m.a, m.b].find((t) => t === p.teamId);
+            if (own && F.castMatchVote(d, r, i, p.id, own) !== d) issues.push('own-team vote accepted');
+            const pick = [m.a, m.b].find((t) => t !== p.teamId);
+            const before = d; d = F.castMatchVote(d, r, i, p.id, pick);
+            if (before === d && !Object.prototype.hasOwnProperty.call(m.votes || {}, p.id)) issues.push('vote refused');
+            if (F.castMatchVote(d, r, i, p.id, pick) !== d) issues.push('duplicate vote accepted');
+          });
+        }
+        if (F.needsMatch(mode)) { d = F.playMatchup(d, r, i); const m1 = F.getMatchup(d, r, i).match; const again = F.playMatchup(d, r, i); if (again !== d || !m1) issues.push('match re-simulated'); }
+        d = F.resolveMatchup(d, r, i);
+        const m = F.getMatchup(d, r, i);
+        if (!m.winner) { if (m.revoted) continue; issues.push('not decided'); break; }
+        if (F.resolveMatchup(d, r, i) !== d) issues.push('decided twice');
+      }
+      return { d, issues };
+    };
+    const sizes = [2, 3, 4, 5, 8, 16]; let allOk = true; const notes = [];
+    for (const n of sizes) for (const mode of ['bracket', 'sim', 'combined']) {
+      const { d, issues } = runFinale(withMode(full(n, 'ui' + n + mode), mode));
+      const t = DN.tally(d);
+      const good = !issues.length && d.finale.champion && d.votesRevealed && t.winners.length === 1 && t.winners[0].id === d.finale.champion && F.finaleStandings(d)[0].team.id === d.finale.champion && F.championStory(d).length > 10;
+      if (!good) { allOk = false; notes.push(n + '/' + mode + ': ' + issues.join(',')); }
+      DN.stats.computeAwards(d); DN.stats.computeShame(d);
+    }
+    ok(allOk, 'every mode × 2/3/4/5/8/16 teams: one champion, no own-team or duplicate votes, no re-simulation, nothing decided twice' + (notes.length ? ' — ' + notes.join('; ') : ''));
+    // Non-football topics: sim/combined fall back to the vote bracket; no sports ratings.
+    const nf = DN.starterTopics().find((t) => t.layout !== 'pitch');
+    ok(F.finaleMode({ topic: nf, rules: { finale: { mode: 'sim' } } }) === 'bracket' && !F.isFootball(nf), 'non-football topics don’t get ratings, and simulator modes fall back to the vote bracket');
+    ok(F.finaleMode({ topic: nf, rules: {} }) === 'vote', 'Group Vote stays the default (old saves without the setting)');
+    // Ties.
+    const base4 = withMode(full(4, 'tie'), 'bracket');
+    const tieRun = (tb) => {
+      let d = F.startFinale({ ...base4, rules: { ...base4.rules, finale: { ...base4.rules.finale, tiebreak: tb } } });
+      const { r, i, m } = F.nextMatchup(d.finale.bracket);
+      const v = F.matchVoters(d, m); d = F.castMatchVote(d, r, i, v[0].id, m.a); d = F.castMatchVote(d, r, i, v[1].id, m.b);
+      return { d: F.resolveMatchup(d, r, i), r, i };
+    };
+    const t1 = tieRun('rating'); const m1 = F.getMatchup(t1.d, t1.r, t1.i);
+    const ra = F.teamRating(t1.d, t1.d.managers.find((x) => x.id === m1.a)).rating, rb = F.teamRating(t1.d, t1.d.managers.find((x) => x.id === m1.b)).rating;
+    ok(m1.winner && (ra === rb || m1.winner === (ra > rb ? m1.a : m1.b)) && /higher-rated/.test(m1.why), 'tied vote → the higher-rated team goes through (' + ra + ' v ' + rb + ')');
+    const t2 = tieRun('revote'); const m2 = F.getMatchup(t2.d, t2.r, t2.i);
+    ok(!m2.winner && m2.revoted && !Object.keys(m2.votes).length, 'tied vote with “vote again” clears the votes for one revote');
+    let d2 = t2.d; const v2 = F.matchVoters(d2, m2); d2 = F.castMatchVote(d2, t2.r, t2.i, v2[0].id, m2.a); d2 = F.castMatchVote(d2, t2.r, t2.i, v2[1].id, m2.b); d2 = F.resolveMatchup(d2, t2.r, t2.i);
+    ok(!!F.getMatchup(d2, t2.r, t2.i).winner, 'a second tie is settled by rating, not another revote');
+    // Team mode: no member votes for their own team.
+    const tm = full(4, 'teams');
+    const teamD = withMode({ ...tm, teamMode: true, managers: tm.managers.map((m, k) => ({ ...m, members: [{ id: m.id + 'a', name: 'P' + k + 'a' }, { id: m.id + 'b', name: 'P' + k + 'b', bot: k % 2 ? { type: 'chaos', level: 'easy' } : undefined }] })) }, 'bracket');
+    let td = F.startFinale(teamD); const tn = F.nextMatchup(td.finale.bracket);
+    const tv = F.matchVoters(td, tn.m);
+    ok(tv.every((p) => p.teamId !== tn.m.a && p.teamId !== tn.m.b), 'team mode: only members of the other teams vote on a matchup');
+    td = F.botMatchVotes(td, tn.r, tn.i);
+    ok(Object.entries(F.getMatchup(td, tn.r, tn.i).votes).every(([pid, t]) => tv.find((p) => p.id === pid).teamId !== t), 'bots vote, never for their own team');
+    const finalOnly = F.startFinale(withMode(full(2, 'two'), 'bracket'));
+    const fv = F.matchVoters(finalOnly, F.nextMatchup(finalOnly.finale.bracket).m);
+    ok(fv.length === 2 && F.matchVoteProblem(finalOnly, F.nextMatchup(finalOnly.finale.bracket).m, fv[0].id, fv[0].teamId) === 'You can’t vote for your own team.', 'with only two teams both vote, each blocked from their own team');
+    // Incomplete and empty rosters.
+    const inc = full(3, 'inc'); const incD = { ...inc, managers: inc.managers.map((m, k) => (k === 0 ? { ...m, team: m.team.map((t, j) => (j < 2 ? t : null)) } : k === 2 ? { ...m, team: m.team.map(() => null) } : m)) };
+    const incRun = runFinale(withMode(incD, 'sim'));
+    ok(F.teamRating(incD, incD.managers[0]).provisional && incRun.d.finale.champion && !incRun.d.finale.bracket.rounds[0].some((m) => m.a === incD.managers[2].id || m.b === incD.managers[2].id), 'incomplete squads get a provisional rating and still play; empty teams sit out');
+    const none = F.startFinale(withMode({ ...inc, managers: inc.managers.map((m) => ({ ...m, team: m.team.map(() => null) })) }, 'sim'));
+    ok(!none.finale.champion && !F.nextMatchup(none.finale.bracket) && !none.votesRevealed, 'no teams with players → no matchups and no champion (no crash)');
+    // Missing ratings / overrides on real topic data.
+    const pl = DN.starterTopics().find((t) => t.id === 't-pl');
+    const rs = pl.items.map((it) => F.playerRating(it));
+    ok(rs.every((r) => r.ovr >= 1 && r.ovr <= 99 && r.estimated && Object.values(r.attrs).every((a) => a >= 1 && a <= 99)), 'every Premier League player gets an estimated 1–99 rating with six attributes in range');
+    ok(F.playerRating({ ...pl.items[0], rating: 'abc' }).estimated && F.playerRating({ ...pl.items[0], rating: 150 }).estimated, 'invalid overrides are ignored (falls back to the estimate)');
+    const share = DN.share.unpackTopic(DN.share.packTopic({ ...pl, items: pl.items.map((it, k) => (k === 0 ? { ...it, rating: 88 } : it)) }));
+    ok(share.ok && share.topic.items[0].rating === 88 && share.topic.items[1].rating === undefined, 'rating overrides survive topic sharing');
+    // Profiles.
+    const champs = runFinale(withMode(full(4, 'prof'), 'sim')).d;
+    const humanD = { ...champs, createdAt: Date.now() };
+    const rows = DN.stats.careerStats([humanD], {});
+    const champName = DN.tally(humanD).winners[0].name.toLowerCase();
+    const cr = rows.find((r) => r.key === champName);
+    ok(cr && cr.wins === 1 && cr.titles === 1 && cr.matches >= 1 && cr.topRating, 'profiles count finale titles, match record, goals and best team rating');
+    ok(DN.winsBoard([humanD]).find((r) => r.name.toLowerCase() === champName).wins === 1, 'the champion counts on the all-time wins board');
+  }
+
+  console.log('Step 6: finale through the screens');
+  {
+    const fb = (d, text) => btn(d.querySelector('.finale') || d, text);
+    const mk = async (mode, n, seed) => {
+      const a = await boot();
+      const sim = require('./finale-sim.js')(a.DN);
+      const raw = sim.fullDraft(n, seed);
+      return { ...raw, topic: { ...raw.topic, layout: 'pitch' }, managers: raw.managers.map((m, k) => ({ ...m, name: ['Ash', 'Bilal', 'Cam', 'Dee', 'Eli'][k] || 'T' + k })), rules: { ...raw.rules, finale: { mode, weight: 60, speed: 'instant', commentary: true, tiebreak: 'rating' } }, phase: 'done', mode: 'local', createdAt: Date.now(), history: [] };
+    };
+    // Match simulator, 3 teams (one bye), instant speed.
+    const draft = await mk('sim', 3, 'scr');
+    const { w, d } = await boot({ idb: false, storage: { dn_current_v1: JSON.stringify(draft) }, speed: 0.02 });
+    await click(w, btn(d, 'Resume draft'));
+    ok(/Start the finale/.test(d.body.textContent) && !/Start the secret vote/.test(d.body.textContent), 'Results offers the finale instead of the group vote');
+    ok(!!d.querySelector('.teamrating') && /Team rating/.test(d.body.textContent), 'team cards show the team rating with a breakdown');
+    await click(w, btn(d, 'Start the finale'));
+    ok(!!d.querySelector('.finale .bracket') && /Semi-finals|Final/.test(d.body.textContent), 'the finale shows a bracket with round names');
+    let rounds = 0;
+    while (rounds++ < 5 && fb(d, 'Kick off')) {
+      await click(w, fb(d, 'Kick off')); await sleep(80);
+      ok(!!d.querySelector('.scoreboard') && /FT|AET|pens/.test(d.querySelector('.sb-clock').textContent), 'match ' + rounds + ': scoreboard reaches full-time');
+      ok(/Match summary/.test(d.body.textContent), 'match ' + rounds + ': summary with scorers and stats');
+      await click(w, fb(d, 'Continue'));
+      ok(/Through to the next round|Winner of the final/.test(d.body.textContent), 'match ' + rounds + ': the winner is shown');
+      const back = fb(d, 'Back to the bracket') || fb(d, 'Reveal the champion');
+      await click(w, back); await sleep(50);
+    }
+    const stored = JSON.parse(w.localStorage.getItem('dn_current_v1') || 'null');
+    await sleep(200);
+    ok(/Champions!/.test(d.body.textContent) && /Why they won/.test(d.body.textContent) && /Final standings/.test(d.body.textContent), 'results show the champion, why they won and the final standings');
+    const cur = w.__DN.store.get('dn_current_v1');
+    ok(cur && cur.finale && cur.finale.champion && cur.votesRevealed, 'the champion is saved with the draft');
+    const champ = JSON.stringify(cur.finale);
+    // Watch a recorded match again and play a friendly: the saved result must not change.
+    const dm = d.querySelector('.resultwrap .bmatch.done'); if (dm) await click(w, dm);
+    const again = btn(d, 'Watch again'); if (again) { await click(w, again); await sleep(1500); }
+    await click(w, btn(d, 'Close'));
+    await click(w, btn(d, 'Friendly match'));
+    await click(w, fb(d, 'Kick off')); await sleep(80);
+    ok(/Exhibition/.test(d.body.textContent) && !!d.querySelector('.scoreboard'), 'a friendly/rematch can be played between any two teams');
+    await click(w, btn(d, 'Rematch')); await sleep(80);
+    await click(w, btn(d, 'Close'));
+    ok(JSON.stringify(w.__DN.store.get('dn_current_v1').finale) === champ, 'replays and rematches don’t change the saved result');
+    void stored;
+
+    // Local vote bracket with 3 teams: pass the phone, no own-team votes.
+    const vd = await mk('bracket', 3, 'vote');
+    const b2 = await boot({ idb: false, storage: { dn_current_v1: JSON.stringify(vd) }, speed: 0.02 });
+    await click(b2.w, btn(b2.d, 'Resume draft'));
+    await click(b2.w, btn(b2.d, 'Start the finale'));
+    let guard = 0;
+    while (guard++ < 6 && fb(b2.d, 'Vote on this matchup')) {
+      await click(b2.w, fb(b2.d, 'Vote on this matchup'));
+      const grid = [...b2.d.querySelectorAll('.finale .votegrid .votebtn:not([disabled])')];
+      for (const g of grid) {
+        await click(b2.w, [...b2.d.querySelectorAll('.finale .votegrid .votebtn:not([disabled])')][0]);
+        const opts = [...b2.d.querySelectorAll('.finale .votebtn')];
+        ok(opts.some((o) => o.disabled) || opts.every((o) => !/your team/.test(o.textContent)), 'voter sees their own team blocked (if it’s in the matchup)');
+        await click(b2.w, opts.find((o) => !o.disabled));
+        await click(b2.w, fb(b2.d, 'Lock in'));
+        await click(b2.w, fb(b2.d, 'Next voter'));
+        void g;
+      }
+      await click(b2.w, fb(b2.d, 'Count'));
+      ok(/Votes/.test(b2.d.body.textContent) && /→/.test(b2.d.body.textContent), 'matchup result shows who voted for whom');
+      await click(b2.w, fb(b2.d, 'Back to the bracket') || fb(b2.d, 'Reveal the champion')); await sleep(50);
+    }
+    await sleep(200);
+    ok(/Champions!/.test(b2.d.body.textContent), 'the vote bracket crowns a champion through the screens');
+
+    // Combined finale, animated at "fast" speed (sped up for the test), with the auctioneer voice.
+    const cd = await mk('combined', 4, 'comb');
+    cd.rules.finale.speed = 'fast';
+    const b3 = await boot({ idb: false, storage: { dn_current_v1: JSON.stringify(cd) }, speed: 0.02, fakeAudio: true });
+    await click(b3.w, btn(b3.d, 'Resume draft'));
+    await click(b3.w, btn(b3.d, 'Start the finale'));
+    let g3 = 0, sawClock = false, sawBreakdown = false;
+    while (g3++ < 6 && fb(b3.d, 'Vote, then kick off')) {
+      await click(b3.w, fb(b3.d, 'Vote, then kick off'));
+      while (b3.d.querySelector('.finale .votegrid .votebtn:not([disabled])')) {
+        await click(b3.w, b3.d.querySelector('.finale .votegrid .votebtn:not([disabled])'));
+        await click(b3.w, [...b3.d.querySelectorAll('.finale .votebtn')].find((o) => !o.disabled));
+        await click(b3.w, fb(b3.d, 'Lock in')); await click(b3.w, fb(b3.d, 'Next voter'));
+      }
+      await click(b3.w, fb(b3.d, 'Count'));
+      await sleep(120);
+      const ck = b3.d.querySelector('.sb-clock'); if (ck && /′/.test(ck.textContent)) sawClock = true;
+      for (let t = 0; t < 100 && !fb(b3.d, 'Combine with the votes'); t++) await sleep(100);
+      await click(b3.w, fb(b3.d, 'Combine with the votes'));
+      if (/How it was decided/.test(b3.d.body.textContent) && /match 60%/.test(b3.d.body.textContent)) sawBreakdown = true;
+      await click(b3.w, fb(b3.d, 'Back to the bracket') || fb(b3.d, 'Reveal the champion')); await sleep(50);
+    }
+    await sleep(200);
+    ok(sawClock, 'the animated match shows a running clock');
+    ok(sawBreakdown, 'combined finale shows the 60% match / 40% votes breakdown');
+    ok(/Champions!/.test(b3.d.body.textContent), 'combined finale crowns a champion through the screens');
+    ok(b3.w.__spoken.some((t) => /GOAL|scores|champions/i.test(t)), 'the auctioneer calls goals / the champion');
+
+    // Solo: you vote on matchups you're not in; bots vote by themselves.
+    const sd = await mk('bracket', 4, 'solo');
+    sd.mode = 'solo'; sd.managers = sd.managers.map((m, k) => (k === 0 ? { ...m, human: true } : { ...m, bot: { type: ['big', 'bargain', 'strategist', 'chaos'][k % 4], level: 'medium' } }));
+    const b4 = await boot({ idb: false, storage: { dn_current_v1: JSON.stringify(sd) }, speed: 0.02 });
+    await click(b4.w, btn(b4.d, 'Resume draft'));
+    await click(b4.w, btn(b4.d, 'Start the finale'));
+    let g4 = 0;
+    while (g4++ < 6 && fb(b4.d, 'Vote on this matchup')) {
+      await click(b4.w, fb(b4.d, 'Vote on this matchup'));
+      const pick = [...b4.d.querySelectorAll('.finale .votebtn')].find((o) => !o.disabled && /rating/.test(o.textContent));
+      if (pick) { await click(b4.w, pick); await click(b4.w, fb(b4.d, 'Lock in')); await click(b4.w, fb(b4.d, 'Count the votes')); }
+      else await click(b4.w, fb(b4.d, 'Count'));
+      await click(b4.w, fb(b4.d, 'Back to the bracket') || fb(b4.d, 'Reveal the champion')); await sleep(50);
+    }
+    await sleep(200);
+    const s4 = b4.w.__DN.store.get('dn_current_v1');
+    const okVotes = s4.finale.bracket.rounds.flat().every((m) => Object.entries(m.votes || {}).every(([pid, t]) => pid !== t));
+    ok(/Champions!/.test(b4.d.body.textContent) && okVotes, 'solo bracket: bots vote, nobody votes for their own team, a champion is crowned');
+  }
+
   console.log('Persistence after refresh');
   {
     const fake = require('fake-indexeddb');

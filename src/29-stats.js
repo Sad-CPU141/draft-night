@@ -31,7 +31,7 @@ const canCompress = () => typeof window !== 'undefined' && typeof window.Compres
 // Only what a topic needs: no profiles, drafts or other private data.
 function packTopic(t, withPhotos) {
   return { v: 1, n: t.name, e: t.emoji, s: t.slots, l: t.layout || 'list', a: t.art || 'emoji', ks: t.kitShape || '', kl: t.kitLabel || '', ph: !!t.photos, f: t.folder || '',
-    i: t.items.map((it) => { const r = [it.name, it.pos || '', it.desc || '', it.emoji || '', it.imageUrl || '', it.wiki || '', it.kit || null, it.photosOff ? 1 : 0]; if (withPhotos && it.photo) r.push(it.photo); return r; }) };
+    i: t.items.map((it) => { const r = [it.name, it.pos || '', it.desc || '', it.emoji || '', it.imageUrl || '', it.wiki || '', it.kit || null, it.photosOff ? 1 : 0]; if (withPhotos && it.photo) r.push(it.photo); if (validRating(it.rating)) { while (r.length < 9) r.push(''); r[9] = Math.round(+it.rating); } return r; }) };
 }
 // Rebuild a safe topic from shared data. Returns { ok, topic, error }.
 function unpackTopic(o) {
@@ -48,6 +48,7 @@ function unpackTopic(o) {
     if (r[5]) it.wiki = clip(r[5], 120);
     if (Array.isArray(r[6]) && goodColor(r[6][0]) && goodColor(r[6][1])) it.kit = [goodColor(r[6][0]), goodColor(r[6][1])];
     if (r[7]) it.photosOff = true;
+    if (validRating(r[9])) it.rating = Math.round(+r[9]);
     return it;
   });
   if (!items.length) return { ok: false, error: 'That topic has no items.' };
@@ -121,7 +122,25 @@ function computeAwards(d) {
   const spends = d.managers.map((m) => ({ m, s: d.rules.budget - m.budget }));
   const top = spends.reduce((a, x) => (x.s > a.s ? x : a));
   if (top.s > 0) add('spender', '🤑', 'Big Spender', top.m, 'Spent ' + money(top.s) + ', the most of anyone.');
-  if (d.votesRevealed) {
+  if (d.finale && d.finale.champion) {
+    const champ = teamOf(d, d.finale.champion);
+    if (champ.budget > 0) add('pincher', '🪙', 'Penny Pincher', champ, 'Won the title and still kept ' + money(champ.budget) + '.');
+    const games = playedMatchups(d.finale.bracket);
+    const last = games[games.length - 1];
+    if (last && last.m.winner === champ.id) {
+      const lm = last.m; const loser = teamOf(d, lm.winner === lm.a ? lm.b : lm.a);
+      const va = Object.values(lm.votes || {}).filter((v) => v === lm.winner).length, vb = Object.values(lm.votes || {}).length - va;
+      if (lm.match && lm.match.pens) add('robbed', '😤', 'Most Robbed', loser, 'Lost the final on penalties.');
+      else if (lm.match && Math.abs(lm.match.score[0] - lm.match.score[1]) === 1 && d.finale.mode === 'sim') add('robbed', '😤', 'Most Robbed', loser, 'Lost the final by a single goal.');
+      else if (d.finale.mode === 'bracket' && va - vb === 1) add('robbed', '😤', 'Most Robbed', loser, 'Lost the final by a single vote.');
+    }
+    if (isFootball(d.topic)) {
+      const giant = games.map(({ m }) => { const w = teamOf(d, m.winner), l = teamOf(d, m.winner === m.a ? m.b : m.a); return { w, l, gap: teamRating(d, l).rating - teamRating(d, w).rating }; }).filter((x) => x.gap >= 3).sort((a, b) => b.gap - a.gap)[0];
+      if (giant) add('giant', '🪓', 'Giant Killer', giant.w, 'Knocked out ' + giant.l.name + ', rated ' + giant.gap + ' higher.');
+    }
+    const boot = goldenBoot(d);
+    if (boot) add('boot', '👟', 'Golden Boot', teamOf(d, boot.teamId), boot.player + ' scored ' + boot.goals + ' goal' + (boot.goals === 1 ? '' : 's') + ' in the finale.');
+  } else if (d.votesRevealed) {
     const { counts, winners } = tally(d);
     const sorted = Object.values(counts).sort((a, b) => b - a); const median = sorted[Math.floor(sorted.length / 2)] || 0;
     const strong = d.managers.filter((m) => counts[m.id] >= Math.max(1, median));
@@ -155,7 +174,10 @@ function computeShame(d) {
   const buys = []; d.managers.forEach((m) => m.team.forEach((t) => { if (t && !t.free) buys.push({ m, item: d.items[t.itemId], price: t.price }); }));
   const disaster = buys.filter((b) => b.price >= d.rules.budget * 0.5).sort((a, b) => b.price - a.price)[0];
   if (disaster) out.push({ id: 'budget', emoji: '🔥', title: 'Budget Disaster', team: disaster.m.name, item: disaster.item.name, price: disaster.price, why: 'Spent ' + Math.round((disaster.price / d.rules.budget) * 100) + '% of the whole budget on one item.' });
-  if (d.votesRevealed) {
+  if (d.finale && d.finale.champion) {
+    const regret = buys.filter((b) => finaleRecord(d, b.m.id).won === 0 && b.price >= d.rules.budget / d.rules.slots.length).sort((a, b) => b.price - a.price)[0];
+    if (regret) out.push({ id: 'regret', emoji: '🙈', title: 'Most Regrettable Buy', team: regret.m.name, item: regret.item.name, price: regret.price, why: 'The priciest item on a team that didn’t win a single matchup.' });
+  } else if (d.votesRevealed) {
     const { counts } = tally(d);
     const regret = buys.filter((b) => counts[b.m.id] === 0 && b.price >= d.rules.budget / d.rules.slots.length).sort((a, b) => b.price - a.price)[0];
     if (regret) out.push({ id: 'regret', emoji: '🙈', title: 'Most Regrettable Buy', team: regret.m.name, item: regret.item.name, price: regret.price, why: 'The priciest item on a team that got zero votes.' });
@@ -177,7 +199,7 @@ function careerStats(past, settings) {
     const winIds = winners.map((w) => w.id);
     const awards = computeAwards(d);
     humanPlayers(d).forEach((p) => {
-      const r = P[p.key] || (P[p.key] = { key: p.key, name: p.name, emoji: p.emoji, games: 0, wins: 0, teamGames: 0, teamWins: 0, spent: 0, picks: {}, buys: [], awards: {}, best: null, chaos: {}, legendary: 0, trades: 0, cardsUsed: 0, lastAt: 0 });
+      const r = P[p.key] || (P[p.key] = { key: p.key, name: p.name, emoji: p.emoji, games: 0, wins: 0, teamGames: 0, teamWins: 0, spent: 0, picks: {}, buys: [], awards: {}, best: null, chaos: {}, legendary: 0, trades: 0, cardsUsed: 0, lastAt: 0, titles: 0, matches: 0, matchWins: 0, goals: 0, topRating: null });
       const team = d.managers.find((m) => m.id === p.teamId); if (!team) return;
       r.games++; if (d.teamMode) r.teamGames++;
       const won = winIds.includes(team.id);
@@ -192,8 +214,16 @@ function careerStats(past, settings) {
       (d.cardLog || []).filter((e) => e.by === team.id).forEach((e) => { r.chaos[e.card] = (r.chaos[e.card] || 0) + 1; r.cardsUsed++; });
       r.trades += d.trade ? d.trade.proposals.filter((t) => t.status === 'accepted' && (t.from === team.id || t.to === team.id)).length : 0;
       awards.filter((a) => a.teamId === team.id).forEach((a) => { r.awards[a.title] = (r.awards[a.title] || 0) + 1; });
-      const share = (counts[team.id] || 0) / Math.max(1, Object.keys(d.votes || {}).length);
-      if (won && (!r.best || share > r.best.share)) r.best = { share, votes: counts[team.id], topic: d.topic.name, date: d.createdAt, team: team.name };
+      if (d.finale && d.finale.champion) {
+        const rec = finaleRecord(d, team.id);
+        if (won) r.titles++;
+        if (needsMatch(d.finale.mode)) { r.matches += rec.played; r.matchWins += rec.won; r.goals += rec.gf; }
+        if (won && (!r.best || r.best.votes != null)) r.best = { share: 1, votes: null, how: 'Won the ' + (needsMatch(d.finale.mode) ? 'knockout' : 'bracket') + ' (' + rec.won + ' win' + (rec.won === 1 ? '' : 's') + ')', topic: d.topic.name, date: d.createdAt, team: team.name };
+      } else {
+        const share = (counts[team.id] || 0) / Math.max(1, Object.keys(d.votes || {}).length);
+        if (won && (!r.best || (r.best.votes != null && share > r.best.share))) r.best = { share, votes: counts[team.id], topic: d.topic.name, date: d.createdAt, team: team.name };
+      }
+      if (isFootball(d.topic)) { const tr = teamRating(d, team).rating; if (r.topRating == null || tr > r.topRating.rating) r.topRating = { rating: tr, team: team.name, topic: d.topic.name }; }
       if ((d.createdAt || 0) >= r.lastAt) { r.lastAt = d.createdAt || 0; r.name = p.name; r.emoji = p.emoji || r.emoji; }
     });
   });
