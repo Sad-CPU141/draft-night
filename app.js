@@ -1,4 +1,4 @@
-/* Draft Night e316caa9e3 — built from src/ by build.js. Edit src/, not this file. */
+/* Draft Night 14c0e9aea9 — built from src/ by build.js. Edit src/, not this file. */
 "use strict";
 (function(){
 function _extends() { return _extends = Object.assign ? Object.assign.bind() : function (n) { for (var e = 1; e < arguments.length; e++) { var t = arguments[e]; for (var r in t) ({}).hasOwnProperty.call(t, r) && (n[r] = t[r]); } return n; }, _extends.apply(null, arguments); }
@@ -10497,7 +10497,7 @@ function TopBar({
     }
   }), React.createElement("div", {
     className: "title"
-  }, title), right || React.createElement("span", {
+  }, title), React.createElement(TvButton, null), right || React.createElement("span", {
     style: {
       width: 46
     }
@@ -13972,14 +13972,14 @@ function Auction({
   return React.createElement("div", {
     className: 'app auction' + (auto ? ' solo' : '')
   }, React.createElement("div", {
-    className: "topbar"
+    className: "topbar dense"
   }, React.createElement("button", {
     className: "iconbtn",
     onClick: goHome,
     "aria-label": "Home"
-  }, "\u2302"), React.createElement("div", {
-    className: "title num"
-  }, "Item ", d.processed + 1, " of ", total), React.createElement(MuteButton, null), ruleOn(d, 'chaos') && (!online || you) && React.createElement("button", {
+  }, "\u2302"), React.createElement("span", {
+    className: "grow"
+  }), React.createElement(MuteButton, null), React.createElement(TvButton, null), ruleOn(d, 'chaos') && (!online || you) && React.createElement("button", {
     className: "pillbtn",
     onClick: () => setCardsOpen(true),
     "aria-label": "Chaos Cards"
@@ -13999,8 +13999,11 @@ function Auction({
       width: d.processed / Math.max(1, total) * 100 + '%'
     }
   })), React.createElement("span", {
-    className: "small muted num"
-  }, d.queue.length - 1, " left")), React.createElement("div", {
+    className: "small muted num",
+    style: {
+      whiteSpace: 'nowrap'
+    }
+  }, "Item ", d.processed + 1, " of ", total, " \xB7 ", d.queue.length - 1, " left")), React.createElement("div", {
     className: "paused stack"
   }, showCard ? React.createElement(ItemCard, {
     key: d.reveal,
@@ -14185,14 +14188,16 @@ function Nominate({
   return React.createElement("div", {
     className: "app"
   }, React.createElement("div", {
-    className: "topbar"
+    className: "topbar dense wraptitle"
   }, React.createElement("button", {
     className: "iconbtn",
     onClick: goHome,
     "aria-label": "Home"
-  }, "\u2302"), React.createElement(MuteButton, null), React.createElement("div", {
+  }, "\u2302"), React.createElement(MuteButton, null), React.createElement(TvButton, null), React.createElement("div", {
     className: "title"
-  }, "Nomination \xB7 ", d.processed + 1, " of ", d.processed + d.queue.length), React.createElement("button", {
+  }, "Nomination \xB7 ", d.processed + 1, " of ", d.processed + d.queue.length), React.createElement("span", {
+    className: "grow"
+  }), React.createElement("button", {
     className: "pillbtn",
     onClick: () => setTeams(true)
   }, "Teams"), (solo || nv.online && nv.isHost) && React.createElement("button", {
@@ -14383,7 +14388,7 @@ function TradeWindow({
     className: "iconbtn",
     onClick: goHome,
     "aria-label": "Home"
-  }, "\u2302"), React.createElement(MuteButton, null), React.createElement("div", {
+  }, "\u2302"), React.createElement(MuteButton, null), React.createElement(TvButton, null), React.createElement("div", {
     className: "title"
   }, "Trade window"), React.createElement("span", {
     className: 'tclock num' + (left < 30000 ? ' hot' : ''),
@@ -14638,14 +14643,16 @@ function FreePick({
   return React.createElement("div", {
     className: "app"
   }, React.createElement("div", {
-    className: "topbar"
+    className: "topbar dense wraptitle"
   }, React.createElement("button", {
     className: "iconbtn",
     onClick: goHome,
     "aria-label": "Home"
-  }, "\u2302"), React.createElement(MuteButton, null), React.createElement("div", {
+  }, "\u2302"), React.createElement(MuteButton, null), React.createElement(TvButton, null), React.createElement("div", {
     className: "title"
-  }, "Free picks \xB7 round ", cp.round + 1), React.createElement("button", {
+  }, "Free picks \xB7 round ", cp.round + 1), React.createElement("span", {
+    className: "grow"
+  }), React.createElement("button", {
     className: "pillbtn",
     onClick: () => setTeams(true)
   }, "Teams"), (d.mode === 'solo' || nv.online && nv.isHost) && React.createElement("button", {
@@ -17608,10 +17615,11 @@ function App() {
         value: localNet
       }, React.createElement("div", {
         className: localTv ? 'tvmode' : ''
-      }, view, localTv ? React.createElement(TvExit, {
-        onExit: () => setLocalTv(false)
-      }) : React.createElement(TvSwitch, {
+      }, React.createElement(TvSwitch, {
+        on: !localTv,
         onThisScreen: () => setLocalTv(true)
+      }, view), localTv && React.createElement(TvExit, {
+        onExit: () => setLocalTv(false)
       })));
       break;
     case 'past':
@@ -19089,7 +19097,18 @@ const LINE_X = {
   MID: 0.38,
   FWD: 0.54
 };
-const SEG = 0.85;
+const SEG = 1.25;
+const IN = 1.6;
+const TS = 1.5;
+const PIN = 1.8;
+const GLIDE = {
+  half: 2.2,
+  full: 1.8,
+  et: 1.8,
+  pens: 1.8,
+  restart: 2,
+  kickoff: 1.2
+};
 function lineupOf(d, m) {
   const sq = squad(d, m);
   const hasGK = sq.some(p => p.role === 'GK');
@@ -19128,17 +19147,17 @@ function matchScript(match) {
   };
   add({
     type: 'kickoff',
-    dur: 1.4,
+    dur: 2,
     min: 0,
     show: [0],
-    reveal: 0.2
+    reveal: 0.1
   });
   match.events.forEach((e, k) => {
     if (e.type === 'kickoff') return;
     if (e.type === 'half' || e.type === 'full' || e.type === 'et' || e.type === 'pens') {
       add({
         type: e.type,
-        dur: e.type === 'half' ? 2 : 1.6,
+        dur: e.type === 'half' ? 3.6 : 3,
         min: e.min,
         show: [k],
         reveal: 0.1
@@ -19148,10 +19167,10 @@ function matchScript(match) {
     if (e.type === 'pen') {
       add({
         type: 'pen',
-        dur: 1.8,
+        dur: PIN + 1.9 * TS,
         min: 120,
         show: [k],
-        reveal: 0.75,
+        reveal: PIN + 0.75 * TS,
         pen: e
       });
       return;
@@ -19164,15 +19183,23 @@ function matchScript(match) {
     if (e.seq == null) return;
     const q = match.seqs[e.seq];
     const n = q.chain.length;
-    const tail = q.kind === 'goal' ? 3.4 : q.kind === 'tackle' || q.kind === 'intercept' ? 1.1 : 1.7;
+    const tail = (q.kind === 'goal' ? 3.6 : q.kind === 'tackle' || q.kind === 'intercept' ? 1.2 : 1.8) * TS;
     add({
       type: 'seq',
-      dur: 0.35 + n * SEG + tail,
+      dur: IN + n * SEG + tail,
       min: q.min,
       et: !!q.et,
       q,
       show: [k],
-      reveal: 0.35 + n * SEG + (q.kind === 'goal' ? 0.7 : q.kind === 'tackle' || q.kind === 'intercept' ? 0.5 : 0.6)
+      reveal: IN + n * SEG + (q.kind === 'goal' ? 0.7 : q.kind === 'tackle' || q.kind === 'intercept' ? 0.5 : 0.6) * TS
+    });
+    if (q.kind === 'goal') add({
+      type: 'restart',
+      dur: 2.4,
+      min: q.min,
+      et: !!q.et,
+      show: [],
+      reveal: 0.1
     });
   });
   return {
@@ -19187,7 +19214,7 @@ function beatFrame(beat, L, prevEnd) {
   });
   const base = team => L[team].map(pl => toPitch(team, pl.base));
   const idx = (team, name) => L[team].findIndex(p => p.name === name);
-  const frame = u => {
+  const raw = u => {
     if (beat.type !== 'seq' && beat.type !== 'pen') return {
       pos: [base(0), base(1)],
       ball: {
@@ -19200,9 +19227,14 @@ function beatFrame(beat, L, prevEnd) {
       const e = beat.pen;
       const T = e.team;
       const D = 1 - T;
+      const pu = Math.max(0, u - PIN) / TS;
+      const toPitch = (_team, p) => ({
+        x: p.x * PITCH.w,
+        y: p.y * PITCH.h
+      });
       const pos = [0, 1].map(team => L[team].map((pl, i) => toPitch(T, {
-        x: 0.62,
-        y: 0.2 + 0.6 * (i + team * 3) / (L[0].length + L[1].length)
+        x: team === D && pl.role === 'GK' ? 0.985 : 0.5,
+        y: 0.3 + 0.4 * (i + team * L[0].length) / Math.max(1, L[0].length + L[1].length - 1)
       })));
       const si = Math.max(0, idx(T, e.player));
       const ki = L[D].findIndex(p => p.role === 'GK');
@@ -19211,10 +19243,10 @@ function beatFrame(beat, L, prevEnd) {
         y: 0.5
       };
       pos[T][si] = toPitch(T, {
-        x: 0.86,
+        x: lerp(0.84, 0.88, ease((pu - 0.3) / 0.2)),
         y: 0.5
       });
-      const shotU = ease((u - 0.5) / 0.35);
+      const shotU = ease((pu - 0.5) / 0.35);
       const target = e.scored ? {
         x: 1.01,
         y: 0.5 + e.side * 0.05
@@ -19225,7 +19257,7 @@ function beatFrame(beat, L, prevEnd) {
       const keeperY = e.scored ? 0.5 - e.side * 0.06 : 0.5 + e.side * 0.04;
       if (ki >= 0) pos[D][ki] = toPitch(T, {
         x: 0.985,
-        y: lerp(0.5, keeperY, ease((u - 0.5) / 0.3))
+        y: lerp(0.5, keeperY, ease((pu - 0.5) / 0.3))
       });
       const ball = toPitch(T, lerpP(spot, target, shotU));
       return {
@@ -19234,7 +19266,8 @@ function beatFrame(beat, L, prevEnd) {
         holder: {
           team: T,
           i: si
-        }
+        },
+        banner: pu > 0.9 ? e.scored ? 'SCORED!' : 'SAVED!' : null
       };
     }
     const q = beat.q;
@@ -19242,41 +19275,61 @@ function beatFrame(beat, L, prevEnd) {
     const D = 1 - T;
     const n = q.chain.length;
     const shot = q.kind === 'goal' || q.kind === 'save' || q.kind === 'miss' || q.kind === 'block';
-    const key = k => ({
-      x: shot ? lerp(0.34, 0.8, n > 1 ? k / (n - 1) : 1) : lerp(0.28, 0.52, n > 1 ? k / (n - 1) : 1),
-      y: Math.min(0.88, Math.max(0.12, 0.5 + (hashU(q.min, q.i, k) - 0.5) * 0.62))
+    const gkAt = q.chain.map(nm => {
+      const j = idx(T, nm);
+      return j >= 0 && L[T][j].role === 'GK';
     });
-    const uu = u - 0.35;
-    let ballA;
-    let holderK = 0;
-    if (uu < 0) {
-      ballA = key(0);
-      holderK = 0;
-    } else if (uu < n * SEG) {
-      const k = Math.min(n - 1, Math.floor(uu / SEG));
-      const r = (uu - k * SEG) / SEG;
-      holderK = k;
-      if (k < n - 1 && r > 0.6) {
-        ballA = lerpP(key(k), key(k + 1), ease((r - 0.6) / 0.4));
-        holderK = -1;
-      } else {
-        const carry = {
-          x: key(k).x + 0.03 * Math.min(1, r / 0.6),
+    const key = k => ({
+      x: gkAt[k] ? 0.13 : shot ? lerp(0.34, 0.8, n > 1 ? k / (n - 1) : 1) : lerp(0.28, 0.52, n > 1 ? k / (n - 1) : 1),
+      y: gkAt[k] ? 0.5 : Math.min(0.88, Math.max(0.12, 0.5 + (hashU(q.min, q.i, k) - 0.5) * 0.62))
+    });
+    const carried = k => ({
+      x: key(k).x + 0.03,
+      y: key(k).y
+    });
+    const uu = u - IN;
+    const PASS = 0.4;
+    const ballAt = v => {
+      if (v < 0) return {
+        b: key(0),
+        h: 0
+      };
+      if (v >= n * SEG) return {
+        b: carried(n - 1),
+        h: n - 1
+      };
+      const k = Math.min(n - 1, Math.floor(v / SEG));
+      const r = (v - k * SEG) / SEG;
+      if (k < n - 1 && r > PASS) return {
+        b: lerpP(carried(k), key(k + 1), ease((r - PASS) / (1 - PASS))),
+        h: -1
+      };
+      return {
+        b: {
+          x: key(k).x + 0.03 * ease(Math.min(1, r / PASS)),
           y: key(k).y
-        };
-        ballA = carry;
-      }
-    } else ballA = {
-      x: key(n - 1).x + 0.03,
-      y: key(n - 1).y
+        },
+        h: k
+      };
     };
+    const now = ballAt(uu);
+    let ballA = now.b;
+    const holderK = now.h;
+    const shapeBall = [0, 0.2, 0.4, 0.6, 0.8, 1].map(lag => ballAt(uu - lag).b).reduce((acc, p, _i, arr) => ({
+      x: acc.x + p.x / arr.length,
+      y: acc.y + p.y / arr.length
+    }), {
+      x: 0,
+      y: 0
+    });
     const tail = uu - n * SEG;
-    const push = (ballA.x - 0.45) * 0.55;
+    const tl = tail / TS;
+    const push = (shapeBall.x - 0.45) * 0.55;
     const pos = [[], []];
     L[T].forEach((pl, i) => {
       let p = {
         x: pl.base.x + (pl.role === 'GK' ? 0 : push),
-        y: lerp(pl.base.y, ballA.y, pl.role === 'GK' ? 0 : 0.18)
+        y: lerp(pl.base.y, shapeBall.y, pl.role === 'GK' ? 0 : 0.18)
       };
       const ci = q.chain.indexOf(pl.name);
       if (ci >= 0) {
@@ -19291,24 +19344,10 @@ function beatFrame(beat, L, prevEnd) {
       pos[T][i] = p;
     });
     const dA = {
-      x: 1 - ballA.x,
-      y: ballA.y
+      x: 1 - shapeBall.x,
+      y: shapeBall.y
     };
     const drop = (dA.x - 0.45) * 0.5;
-    let presser = -1,
-      best = 9;
-    L[D].forEach((pl, i) => {
-      if (pl.role === 'GK') return;
-      const p = {
-        x: pl.base.x + drop,
-        y: lerp(pl.base.y, dA.y, 0.3)
-      };
-      const dist = Math.hypot(p.x - dA.x, p.y - dA.y);
-      if (dist < best) {
-        best = dist;
-        presser = i;
-      }
-    });
     L[D].forEach((pl, i) => {
       let p = pl.role === 'GK' ? {
         x: 0.035,
@@ -19317,37 +19356,54 @@ function beatFrame(beat, L, prevEnd) {
         x: pl.base.x + drop,
         y: lerp(pl.base.y, dA.y, 0.3)
       };
-      if (i === presser) p = lerpP(p, {
-        x: dA.x - 0.05,
-        y: dA.y + 0.03
-      }, 0.65);
+      if (pl.role !== 'GK') {
+        const dist = Math.hypot(p.x - dA.x, p.y - dA.y);
+        const w = 0.65 * Math.min(1, Math.max(0, (0.3 - dist) / 0.18));
+        p = lerpP(p, {
+          x: dA.x - 0.05,
+          y: dA.y + 0.03
+        }, w);
+      }
       pos[D][i] = p;
     });
-    let ball = toPitch(T, ballA);
     let holder = holderK >= 0 ? {
       team: T,
       i: idx(T, q.chain[holderK])
     } : null;
     let banner = null;
     let celebrate = null;
+    const toD = p => ({
+      x: 1 - p.x,
+      y: p.y
+    });
+    const shooterA = carried(n - 1);
+    const closer = q.kind === 'tackle' || q.kind === 'intercept' ? idx(D, q.tackler) : q.kind === 'block' ? idx(D, q.blocker) : -1;
+    const meetA = q.kind === 'block' ? lerpP(shooterA, {
+      x: 1,
+      y: 0.5
+    }, 0.35) : {
+      x: shooterA.x + 0.02,
+      y: shooterA.y
+    };
+    if (closer >= 0) {
+      const s0 = Math.max(-IN * 0.5, (n - 1) * SEG - 0.4),
+        s1 = n * SEG + (q.kind === 'block' ? 0.4 : 0.45) * TS;
+      pos[D][closer] = lerpP(pos[D][closer], toD(meetA), ease((uu - s0) / (s1 - s0)));
+    }
     if (tail >= 0) {
-      const shooterA = {
-        x: key(n - 1).x + 0.03,
-        y: key(n - 1).y
-      };
       const ki = L[D].findIndex(p => p.role === 'GK');
       if (q.kind === 'goal') {
         const goalPt = {
           x: 1.015,
           y: 0.5 + q.side * 0.055
         };
-        ballA = lerpP(shooterA, goalPt, ease(tail / 0.7));
-        if (ki >= 0) pos[D][ki] = {
+        ballA = lerpP(shooterA, goalPt, ease(tl / 0.7));
+        if (ki >= 0) pos[D][ki] = lerpP(pos[D][ki], {
           x: 0.035,
-          y: lerp(0.5, 0.5 + q.side * 0.12, ease(tail / 0.6))
-        };
-        holder = tail < 0.05 ? holder : null;
-        if (tail > 0.7) {
+          y: 0.5 + q.side * 0.12
+        }, ease(tl / 0.6));
+        holder = tl < 0.05 ? holder : null;
+        if (tl > 0.7) {
           banner = 'GOAL!';
           const si = idx(T, q.shooter);
           celebrate = {
@@ -19358,12 +19414,12 @@ function beatFrame(beat, L, prevEnd) {
             x: 0.9,
             y: 0.5 + q.side * 0.4
           };
-          pos[T][si] = lerpP(shooterA, corner, ease((tail - 0.7) / 1.4));
+          pos[T][si] = lerpP(pos[T][si], corner, ease((tl - 0.7) / 1.4));
           L[T].forEach((pl, i) => {
             if (i !== si && pl.role !== 'GK') pos[T][i] = lerpP(pos[T][i], {
               x: corner.x - 0.06 - 0.02 * i,
               y: corner.y - q.side * 0.05 * (i % 3)
-            }, ease((tail - 1.1) / 1.4));
+            }, ease((tl - 1.1) / 1.6));
           });
         }
       } else if (q.kind === 'save') {
@@ -19371,78 +19427,61 @@ function beatFrame(beat, L, prevEnd) {
           x: 0.965,
           y: 0.5 + q.side * 0.07
         };
-        if (ki >= 0) pos[D][ki] = {
-          x: 1 - kp.x,
-          y: lerp(0.5, kp.y, ease(tail / 0.45))
-        };
-        ballA = lerpP(shooterA, kp, ease(tail / 0.6));
-        holder = tail > 0.6 && ki >= 0 ? {
+        if (ki >= 0) pos[D][ki] = lerpP(pos[D][ki], toD(kp), ease(tl / 0.45));
+        ballA = lerpP(shooterA, kp, ease(tl / 0.6));
+        holder = tl > 0.6 && ki >= 0 ? {
           team: D,
           i: ki
         } : null;
-        if (tail > 0.6) banner = 'SAVE!';
+        if (tl > 0.6) banner = 'SAVE!';
       } else if (q.kind === 'miss') {
         ballA = lerpP(shooterA, {
           x: 1.03,
           y: 0.5 + q.side * 0.2
-        }, ease(tail / 0.8));
+        }, ease(tl / 0.8));
         holder = null;
-        if (tail > 0.8) banner = 'WIDE!';
+        if (tl > 0.8) banner = 'WIDE!';
       } else if (q.kind === 'block') {
-        const bi = idx(D, q.blocker);
-        const bp = lerpP(shooterA, {
-          x: 1,
-          y: 0.5
-        }, 0.35);
-        if (bi >= 0) pos[D][bi] = {
-          x: 1 - bp.x,
-          y: lerp(pos[D][bi].y, bp.y, ease(tail / 0.4))
-        };
-        ballA = lerpP(shooterA, bp, ease(tail / 0.5));
+        const bp = meetA;
+        ballA = lerpP(shooterA, bp, ease(tl / 0.5));
         holder = null;
-        if (tail > 0.5) banner = 'BLOCKED!';
+        if (tl > 0.5) banner = 'BLOCKED!';
       } else {
-        const ti = idx(D, q.tackler);
-        const meet = {
-          x: shooterA.x + 0.02,
-          y: shooterA.y
-        };
-        if (ti >= 0) pos[D][ti] = {
-          x: 1 - meet.x,
-          y: lerp(pos[D][ti].y, meet.y, ease(tail / 0.45))
-        };
-        ballA = tail < 0.5 ? meet : lerpP(meet, {
+        const ti = closer;
+        const meet = meetA;
+        ballA = tl < 0.5 ? lerpP(shooterA, meet, ease(tl / 0.5)) : lerpP(meet, {
           x: meet.x - 0.06,
           y: meet.y
-        }, ease((tail - 0.5) / 0.5));
-        holder = tail > 0.45 && ti >= 0 ? {
+        }, ease((tl - 0.5) / 0.5));
+        holder = tl > 0.45 && ti >= 0 ? {
           team: D,
           i: ti
         } : holder;
-        if (tail > 0.45) banner = q.kind === 'tackle' ? 'TACKLE!' : 'INTERCEPTED!';
+        if (tl > 0.45) banner = q.kind === 'tackle' ? 'TACKLE!' : 'INTERCEPTED!';
       }
-      ball = toPitch(T, ballA);
     }
-    let out = {
-      pos: [pos[0].map(p => toPitch(0, p)), pos[1].map(p => toPitch(1, p))],
-      ball,
+    const out = {
+      pos: [],
+      ball: toPitch(T, ballA),
       holder,
       banner,
       celebrate
     };
     out.pos[T] = pos[T].map(p => toPitch(T, p));
     out.pos[D] = pos[D].map(p => toPitch(D, p));
-    if (u < 0.35 && prevEnd) {
-      const k2 = ease(u / 0.35);
-      out = {
-        ...out,
-        pos: out.pos.map((team, ti) => team.map((p, i) => prevEnd.pos[ti][i] ? lerpP(prevEnd.pos[ti][i], p, k2) : p)),
-        ball: lerpP(prevEnd.ball, out.ball, k2)
-      };
-    }
     return out;
   };
-  return frame;
+  const glide = beat.type === 'seq' ? IN : beat.type === 'pen' ? PIN * 0.9 : Math.min(beat.dur * 0.8, GLIDE[beat.type] || 1.5);
+  return u => {
+    const out = raw(u);
+    if (!prevEnd || u >= glide) return out;
+    const k = ease(u / glide);
+    return {
+      ...out,
+      pos: out.pos.map((team, ti) => team.map((p, i) => prevEnd.pos[ti] && prevEnd.pos[ti][i] ? lerpP(prevEnd.pos[ti][i], p, k) : p)),
+      ball: lerpP(prevEnd.ball, out.ball, k)
+    };
+  };
 }
 function matchFrame(script, L, t) {
   const {
@@ -19481,7 +19520,7 @@ function PitchMatch({
 }) {
   const L = useMemo(() => [lineupOf(d, A), lineupOf(d, B)], [d.id, A.id, B.id]);
   const script = useMemo(() => matchScript(match), [match]);
-  const base = speed === 'fast' ? 3 : 1.6;
+  const base = speed === 'fast' ? 1.8 : 1;
   const [t, setT] = useState(speed === 'instant' ? script.total : 0);
   const [playing, setPlaying] = useState(speed !== 'instant');
   const [mult, setMult] = useState(1);
@@ -21147,15 +21186,16 @@ function RoomGame({
     key: s.uid,
     className: "btn btn-sm",
     onClick: () => room.send('claimSeat', [s.uid])
-  }, s.name))), view, flash && React.createElement(Flash, {
-    f: flash,
-    onDone: () => setFlash(null)
-  }), tv && React.createElement(TvExit, null), !tv && isHost && (tvView ? React.createElement(TvExit, {
-    onExit: () => setTvView(false)
-  }) : React.createElement(TvSwitch, {
+  }, s.name))), React.createElement(TvSwitch, {
+    on: !tv && isHost && !tvView,
     code: room.code,
     onThisScreen: () => setTvView(true)
-  })), askLeave && React.createElement(Confirm, {
+  }, view), flash && React.createElement(Flash, {
+    f: flash,
+    onDone: () => setFlash(null)
+  }), tv && React.createElement(TvExit, null), !tv && isHost && tvView && React.createElement(TvExit, {
+    onExit: () => setTvView(false)
+  }), askLeave && React.createElement(Confirm, {
     title: "Leave the room?",
     body: isHost ? 'Another player takes over as host and the game carries on. You can rejoin from Online.' : 'The game carries on. A bot covers your seat after a minute; you can rejoin from Online.',
     yes: "Leave",
@@ -21438,9 +21478,22 @@ function goFullscreen() {
     if (!document.fullscreenElement && el.requestFullscreen) el.requestFullscreen().catch(() => {});
   } catch (e) {}
 }
+const TvCtx = React.createContext(null);
+function TvButton() {
+  const open = React.useContext(TvCtx);
+  if (!open) return null;
+  return React.createElement("button", {
+    className: "iconbtn tvbtn",
+    onClick: open,
+    "aria-label": "TV mode",
+    title: "TV mode"
+  }, "\uD83D\uDCFA");
+}
 function TvSwitch({
   code,
-  onThisScreen
+  onThisScreen,
+  children,
+  on = true
 }) {
   const [open, setOpen] = useState(false);
   const [msg, setMsg] = useState('');
@@ -21452,12 +21505,7 @@ function TvSwitch({
     const w = window.open(tvUrl(code), '_blank');
     if (!w) setMsg('The browser blocked the new window. Allow pop-ups for this site, or use “On this screen”.');else setOpen(false);
   };
-  return React.createElement(React.Fragment, null, React.createElement("button", {
-    className: "tvfab",
-    onClick: () => setOpen(true),
-    "aria-label": "TV mode",
-    title: "TV mode"
-  }, "\uD83D\uDCFA"), open && React.createElement(Sheet, {
+  const sheet = open && React.createElement(Sheet, {
     center: true,
     onClose: () => setOpen(false)
   }, React.createElement("h2", {
@@ -21496,7 +21544,14 @@ function TvSwitch({
   }, msg), React.createElement("button", {
     className: "btn btn-ghost",
     onClick: () => setOpen(false)
-  }, "Close")));
+  }, "Close"));
+  if (children !== undefined) return React.createElement(TvCtx.Provider, {
+    value: on ? () => setOpen(true) : null
+  }, children, on && sheet);
+  return React.createElement(React.Fragment, null, React.createElement("button", {
+    className: "btn",
+    onClick: () => setOpen(true)
+  }, "\uD83D\uDCFA TV mode"), sheet);
 }
 function TvExit({
   onExit

@@ -1,4 +1,4 @@
-/* Draft Night e316caa9e3 — built from src/styles.css */
+/* Draft Night 14c0e9aea9 — built from src/styles.css */
 /* Layout: one phone-width column, a stage-lit backdrop, the auction screen as a full-height console with a sticky gavel bar. */
 :root{
   --ink:#0f0c21; --stage:#19153a; --panel:#221d47; --panel2:#2c2659; --line:#3d3672;
@@ -519,11 +519,16 @@ html[data-motion="reduce"] *,html[data-motion="reduce"] *::before,html[data-moti
 .tvmode .matchview .mfeed{max-height:none}
 
 /* ---------- TV switch ---------- */
-.tvfab{position:fixed;right:12px;bottom:calc(112px + env(safe-area-inset-bottom,0px));z-index:35;width:48px;height:48px;border-radius:50%;border:2px solid var(--line);background:var(--panel);font-size:22px;box-shadow:0 6px 18px rgba(0,0,0,.4)}
-.tvfab:focus-visible{outline:3px solid var(--gold)}
+.tvbtn{font-size:20px}
+/* Busy game top bars: slightly smaller buttons so everything fits on a 360px phone. */
+.topbar.dense{gap:6px}
+.topbar.dense .iconbtn{width:42px;height:42px}
+.topbar.dense .pillbtn{height:42px;padding-inline:11px}
+.topbar.wraptitle{flex-wrap:wrap}
+.topbar.wraptitle .title{order:10;flex-basis:100%;min-height:0;font-size:16px}
 .tvbar{position:fixed;top:10px;right:10px;z-index:60;display:flex;gap:8px}
 .tvbar .pillbtn{background:rgba(34,29,71,.92)}
-.tvmode .resactions,.tvmode .tvfab{display:none}
+.tvmode .resactions,.tvmode .tvbtn{display:none}
 
 .tvmode .topbar button{visibility:hidden}
 .tvmode .tvbar button{visibility:visible}

@@ -12,8 +12,14 @@ const tvUrl = (code) => location.origin + location.pathname + '#tv=' + (code || 
 const canChannel = () => typeof window !== 'undefined' && 'BroadcastChannel' in window;
 function goFullscreen() { try { const el = document.documentElement; if (!document.fullscreenElement && el.requestFullscreen) el.requestFullscreen().catch(() => {}); } catch (e) {} }
 
-// Floating 📺 button + choices.
-function TvSwitch({ code, onThisScreen }) {
+// The 📺 button lives in each game screen's top bar (next to mute), so it never covers Sold or Bid.
+const TvCtx = React.createContext(null);
+function TvButton() {
+  const open = React.useContext(TvCtx);
+  if (!open) return null;
+  return <button className="iconbtn tvbtn" onClick={open} aria-label="TV mode" title="TV mode">📺</button>;
+}
+function TvSwitch({ code, onThisScreen, children, on = true }) {
   const [open, setOpen] = useState(false);
   const [msg, setMsg] = useState('');
   const newWindow = () => {
@@ -21,10 +27,7 @@ function TvSwitch({ code, onThisScreen }) {
     const w = window.open(tvUrl(code), '_blank');
     if (!w) setMsg('The browser blocked the new window. Allow pop-ups for this site, or use “On this screen”.'); else setOpen(false);
   };
-  return (
-    <>
-      <button className="tvfab" onClick={() => setOpen(true)} aria-label="TV mode" title="TV mode">📺</button>
-      {open && (
+  const sheet = open && (
         <Sheet center onClose={() => setOpen(false)}>
           <h2 className="display" style={{ fontSize: 30 }}>TV mode</h2>
           <p className="hint">A big-screen view of the auction, bids, clock, teams and matches. It never bids, votes or spends.</p>
@@ -36,9 +39,10 @@ function TvSwitch({ code, onThisScreen }) {
           {msg && <p className="warn">{msg}</p>}
           <button className="btn btn-ghost" onClick={() => setOpen(false)}>Close</button>
         </Sheet>
-      )}
-    </>
   );
+  // Wrapping game screens: the top bars show a 📺 button. On its own (the lobby): a normal button.
+  if (children !== undefined) return <TvCtx.Provider value={on ? () => setOpen(true) : null}>{children}{on && sheet}</TvCtx.Provider>;
+  return <><button className="btn" onClick={() => setOpen(true)}>📺 TV mode</button>{sheet}</>;
 }
 function TvExit({ onExit }) {
   useEffect(() => {

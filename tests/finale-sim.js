@@ -79,7 +79,7 @@ module.exports = function finaleChecks(DN) {
       goalsT += m1.score[0] + m1.score[1]; if (m1.score[0] + m1.score[1] >= 8) big++;
     }
     out.symmetry = { firstWins: firstWins / N, secondWins: secondWins / N, draws: draws / N, avgGoals: goalsT / N, eightPlus: big / N };
-    let bad = 0, checked = 0, frames = 0, badFrames = 0, chainOk = true;
+    let bad = 0, checked = 0, frames = 0, badFrames = 0, chainOk = true, maxP = 0, maxB = 0; const lengths = [];
     for (let i = 0; i < 120; i++) {
       const dd3 = fullDraft(i % 3 === 0 ? 3 : 2, 'anim' + i);
       const A = dd3.managers[0], B = dd3.managers[1];
@@ -101,12 +101,23 @@ module.exports = function finaleChecks(DN) {
         const fr = F.matchFrame(script, L, t); frames++;
         if (!isFinite(fr.ball.x) || !isFinite(fr.ball.y) || fr.pos.some((team) => team.some((p) => !p || !isFinite(p.x) || !isFinite(p.y)))) badFrames++;
       }
+      // Smoothness: step through the first 25 matches at 30 frames a second (1× speed) and
+      // record the fastest any player or the ball moves between two frames.
+      if (checked <= 25) {
+        const L2 = [F.lineupOf(dd3, A), F.lineupOf(dd3, B)]; let pf = null;
+        for (let t = 0; t <= script.total; t += 1 / 30) {
+          const fr = F.matchFrame(script, L2, t);
+          if (pf) { fr.pos.forEach((team, ti) => team.forEach((p, pi) => { maxP = Math.max(maxP, Math.hypot(p.x - pf.pos[ti][pi].x, p.y - pf.pos[ti][pi].y) * 30); })); maxB = Math.max(maxB, Math.hypot(fr.ball.x - pf.ball.x, fr.ball.y - pf.ball.y) * 30); }
+          pf = fr;
+        }
+        lengths.push(script.total);
+      }
       const roster = [A, B].map((t) => new Set(t.team.filter(Boolean).map((x) => dd3.items[x.itemId].name)));
       m.seqs.forEach((q) => { if (!q.chain.every((n) => roster[q.team].has(n))) chainOk = false; if (q.kind === 'goal' && q.chain[q.chain.length - 1] !== q.shooter) chainOk = false; });
       const again = F.simulateMatch(dd3, A, B, 'k' + i, i % 2 === 0);
       if (JSON.stringify(again) !== JSON.stringify(m)) bad++;
     }
-    out.animation = { checked, bad, frames, badFrames, chainOk };
+    out.animation = { checked, bad, frames, badFrames, chainOk, maxP, maxB, avgLength: lengths.reduce((a, b) => a + b, 0) / Math.max(1, lengths.length) };
     // Home advantage is optional and small.
     const dd4 = fullDraft(2, 'home'); let h0 = 0, h1 = 0;
     for (let i = 0; i < 1500; i++) { const a = F.simulateMatch({ ...dd4, seed: 'h' + i }, dd4.managers[0], dd4.managers[1], 'x', false); const b = F.simulateMatch({ ...dd4, seed: 'h' + i }, dd4.managers[0], dd4.managers[1], 'x', false, { home: 1 }); if (a.score[1] > a.score[0]) h0++; if (b.score[1] > b.score[0]) h1++; }

@@ -546,7 +546,8 @@ async function tap(w, el) { el.dispatchEvent(new w.MouseEvent('pointerdown', { b
     const before = JSON.stringify(H.DN.store.get('dn_current_v1'));
     await sleep(200);
     ok(JSON.stringify(H.DN.store.get('dn_current_v1')) === before, 'the TV window never changes the saved game');
-    await click(H.w, H.d.querySelector('.tvfab'));
+    ok(!!H.d.querySelector('.topbar .tvbtn') && !H.d.querySelector('.tvfab'), 'the 📺 TV button sits in the top bar (no floating button over Sold/Bid)');
+    await click(H.w, H.d.querySelector('.topbar .tvbtn'));
     await click(H.w, btn(H.d, 'Show TV view on this screen'));
     ok(!!H.d.querySelector('.tvmode') && H.d.querySelectorAll('.mgr[role=button]').length === 0 && /Back to controls/.test(H.d.body.textContent), 'host can switch this screen to the TV view (read-only)');
     await click(H.w, btn(H.d, 'Back to controls'));
@@ -769,6 +770,8 @@ async function tap(w, el) { el.dispatchEvent(new w.MouseEvent('pointerdown', { b
     ok(sy.avgGoals > 1.8 && sy.avgGoals < 3.6 && sy.eightPlus < 0.02 && sy.draws > 0.15 && sy.draws < 0.35, 'plausible scores: ' + sy.avgGoals.toFixed(2) + ' goals a game, ' + (sy.draws * 100).toFixed(0) + '% draws, ' + (sy.eightPlus * 100).toFixed(1) + '% with 8+ goals');
     const an = sim.animation;
     ok(an.checked > 100 && an.bad === 0, 'animation: in ' + an.checked + ' matches the score on screen only rises on goals and finishes exactly on the recorded result; replays are identical');
+    ok(an.maxP < 90 && an.maxB < 160, 'animation is smooth: nobody jumps between frames (fastest player ' + Math.round(an.maxP) + ' m/s on screen during a glide, ball ' + Math.round(an.maxB) + ' m/s on a shot; before this fix players teleported at 2,800+ m/s)');
+    ok(an.avgLength >= 120, 'a match lasts about ' + Math.round(an.avgLength / 60 * 10) / 10 + ' minutes at 1× (slow enough to follow; 2×, 4× and Skip still available)');
     ok(an.badFrames === 0 && an.frames > 5000, 'animation: every frame (' + an.frames + ' sampled) has every player and the ball on the pitch');
     ok(an.chainOk, 'every passing move uses only that team’s drafted players, and goals end with the scorer');
     ok(sim.home.withHome > sim.home.without && sim.home.withHome - sim.home.without < 0.12, 'home advantage (optional) is a modest boost: ' + (sim.home.without * 100).toFixed(1) + '% → ' + (sim.home.withHome * 100).toFixed(1) + '% wins');

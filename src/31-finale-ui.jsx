@@ -476,7 +476,12 @@ const lerp = (a, b, u) => a + (b - a) * u;
 const ease = (u) => (u <= 0 ? 0 : u >= 1 ? 1 : u * u * (3 - 2 * u));
 const lerpP = (p, q, u) => ({ x: lerp(p.x, q.x, u), y: lerp(p.y, q.y, u) });
 const LINE_X = { GK: 0.04, DEF: 0.2, MID: 0.38, FWD: 0.54 };
-const SEG = 0.85; // seconds per touch in a passing move
+// Pacing (seconds of match-viewer time at 1×). Slow enough to follow every pass.
+const SEG = 1.25; // per touch in a passing move
+const IN = 1.6; // lead-in: players glide from where the last moment ended
+const TS = 1.5; // stretch for shots, saves, tackles and celebrations
+const PIN = 1.8; // lead-in before each penalty
+const GLIDE = { half: 2.2, full: 1.8, et: 1.8, pens: 1.8, restart: 2, kickoff: 1.2 };
 
 // Formation spots from the drafted squad (in "attack" coordinates: 0 = own goal, 1 = opponent's goal).
 function lineupOf(d, m) {
@@ -493,110 +498,128 @@ function lineupOf(d, m) {
 function matchScript(match) {
   const beats = []; let t = 0;
   const add = (b) => { b.t0 = t; t += b.dur; beats.push(b); return b; };
-  add({ type: 'kickoff', dur: 1.4, min: 0, show: [0], reveal: 0.2 });
+  add({ type: 'kickoff', dur: 2, min: 0, show: [0], reveal: 0.1 });
   match.events.forEach((e, k) => {
     if (e.type === 'kickoff') return;
-    if (e.type === 'half' || e.type === 'full' || e.type === 'et' || e.type === 'pens') { add({ type: e.type, dur: e.type === 'half' ? 2 : 1.6, min: e.min, show: [k], reveal: 0.1 }); return; }
-    if (e.type === 'pen') { add({ type: 'pen', dur: 1.8, min: 120, show: [k], reveal: 0.75, pen: e }); return; }
+    if (e.type === 'half' || e.type === 'full' || e.type === 'et' || e.type === 'pens') { add({ type: e.type, dur: e.type === 'half' ? 3.6 : 3, min: e.min, show: [k], reveal: 0.1 }); return; }
+    if (e.type === 'pen') { add({ type: 'pen', dur: PIN + 1.9 * TS, min: 120, show: [k], reveal: PIN + 0.75 * TS, pen: e }); return; }
     if (e.type === 'yellow' || e.type === 'red' || e.type === 'note') { const last = beats[beats.length - 1]; last.show.push(k); return; }
     if (e.seq == null) return;
     const q = match.seqs[e.seq]; const n = q.chain.length;
-    const tail = q.kind === 'goal' ? 3.4 : q.kind === 'tackle' || q.kind === 'intercept' ? 1.1 : 1.7;
-    add({ type: 'seq', dur: 0.35 + n * SEG + tail, min: q.min, et: !!q.et, q, show: [k], reveal: 0.35 + n * SEG + (q.kind === 'goal' ? 0.7 : q.kind === 'tackle' || q.kind === 'intercept' ? 0.5 : 0.6) });
+    const tail = (q.kind === 'goal' ? 3.6 : q.kind === 'tackle' || q.kind === 'intercept' ? 1.2 : 1.8) * TS;
+    add({ type: 'seq', dur: IN + n * SEG + tail, min: q.min, et: !!q.et, q, show: [k], reveal: IN + n * SEG + (q.kind === 'goal' ? 0.7 : q.kind === 'tackle' || q.kind === 'intercept' ? 0.5 : 0.6) * TS });
+    // After a goal everyone walks back for the kick-off instead of jumping into place.
+    if (q.kind === 'goal') add({ type: 'restart', dur: 2.4, min: q.min, et: !!q.et, show: [], reveal: 0.1 });
   });
   return { beats, total: t };
 }
-// Where everyone is at time u (seconds) into one beat.
+// Where everyone is at time u (seconds) into one beat. Every beat glides in from where
+// the previous one ended (prevEnd), so nobody ever jumps across the pitch.
 function beatFrame(beat, L, prevEnd) {
   const toPitch = (team, p) => ({ x: (team === 0 ? p.x : 1 - p.x) * PITCH.w, y: p.y * PITCH.h });
   const base = (team) => L[team].map((pl) => toPitch(team, pl.base));
   const idx = (team, name) => L[team].findIndex((p) => p.name === name);
-  const frame = (u) => {
+  const raw = (u) => {
     if (beat.type !== 'seq' && beat.type !== 'pen') return { pos: [base(0), base(1)], ball: { x: PITCH.w / 2, y: PITCH.h / 2 }, holder: null };
     if (beat.type === 'pen') {
       const e = beat.pen; const T = e.team; const D = 1 - T;
-      const pos = [0, 1].map((team) => L[team].map((pl, i) => toPitch(T, { x: 0.62, y: 0.2 + (0.6 * (i + team * 3)) / (L[0].length + L[1].length) })));
+      const pu = Math.max(0, u - PIN) / TS;
+      // Every kick is taken at the same (right-hand) goal; the rest wait in the centre circle.
+      const toPitch = (_team, p) => ({ x: p.x * PITCH.w, y: p.y * PITCH.h });
+      const pos = [0, 1].map((team) => L[team].map((pl, i) => toPitch(T, { x: team === D && pl.role === 'GK' ? 0.985 : 0.5, y: 0.3 + (0.4 * (i + team * L[0].length)) / Math.max(1, L[0].length + L[1].length - 1) })));
       const si = Math.max(0, idx(T, e.player)); const ki = L[D].findIndex((p) => p.role === 'GK');
       const spot = { x: 0.89, y: 0.5 };
-      pos[T][si] = toPitch(T, { x: 0.86, y: 0.5 });
-      const shotU = ease((u - 0.5) / 0.35);
+      pos[T][si] = toPitch(T, { x: lerp(0.84, 0.88, ease((pu - 0.3) / 0.2)), y: 0.5 });
+      const shotU = ease((pu - 0.5) / 0.35);
       const target = e.scored ? { x: 1.01, y: 0.5 + e.side * 0.05 } : { x: 0.985, y: 0.5 + e.side * 0.04 };
       const keeperY = e.scored ? 0.5 - e.side * 0.06 : 0.5 + e.side * 0.04;
-      if (ki >= 0) pos[D][ki] = toPitch(T, { x: 0.985, y: lerp(0.5, keeperY, ease((u - 0.5) / 0.3)) });
+      if (ki >= 0) pos[D][ki] = toPitch(T, { x: 0.985, y: lerp(0.5, keeperY, ease((pu - 0.5) / 0.3)) });
       const ball = toPitch(T, lerpP(spot, target, shotU));
-      return { pos, ball, holder: { team: T, i: si } };
+      return { pos, ball, holder: { team: T, i: si }, banner: pu > 0.9 ? (e.scored ? 'SCORED!' : 'SAVED!') : null };
     }
     const q = beat.q; const T = q.team; const D = 1 - T; const n = q.chain.length;
     const shot = q.kind === 'goal' || q.kind === 'save' || q.kind === 'miss' || q.kind === 'block';
-    const key = (k) => ({ x: shot ? lerp(0.34, 0.8, n > 1 ? k / (n - 1) : 1) : lerp(0.28, 0.52, n > 1 ? k / (n - 1) : 1), y: Math.min(0.88, Math.max(0.12, 0.5 + (hashU(q.min, q.i, k) - 0.5) * 0.62)) });
-    const uu = u - 0.35; // first 0.35s: move from where the last beat ended
-    let ballA; let holderK = 0;
-    if (uu < 0) { ballA = key(0); holderK = 0; }
-    else if (uu < n * SEG) {
-      const k = Math.min(n - 1, Math.floor(uu / SEG)); const r = (uu - k * SEG) / SEG;
-      holderK = k;
-      if (k < n - 1 && r > 0.6) { ballA = lerpP(key(k), key(k + 1), ease((r - 0.6) / 0.4)); holderK = -1; }
-      else { const carry = { x: key(k).x + 0.03 * Math.min(1, r / 0.6), y: key(k).y }; ballA = carry; }
-    } else ballA = { x: key(n - 1).x + 0.03, y: key(n - 1).y };
-    const tail = uu - n * SEG;
+    const gkAt = q.chain.map((nm) => { const j = idx(T, nm); return j >= 0 && L[T][j].role === 'GK'; });
+    // A keeper in the move plays it out from the edge of their box rather than sprinting upfield.
+    const key = (k) => ({ x: gkAt[k] ? 0.13 : shot ? lerp(0.34, 0.8, n > 1 ? k / (n - 1) : 1) : lerp(0.28, 0.52, n > 1 ? k / (n - 1) : 1), y: gkAt[k] ? 0.5 : Math.min(0.88, Math.max(0.12, 0.5 + (hashU(q.min, q.i, k) - 0.5) * 0.62)) });
+    const carried = (k) => ({ x: key(k).x + 0.03, y: key(k).y });
+    const uu = u - IN; // lead-in: hold the opening shape while everyone glides in
+    const PASS = 0.4; // last 60% of each touch is the pass to the next player
+    const ballAt = (v) => {
+      if (v < 0) return { b: key(0), h: 0 };
+      if (v >= n * SEG) return { b: carried(n - 1), h: n - 1 };
+      const k = Math.min(n - 1, Math.floor(v / SEG)); const r = (v - k * SEG) / SEG;
+      if (k < n - 1 && r > PASS) return { b: lerpP(carried(k), key(k + 1), ease((r - PASS) / (1 - PASS))), h: -1 };
+      return { b: { x: key(k).x + 0.03 * ease(Math.min(1, r / PASS)), y: key(k).y }, h: k };
+    };
+    const now = ballAt(uu); let ballA = now.b; const holderK = now.h;
+    // The team shape follows where the ball has been over the last second, so whole lines
+    // shift smoothly instead of lurching with every long pass.
+    const shapeBall = [0, 0.2, 0.4, 0.6, 0.8, 1].map((lag) => ballAt(uu - lag).b).reduce((acc, p, _i, arr) => ({ x: acc.x + p.x / arr.length, y: acc.y + p.y / arr.length }), { x: 0, y: 0 });
+    const tail = uu - n * SEG; const tl = tail / TS;
     // Formation shift: attackers push up with the ball, defenders drop and squeeze towards it.
-    const push = (ballA.x - 0.45) * 0.55;
+    const push = (shapeBall.x - 0.45) * 0.55;
     const pos = [[], []];
     L[T].forEach((pl, i) => {
-      let p = { x: pl.base.x + (pl.role === 'GK' ? 0 : push), y: lerp(pl.base.y, ballA.y, pl.role === 'GK' ? 0 : 0.18) };
+      let p = { x: pl.base.x + (pl.role === 'GK' ? 0 : push), y: lerp(pl.base.y, shapeBall.y, pl.role === 'GK' ? 0 : 0.18) };
       const ci = q.chain.indexOf(pl.name);
       if (ci >= 0) { const until = ci * SEG; const pre = ease(1 - Math.max(0, until - Math.max(0, uu)) / (SEG * 1.6)); p = lerpP(p, key(ci), pre); if (ci < n - 1 && uu > (ci + 1) * SEG) p = lerpP(key(ci), { x: key(ci).x + 0.08, y: key(ci).y }, ease((uu - (ci + 1) * SEG) / SEG)); }
       pos[T][i] = p;
     });
-    const dA = { x: 1 - ballA.x, y: ballA.y }; // ball in the defenders' attack coordinates
+    const dA = { x: 1 - shapeBall.x, y: shapeBall.y }; // (recent) ball in the defenders' attack coordinates
     const drop = (dA.x - 0.45) * 0.5;
-    let presser = -1, best = 9;
-    L[D].forEach((pl, i) => { if (pl.role === 'GK') return; const p = { x: pl.base.x + drop, y: lerp(pl.base.y, dA.y, 0.3) }; const dist = Math.hypot(p.x - dA.x, p.y - dA.y); if (dist < best) { best = dist; presser = i; } });
+    // Defenders near the ball close it down; the pull fades smoothly with distance (no sudden switches).
     L[D].forEach((pl, i) => {
       let p = pl.role === 'GK' ? { x: 0.035, y: lerp(0.5, dA.y, 0.3) } : { x: pl.base.x + drop, y: lerp(pl.base.y, dA.y, 0.3) };
-      if (i === presser) p = lerpP(p, { x: dA.x - 0.05, y: dA.y + 0.03 }, 0.65);
+      if (pl.role !== 'GK') { const dist = Math.hypot(p.x - dA.x, p.y - dA.y); const w = 0.65 * Math.min(1, Math.max(0, (0.3 - dist) / 0.18)); p = lerpP(p, { x: dA.x - 0.05, y: dA.y + 0.03 }, w); }
       pos[D][i] = p;
     });
-    let ball = toPitch(T, ballA); let holder = holderK >= 0 ? { team: T, i: idx(T, q.chain[holderK]) } : null; let banner = null; let celebrate = null;
+    let holder = holderK >= 0 ? { team: T, i: idx(T, q.chain[holderK]) } : null; let banner = null; let celebrate = null;
+    const toD = (p) => ({ x: 1 - p.x, y: p.y }); // attack → defending side's coordinates
+    const shooterA = carried(n - 1);
+    // The tackler or blocker starts closing in during the last touch, so they arrive at a run, not a jump.
+    const closer = q.kind === 'tackle' || q.kind === 'intercept' ? idx(D, q.tackler) : q.kind === 'block' ? idx(D, q.blocker) : -1;
+    const meetA = q.kind === 'block' ? lerpP(shooterA, { x: 1, y: 0.5 }, 0.35) : { x: shooterA.x + 0.02, y: shooterA.y };
+    if (closer >= 0) { const s0 = Math.max(-IN * 0.5, (n - 1) * SEG - 0.4), s1 = n * SEG + (q.kind === 'block' ? 0.4 : 0.45) * TS; pos[D][closer] = lerpP(pos[D][closer], toD(meetA), ease((uu - s0) / (s1 - s0))); }
     if (tail >= 0) {
-      const shooterA = { x: key(n - 1).x + 0.03, y: key(n - 1).y };
       const ki = L[D].findIndex((p) => p.role === 'GK');
       if (q.kind === 'goal') {
         const goalPt = { x: 1.015, y: 0.5 + q.side * 0.055 };
-        ballA = lerpP(shooterA, goalPt, ease(tail / 0.7));
-        if (ki >= 0) pos[D][ki] = { x: 0.035, y: lerp(0.5, 0.5 + q.side * 0.12, ease(tail / 0.6)) }; // dives, too late
-        holder = tail < 0.05 ? holder : null;
-        if (tail > 0.7) { banner = 'GOAL!'; const si = idx(T, q.shooter); celebrate = { team: T, i: si }; const corner = { x: 0.9, y: 0.5 + q.side * 0.4 }; pos[T][si] = lerpP(shooterA, corner, ease((tail - 0.7) / 1.4)); L[T].forEach((pl, i) => { if (i !== si && pl.role !== 'GK') pos[T][i] = lerpP(pos[T][i], { x: corner.x - 0.06 - 0.02 * i, y: corner.y - q.side * 0.05 * (i % 3) }, ease((tail - 1.1) / 1.4)); }); }
+        ballA = lerpP(shooterA, goalPt, ease(tl / 0.7));
+        if (ki >= 0) pos[D][ki] = lerpP(pos[D][ki], { x: 0.035, y: 0.5 + q.side * 0.12 }, ease(tl / 0.6)); // dives, too late
+        holder = tl < 0.05 ? holder : null;
+        if (tl > 0.7) { banner = 'GOAL!'; const si = idx(T, q.shooter); celebrate = { team: T, i: si }; const corner = { x: 0.9, y: 0.5 + q.side * 0.4 }; pos[T][si] = lerpP(pos[T][si], corner, ease((tl - 0.7) / 1.4)); L[T].forEach((pl, i) => { if (i !== si && pl.role !== 'GK') pos[T][i] = lerpP(pos[T][i], { x: corner.x - 0.06 - 0.02 * i, y: corner.y - q.side * 0.05 * (i % 3) }, ease((tl - 1.1) / 1.6)); }); }
       } else if (q.kind === 'save') {
         const kp = { x: 0.965, y: 0.5 + q.side * 0.07 };
-        if (ki >= 0) pos[D][ki] = { x: 1 - kp.x, y: lerp(0.5, kp.y, ease(tail / 0.45)) };
-        ballA = lerpP(shooterA, kp, ease(tail / 0.6)); holder = tail > 0.6 && ki >= 0 ? { team: D, i: ki } : null;
-        if (tail > 0.6) banner = 'SAVE!';
+        if (ki >= 0) pos[D][ki] = lerpP(pos[D][ki], toD(kp), ease(tl / 0.45));
+        ballA = lerpP(shooterA, kp, ease(tl / 0.6)); holder = tl > 0.6 && ki >= 0 ? { team: D, i: ki } : null;
+        if (tl > 0.6) banner = 'SAVE!';
       } else if (q.kind === 'miss') {
-        ballA = lerpP(shooterA, { x: 1.03, y: 0.5 + q.side * 0.2 }, ease(tail / 0.8)); holder = null;
-        if (tail > 0.8) banner = 'WIDE!';
+        ballA = lerpP(shooterA, { x: 1.03, y: 0.5 + q.side * 0.2 }, ease(tl / 0.8)); holder = null;
+        if (tl > 0.8) banner = 'WIDE!';
       } else if (q.kind === 'block') {
-        const bi = idx(D, q.blocker); const bp = lerpP(shooterA, { x: 1, y: 0.5 }, 0.35);
-        if (bi >= 0) pos[D][bi] = { x: 1 - bp.x, y: lerp(pos[D][bi].y, bp.y, ease(tail / 0.4)) };
-        ballA = lerpP(shooterA, bp, ease(tail / 0.5)); holder = null;
-        if (tail > 0.5) banner = 'BLOCKED!';
+        const bp = meetA;
+        ballA = lerpP(shooterA, bp, ease(tl / 0.5)); holder = null;
+        if (tl > 0.5) banner = 'BLOCKED!';
       } else {
-        const ti = idx(D, q.tackler);
-        const meet = { x: shooterA.x + 0.02, y: shooterA.y };
-        if (ti >= 0) pos[D][ti] = { x: 1 - meet.x, y: lerp(pos[D][ti].y, meet.y, ease(tail / 0.45)) };
-        ballA = tail < 0.5 ? meet : lerpP(meet, { x: meet.x - 0.06, y: meet.y }, ease((tail - 0.5) / 0.5));
-        holder = tail > 0.45 && ti >= 0 ? { team: D, i: ti } : holder;
-        if (tail > 0.45) banner = q.kind === 'tackle' ? 'TACKLE!' : 'INTERCEPTED!';
+        const ti = closer; const meet = meetA;
+        ballA = tl < 0.5 ? lerpP(shooterA, meet, ease(tl / 0.5)) : lerpP(meet, { x: meet.x - 0.06, y: meet.y }, ease((tl - 0.5) / 0.5));
+        holder = tl > 0.45 && ti >= 0 ? { team: D, i: ti } : holder;
+        if (tl > 0.45) banner = q.kind === 'tackle' ? 'TACKLE!' : 'INTERCEPTED!';
       }
-      ball = toPitch(T, ballA);
     }
-    let out = { pos: [pos[0].map((p) => toPitch(0, p)), pos[1].map((p) => toPitch(1, p))], ball, holder, banner, celebrate };
-    // Each team's spots are in its own attack coordinates: convert the defending side too.
+    const out = { pos: [], ball: toPitch(T, ballA), holder, banner, celebrate };
+    // Each team's spots are in its own attack coordinates.
     out.pos[T] = pos[T].map((p) => toPitch(T, p)); out.pos[D] = pos[D].map((p) => toPitch(D, p));
-    if (u < 0.35 && prevEnd) { const k2 = ease(u / 0.35); out = { ...out, pos: out.pos.map((team, ti) => team.map((p, i) => (prevEnd.pos[ti][i] ? lerpP(prevEnd.pos[ti][i], p, k2) : p))), ball: lerpP(prevEnd.ball, out.ball, k2) }; }
     return out;
   };
-  return frame;
+  const glide = beat.type === 'seq' ? IN : beat.type === 'pen' ? PIN * 0.9 : Math.min(beat.dur * 0.8, GLIDE[beat.type] || 1.5);
+  return (u) => {
+    const out = raw(u);
+    if (!prevEnd || u >= glide) return out;
+    const k = ease(u / glide);
+    return { ...out, pos: out.pos.map((team, ti) => team.map((p, i) => (prevEnd.pos[ti] && prevEnd.pos[ti][i] ? lerpP(prevEnd.pos[ti][i], p, k) : p))), ball: lerpP(prevEnd.ball, out.ball, k) };
+  };
 }
 function matchFrame(script, L, t) {
   const { beats } = script;
@@ -617,7 +640,7 @@ function revealedEvents(script, t) {
 function PitchMatch({ d, A, B, match, speed, commentary, onDone, label }) {
   const L = useMemo(() => [lineupOf(d, A), lineupOf(d, B)], [d.id, A.id, B.id]);
   const script = useMemo(() => matchScript(match), [match]);
-  const base = speed === 'fast' ? 3 : 1.6;
+  const base = speed === 'fast' ? 1.8 : 1; // 1× is real viewing pace; 2×/4× and Skip are there for long brackets
   const [t, setT] = useState(speed === 'instant' ? script.total : 0);
   const [playing, setPlaying] = useState(speed !== 'instant');
   const [mult, setMult] = useState(1);

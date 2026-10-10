@@ -430,6 +430,7 @@ function TopBar({ onBack, title, right, backLabel = '←' }) {
     <div className="topbar">
       {onBack ? <button className="iconbtn" onClick={onBack} aria-label="Back">{backLabel}</button> : <span style={{ width: 46 }} />}
       <div className="title">{title}</div>
+      <TvButton />
       {right || <span style={{ width: 46 }} />}
     </div>
   );
@@ -1751,15 +1752,16 @@ function Auction({ d, setDraft, goHome, flashing, onFlash }) {
   const vetoHere = d.pending && nv.controls(d.pending.target) && !(nv.runsBots && (isBot(teamOf(d, d.pending.target)) || isBotTeam(teamOf(d, d.pending.target)))) && !(solo && (isBot(teamOf(d, d.pending.target)) || isBotTeam(teamOf(d, d.pending.target))));
   return (
     <div className={'app auction' + (auto ? ' solo' : '')}>
-      <div className="topbar">
+      <div className="topbar dense">
         <button className="iconbtn" onClick={goHome} aria-label="Home">⌂</button>
-        <div className="title num">Item {d.processed + 1} of {total}</div>
+        <span className="grow" />
         <MuteButton />
+        <TvButton />
         {ruleOn(d, 'chaos') && (!online || you) && <button className="pillbtn" onClick={() => setCardsOpen(true)} aria-label="Chaos Cards">🃏</button>}
         <button className="pillbtn" onClick={() => setTeams(true)}>Teams</button>
         {nv.isHost && !nv.tv && <button className="iconbtn" onClick={() => setPaused((p) => !p)} aria-label={paused ? 'Resume' : 'Pause'}>{paused ? '▶' : 'Ⅱ'}</button>}
       </div>
-      <div className="progress"><div className="bar"><i style={{ width: (d.processed / Math.max(1, total)) * 100 + '%' }} /></div><span className="small muted num">{d.queue.length - 1} left</span></div>
+      <div className="progress"><div className="bar"><i style={{ width: (d.processed / Math.max(1, total)) * 100 + '%' }} /></div><span className="small muted num" style={{ whiteSpace: 'nowrap' }}>Item {d.processed + 1} of {total} · {d.queue.length - 1} left</span></div>
 
       <div className="paused stack">
         {showCard ? <ItemCard key={d.reveal} item={item} d={d} /> : <div style={{ minHeight: 156 }} />}
@@ -1848,10 +1850,12 @@ function Nominate({ d, setDraft, goHome }) {
   const shown = pool.filter((it) => !q.trim() || (it.name + ' ' + (it.pos || '') + ' ' + (it.desc || '')).toLowerCase().includes(q.trim().toLowerCase()));
   return (
     <div className="app">
-      <div className="topbar">
+      <div className="topbar dense wraptitle">
         <button className="iconbtn" onClick={goHome} aria-label="Home">⌂</button>
         <MuteButton />
+        <TvButton />
         <div className="title">Nomination · {d.processed + 1} of {d.processed + d.queue.length}</div>
+        <span className="grow" />
         <button className="pillbtn" onClick={() => setTeams(true)}>Teams</button>
         {(solo || (nv.online && nv.isHost)) && <button className="iconbtn" onClick={() => setPaused((p) => !p)} aria-label={paused ? 'Resume' : 'Pause'}>{paused ? '▶' : 'Ⅱ'}</button>}
       </div>
@@ -1951,6 +1955,7 @@ function TradeWindow({ d, setDraft, goHome }) {
       <div className="topbar">
         <button className="iconbtn" onClick={goHome} aria-label="Home">⌂</button>
         <MuteButton />
+        <TvButton />
         <div className="title">Trade window</div>
         <span className={'tclock num' + (left < 30000 ? ' hot' : '')} aria-live="polite">{mm}:{String(ss).padStart(2, '0')}</span>
       </div>
@@ -2049,10 +2054,12 @@ function FreePick({ d, setDraft, goHome, flashing, onFlash }) {
   const avail = d.leftover.filter((id) => canTake(d, m, id));
   return (
     <div className="app">
-      <div className="topbar">
+      <div className="topbar dense wraptitle">
         <button className="iconbtn" onClick={goHome} aria-label="Home">⌂</button>
         <MuteButton />
+        <TvButton />
         <div className="title">Free picks · round {cp.round + 1}</div>
+        <span className="grow" />
         <button className="pillbtn" onClick={() => setTeams(true)}>Teams</button>
         {(d.mode === 'solo' || (nv.online && nv.isHost)) && <button className="iconbtn" onClick={() => setPaused((p) => !p)} aria-label={paused ? 'Resume' : 'Pause'}>{paused ? '▶' : 'Ⅱ'}</button>}
       </div>
@@ -3106,7 +3113,7 @@ function App() {
       else if (draft.phase === 'nominate') view = <Nominate d={draft} setDraft={setDraft} goHome={() => go('home')} />;
       else if (draft.phase === 'trade') view = <TradeWindow d={draft} setDraft={setDraft} goHome={() => go('home')} />;
       else view = <Results d={draft} past={past} showShame={settings.showShame} live onChange={setDraft} onBack={() => go('home')} onUndo={draft.mode === 'solo' ? null : () => setDraft((p) => undo(p))} onFinish={() => { setDraft(null); go('home'); }} onPlayAgain={playAgain} />;
-      view = <NetCtx.Provider value={localNet}><div className={localTv ? 'tvmode' : ''}>{view}{localTv ? <TvExit onExit={() => setLocalTv(false)} /> : <TvSwitch onThisScreen={() => setLocalTv(true)} />}</div></NetCtx.Provider>;
+      view = <NetCtx.Provider value={localNet}><div className={localTv ? 'tvmode' : ''}><TvSwitch on={!localTv} onThisScreen={() => setLocalTv(true)}>{view}</TvSwitch>{localTv && <TvExit onExit={() => setLocalTv(false)} />}</div></NetCtx.Provider>;
       break;
     case 'past':
       view = <PastList past={past} onBack={() => go('home')} onOpen={(id) => go('past-view', { id })} onDelete={(id) => setPast((p) => p.filter((x) => x.id !== id))} />;

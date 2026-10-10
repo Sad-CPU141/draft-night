@@ -1,7 +1,7 @@
 /* Draft Night service worker.
    App files: network first, so new versions always win when online; cached copy when offline.
    Libraries, icons, fonts: cache first. Wikipedia images are left to the browser cache. */
-const VERSION = 'e316caa9e3';
+const VERSION = '14c0e9aea9';
 const CACHE = 'draft-night-' + VERSION;
 const CORE = ['./', './index.html', './app.js?v=' + VERSION, './styles.css?v=' + VERSION, './manifest.webmanifest',
   './vendor/react.production.min.js', './vendor/react-dom.production.min.js', './vendor/html2canvas.min.js',

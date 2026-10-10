@@ -148,7 +148,7 @@ module.exports = async function onlineTests({ ok, boot, btn, click, sleep }) {
 
   // Host TV view on the same phone: still the host, no extra seat, and back to controls.
   const playersBefore = Object.keys(roomData(code).players || {}).length;
-  await click(H.w, H.d.querySelector('.tvfab'));
+  await click(H.w, H.d.querySelector('.topbar .tvbtn'));
   await click(H.w, btn(H.d, 'Show TV view on this screen'));
   ok(!!H.d.querySelector('.tvmode') && H.d.querySelectorAll('.mgr[role=button]').length === 0 && roomData(code).meta.host === 'host1', 'host switches to TV view on this phone: read-only, still the host');
   const procTv = state(code).processed;
