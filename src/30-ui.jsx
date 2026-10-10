@@ -398,6 +398,13 @@ function TopBar({ onBack, title, right, backLabel = '←' }) {
     </div>
   );
 }
+// Master mute, shown on every game screen. Uses the shared audio settings.
+const AudioCtx = React.createContext({ cfg: AUDIO_DEFAULTS, set: () => {} });
+function MuteButton() {
+  const { cfg, set } = React.useContext(AudioCtx);
+  return <button className={'iconbtn mute' + (cfg.muted ? ' on' : '')} onClick={() => set({ ...cfg, muted: !cfg.muted })} aria-pressed={cfg.muted} aria-label={cfg.muted ? 'Unmute sound' : 'Mute all sound'}>{cfg.muted ? '🔇' : '🔊'}</button>;
+}
+
 function Seg({ value, options, onChange, label }) {
   return (
     <div className="seg" role="group" aria-label={label}>
@@ -471,7 +478,7 @@ function TeamsSheet({ d, onClose }) {
 /* ============================================================
    HOME
    ============================================================ */
-function Home({ draft, past, onNew, onSolo, onResume, onTopics, onPast, onAbandon, onSettings, showInstall, onDismissInstall }) {
+function Home({ draft, past, onNew, onSolo, onResume, onTopics, onPast, onAbandon, onSettings, onPlayers, showInstall, onDismissInstall }) {
   const [ask, setAsk] = useState(null);
   const [soon, setSoon] = useState(false);
   const status = draft && (draft.phase === 'auction' ? 'Item ' + (draft.processed + 1) + ' of ' + (draft.processed + draft.queue.length) : draft.phase === 'nominate' ? 'Nominating' : draft.phase === 'trade' ? 'Trade window' : draft.phase === 'freepick' ? 'Free picks' : 'Results & voting');
@@ -506,7 +513,8 @@ function Home({ draft, past, onNew, onSolo, onResume, onTopics, onPast, onAbando
       <div className="menu">
         <button className="btn" onClick={onTopics}>Topics</button>
         <button className="btn" onClick={onPast}>Past drafts{past.length ? ' (' + past.length + ')' : ''}</button>
-        <button className="btn btn-ghost" onClick={onSettings}>Backup &amp; app settings</button>
+        <button className="btn" onClick={onPlayers}>Players &amp; stats</button>
+        <button className="btn btn-ghost" onClick={onSettings}>Settings, sound &amp; backup</button>
       </div>
       {showInstall && (
         <div className="card row installcard">
@@ -525,13 +533,16 @@ function Home({ draft, past, onNew, onSolo, onResume, onTopics, onPast, onAbando
 /* ============================================================
    TOPICS
    ============================================================ */
-function TopicsList({ topics, onBack, onOpen, onCreate, onDuplicate, onDelete, folder, setFolder }) {
+function TopicsList({ topics, onBack, onOpen, onCreate, onDuplicate, onDelete, folder, setFolder, onImport }) {
   const [del, setDel] = useState(null);
   const [q, setQ] = useState('');
   return (
     <div className="app">
       <TopBar onBack={folder && !q ? () => setFolder(null) : onBack} title={'Topics (' + topics.length + ')'} />
-      <button className="btn btn-gold" onClick={() => onCreate(folder)}>+ New topic{folder ? ' in ' + folder : ''}</button>
+      <div className="row">
+        <button className="btn btn-gold grow" onClick={() => onCreate(folder)}>+ New topic{folder ? ' in ' + folder : ''}</button>
+        <button className="btn grow" style={{ width: 'auto' }} onClick={onImport}>Import</button>
+      </div>
       <TopicSearch q={q} setQ={setQ} />
       <FolderBrowser topics={topics} q={q} folder={folder} setFolder={setFolder} renderTopic={(t) => (
         <div key={t.id} className="card stack-sm" style={{ padding: 12 }}>
@@ -670,6 +681,7 @@ function ItemEditor({ item, slots, topic, onSave, onDelete, onClose }) {
 
 function TopicEditor({ topic, folders, onChange, onBack, onDuplicate, onDelete }) {
   const [newFolder, setNewFolder] = useState(false);
+  const [sharing, setSharing] = useState(false);
   const [editing, setEditing] = useState(null);
   const [bulk, setBulk] = useState('');
   const [bulkOpen, setBulkOpen] = useState(false);
@@ -692,7 +704,7 @@ function TopicEditor({ topic, folders, onChange, onBack, onDuplicate, onDelete }
   topic.items.forEach((it) => { const k = it.pos || '—'; counts[k] = (counts[k] || 0) + 1; });
   return (
     <div className="app">
-      <TopBar onBack={onBack} title="Edit topic" right={<button className="pillbtn" onClick={onDuplicate}>Copy</button>} />
+      <TopBar onBack={onBack} title="Edit topic" right={<button className="pillbtn" onClick={() => setSharing(true)}>Share</button>} />
       <div className="card stack">
         <div className="row">
           <div className="field" style={{ width: 76, flex: 'none' }}><label htmlFor="tp-emoji">Emoji</label><input id="tp-emoji" className="input" style={{ textAlign: 'center', fontSize: 26, padding: 6 }} value={topic.emoji} onChange={(e) => set({ emoji: [...e.target.value].slice(-2).join('') })} /></div>
@@ -748,7 +760,8 @@ function TopicEditor({ topic, folders, onChange, onBack, onDuplicate, onDelete }
         ))}
         {!topic.items.length && <p className="muted">No items yet. Add them one by one or paste a list with Bulk add.</p>}
       </div>
-      <button className="btn btn-danger" onClick={() => setDel(true)}>Delete topic</button>
+      <div className="row"><button className="btn grow" onClick={onDuplicate}>Duplicate topic</button><button className="btn btn-danger grow" onClick={() => setDel(true)}>Delete topic</button></div>
+      {sharing && <ShareTopicSheet topic={topic} onClose={() => setSharing(false)} />}
       {editing && <ItemEditor item={editing} slots={topic.slots} topic={topic}onSave={(it) => { const { isNew, ...rest } = it; saveItem(rest); }} onDelete={editing.isNew ? null : () => set({ items: topic.items.filter((x) => x.id !== editing.id) })} onClose={() => setEditing(null)} />}
       {del && <Confirm title="Delete topic?" body="This can't be undone." yes="Delete" danger onYes={onDelete} onClose={() => setDel(false)} />}
     </div>
@@ -1392,6 +1405,16 @@ function Auction({ d, setDraft, goHome, flashing, onFlash }) {
     const real = d.items[d.queue[0]];
     const info = { kind: 'sold', name: leader.name, emoji: leader.emoji, color: leader.color, price, item: real.name, mystery: !!real.mystery, rarity: (d.rarity || {})[real.id] || null, doubled: !!d.bid.double };
     buzz([40, 30, 160]); setGavel(true); setThinking(null);
+    const big = price >= d.rules.budget * ((audio.cfg.bigSale || 40) / 100);
+    info.big = big;
+    audio.play(big ? 'big' : 'gavel');
+    let line = callLine('sold', { who: leader.name, amt: money(price) });
+    if (big) line += ' ' + callLine('big');
+    if (real.mystery) { audio.play('drumroll'); line += ' ' + callLine('mysteryReveal', { item: real.name }); }
+    if (info.rarity === 'legendary') { line += ' ' + callLine('legendary'); setTimeout(() => audio.play('cheer'), 900); }
+    else if (info.rarity === 'rare') line += ' ' + callLine('rare');
+    else if (big) setTimeout(() => audio.play('cheer'), 500);
+    audio.say(line, 3, d.id + ':sold:' + d.reveal);
     setTimeout(() => {
       setGavel(false); onFlash(info); setDraft((p) => sell(p)); busy.current = false;
       if (solo) talk.later(ms(1900), () => {
@@ -1407,6 +1430,7 @@ function Auction({ d, setDraft, goHome, flashing, onFlash }) {
     if (busy.current || flashing) return;
     const back = d.rules.noBids === 'back' && !d.passed.includes(d.queue[0]);
     setThinking(null);
+    audio.say(callLine('noBids'), 1, d.id + ':skip:' + d.reveal);
     onFlash({ kind: 'skip', item: visibleItem(d, item.id).name, back });
     setDraft((p) => skipItem(p));
   }
@@ -1474,6 +1498,8 @@ function Auction({ d, setDraft, goHome, flashing, onFlash }) {
   useEffect(() => {
     if (logLen > seenLog.current) {
       const e = d.cardLog[logLen - 1];
+      audio.play(e.result === 'done' ? 'card' : 'buzzer');
+      audio.say(e.result === 'vetoed' ? callLine('vetoed') : e.result === 'done' ? callLine('card', { who: teamOf(d, e.by).name, card: CARD_INFO[e.card].name }) : '', 2, d.id + ':card:' + e.id);
       onFlash({ kind: 'card', card: e.card, result: e.result, text: e.detail, by: teamOf(d, e.by) });
     }
     seenLog.current = logLen;
@@ -1489,6 +1515,31 @@ function Auction({ d, setDraft, goHome, flashing, onFlash }) {
     const { limit } = botLimit(d, a, vis, seeded(d.seed, 'adv', d.reveal));
     if (limit >= d.rules.minBid) talk.say(a, 'advise', { slot: money(limit) }); else talk.say(a, 'pass');
   }, [d.reveal, flashing]);
+
+  // Auctioneer: new item, bids, bidding wars and the going-once countdown (it only follows the real state).
+  useEffect(() => {
+    if (flashing || !item || d.bid) return;
+    const vis = visibleItem(d, item.id); const r = rarityOf(d, item.id);
+    const line = vis.hidden ? callLine('mystery') : r === 'legendary' ? callLine('legendaryUp') + ' ' + callLine('next', { item: vis.name }) : callLine('next', { item: vis.name });
+    if (r === 'legendary') audio.play('drumroll');
+    audio.say(line, 1, d.id + ':next:' + d.reveal);
+  }, [d.reveal, flashing]);
+  const lastCall = useRef(0);
+  useEffect(() => {
+    if (!d.bid) return;
+    audio.play('bid');
+    const who = (leader && leader.name) || '';
+    const amt = money(d.bid.amount);
+    const leads = new Set(d.bids.filter(Boolean).map((b) => b.leaderId).concat(d.bid.leaderId)).size;
+    if (d.bids.filter(Boolean).length === 0) { audio.say(callLine('open', { who, amt }), 1); lastCall.current = Date.now(); return; }
+    if (d.bids.filter(Boolean).length >= 4 && leads >= 2 && audio.say(callLine('war'), 1, d.id + ':war:' + d.reveal)) { lastCall.current = Date.now(); return; }
+    if (Date.now() - lastCall.current > 2200) { audio.say(callLine('raise', { who, amt }), 1); lastCall.current = Date.now(); }
+  }, [bidKey]);
+  useEffect(() => {
+    if (!timer || !d.bid || hold || flashing || gavel) return;
+    if (left === 2) audio.say(callLine('once'), 2, d.id + ':once:' + bidKey);
+    if (left === 1) audio.say(callLine('twice'), 2, d.id + ':twice:' + bidKey);
+  }, [left]);
 
   // Solo: a little pre-game talk, and the strategist grumbles about items it can't use.
   useEffect(() => {
@@ -1512,6 +1563,7 @@ function Auction({ d, setDraft, goHome, flashing, onFlash }) {
       <div className="topbar">
         <button className="iconbtn" onClick={goHome} aria-label="Home">⌂</button>
         <div className="title num">Item {d.processed + 1} of {total}</div>
+        <MuteButton />
         {ruleOn(d, 'chaos') && <button className="pillbtn" onClick={() => setCardsOpen(true)} aria-label="Chaos Cards">🃏</button>}
         <button className="pillbtn" onClick={() => setTeams(true)}>Teams</button>
         <button className="iconbtn" onClick={() => setPaused((p) => !p)} aria-label={paused ? 'Resume' : 'Pause'}>{paused ? '▶' : 'Ⅱ'}</button>
@@ -1601,6 +1653,7 @@ function Nominate({ d, setDraft, goHome }) {
     <div className="app">
       <div className="topbar">
         <button className="iconbtn" onClick={goHome} aria-label="Home">⌂</button>
+        <MuteButton />
         <div className="title">Nomination · {d.processed + 1} of {d.processed + d.queue.length}</div>
         <button className="pillbtn" onClick={() => setTeams(true)}>Teams</button>
         {solo && <button className="iconbtn" onClick={() => setPaused((p) => !p)} aria-label={paused ? 'Resume' : 'Pause'}>{paused ? '▶' : 'Ⅱ'}</button>}
@@ -1651,6 +1704,9 @@ function TradeWindow({ d, setDraft, goHome }) {
   const [handoff, setHandoff] = useState(null); // local: confirm the receiving team has the phone
   const [msg, setMsg] = useState('');
   const left = Math.max(0, d.trade.endsAt - now);
+  const nOffers = d.trade.proposals.length, nDone = d.trade.proposals.filter((x) => x.status === 'accepted').length;
+  useEffect(() => { if (nOffers) { audio.play('bid'); audio.say(callLine('tradeOffer'), 1, d.id + ':offer:' + nOffers); } }, [nOffers]);
+  useEffect(() => { if (nDone) { audio.play('trade'); audio.say(callLine('tradeDone'), 2, d.id + ':deal:' + nDone); } }, [nDone]);
   useEffect(() => { const t = setInterval(() => setNow(Date.now()), ms(1000)); return () => clearInterval(t); }, []);
   useEffect(() => { if (left <= 0) setDraft((p) => closeTrades(p)); }, [left <= 0]);
   // Solo: bot teams make at most one offer each when the window opens…
@@ -1696,6 +1752,7 @@ function TradeWindow({ d, setDraft, goHome }) {
     <div className="app">
       <div className="topbar">
         <button className="iconbtn" onClick={goHome} aria-label="Home">⌂</button>
+        <MuteButton />
         <div className="title">Trade window</div>
         <span className={'tclock num' + (left < 30000 ? ' hot' : '')} aria-live="polite">{mm}:{String(ss).padStart(2, '0')}</span>
       </div>
@@ -1792,6 +1849,7 @@ function FreePick({ d, setDraft, goHome, flashing, onFlash }) {
     <div className="app">
       <div className="topbar">
         <button className="iconbtn" onClick={goHome} aria-label="Home">⌂</button>
+        <MuteButton />
         <div className="title">Free picks · round {cp.round + 1}</div>
         <button className="pillbtn" onClick={() => setTeams(true)}>Teams</button>
         {d.mode === 'solo' && <button className="iconbtn" onClick={() => setPaused((p) => !p)} aria-label={paused ? 'Resume' : 'Pause'}>{paused ? '▶' : 'Ⅱ'}</button>}
@@ -1956,7 +2014,51 @@ function Voting({ d, onVote, onReveal, onClose, onSoloVote }) {
   );
 }
 
-function Results({ d, past, onChange, onBack, onUndo, onFinish, onPlayAgain, live }) {
+// Purpose-built picture layouts for the group chat (rendered off-screen, then captured).
+function ExportCard({ d, kind, showShame }) {
+  const { counts, winners } = tally(d);
+  const ranked = [...d.managers].sort((a, b) => (counts[b.id] || 0) - (counts[a.id] || 0));
+  const head = <div className="exhead"><span className="tag"><i />$20 AUCTION</span><b>DRAFT NIGHT</b><span>{d.topic.emoji} {d.topic.name} · {new Date(d.createdAt).toLocaleDateString()}</span></div>;
+  if (kind === 'winner') {
+    const w = winners[0];
+    return (
+      <>
+        {head}
+        <div className="exwin" style={mStyle(w)}>
+          <span className="exlabel">{winners.length > 1 ? 'JOINT CHAMPIONS' : 'CHAMPION'}</span>
+          <span className="exname">{winners.map((x) => x.emoji + ' ' + x.name).join(' & ')}</span>
+          {w.members && <span className="exmem">{w.members.map((p) => p.name).join(' · ')}</span>}
+          <span className="exvotes">{counts[w.id]} vote{counts[w.id] === 1 ? '' : 's'} · {money(d.rules.budget - w.budget)} spent · {money(w.budget)} left</span>
+        </div>
+        <div className="exroster">
+          {d.rules.slots.map((sl, i) => { const t = w.team[i]; const it = t && d.items[t.itemId]; const r = t && rarityOf(d, t.itemId); return (
+            <div key={i} className="exrow">
+              <span className="exslot">{sl}</span>
+              {it ? <ItemArt item={it} topic={d.topic} size={40} radius={8} /> : <span style={{ width: 40 }} />}
+              <span className="exitem">{it ? it.name : 'Empty'}{r && r !== 'common' ? <span className={'rmark ' + r}> {r === 'legendary' ? '★' : '◆'}</span> : null}</span>
+              <span className="exprice">{t ? (t.free ? 'FREE' : money(t.price)) : ''}</span>
+            </div>
+          ); })}
+        </div>
+      </>
+    );
+  }
+  const awards = computeAwards(d); const shame = showShame ? computeShame(d) : [];
+  return (
+    <>
+      {head}
+      <div className="board">
+        <h3>{d.votesRevealed ? '🗳️ Final standings' : '💰 Teams'}</h3>
+        {ranked.map((m, i) => <div key={m.id} className="brow" style={mStyle(m)}><span className="rk num">{d.votesRevealed ? i + 1 : ''}</span><span className="bn">{m.emoji} {m.name}</span><span className="bw num" style={{ fontSize: 18 }}>{d.votesRevealed ? (counts[m.id] || 0) + ' votes' : money(d.rules.budget - m.budget)}</span></div>)}
+      </div>
+      {awards.length > 0 && <div className="board"><h3>🎖️ Awards</h3>{awards.map((a, i) => <p key={a.id + i} className="award"><b>{a.emoji} {a.title}: {a.team}</b><br /><span className="small">{a.why}</span></p>)}</div>}
+      {shame.length > 0 && <div className="board"><h3>🙈 Hall of Shame</h3>{shame.map((a) => <p key={a.id} className="award"><b>{a.emoji} {a.title}: {a.team}</b><br /><span className="small">{a.item} for {money(a.price)}. {a.why}</span></p>)}</div>}
+      <p className="exportfoot">DRAFT NIGHT · {(location.host + location.pathname).replace(/\/(index\.html)?$/, '')}</p>
+    </>
+  );
+}
+
+function Results({ d, past, onChange, onBack, onUndo, onFinish, onPlayAgain, live, showShame }) {
   const ref = useRef(null);
   const [voting, setVoting] = useState(false);
   const [img, setImg] = useState(null);
@@ -1968,7 +2070,14 @@ function Results({ d, past, onChange, onBack, onUndo, onFinish, onPlayAgain, liv
   const revealed = d.votesRevealed && winners.length > 0;
   const noVotes = d.votesRevealed && !winners.length;
   const solo = d.mode === 'solo';
-  const doReveal = () => { setVoting(false); setParty((x) => x + 1); buzz([60, 40, 60, 40, 200]); window.scrollTo({ top: 0, behavior: 'smooth' }); };
+  const doReveal = () => {
+    setVoting(false); audio.play('drumroll');
+    setTimeout(() => { setParty((x) => x + 1); buzz([60, 40, 60, 40, 200]); audio.play('fanfare'); setTimeout(() => audio.play('cheer'), 400); window.scrollTo({ top: 0, behavior: 'smooth' }); }, 1100);
+  };
+  useEffect(() => {
+    if (!revealed) return;
+    audio.say(winners.length > 1 ? callLine('tie', { who: winners.map((w) => w.name).join(' and ') }) : callLine('winner', { who: winners[0].name }), 3, d.id + ':winner:' + Object.keys(d.votes || {}).length);
+  }, [revealed]);
   // Solo: your vote, then every bot votes for the team it rates highest (never its own), all revealed together.
   const soloVote = (target) => {
     setTimeout(() => {
@@ -1987,15 +2096,34 @@ function Results({ d, past, onChange, onBack, onUndo, onFinish, onPlayAgain, liv
   };
   const winIds = revealed ? winners.map((w) => w.id) : [];
   const ordered = revealed ? [...d.managers].sort((a, b) => counts[b.id] - counts[a.id]) : d.managers;
-  const exportImg = async () => {
+  const stageRef = useRef(null);
+  const [exportKind, setExportKind] = useState(null); // 'winner' | 'awards' while rendering off-screen
+  const [pickFormat, setPickFormat] = useState(false);
+  // Wait until every picture in the node has loaded (or failed and fallen back) before capturing.
+  const imagesReady = async (node) => {
+    const imgs = [...node.querySelectorAll('img')];
+    await Promise.all(imgs.map((im) => (im.complete ? Promise.resolve() : new Promise((r) => { im.addEventListener('load', r, { once: true }); im.addEventListener('error', r, { once: true }); setTimeout(r, 6000); }))));
+  };
+  const makeImage = async (kind) => {
+    setPickFormat(false);
+    if (kind === 'full') return exportImg(ref.current, 'results');
+    setExportKind(kind);
+  };
+  useEffect(() => {
+    if (!exportKind || !stageRef.current) return;
+    const node = stageRef.current;
+    (async () => { await imagesReady(node); await exportImg(node, exportKind); setExportKind(null); })();
+  }, [exportKind]);
+  const exportImg = async (node, kind) => {
     setImgBusy(true); setImgErr('');
     try {
       if (!window.html2canvas) throw new Error('missing');
       try { if (document.fonts && document.fonts.ready) await document.fonts.ready; } catch (e) {}
-      const canvas = await window.html2canvas(ref.current, { backgroundColor: '#0f0c21', scale: Math.min(3, Math.max(2, window.devicePixelRatio || 2)), useCORS: true, allowTaint: false, logging: false, imageTimeout: 8000 });
+      await imagesReady(node);
+      const canvas = await window.html2canvas(node, { backgroundColor: '#0f0c21', scale: Math.min(3, Math.max(2, window.devicePixelRatio || 2)), useCORS: true, allowTaint: false, logging: false, imageTimeout: 8000 });
       const blob = await new Promise((resolve, reject) => canvas.toBlob((b) => (b ? resolve(b) : reject(new Error('empty'))), 'image/png'));
       const slug = (d.topic.name || 'draft').toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '').slice(0, 40);
-      setImg({ url: URL.createObjectURL(blob), blob, name: 'draft-night-' + slug + '-' + todayStamp() + '.png' });
+      setImg({ url: URL.createObjectURL(blob), blob, name: 'draft-night-' + slug + '-' + (kind || 'results') + '-' + todayStamp() + '.png' });
     } catch (e) { setImgErr("The image couldn't be made. Try again, and if it keeps failing, take a screenshot instead."); }
     setImgBusy(false);
   };
@@ -2005,7 +2133,7 @@ function Results({ d, past, onChange, onBack, onUndo, onFinish, onPlayAgain, liv
   const doDownload = () => { downloadBlob(img.blob, img.name); setImgNote(isIOS() ? 'On iPhone, check the Downloads folder in the Files app. To put it in Photos, press and hold the picture instead.' : 'Saved to your downloads.'); };
   return (
     <div className="app">
-      <TopBar onBack={onBack} backLabel="⌂" title="Results" right={live && onUndo && d.history.length && !d.votesRevealed ? <button className="pillbtn" onClick={onUndo}>Undo</button> : null} />
+      <TopBar onBack={onBack} backLabel="⌂" title="Results" right={live && onUndo && d.history.length && !d.votesRevealed ? <button className="pillbtn" onClick={onUndo}>Undo</button> : <MuteButton />} />
       <div ref={ref} className="resultwrap">
         <div className="rhead">
           <p className="eyebrow">{d.topic.emoji} {d.topic.name} · {new Date(d.createdAt).toLocaleDateString()}</p>
@@ -2042,6 +2170,7 @@ function Results({ d, past, onChange, onBack, onUndo, onFinish, onPlayAgain, liv
         {d.votesRevealed && !noVotes && (
           <p className="hint" style={{ textAlign: 'center' }}>{participants(d).map((m) => { const t = d.votes && d.votes[m.id]; const to = t && d.managers.find((x) => x.id === t); return m.name + ' → ' + (to ? to.name : 'no vote'); }).join(' · ')}</p>
         )}
+        <AwardsBoard d={d} showShame={showShame !== false} />
         {revealed && <Leaderboard rows={winsBoard([...(past || []).filter((p) => p.id !== d.id), d])} highlight={winners.map((w) => w.name.trim().toLowerCase())} />}
         {d.trade && d.trade.proposals.some((t) => t.status === 'accepted') && (
           <div className="board"><h3>🤝 Trades</h3>{d.trade.proposals.filter((t) => t.status === 'accepted').map((t) => <p key={t.id} className="small" style={{ margin: 0 }}>{tradeText(d, t)}</p>)}</div>
@@ -2055,7 +2184,7 @@ function Results({ d, past, onChange, onBack, onUndo, onFinish, onPlayAgain, liv
       <div className="stack">
         {!d.votesRevealed && <button className="btn btn-gold" onClick={() => setVoting(true)}>{solo ? 'Vote for the best team' : Object.keys(d.votes || {}).length ? 'Continue the vote' : 'Start the secret vote'}</button>}
         {live && onPlayAgain && d.votesRevealed && <button className="btn btn-gold" onClick={onPlayAgain}>Play again</button>}
-        <button className="btn" onClick={exportImg} disabled={imgBusy}>{imgBusy ? 'Making image…' : 'Save as image'}</button>
+        <button className="btn" onClick={() => setPickFormat(true)} disabled={imgBusy}>{imgBusy ? 'Making image…' : 'Save as image'}</button>
         {imgErr && <p className="warn">{imgErr}</p>}
         {d.votesRevealed && <button className="btn btn-ghost" onClick={() => onChange({ ...d, votes: {}, votesRevealed: false })}>Redo the vote</button>}
         {live && onPlayAgain && !d.votesRevealed && <button className="btn btn-ghost" onClick={onPlayAgain}>Play again</button>}
@@ -2068,6 +2197,17 @@ function Results({ d, past, onChange, onBack, onUndo, onFinish, onPlayAgain, liv
         onReveal={() => { onChange({ ...d, votesRevealed: true }); doReveal(); }}
         onClose={() => setVoting(false)} />}
       {party > 0 && revealed && <Confetti key={party} colors={[...winners.map((w) => w.color), '#ffc83d', '#ffffff']} />}
+      {pickFormat && (
+        <Sheet center onClose={() => setPickFormat(false)}>
+          <h2 className="display" style={{ fontSize: 30 }}>Which picture?</h2>
+          <button className="btn btn-gold" onClick={() => makeImage('winner')} disabled={!revealed}>🏆 Winner card</button>
+          {!revealed && <p className="hint">Reveal the vote first to make a winner card.</p>}
+          <button className="btn" onClick={() => makeImage('full')}>📋 Full results</button>
+          <button className="btn" onClick={() => makeImage('awards')}>🎖️ Awards & standings</button>
+          <button className="btn btn-ghost" onClick={() => setPickFormat(false)}>Cancel</button>
+        </Sheet>
+      )}
+      {exportKind && <div className="exportstage" aria-hidden="true"><div ref={stageRef} className="excard"><ExportCard d={d} kind={exportKind} showShame={showShame !== false} /></div></div>}
       {img && (
         <Sheet center onClose={closeImg}>
           <h2 className="display" style={{ fontSize: 30 }}>Ready for the group chat</h2>
@@ -2117,7 +2257,7 @@ function Flash({ f, onDone }) {
   useEffect(() => { const t = setTimeout(onDone, ms(f.kind === 'skip' ? 1100 : f.mystery || f.rarity === 'legendary' ? 2600 : 1800)); return () => clearTimeout(t); }, [f]);
   return (
     <div className="flash" onClick={onDone} style={{ '--fc': f.color || 'var(--muted)' }}>
-      {f.kind === 'sold' && <div className={'inner' + (f.rarity === 'legendary' ? ' legendary' : '')}>
+      {f.kind === 'sold' && <div className={'inner' + (f.rarity === 'legendary' ? ' legendary' : '') + (f.big ? ' bigsale' : '')}>
         <div className="big" style={{ color: 'var(--gold)' }}>SOLD!</div>
         <div className="to" style={{ color: f.color }}>to {f.emoji} {f.name}</div>
         <div className="price num">{money(f.price)}{f.doubled ? <small className="dbl"> (Double Bid)</small> : null}</div>
@@ -2168,6 +2308,226 @@ function migrateTopics(stored) {
   starters.forEach((s) => { if (!seen.includes(s.id) && !out.some((t) => t.id === s.id)) out.push(s); });
   store.set(K.seen, allIds);
   return out;
+}
+
+/* ============================================================
+   TOPIC SHARING UI
+   ============================================================ */
+async function copyText(text) {
+  try { await navigator.clipboard.writeText(text); return true; } catch (e) {
+    try { const ta = document.createElement('textarea'); ta.value = text; ta.style.position = 'fixed'; ta.style.opacity = '0'; document.body.appendChild(ta); ta.select(); const ok = document.execCommand('copy'); ta.remove(); return ok; } catch (e2) { return false; }
+  }
+}
+function ShareTopicSheet({ topic, onClose }) {
+  const [withPhotos, setWithPhotos] = useState(false);
+  const [code, setCode] = useState('');
+  const [note, setNote] = useState('');
+  const hasPhotos = topic.items.some((i) => i.photo);
+  useEffect(() => { let live = true; encodeTopic(topic, withPhotos).then((c) => { if (live) setCode(c); }); return () => { live = false; }; }, [topic, withPhotos]);
+  const link = code ? shareLink(code) : '';
+  const tooLong = link.length > MAX_LINK;
+  const fp = topicCode(topic);
+  const copy = async (text, what) => setNote((await copyText(text)) ? what + ' copied.' : 'Couldn’t copy automatically. Press and hold the text to copy it.');
+  const file = () => { downloadBlob(topicFile(topic), (topic.name || 'topic').toLowerCase().replace(/[^a-z0-9]+/g, '-').slice(0, 40) + '.dntopic.json'); setNote(isIOS() ? 'Saved to Files → Downloads. Send that file to your friend.' : 'Topic file saved.'); };
+  const share = async () => { try { if (navigator.share) { await navigator.share({ title: topic.name + ' · Draft Night', text: 'Import my Draft Night topic “' + topic.name + '”', url: link }); return; } } catch (e) { if (e && e.name === 'AbortError') return; } copy(link, 'Link'); };
+  return (
+    <Sheet center onClose={onClose}>
+      <p className="eyebrow">Share topic</p>
+      <h2 className="display" style={{ fontSize: 30 }}>{topic.emoji} {topic.name}</h2>
+      <div className="row"><span className="fpcode num">{fp}</span><span className="hint grow">Fingerprint: your friend sees the same code after importing, so you know it arrived intact.</span></div>
+      {hasPhotos && <Toggle on={withPhotos} onChange={setWithPhotos} title="Include uploaded photos" sub="Makes the link much longer. The topic file always includes them." />}
+      {!code ? <p className="hint">Preparing…</p> : <>
+        <div className="row">
+          <button className="btn btn-gold grow" onClick={share} disabled={tooLong}>Share link</button>
+          <button className="btn grow" onClick={() => copy(link, 'Link')} disabled={tooLong}>Copy link</button>
+        </div>
+        <button className="btn" onClick={() => copy(code, 'Share code')}>Copy share code ({Math.round(code.length / 100) / 10}k characters)</button>
+        <button className="btn" onClick={file}>Download topic file</button>
+        {tooLong ? <p className="warn">This topic is too big for a link ({Math.round(link.length / 1000)}k characters). Send the topic file or the share code instead.</p>
+          : <p className="hint">The link holds the whole topic, so it works without any account or server. Image links and Wikipedia settings come along; uploaded photos only if you include them.</p>}
+      </>}
+      {note && <p className="hint" style={{ color: 'var(--ok)' }}>{note}</p>}
+      <button className="btn btn-ghost" onClick={onClose}>Done</button>
+    </Sheet>
+  );
+}
+function ImportTopicSheet({ topics, initial, onImport, onClose }) {
+  const [text, setText] = useState(initial || '');
+  const [res, setRes] = useState(null);
+  const [busy, setBusy] = useState(false);
+  const fileRef = useRef(null);
+  const check = async (t) => { setBusy(true); setRes(await decodeShared(t)); setBusy(false); };
+  useEffect(() => { if (initial) check(initial); }, []);
+  const fromFile = async (e) => { const f = e.target.files && e.target.files[0]; e.target.value = ''; if (!f) return; if (f.size > 20 * 1024 * 1024) { setRes({ ok: false, error: 'That file is too big to be a topic.' }); return; } const t = await f.text(); setText(''); check(t); };
+  const dup = res && res.ok && topics.find((t) => topicCode(t) === topicCode(res.topic));
+  const sameName = res && res.ok && !dup && topics.find((t) => t.name.trim().toLowerCase() === res.topic.name.trim().toLowerCase());
+  return (
+    <Sheet center onClose={onClose}>
+      <p className="eyebrow">Import a topic</p>
+      <h2 className="display" style={{ fontSize: 30 }}>Add a friend’s topic</h2>
+      {!res || !res.ok ? <>
+        <div className="field"><label htmlFor="import-text">Paste a share link or share code</label>
+          <textarea id="import-text" className="input" style={{ minHeight: 90 }} value={text} onChange={(e) => setText(e.target.value)} placeholder="https://…#topic=DN1.…" /></div>
+        <div className="row">
+          <button className="btn btn-gold grow" disabled={!text.trim() || busy} onClick={() => check(text)}>{busy ? 'Checking…' : 'Check'}</button>
+          <button className="btn grow" onClick={() => fileRef.current && fileRef.current.click()}>Open topic file</button>
+        </div>
+        <input ref={fileRef} id="import-file" type="file" accept="application/json,.json" hidden onChange={fromFile} />
+        {res && !res.ok && <p className="warn">{res.error}</p>}
+      </> : <>
+        <div className="card stack-sm" style={{ background: 'var(--stage)' }}>
+          <b style={{ fontFamily: 'var(--cond)', fontSize: 20 }}>{res.topic.emoji} {res.topic.name}</b>
+          <span className="small muted">{res.topic.items.length} items · slots {res.topic.slots.join(', ')} · {res.topic.folder}</span>
+          <span className="small">{res.topic.items.slice(0, 6).map((i) => i.name).join(', ')}{res.topic.items.length > 6 ? '…' : ''}</span>
+          <span className="fpcode num" style={{ alignSelf: 'flex-start' }}>{topicCode(res.topic)}</span>
+        </div>
+        {dup && <p className="warn">You already have this exact topic (“{dup.name}”). Adding it again makes a second copy.</p>}
+        {sameName && <p className="hint">You have a different topic with the same name. This one is added alongside it; nothing is overwritten.</p>}
+        <div className="row pin">
+          <button className="btn btn-ghost grow" onClick={() => setRes(null)}>Back</button>
+          <button className="btn btn-gold grow" onClick={() => { onImport(dup ? { ...res.topic, name: res.topic.name + ' (copy)' } : res.topic); onClose(); }}>{dup ? 'Add a copy' : 'Add topic'}</button>
+        </div>
+      </>}
+    </Sheet>
+  );
+}
+
+/* ============================================================
+   PLAYERS, STATS & HALL OF SHAME
+   ============================================================ */
+const pct = (x) => Math.round(x * 100) + '%';
+function ProfilesScreen({ past, settings, setSettings, onBack, onOpen, onShame }) {
+  const rows = careerStats(past, settings);
+  const [ask, setAsk] = useState(false);
+  return (
+    <div className="app">
+      <TopBar onBack={onBack} title="Players & stats" />
+      <p className="hint">Built from finished drafts on this device (after the vote is revealed). Bots aren’t included. Stats don’t sync between phones; use a backup to move them.</p>
+      {!rows.length && <div className="card"><p className="muted" style={{ margin: 0 }}>Finish a draft and reveal the vote, and everyone who played gets a profile here.</p></div>}
+      <div className="stack-sm">
+        {rows.map((r, i) => (
+          <button key={r.key} className="tcard" onClick={() => onOpen(r.key)}>
+            <span className="em">{r.emoji}</span>
+            <span className="meta"><span className="name">{i === 0 && r.wins ? '👑 ' : ''}{r.name}</span><span className="sub">{r.wins} win{r.wins === 1 ? '' : 's'} · {r.games} game{r.games === 1 ? '' : 's'} · {pct(r.winRate)} · {money(Math.round(r.spent))} spent</span></span>
+            <span className="muted" style={{ fontSize: 22 }}>›</span>
+          </button>
+        ))}
+      </div>
+      {settings.showShame !== false && <button className="btn" onClick={onShame}>🙈 Hall of Shame</button>}
+      <Toggle on={settings.showShame !== false} onChange={(v) => setSettings((x) => ({ ...x, showShame: v }))} title="Show the Hall of Shame" sub="Funny awards for the worst buys. Turn off if your group prefers not to see it." />
+      {rows.length > 0 && <button className="btn btn-danger" onClick={() => setAsk(true)}>Reset stats</button>}
+      {ask && <Confirm title="Reset all stats?" body="Profiles, wins and awards start from zero. Your Past Drafts stay saved and aren’t deleted." yes="Reset stats" danger onYes={() => setSettings((x) => ({ ...x, statsResetAt: Date.now() }))} onClose={() => setAsk(false)} />}
+    </div>
+  );
+}
+function ProfileView({ past, settings, setSettings, pkey, onBack }) {
+  const r = careerStats(past, settings).find((x) => x.key === pkey);
+  const [name, setName] = useState(r ? r.name : '');
+  const [emoji, setEmoji] = useState(r ? r.emoji : '🙂');
+  if (!r) return <div className="app"><TopBar onBack={onBack} title="Player" /><p className="muted">That player has no finished games.</p></div>;
+  const save = (n, e) => setSettings((x) => ({ ...x, profiles: { ...(x.profiles || {}), [pkey]: { name: n.trim() || r.name, emoji: e || '🙂' } } }));
+  const Stat = ({ k, v, d: sub }) => <div className="stat"><span className="k">{k}</span><span className="v num">{v}</span>{sub && <span className="d">{sub}</span>}</div>;
+  return (
+    <div className="app">
+      <TopBar onBack={onBack} title="Player" />
+      <div className="card row" style={{ gap: 10 }}>
+        <button className="emo" onClick={() => { const e = EMOJIS[(EMOJIS.indexOf(emoji) + 1) % EMOJIS.length]; setEmoji(e); save(name, e); }} aria-label="Change avatar">{emoji}</button>
+        <input id="profile-name" className="input grow" maxLength={16} value={name} onChange={(e) => setName(e.target.value)} onBlur={() => save(name, emoji)} />
+      </div>
+      <p className="hint">Changing the display name only changes how it’s shown. Games are matched by the name typed when playing.</p>
+      <div className="stat-grid">
+        <Stat k="Wins" v={r.wins} d={pct(r.winRate) + ' win rate'} />
+        <Stat k="Games" v={r.games} d={r.teamGames ? r.teamGames + ' in teams' : 'all individual'} />
+        <Stat k="Team wins" v={r.teamWins} />
+        <Stat k="Money spent" v={money(Math.round(r.spent))} d={r.teamGames ? 'team spending split evenly' : null} />
+        <Stat k="Legendaries" v={r.legendary} />
+        <Stat k="Trades done" v={r.trades} d={r.topCard ? 'Favourite card: ' + CARD_INFO[r.topCard].name : null} />
+      </div>
+      <div className="board">
+        <h3>❤️ Favourite picks</h3>
+        {r.favourites.length ? r.favourites.map(([n, c]) => <p key={n} className="small" style={{ margin: 0 }}>{n} · drafted {c} times</p>) : <p className="hint" style={{ margin: 0 }}>Draft the same item twice and it shows up here.</p>}
+      </div>
+      <div className="board">
+        <h3>🏷️ Best bargain · 💸 Biggest overpay</h3>
+        {r.bargain ? <p className="small" style={{ margin: 0 }}>Bargain: {r.bargain.name} for {money(r.bargain.price)} (usually {money(Math.round(r.bargain.avg))}) · {r.bargain.topic}</p> : <p className="hint" style={{ margin: 0 }}>No bargain on record yet.</p>}
+        {r.overpay ? <p className="small" style={{ margin: 0 }}>Overpay: {r.overpay.name} for {money(r.overpay.price)} (usually {money(Math.round(r.overpay.avg))}) · {r.overpay.topic}</p> : <p className="hint" style={{ margin: 0 }}>No overpay on record yet.</p>}
+        <p className="hint" style={{ margin: 0 }}>How it’s worked out: each price is compared with the average that same item sold for across your saved drafts. Items need at least 2 sales to compare, so nothing is guessed.</p>
+      </div>
+      {r.best && <div className="board"><h3>🏆 Best win</h3><p className="small" style={{ margin: 0 }}>{r.best.team} · {r.best.topic} · {r.best.votes} vote{r.best.votes === 1 ? '' : 's'} ({pct(r.best.share)}) · {new Date(r.best.date).toLocaleDateString()}</p></div>}
+      <div className="board"><h3>🎖️ Awards</h3>{Object.keys(r.awards).length ? Object.entries(r.awards).sort((a, b) => b[1] - a[1]).map(([t, n]) => <p key={t} className="small" style={{ margin: 0 }}>{t} × {n}</p>) : <p className="hint" style={{ margin: 0 }}>No awards yet.</p>}</div>
+    </div>
+  );
+}
+function ShameScreen({ past, settings, onBack }) {
+  const rows = hallOfShame(past, settings);
+  return (
+    <div className="app">
+      <TopBar onBack={onBack} title="Hall of Shame" />
+      <p className="hint">All in good fun. Each entry says exactly why it’s here, using that draft’s own prices.</p>
+      {!rows.length && <div className="card"><p className="muted" style={{ margin: 0 }}>Nobody has embarrassed themselves yet. Give it time.</p></div>}
+      <div className="stack-sm">
+        {rows.map((x, i) => (
+          <div key={x.draftId + x.id + i} className="shame">
+            <span className="se">{x.emoji}</span>
+            <span className="grow" style={{ minWidth: 0 }}><b>{x.title}: {x.item} · {money(x.price)}</b><span className="small" style={{ display: 'block' }}>{x.team} · {x.topic} · {new Date(x.date).toLocaleDateString()}</span><span className="small muted" style={{ display: 'block' }}>{x.why}</span></span>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+function AwardsBoard({ d, showShame }) {
+  const awards = computeAwards(d); const shame = showShame ? computeShame(d) : [];
+  if (!awards.length && !shame.length) return null;
+  return (
+    <>
+      {awards.length > 0 && <div className="board"><h3>🎖️ Awards</h3>{awards.map((a, i) => <p key={a.id + i} className="award"><b>{a.emoji} {a.title}: {a.team}</b><span className="small muted"> — {a.why}</span></p>)}</div>}
+      {shame.length > 0 && <div className="board"><h3>🙈 Hall of Shame</h3>{shame.map((a) => <p key={a.id} className="award"><b>{a.emoji} {a.title}: {a.team}</b><span className="small muted"> — {a.item} for {money(a.price)}. {a.why}</span></p>)}</div>}
+    </>
+  );
+}
+
+/* ============================================================
+   SOUND & VOICE SETTINGS
+   ============================================================ */
+function AudioSettings() {
+  const { cfg, set } = React.useContext(AudioCtx);
+  const [voices, setVoices] = useState(() => audio.voices());
+  useEffect(() => {
+    if (!audio.hasSpeech()) return undefined;
+    const upd = () => setVoices(audio.voices());
+    try { window.speechSynthesis.addEventListener('voiceschanged', upd); } catch (e) {}
+    const t = setTimeout(upd, 600);
+    return () => { clearTimeout(t); try { window.speechSynthesis.removeEventListener('voiceschanged', upd); } catch (e) {} };
+  }, []);
+  const up = (p) => set({ ...cfg, ...p });
+  const Range = ({ id, label, value, onChange }) => (
+    <div className="field"><label htmlFor={id}>{label} · {Math.round(value * 100)}%</label>
+      <input id={id} type="range" min="0" max="1" step="0.05" value={value} onChange={(e) => onChange(parseFloat(e.target.value))} /></div>
+  );
+  return (
+    <section className="card stack">
+      <h3>🔊 Sound &amp; voice</h3>
+      <Toggle on={cfg.muted} onChange={(v) => up({ muted: v })} title="Mute everything" sub="Silences the auctioneer, sound effects and music right away. Also on the 🔊 button during games." />
+      <Toggle on={cfg.voice} onChange={(v) => up({ voice: v })} title="Auctioneer voice" sub={audio.hasSpeech() ? 'Calls out items, bids, “going once…” and SOLD.' : 'This browser can’t speak, so the auctioneer stays silent. Everything else still works.'} />
+      {cfg.voice && audio.hasSpeech() && <>
+        <div className="field"><span className="label">Voice speed</span><Seg label="Voice speed" value={cfg.rate} options={[[0.95, 'Slow'], [1.15, 'Normal'], [1.35, 'Fast'], [1.55, 'Hype']]} onChange={(v) => up({ rate: v })} /></div>
+        {voices.length > 0 && <div className="field"><label htmlFor="voice-pick">Voice</label>
+          <select id="voice-pick" className="input" value={cfg.voiceName} onChange={(e) => up({ voiceName: e.target.value })}>
+            <option value="">Best available</option>
+            {voices.map((v) => <option key={v.name} value={v.name}>{v.name}</option>)}
+          </select></div>}
+        {Range({ id: 'voice-vol', label: 'Voice volume', value: cfg.voiceVol, onChange: (v) => up({ voiceVol: v }) })}
+      </>}
+      <Toggle on={cfg.sfx} onChange={(v) => up({ sfx: v })} title="Sound effects" sub="Gavel, crowd cheers, buzzer, drumroll and small blips." />
+      {cfg.sfx && Range({ id: 'sfx-vol', label: 'Effects volume', value: cfg.sfxVol, onChange: (v) => up({ sfxVol: v }) })}
+      <Toggle on={cfg.music} onChange={(v) => up({ music: v })} title="Background music" sub="An original looping game-show track, played quietly under everything." />
+      {cfg.music && Range({ id: 'music-vol', label: 'Music volume', value: cfg.musicVol, onChange: (v) => up({ musicVol: v }) })}
+      <div className="field"><span className="label">Big-money sale</span><Seg label="Big sale threshold" value={cfg.bigSale} options={[[30, '30%'], [40, '40%'], [50, '50%']]} onChange={(v) => up({ bigSale: v })} />
+        <p className="hint">A sale for at least this share of the starting budget gets the extra-dramatic SOLD.</p></div>
+      <button className="btn btn-sm" style={{ alignSelf: 'flex-start' }} disabled={cfg.muted} onClick={() => audio.test()}>Test sound</button>
+    </section>
+  );
 }
 
 /* ============================================================
@@ -2235,6 +2595,8 @@ function SettingsScreen({ onBack, state, onRestore }) {
         <p className="hint">Updates arrive automatically. When a new version is ready you'll see a Reload button.</p>
       </section>
 
+      <AudioSettings />
+
       <section className="card stack">
         <h3>💾 Backup &amp; restore</h3>
         <p className="hint">Everything is saved on this device only. A backup file copies your topics, uploaded photos ({photoCount}), drafts and win history so you can move them to another phone or browser. It does not sync automatically.</p>
@@ -2282,7 +2644,16 @@ function App() {
   const [flash, setFlash] = useState(null);
   const [toast, setToast] = useState(null);
   const [folder, setFolder] = useState(null);
+  const [importing, setImporting] = useState(null); // null, '' (blank) or a shared code from a link
+  // Opening a share link (#topic=…) shows the import preview, then tidies the address bar.
+  useEffect(() => {
+    const m = (location.hash || '').match(/^#topic=(.+)$/);
+    if (m) { setImporting(decodeURIComponent(m[1])); try { history.replaceState(null, '', location.pathname + location.search); } catch (e) {} }
+  }, []);
   const [settings, setSettings] = useState(() => store.get(K.settings, {}));
+  const audioCfg = { ...AUDIO_DEFAULTS, ...(settings.audio || {}) };
+  const setAudioCfg = (c) => setSettings((x) => ({ ...x, audio: c }));
+  useEffect(() => { audio.set(audioCfg); }, [JSON.stringify(audioCfg)]);
   const soloCfg = { ...DEFAULT_SOLO, ...(settings.solo || {}) };
   const setSoloCfg = (c) => setSettings((x) => ({ ...x, solo: c }));
   const [soloRules, setSoloRules] = useState(null); // { topicId, rules }
@@ -2334,7 +2705,7 @@ function App() {
   let view;
   switch (screen.name) {
     case 'topics':
-      view = <TopicsList topics={topics} folder={folder} setFolder={setFolder} onBack={() => go(screen.from || 'home')} onOpen={(id) => go('topic', { id, from: screen.from })}
+      view = <TopicsList topics={topics} folder={folder} setFolder={setFolder} onImport={() => setImporting('')} onBack={() => go(screen.from || 'home')} onOpen={(id) => go('topic', { id, from: screen.from })}
         onCreate={(f) => { const t = { id: uid(), name: 'New topic', emoji: '🎲', slots: ['Pick 1', 'Pick 2', 'Pick 3'], layout: 'list', art: 'emoji', folder: f || 'My Topics', items: [] }; setTopics((ts) => [...ts, t]); go('topic', { id: t.id, from: screen.from }); }}
         onDuplicate={dupTopic} onDelete={(id) => setTopics((ts) => ts.filter((x) => x.id !== id))} />;
       break;
@@ -2389,16 +2760,25 @@ function App() {
       else if (draft.phase === 'freepick') view = <FreePick d={draft} setDraft={setDraft} goHome={() => go('home')} flashing={!!flash} onFlash={setFlash} />;
       else if (draft.phase === 'nominate') view = <Nominate d={draft} setDraft={setDraft} goHome={() => go('home')} />;
       else if (draft.phase === 'trade') view = <TradeWindow d={draft} setDraft={setDraft} goHome={() => go('home')} />;
-      else view = <Results d={draft} past={past} live onChange={setDraft} onBack={() => go('home')} onUndo={draft.mode === 'solo' ? null : () => setDraft((p) => undo(p))} onFinish={() => { setDraft(null); go('home'); }} onPlayAgain={playAgain} />;
+      else view = <Results d={draft} past={past} showShame={settings.showShame} live onChange={setDraft} onBack={() => go('home')} onUndo={draft.mode === 'solo' ? null : () => setDraft((p) => undo(p))} onFinish={() => { setDraft(null); go('home'); }} onPlayAgain={playAgain} />;
       break;
     case 'past':
       view = <PastList past={past} onBack={() => go('home')} onOpen={(id) => go('past-view', { id })} onDelete={(id) => setPast((p) => p.filter((x) => x.id !== id))} />;
       break;
     case 'past-view': {
       const p = past.find((x) => x.id === screen.id);
-      view = p ? <Results d={p} past={past} onChange={(nd) => { setPast((ps) => ps.map((x) => (x.id === nd.id ? nd : x))); if (draft && draft.id === nd.id) setDraft({ ...draft, votes: nd.votes, votesRevealed: nd.votesRevealed }); }} onBack={() => go('past')} /> : null;
+      view = p ? <Results d={p} past={past} showShame={settings.showShame} onChange={(nd) => { setPast((ps) => ps.map((x) => (x.id === nd.id ? nd : x))); if (draft && draft.id === nd.id) setDraft({ ...draft, votes: nd.votes, votesRevealed: nd.votesRevealed }); }} onBack={() => go('past')} /> : null;
       break;
     }
+    case 'players':
+      view = <ProfilesScreen past={past} settings={settings} setSettings={setSettings} onBack={() => go('home')} onOpen={(key) => go('player', { id: key })} onShame={() => go('shame')} />;
+      break;
+    case 'player':
+      view = <ProfileView key={screen.id} past={past} settings={settings} setSettings={setSettings} pkey={screen.id} onBack={() => go('players')} />;
+      break;
+    case 'shame':
+      view = <ShameScreen past={past} settings={settings} onBack={() => go('players')} />;
+      break;
     case 'settings':
       view = <SettingsScreen onBack={() => go('home')} state={{ topics, past, draft, managers, settings }}
         onRestore={(data, mode) => {
@@ -2418,16 +2798,18 @@ function App() {
         showInstall={!app.standalone && !settings.installDismissed && (app.canPrompt || isIOS())} onDismissInstall={() => setSettings((x) => ({ ...x, installDismissed: true }))}
         onNew={() => { setDraft(null); setRules({ ...rulePrefs(), slots: [] }); go('setup-managers'); }}
         onSolo={() => { setDraft(null); go('solo-setup'); }}
+        onPlayers={() => go('players')}
         onResume={() => go('draft')} onTopics={() => go('topics')} onPast={() => go('past')} onAbandon={() => setDraft(null)} />;
   }
 
   return (
-    <>
+    <AudioCtx.Provider value={{ cfg: audioCfg, set: setAudioCfg }}>
       {view}
       {flash && <Flash f={flash} onDone={() => setFlash(null)} />}
+      {importing !== null && <ImportTopicSheet topics={topics} initial={importing} onClose={() => setImporting(null)} onImport={(t) => { setTopics((ts) => [...ts, t]); setToast('Added “' + t.name + '” to ' + t.folder + '.'); }} />}
       {app.updateReady && !toast && <div className="toast ok" role="status"><span className="grow">A new version of Draft Night is ready.</span><button onClick={() => app.applyUpdate()}>Reload</button></div>}
       {toast && <div className="toast" role="status"><span className="grow">{toast}</span><button onClick={() => setToast(null)}>OK</button></div>}
-    </>
+    </AudioCtx.Provider>
   );
 }
 
@@ -2447,7 +2829,7 @@ class Boundary extends React.Component {
   }
 }
 
-if (window.__DN_TEST__) window.__DN = { bots: { makeBots, nextBotAction, botDecision, botFreePickChoice, botVote, teamScore, voteChoices, itemFame, seeded, BOT_LEVELS, BOT_TYPES, botCardPlay, botVeto, botNominate, botTradeDecision, botTradeOffer }, twists: { twistRules, TWIST_DEFAULTS, playCard, answerCard, cardProblem, doubleProblem, nominate, currentNominator, nominationPool, botActors, botAdvisers, participants, visibleItem, isHidden, rarityOf, frozenNow, proposeTrade, acceptTrade, rejectTrade, cancelTrade, closeTrades, tradeProblem, openTrades, hasCard }, DEFAULT_SOLO, isFlex, canBid, createDraft, placeBid, sell, skipItem, undo, freePick, currentPicker, canTake, nextAmount, isDraftOver, draftStats, winsBoard, tally, starterTopics, migrateTopics, validateBackup, makeBackup, wikiTitleFor, PHOTO_TOPICS, store, wiki, DEFAULT_RULES, COLORS, emptyCount, assignSlot, maxBid };
+if (window.__DN_TEST__) window.__DN = { audio, AUDIO_DEFAULTS, share: { encodeTopic, decodeShared, packTopic, unpackTopic, topicCode, shareLink, MAX_LINK }, stats: { careerStats, computeAwards, computeShame, hallOfShame, humanPlayers }, bots: { makeBots, nextBotAction, botDecision, botFreePickChoice, botVote, teamScore, voteChoices, itemFame, seeded, BOT_LEVELS, BOT_TYPES, botCardPlay, botVeto, botNominate, botTradeDecision, botTradeOffer }, twists: { twistRules, TWIST_DEFAULTS, playCard, answerCard, cardProblem, doubleProblem, nominate, currentNominator, nominationPool, botActors, botAdvisers, participants, visibleItem, isHidden, rarityOf, frozenNow, proposeTrade, acceptTrade, rejectTrade, cancelTrade, closeTrades, tradeProblem, openTrades, hasCard }, DEFAULT_SOLO, isFlex, canBid, createDraft, placeBid, sell, skipItem, undo, freePick, currentPicker, canTake, nextAmount, isDraftOver, draftStats, winsBoard, tally, starterTopics, migrateTopics, validateBackup, makeBackup, wikiTitleFor, PHOTO_TOPICS, store, wiki, DEFAULT_RULES, COLORS, emptyCount, assignSlot, maxBid };
 store.init().finally(() => {
   ReactDOM.createRoot(document.getElementById('root')).render(<Boundary><App /></Boundary>);
 });

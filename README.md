@@ -18,6 +18,18 @@ One phone, one auctioneer, everyone shouting bids. Build the best team for the m
 - **Nomination mode**: teams take turns choosing the next item.
 - **Trade window** (3 minutes by default): 1-for-1 trades with optional money; the other team must accept.
 
+## Sound
+- **Auctioneer voice** (browser speech, no downloads): calls items, bids, bidding wars, “going once… twice…”, SOLD, mystery and Legendary reveals, trades and the winner. Speed (slow/normal/fast/hype), voice choice and volume. It only follows the game; it never decides anything.
+- **Sound effects** (generated in the browser, so they're original): gavel, crowd cheer, buzzer, drumroll, bid blips, card sparkle, trade chime, fanfare.
+- **Background music**: an original generated loop, OFF by default, ducks under the voice.
+- **Master mute**: the 🔊 button on every game screen, and in Settings.
+
+## Sharing & stats
+- **Share a topic**: a link that carries the whole topic (after the `#`, so nothing is uploaded), a long share code, or a `.dntopic.json` file for big topics. The short `DN-XXXXXX` code is a fingerprint to check copies match — a static site can't look topics up by a short code without a server.
+- **Players & stats**: profiles built from finished drafts on this device (games, wins, team wins, win rate, money spent, favourite picks, best bargain, biggest overpay, best win, awards). Bargains/overpays compare a price with that item's average sale price across your saved drafts (needs 2+ sales).
+- **Awards** each game, with a reason: Best Bargain, Biggest Overpay, Big Spender, Penny Pincher, Most Robbed, Chaos Agent, Trade Master, Mystery Master, Legend Hunter, Unluckiest Manager. **Hall of Shame** (can be hidden).
+- **Pictures**: winner card, full results, or awards & standings, as PNG to download or share.
+
 ## Features
 - 48 starter topics in 7 folders (Sports, Food & Drink, Entertainment, Travel & Places, Animals, Style & Rides, Just for Fun), plus your own topics.
 - Real photos from Wikipedia for people, places, food, animals and more, with jerseys or emoji as a fallback. Upload your own photo or paste an image link for any item.
@@ -43,6 +55,7 @@ npm test         # rules, photo lookups, full click-through, backup, persistence
 
 - Edit files in `src/`, then run the build. Don't edit `app.js` directly.
 - `src/28-twists.js` holds the rules for cards, mystery items, rarity, teams, nomination and trades, as plain functions.
+- `src/29-audio.js` is the voice, sound effects and music; `src/29-stats.js` is sharing, stats and awards.
 - `src/27-bots.js` is the bot brain: pure functions that read the draft and return a bid, a delay or a vote.
 - `src/25-wiki-titles.js` holds the exact Wikipedia page names and which topics show photos.
 - `sw.js` is versioned on every build, so phones pick up new versions automatically.

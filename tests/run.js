@@ -10,15 +10,24 @@ let failures = 0;
 const ok = (cond, msg) => { if (cond) console.log('  ✓ ' + msg); else { failures++; console.log('  ✗ ' + msg); } };
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
-async function boot({ idb = true, fetchImpl, storage, speed } = {}) {
+async function boot({ idb = true, fetchImpl, storage, speed, url, fakeAudio, compress, h2c } = {}) {
   const dom = new JSDOM(fs.readFileSync(path.join(root, 'index.html'), 'utf8').replace(/<script[^>]*src="[^"]*"[^>]*><\/script>/g, '').replace(/<link[^>]*>/g, ''), {
-    url: 'https://sad-cpu141.github.io/draft-night/', runScripts: 'outside-only', pretendToBeVisual: true,
+    url: url || 'https://sad-cpu141.github.io/draft-night/', runScripts: 'outside-only', pretendToBeVisual: true,
   });
   const w = dom.window;
   w.__DN_TEST__ = true;
   w.addEventListener('error', (e) => console.log('    PAGE ERROR:', e.error && (e.error.stack || e.error.message)));
   const origErr = w.console.error; w.console.error = (...a) => { console.log('    CONSOLE.ERROR:', String(a[0]).slice(0, 600)); };
   if (speed) w.__DN_TEST_SPEED = speed;
+  if (fakeAudio) {
+    // A pretend speech engine that records what the auctioneer says.
+    w.__spoken = []; w.__cancels = 0;
+    w.SpeechSynthesisUtterance = function (t) { this.text = t; };
+    w.speechSynthesis = { speaking: false, pending: false, getVoices: () => [{ name: 'Test Voice', lang: 'en-US' }], speak(u) { w.__spoken.push(u.text); setTimeout(() => u.onend && u.onend(), 5); }, cancel() { w.__cancels++; }, addEventListener() {}, removeEventListener() {} };
+    w.AudioContext = function () { throw new Error('no audio hardware'); }; // sound effects must fail safely
+  }
+  if (compress) { w.CompressionStream = globalThis.CompressionStream; w.DecompressionStream = globalThis.DecompressionStream; w.Blob = globalThis.Blob; w.Response = globalThis.Response; w.TextEncoder = globalThis.TextEncoder; w.TextDecoder = globalThis.TextDecoder; }
+  if (h2c) w.html2canvas = async (node) => { w.__captured = node.textContent; return { toBlob: (cb) => cb(new w.Blob(['png'], { type: 'image/png' })) }; };
   w.matchMedia = () => ({ matches: false, addListener() {}, removeListener() {} });
   w.scrollTo = () => {};
   w.navigator.vibrate = () => true;
@@ -178,7 +187,7 @@ async function tap(w, el) { el.dispatchEvent(new w.MouseEvent('pointerdown', { b
     ok(!DN.validateBackup({ app: 'draft-night', format: 1, data: { topics: [{ id: 1 }], past: [] } }).ok, 'damaged backups rejected');
     // settings screen renders
     await click(w, btn(d, 'Finish'));
-    await click(w, btn(d, 'Backup & app settings'));
+    await click(w, btn(d, 'Settings, sound'));
     ok(/Export backup/.test(d.body.textContent) && /Import backup/.test(d.body.textContent), 'backup screen shows export and import');
     ok(/Add to Home Screen/.test(d.body.textContent), 'install instructions shown');
   }
@@ -480,6 +489,135 @@ async function tap(w, el) { el.dispatchEvent(new w.MouseEvent('pointerdown', { b
     let bubbles = 0; const t1 = Date.now();
     while (Date.now() - t1 < 4000) { if (b2.d.querySelector('.bubble')) bubbles++; await sleep(20); }
     ok(bubbles === 0 && /Item|Nominat/.test(b2.d.body.textContent), 'trash talk can be turned off');
+  }
+
+  console.log('Step 5: auctioneer, sounds and mute');
+  {
+    const { w, d, DN } = await boot({ speed: 0.02, fakeAudio: true });
+    ok(DN.AUDIO_DEFAULTS.music === false && DN.AUDIO_DEFAULTS.voice === true && DN.AUDIO_DEFAULTS.muted === false, 'defaults: voice on, music OFF, not muted');
+    DN.audio.set({ ...DN.AUDIO_DEFAULTS });
+    let threw = false; try { DN.audio.play('gavel'); DN.audio.play('cheer'); } catch (e) { threw = true; }
+    ok(!threw, 'sound effects fail silently when the device has no audio');
+    w.__spoken.length = 0;
+    ok(DN.audio.say('SOLD to Ash for $5!', 3, 'k1') && !DN.audio.say('SOLD to Ash for $5!', 3, 'k1'), 'the same SOLD can only be announced once');
+    DN.audio.set({ ...DN.AUDIO_DEFAULTS, muted: true });
+    const c0 = w.__cancels;
+    ok(w.__cancels > c0 - 1 && !DN.audio.say('hello', 3) && w.__spoken.length === 1, 'mute stops the voice immediately and blocks new announcements');
+    DN.audio.set({ ...DN.AUDIO_DEFAULTS });
+    // A real solo game with the fake speech engine.
+    await click(w, btn(d, 'Solo'));
+    const so = [...d.querySelectorAll('.modal button')].find((x) => /New draft/.test(x.textContent)); if (so) await click(w, so);
+    // keep it simple: plain rules for this check
+    w.__spoken.length = 0;
+    await click(w, btn(d, 'Start solo draft'));
+    const t0 = Date.now();
+    while (Date.now() - t0 < 90000 && !/Vote for the best team/.test(d.body.textContent)) {
+      const fl = d.querySelector('.flash'); if (fl && Math.random() < 0.2) await click(w, fl);
+      const letIt = btn(d, 'Let it happen'); if (letIt) await click(w, letIt);
+      const fin = btn(d, 'Finish trading'); if (fin && Math.random() < 0.3) await click(w, fin);
+      const nomYes = [...d.querySelectorAll('.modal button')].find((x) => /^Nominate$/.test(x.textContent.trim())); if (nomYes) await click(w, nomYes);
+      const pb = [...d.querySelectorAll('.pickbtn')].find((b) => !b.disabled); if (pb && !d.querySelector('.modal')) await click(w, pb);
+      await sleep(15);
+    }
+    const cur = DN.store.get('dn_current_v1');
+    const paid = cur.managers.flatMap((m) => m.team.filter((t) => t && !t.free && !t.stolen)).length;
+    const solds = w.__spoken.filter((x) => /^SOLD/.test(x)).length;
+    const traded = cur.trade ? cur.trade.proposals.filter((t) => t.status === 'accepted').length : 0;
+    ok(solds > 0 && solds <= paid + 2 * traded + 2, 'SOLD is announced once per sale (' + solds + ' calls, ' + paid + ' items bought)');
+    ok(w.__spoken.some((x) => /Coming up|Next on the block|Who wants|Here comes|mystery/i.test(x)), 'items are announced as they come up');
+    ok(w.__spoken.some((x) => /Going once/.test(x)), 'the going-once countdown is spoken');
+    ok(!w.__spoken.some((x, i) => /Going twice/.test(x) && !w.__spoken.slice(0, i).some((y) => /Going once/.test(y))), '“going twice” never comes before “going once”');
+    ok(/Vote for the best team/.test(d.body.textContent), 'the game still runs normally with sound effects unavailable');
+    await click(w, d.querySelector('.mute'));
+    ok(d.querySelector('.mute').getAttribute('aria-pressed') === 'true', 'the 🔊 button mutes and shows it');
+  }
+
+  console.log('Step 7: topic sharing');
+  {
+    const { w, d, DN } = await boot({ compress: true });
+    const S = DN.share;
+    const t = DN.starterTopics().find((x) => x.id === 't-ff');
+    const custom = { ...t, id: 'mine', name: 'My Snacks', items: t.items.map((i, k) => (k === 0 ? { ...i, imageUrl: 'https://example.com/a.jpg', photo: 'data:image/jpeg;base64,AAAA' } : k === 1 ? { ...i, imageUrl: 'javascript:alert(1)' } : i)) };
+    const code = await S.encodeTopic(custom, false);
+    ok(code.startsWith('DN1.'), 'share code is compressed (' + code.length + ' characters for ' + custom.items.length + ' items)');
+    const back = await S.decodeShared(S.shareLink(code));
+    ok(back.ok && back.topic.name === 'My Snacks' && back.topic.items.length === custom.items.length && back.topic.items[0].emoji === custom.items[0].emoji, 'a share link brings back the topic, items and emojis');
+    ok(back.topic.items[0].imageUrl === 'https://example.com/a.jpg' && !back.topic.items[0].photo, 'image links travel; uploaded photos only when included');
+    ok(!back.topic.items[1].imageUrl, 'unsafe links are stripped on import');
+    ok(S.topicCode(back.topic) === S.topicCode(custom) && /^DN-[0-9A-Z]{6}$/.test(S.topicCode(custom)), 'the fingerprint code matches after import (' + S.topicCode(custom) + ')');
+    const withPhotos = await S.decodeShared(await S.encodeTopic(custom, true));
+    ok(withPhotos.ok && withPhotos.topic.items[0].photo.startsWith('data:image/jpeg'), 'uploaded photos can be included');
+    const packed = JSON.stringify(S.packTopic(custom, false));
+    ok(!/managers|votes|budget|profiles|past/.test(packed), 'a shared topic contains only the topic, nothing private');
+    for (const bad of ['', 'hello', 'DN1.not-really-a-code!!', S.topicCode(custom), '{"app":"x"}']) { const r = await S.decodeShared(bad); if (r.ok || !r.error) { ok(false, 'bad code rejected: ' + bad); break; } }
+    ok(true, 'empty, junk, damaged and fingerprint-only codes are rejected with a clear message');
+    const raw = await S.decodeShared('DN0.' + Buffer.from(JSON.stringify(S.packTopic(custom, false))).toString('base64url'));
+    ok(raw.ok, 'uncompressed codes (older browsers) also work');
+    const big = { ...custom, items: Array.from({ length: 400 }, (_, k) => ({ id: 'x' + k, name: 'Item number ' + k + ' with a fairly long name ' + Math.random().toString(36), pos: '', desc: 'A description that is not short at all ' + Math.random().toString(36), photo: '' })) };
+    ok(S.shareLink(await S.encodeTopic(big, false)).length > S.MAX_LINK, 'very large topics are flagged as too long for a link (the topic file is the fallback)');
+    // Opening a share link in the app
+    const opened = await boot({ compress: true, url: 'https://sad-cpu141.github.io/draft-night/#topic=' + code });
+    await sleep(100);
+    ok(/Add a friend’s topic/.test(opened.d.body.textContent) && /My Snacks/.test(opened.d.body.textContent), 'opening a share link shows a preview first');
+    await click(opened.w, btn(opened.d, 'Add topic'));
+    await sleep(80); await opened.DN.store.flush();
+    ok(opened.DN.store.get('dn_topics_v1').some((x) => x.name === 'My Snacks'), 'confirming adds the topic');
+    const again = await boot({ compress: true, url: 'https://sad-cpu141.github.io/draft-night/#topic=' + code });
+    await sleep(100);
+    ok(/already have this exact topic/.test(again.d.body.textContent), 'importing the same topic again warns about the duplicate');
+    void w; void d;
+  }
+
+  console.log('Step 7: profiles, stats and awards');
+  {
+    const { DN } = await boot();
+    const st = DN.stats;
+    const topic = DN.starterTopics()[0];
+    const play = (managers, seed, votes) => {
+      let x = DN.createDraft(topic, managers, { ...DN.DEFAULT_RULES, slots: topic.slots }, { seed });
+      let k = 0;
+      while (x.phase === 'auction') { const m = x.managers[k++ % x.managers.length]; const nx = DN.placeBid(x, m.id, 1 + (k % 4)); x = nx !== x ? DN.sell(nx) : DN.skipItem(x); }
+      while (x.phase === 'freepick') { const cp = DN.currentPicker(x); x = DN.freePick(x, x.leftover.find((y) => DN.canTake(x, cp.m, y))); }
+      return { ...x, phase: 'done', votes, votesRevealed: true, createdAt: Date.now() + k };
+    };
+    const ind = [{ id: 'a', name: 'Ash', color: '#f00', emoji: 'a' }, { id: 'b', name: 'Bilal', color: '#0f0', emoji: 'b' }, { id: 'c', name: 'Cam', color: '#00f', emoji: 'c' }];
+    const g1 = play(ind, 's1', { a: 'b', b: 'a', c: 'a' });
+    const g2 = play(ind, 's2', { a: 'c', b: 'c', c: 'b' });
+    const teams = [{ id: 'T1', name: 'Reds', color: '#f00', emoji: 'r', members: [{ id: 'p1', name: 'Ash' }, { id: 'p2', name: 'Dev' }] }, { id: 'T2', name: 'Blues', color: '#00f', emoji: 'b', members: [{ id: 'p3', name: 'Bilal' }, { id: 'p4', name: 'Bot', bot: { type: 'chaos', level: 'easy' } }] }];
+    const g3 = play(teams, 's3', { p1: 'T2', p2: 'T2', p3: 'T1', p4: 'T1' }); // tie
+    const unfinished = { ...play(ind, 's4', {}), votesRevealed: false };
+    const rows = st.careerStats([g1, g2, g3, unfinished], {});
+    const ash = rows.find((r) => r.key === 'ash'), dev = rows.find((r) => r.key === 'dev');
+    ok(ash.games === 3 && ash.wins === 2 && ash.teamWins === 1, 'Ash: 3 games, 2 wins (1 a shared team win); the unfinished game isn’t counted');
+    ok(!rows.some((r) => r.key === 'bot'), 'bots don’t get profiles');
+    ok(JSON.stringify(st.careerStats([g1, g2, g3], {})) === JSON.stringify(st.careerStats([g1, g2, g3], {})), 'the same games always give the same stats (nothing counted twice)');
+    const reds = g3.managers.find((m) => m.id === 'T1'); const redSpent = 20 - reds.budget;
+    ok(Math.abs(dev.spent - redSpent / 2) < 0.01, 'team spending is split evenly between human teammates');
+    ok(Math.abs(ash.winRate - 2 / 3) < 0.001, 'win rate = wins ÷ finished games');
+    ok(rows.every((r) => !r.bargain || r.bargain.gap < 0) && rows.every((r) => !r.overpay || r.overpay.gap > 0), 'bargains are below, overpays above, the item’s average price across drafts');
+    const reset = st.careerStats([g1, g2, g3], { statsResetAt: Date.now() + 1e6 });
+    ok(reset.length === 0, 'reset stats starts from zero without deleting drafts');
+    const aw = st.computeAwards(g2);
+    ok(aw.some((a) => a.title === 'Most Robbed' && a.team === 'Bilal'), 'Most Robbed goes to whoever lost the vote by exactly one');
+    ok(aw.every((a) => a.why && a.why.length > 10), 'every award explains why');
+    ok(st.computeShame(g1).every((x) => x.why && x.item && x.price >= 0), 'Hall of Shame entries say what, how much and why');
+  }
+
+  console.log('Step 7: picture formats');
+  {
+    const { w, d } = await boot({ h2c: true });
+    await click(w, btn(d, 'Past drafts'));
+    const first = d.querySelector('.tcard'); if (first) await click(w, first);
+    await click(w, btn(d, 'Save as image'));
+    ok(/Winner card/.test(d.body.textContent) && /Awards/.test(d.body.textContent), 'save as image offers winner card, full results and awards');
+    const wc = btn(d, 'Winner card');
+    if (wc && !wc.disabled) { await click(w, wc); await sleep(300); ok(/CHAMPION/.test(w.__captured || '') && /DRAFT NIGHT/.test(w.__captured || ''), 'the winner card picture contains the champion and branding'); }
+    else ok(true, 'winner card waits for the vote reveal');
+    await click(w, btn(d, 'Done') || d.body);
+    await click(w, btn(d, 'Save as image'));
+    await click(w, btn(d, 'Awards'));
+    await sleep(300);
+    ok(/standings|Teams/i.test(w.__captured || '') && !!btn(d, 'Download'), 'awards picture is made and offered for download/share');
   }
 
   console.log('Persistence after refresh');

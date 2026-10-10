@@ -1,4 +1,4 @@
-/* Draft Night 0686618f2e — built from src/styles.css */
+/* Draft Night 0978476ab2 — built from src/styles.css */
 /* Layout: one phone-width column, a stage-lit backdrop, the auction screen as a full-height console with a sticky gavel bar. */
 :root{
   --ink:#0f0c21; --stage:#19153a; --panel:#221d47; --panel2:#2c2659; --line:#3d3672;
@@ -353,3 +353,27 @@ section.card h3{font-size:21px}
 @keyframes legend{to{background-position:300% 0}}
 .dbl{font-family:var(--body);font-size:16px;color:var(--muted)}
 details.card summary{cursor:pointer}
+.iconbtn.mute.on{border-color:var(--danger);background:color-mix(in srgb,var(--danger) 22%,var(--panel))}
+input[type=range]{width:100%;accent-color:var(--gold);min-height:32px}
+.flash .inner.bigsale .big{font-size:clamp(90px,30vw,140px);animation:shake .5s ease-in-out 2}
+.flash .inner.bigsale .price{font-size:84px;text-shadow:0 0 30px rgba(255,200,61,.8)}
+@keyframes shake{25%{transform:rotate(-4deg) scale(1.05)}75%{transform:rotate(4deg) scale(1.05)}}
+.fpcode{font-family:var(--display);font-size:20px;letter-spacing:.06em;color:var(--gold);background:var(--stage);border:2px dashed var(--gold);border-radius:10px;padding:4px 10px;flex:none}
+.shame{display:flex;gap:12px;align-items:flex-start;padding:10px 12px;border-radius:14px;background:var(--panel);border:2px solid var(--line)}
+.shame .se{font-size:26px}
+.award{margin:0;font-size:15px;line-height:1.35}
+.exportstage{position:fixed;left:-10000px;top:0;width:540px;pointer-events:none}
+.excard{width:540px;padding:24px;background:var(--ink);display:flex;flex-direction:column;gap:16px;font-family:var(--body);color:var(--text)}
+.exhead{display:flex;flex-direction:column;align-items:center;gap:6px;text-align:center}
+.exhead b{font-family:var(--display);font-size:52px;letter-spacing:.03em;color:var(--gold);line-height:1}
+.exhead span:last-child{color:var(--muted);font-weight:700}
+.exwin{display:flex;flex-direction:column;align-items:center;text-align:center;gap:4px;padding:18px;border-radius:22px;background:var(--c);color:var(--on)}
+.exlabel{font-family:var(--cond);font-weight:800;letter-spacing:.2em;font-size:15px}
+.exname{font-family:var(--display);font-size:44px;line-height:1.05;text-transform:uppercase;overflow-wrap:anywhere}
+.exmem{font-weight:700;font-size:15px}
+.exvotes{font-weight:700;font-size:15px;opacity:.9}
+.exroster{display:flex;flex-direction:column;gap:6px}
+.exrow{display:flex;align-items:center;gap:10px;padding:6px 10px;border-radius:12px;background:var(--panel)}
+.exslot{width:56px;font-family:var(--cond);font-weight:800;font-size:13px;color:var(--muted);letter-spacing:.06em;text-transform:uppercase}
+.exitem{flex:1;min-width:0;font-weight:700;font-size:17px;overflow-wrap:anywhere}
+.exprice{font-family:var(--display);font-size:20px;color:var(--gold)}

@@ -1,4 +1,4 @@
-/* Draft Night 0686618f2e — built from src/ by build.js. Edit src/, not this file. */
+/* Draft Night 0978476ab2 — built from src/ by build.js. Edit src/, not this file. */
 "use strict";
 (function(){
 function _extends() { return _extends = Object.assign ? Object.assign.bind() : function (n) { for (var e = 1; e < arguments.length; e++) { var t = arguments[e]; for (var r in t) ({}).hasOwnProperty.call(t, r) && (n[r] = t[r]); } return n; }, _extends.apply(null, arguments); }
@@ -3566,6 +3566,747 @@ function closeTrades(d) {
     }
   };
 }
+const AUDIO_DEFAULTS = {
+  muted: false,
+  voice: true,
+  voiceName: '',
+  rate: 1.15,
+  voiceVol: 1,
+  sfx: true,
+  sfxVol: 0.7,
+  music: false,
+  musicVol: 0.35,
+  bigSale: 40
+};
+const audio = (() => {
+  let cfg = {
+    ...AUDIO_DEFAULTS
+  };
+  let ctx = null,
+    master = null,
+    sfxBus = null,
+    musicBus = null;
+  let musicTimer = null,
+    musicStep = 0;
+  const said = new Set();
+  let speakingPrio = 0;
+  const lastPlayed = {};
+  const hasSpeech = () => typeof window !== 'undefined' && 'speechSynthesis' in window && typeof window.SpeechSynthesisUtterance === 'function';
+  function ensureCtx() {
+    try {
+      if (!ctx) {
+        const AC = window.AudioContext || window.webkitAudioContext;
+        if (!AC) return null;
+        ctx = new AC();
+        master = ctx.createGain();
+        master.connect(ctx.destination);
+        sfxBus = ctx.createGain();
+        sfxBus.connect(master);
+        musicBus = ctx.createGain();
+        musicBus.connect(master);
+        applyGains();
+      }
+      if (ctx.state === 'suspended') ctx.resume().catch(() => {});
+      return ctx;
+    } catch (e) {
+      return null;
+    }
+  }
+  function applyGains() {
+    if (!ctx) return;
+    const t = ctx.currentTime;
+    try {
+      master.gain.setTargetAtTime(cfg.muted ? 0 : 1, t, 0.02);
+      sfxBus.gain.setTargetAtTime(cfg.sfx ? cfg.sfxVol : 0, t, 0.02);
+      musicBus.gain.setTargetAtTime(cfg.music ? cfg.musicVol * 0.5 : 0, t, 0.3);
+    } catch (e) {}
+  }
+  if (typeof window !== 'undefined') {
+    const unlock = () => {
+      if (cfg.muted) return;
+      ensureCtx();
+      if (cfg.music) startMusic();
+    };
+    ['pointerdown', 'keydown', 'touchend'].forEach(ev => window.addEventListener(ev, unlock, {
+      passive: true
+    }));
+  }
+  function noiseBuffer(sec) {
+    const b = ctx.createBuffer(1, Math.max(1, Math.floor(ctx.sampleRate * sec)), ctx.sampleRate);
+    const ch = b.getChannelData(0);
+    for (let i = 0; i < ch.length; i++) ch[i] = Math.random() * 2 - 1;
+    return b;
+  }
+  function tone(type, f0, f1, start, dur, vol, dest) {
+    const o = ctx.createOscillator();
+    const g = ctx.createGain();
+    o.type = type;
+    o.frequency.setValueAtTime(f0, start);
+    if (f1) o.frequency.exponentialRampToValueAtTime(f1, start + dur);
+    g.gain.setValueAtTime(0.0001, start);
+    g.gain.exponentialRampToValueAtTime(vol, start + 0.01);
+    g.gain.exponentialRampToValueAtTime(0.0001, start + dur);
+    o.connect(g);
+    g.connect(dest || sfxBus);
+    o.start(start);
+    o.stop(start + dur + 0.05);
+  }
+  function noise(start, dur, vol, filterType, freq, dest) {
+    const s = ctx.createBufferSource();
+    s.buffer = noiseBuffer(dur);
+    const f = ctx.createBiquadFilter();
+    f.type = filterType;
+    f.frequency.value = freq;
+    const g = ctx.createGain();
+    g.gain.setValueAtTime(vol, start);
+    g.gain.exponentialRampToValueAtTime(0.0001, start + dur);
+    s.connect(f);
+    f.connect(g);
+    g.connect(dest || sfxBus);
+    s.start(start);
+    s.stop(start + dur + 0.05);
+  }
+  const SFX = {
+    bid: t => tone('sine', 880, 1320, t, 0.09, 0.18),
+    gavel: t => {
+      noise(t, 0.08, 0.9, 'lowpass', 1800);
+      tone('triangle', 160, 70, t, 0.25, 0.7);
+      noise(t + 0.18, 0.06, 0.5, 'lowpass', 1500);
+      tone('triangle', 150, 70, t + 0.18, 0.2, 0.45);
+    },
+    cheer: t => {
+      noise(t, 1.6, 0.35, 'bandpass', 1400);
+      noise(t + 0.1, 1.4, 0.25, 'bandpass', 2600);
+      [523, 659, 784].forEach((f, i) => tone('triangle', f, 0, t + i * 0.09, 0.35, 0.12));
+    },
+    buzzer: t => {
+      tone('sawtooth', 140, 120, t, 0.45, 0.25);
+      tone('square', 147, 125, t, 0.45, 0.12);
+    },
+    drumroll: t => {
+      for (let i = 0; i < 22; i++) noise(t + i * 0.045, 0.05, 0.25 + i * 0.012, 'bandpass', 900);
+      noise(t + 22 * 0.045, 0.35, 0.8, 'lowpass', 400);
+      tone('sine', 90, 50, t + 22 * 0.045, 0.4, 0.6);
+    },
+    card: t => [1047, 1319, 1568, 2093].forEach((f, i) => tone('sine', f, 0, t + i * 0.06, 0.18, 0.12)),
+    trade: t => {
+      tone('triangle', 660, 0, t, 0.2, 0.2);
+      tone('triangle', 990, 0, t + 0.14, 0.3, 0.2);
+    },
+    fanfare: t => [392, 523, 659, 784, 1047].forEach((f, i) => tone('square', f, 0, t + i * 0.12, i === 4 ? 0.6 : 0.16, 0.08)),
+    big: t => {
+      SFX.gavel(t);
+      [392, 494, 587, 784].forEach((f, i) => tone('sawtooth', f, 0, t + 0.3 + i * 0.07, 0.5, 0.06));
+    }
+  };
+  function play(name) {
+    if (cfg.muted || !cfg.sfx || !SFX[name]) return;
+    const now = Date.now();
+    if (now - (lastPlayed[name] || 0) < 120) return;
+    lastPlayed[name] = now;
+    try {
+      const c = ensureCtx();
+      if (!c) return;
+      SFX[name](c.currentTime + 0.01);
+    } catch (e) {}
+  }
+  const CHORDS = [[57, 60, 64], [53, 57, 60], [48, 52, 55], [55, 59, 62]];
+  const midi = n => 440 * Math.pow(2, (n - 69) / 12);
+  function scheduleBar() {
+    if (!ctx) return;
+    const t = ctx.currentTime + 0.05;
+    const beat = 0.5;
+    const ch = CHORDS[musicStep % CHORDS.length];
+    ch.forEach(n => {
+      const o = ctx.createOscillator();
+      const g = ctx.createGain();
+      o.type = 'triangle';
+      o.frequency.value = midi(n);
+      g.gain.setValueAtTime(0.0001, t);
+      g.gain.linearRampToValueAtTime(0.05, t + 0.3);
+      g.gain.linearRampToValueAtTime(0.0001, t + beat * 4);
+      o.connect(g);
+      g.connect(musicBus);
+      o.start(t);
+      o.stop(t + beat * 4 + 0.05);
+    });
+    for (let i = 0; i < 4; i++) {
+      tone('sine', midi(ch[0] - 12), 0, t + i * beat, beat * 0.9, 0.12, musicBus);
+      noise(t + i * beat + beat / 2, 0.05, 0.05, 'highpass', 6000, musicBus);
+    }
+    musicStep++;
+  }
+  function startMusic() {
+    if (musicTimer || cfg.muted || !cfg.music) return;
+    const c = ensureCtx();
+    if (!c) return;
+    scheduleBar();
+    musicTimer = setInterval(() => {
+      try {
+        scheduleBar();
+      } catch (e) {}
+    }, 2000);
+  }
+  function stopMusic() {
+    if (musicTimer) {
+      clearInterval(musicTimer);
+      musicTimer = null;
+    }
+  }
+  function duck(on) {
+    if (!ctx || !cfg.music) return;
+    try {
+      musicBus.gain.setTargetAtTime(cfg.muted ? 0 : on ? cfg.musicVol * 0.15 : cfg.musicVol * 0.5, ctx.currentTime, 0.15);
+    } catch (e) {}
+  }
+  function pickVoice() {
+    try {
+      const vs = window.speechSynthesis.getVoices() || [];
+      if (cfg.voiceName) {
+        const v = vs.find(x => x.name === cfg.voiceName);
+        if (v) return v;
+      }
+      const en = vs.filter(v => /^en/i.test(v.lang));
+      return en.find(v => /natural|neural|premium|enhanced/i.test(v.name)) || en.find(v => /google|samantha|daniel|alex|aria|guy/i.test(v.name)) || en[0] || vs[0] || null;
+    } catch (e) {
+      return null;
+    }
+  }
+  function say(text, priority, key) {
+    if (cfg.muted || !cfg.voice || !hasSpeech() || !text) return false;
+    if (key) {
+      if (said.has(key)) return false;
+      said.add(key);
+      if (said.size > 400) said.clear();
+    }
+    try {
+      const synth = window.speechSynthesis;
+      const busy = synth.speaking || synth.pending;
+      if (busy && priority <= speakingPrio && priority < 2) return false;
+      if (busy && priority >= speakingPrio) synth.cancel();
+      const u = new window.SpeechSynthesisUtterance(text);
+      const v = pickVoice();
+      if (v) u.voice = v;
+      u.rate = cfg.rate;
+      u.pitch = 1.08;
+      u.volume = cfg.voiceVol;
+      speakingPrio = priority;
+      u.onend = u.onerror = () => {
+        speakingPrio = 0;
+        duck(false);
+      };
+      duck(true);
+      synth.speak(u);
+      return true;
+    } catch (e) {
+      return false;
+    }
+  }
+  return {
+    get cfg() {
+      return cfg;
+    },
+    set(next) {
+      cfg = {
+        ...AUDIO_DEFAULTS,
+        ...next
+      };
+      applyGains();
+      if (cfg.muted) {
+        try {
+          if (hasSpeech()) window.speechSynthesis.cancel();
+        } catch (e) {}
+        stopMusic();
+      } else if (cfg.music) {
+        if (ctx) startMusic();
+      } else stopMusic();
+    },
+    play,
+    say,
+    hasSpeech,
+    voices() {
+      try {
+        return hasSpeech() ? window.speechSynthesis.getVoices().filter(v => /^en/i.test(v.lang)) : [];
+      } catch (e) {
+        return [];
+      }
+    },
+    test() {
+      ensureCtx();
+      play('gavel');
+      say('SOLD to the highest bidder! What a night!', 3);
+    },
+    resetSaid() {
+      said.clear();
+    }
+  };
+})();
+const CALLS = {
+  next: ['Coming up next: {item}!', 'Next on the block: {item}!', 'Who wants {item}?', 'Here comes {item}! Who’s ready to fight for this one?'],
+  mystery: ['A mystery item! Who’s brave enough?', 'Face down and up for grabs! Mystery time!'],
+  legendaryUp: ['Oh my, a LEGENDARY on the block!', 'Legendary alert! This one’s special!'],
+  open: ['{who} opens at {amt}!', 'We start at {amt} from {who}!'],
+  raise: ['{amt}! Anybody going higher?', 'We’ve got {amt}!', '{who} says {amt}!', '{amt} from {who}! Do I hear more?'],
+  war: ['We’ve got a bidding war!', 'Nobody’s backing down!', 'That bid just changed everything!'],
+  once: ['Going once…'],
+  twice: ['Going twice…'],
+  sold: ['SOLD to {who} for {amt}!', 'SOLD! {who} takes it for {amt}!'],
+  big: ['Someone’s spending big tonight!', 'Huge money! The crowd goes wild!'],
+  mysteryReveal: ['It’s time to reveal the mystery pick… it’s {item}!'],
+  legendary: ['LEGENDARY! What a pull!'],
+  rare: ['We’ve got a RARE card!'],
+  noBids: ['No takers! Moving on.'],
+  card: ['{who} plays {card}!'],
+  vetoed: ['VETOED! Denied!'],
+  tradeOffer: ['We’ve got a trade on the table!'],
+  tradeDone: ['Deal done! That could be a game-changer!'],
+  winner: ['And the winner is… {who}!'],
+  tie: ['It’s a tie! {who}!']
+};
+const callLine = (k, vars) => {
+  const ls = CALLS[k];
+  const l = ls[Math.floor(Math.random() * ls.length)];
+  return l.replace(/\{(\w+)\}/g, (_, v) => vars && vars[v] != null ? vars[v] : '');
+};
+const SHARE_PREFIX = 'DN1.';
+const SHARE_PREFIX_RAW = 'DN0.';
+const MAX_LINK = 7000;
+const clip = (v, n) => typeof v === 'string' ? v.slice(0, n) : '';
+const b64url = bytes => {
+  let s = '';
+  bytes.forEach(b => {
+    s += String.fromCharCode(b);
+  });
+  return btoa(s).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+};
+const unb64url = str => {
+  const s = atob(str.replace(/-/g, '+').replace(/_/g, '/') + '==='.slice((str.length + 3) % 4));
+  const out = new Uint8Array(s.length);
+  for (let i = 0; i < s.length; i++) out[i] = s.charCodeAt(i);
+  return out;
+};
+async function pipeBytes(bytes, stream) {
+  const s = new Blob([bytes]).stream().pipeThrough(stream);
+  return new Uint8Array(await new Response(s).arrayBuffer());
+}
+const canCompress = () => typeof window !== 'undefined' && typeof window.CompressionStream === 'function' && typeof window.DecompressionStream === 'function';
+function packTopic(t, withPhotos) {
+  return {
+    v: 1,
+    n: t.name,
+    e: t.emoji,
+    s: t.slots,
+    l: t.layout || 'list',
+    a: t.art || 'emoji',
+    ks: t.kitShape || '',
+    kl: t.kitLabel || '',
+    ph: !!t.photos,
+    f: t.folder || '',
+    i: t.items.map(it => {
+      const r = [it.name, it.pos || '', it.desc || '', it.emoji || '', it.imageUrl || '', it.wiki || '', it.kit || null, it.photosOff ? 1 : 0];
+      if (withPhotos && it.photo) r.push(it.photo);
+      return r;
+    })
+  };
+}
+function unpackTopic(o) {
+  if (!o || o.v !== 1 || typeof o.n !== 'string' || !Array.isArray(o.s) || !Array.isArray(o.i)) return {
+    ok: false,
+    error: 'That isn’t a Draft Night topic.'
+  };
+  if (o.i.length > 600) return {
+    ok: false,
+    error: 'That topic has too many items (600 max).'
+  };
+  const slots = o.s.map(x => clip(String(x), 20)).filter(Boolean).slice(0, 16);
+  if (!slots.length) return {
+    ok: false,
+    error: 'That topic has no slots.'
+  };
+  const goodUrl = u => typeof u === 'string' && /^https:\/\//.test(u) ? u.slice(0, 2000) : '';
+  const goodPhoto = p => typeof p === 'string' && /^data:image\/(jpeg|png|webp|gif);base64,/.test(p) && p.length < 400000 ? p : '';
+  const goodColor = c => typeof c === 'string' && /^#[0-9a-f]{6}$/i.test(c) ? c : null;
+  const items = o.i.filter(r => Array.isArray(r) && typeof r[0] === 'string' && r[0].trim()).map(r => {
+    const it = {
+      id: uid(),
+      name: clip(r[0], 80).trim(),
+      pos: clip(r[1], 20),
+      desc: clip(r[2], 120),
+      emoji: clip(r[3], 12),
+      photo: goodPhoto(r[8])
+    };
+    if (goodUrl(r[4])) it.imageUrl = goodUrl(r[4]);
+    if (r[5]) it.wiki = clip(r[5], 120);
+    if (Array.isArray(r[6]) && goodColor(r[6][0]) && goodColor(r[6][1])) it.kit = [goodColor(r[6][0]), goodColor(r[6][1])];
+    if (r[7]) it.photosOff = true;
+    return it;
+  });
+  if (!items.length) return {
+    ok: false,
+    error: 'That topic has no items.'
+  };
+  return {
+    ok: true,
+    topic: {
+      id: uid(),
+      name: clip(o.n, 60).trim() || 'Shared topic',
+      emoji: clip(o.e, 12) || '🎲',
+      slots,
+      layout: o.l === 'pitch' ? 'pitch' : 'list',
+      art: o.a === 'kit' ? 'kit' : 'emoji',
+      kitShape: o.ks === 'tank' ? 'tank' : '',
+      kitLabel: o.kl === 'initials' ? 'initials' : '',
+      photos: !!o.ph,
+      folder: clip(o.f, 24) || 'My Topics',
+      items
+    }
+  };
+}
+function topicCode(t) {
+  const sig = JSON.stringify([t.name, t.slots, t.items.map(i => [i.name, i.pos || '', i.desc || ''])]);
+  const A = '23456789ABCDEFGHJKMNPQRSTUVWXYZ';
+  let h = hashStr(sig),
+    h2 = hashStr(sig + '#'),
+    out = '';
+  for (let i = 0; i < 6; i++) {
+    const n = i < 3 ? h : h2;
+    out += A[(n >>> i % 3 * 7) % A.length];
+  }
+  return 'DN-' + out;
+}
+async function encodeTopic(t, withPhotos) {
+  const bytes = new TextEncoder().encode(JSON.stringify(packTopic(t, withPhotos)));
+  if (canCompress()) {
+    try {
+      return SHARE_PREFIX + b64url(await pipeBytes(bytes, new window.CompressionStream('deflate-raw')));
+    } catch (e) {}
+  }
+  return SHARE_PREFIX_RAW + b64url(bytes);
+}
+async function decodeShared(text) {
+  const raw = (text || '').trim();
+  if (!raw) return {
+    ok: false,
+    error: 'Paste a share link or code first.'
+  };
+  if (raw.startsWith('{')) {
+    try {
+      const f = JSON.parse(raw);
+      return f && f.app === 'draft-night-topic' ? unpackTopic(f.topic) : {
+        ok: false,
+        error: 'That file isn’t a Draft Night topic.'
+      };
+    } catch (e) {
+      return {
+        ok: false,
+        error: 'That file isn’t a Draft Night topic.'
+      };
+    }
+  }
+  if (/^DN-[0-9A-Z]{6}$/i.test(raw)) return {
+    ok: false,
+    error: 'That’s a topic fingerprint, not the topic itself. Ask your friend for the share link, the long share code, or the topic file.'
+  };
+  const m = raw.match(/(DN[01]\.[A-Za-z0-9_-]+)/);
+  if (!m) return {
+    ok: false,
+    error: 'That doesn’t look like a Draft Night share link or code.'
+  };
+  try {
+    const code = m[1];
+    const body = unb64url(code.slice(4));
+    const bytes = code.startsWith(SHARE_PREFIX) ? canCompress() ? await pipeBytes(body, new window.DecompressionStream('deflate-raw')) : null : body;
+    if (!bytes) return {
+      ok: false,
+      error: 'This browser can’t open compressed share codes. Ask for the topic file instead.'
+    };
+    return unpackTopic(JSON.parse(new TextDecoder().decode(bytes)));
+  } catch (e) {
+    return {
+      ok: false,
+      error: 'That share code is damaged or incomplete. Copy the whole link again.'
+    };
+  }
+}
+const shareLink = code => location.origin + location.pathname + '#topic=' + code;
+const topicFile = t => new Blob([JSON.stringify({
+  app: 'draft-night-topic',
+  format: 1,
+  topic: packTopic(t, true)
+})], {
+  type: 'application/json'
+});
+const nameKey = n => (n || '').trim().toLowerCase();
+function humanPlayers(d) {
+  if (d.teamMode) return d.managers.flatMap(t => (t.members || []).filter(p => !p.bot).map(p => ({
+    key: nameKey(p.name),
+    name: p.name,
+    emoji: p.emoji,
+    teamId: t.id,
+    teamName: t.name,
+    share: 1 / Math.max(1, (t.members || []).filter(x => !x.bot).length)
+  })));
+  return d.managers.filter(m => !m.bot).map(m => ({
+    key: nameKey(m.name),
+    name: m.name,
+    emoji: m.emoji,
+    teamId: m.id,
+    teamName: m.name,
+    share: 1
+  }));
+}
+const finished = d => d && d.votesRevealed && d.phase === 'done';
+function priceGaps(d) {
+  const buys = [];
+  d.managers.forEach(m => m.team.forEach((t, i) => {
+    if (t && !t.free && !t.stolen) buys.push({
+      team: m,
+      item: d.items[t.itemId],
+      price: t.price,
+      key: norm(d.items[t.itemId].pos || d.rules.slots[i])
+    });
+  }));
+  const groups = {};
+  buys.forEach(b => {
+    (groups[b.key] = groups[b.key] || []).push(b.price);
+  });
+  return buys.filter(b => groups[b.key].length >= 2).map(b => {
+    const others = groups[b.key].length - 1;
+    const avg = (groups[b.key].reduce((a, x) => a + x, 0) - b.price) / others;
+    return {
+      ...b,
+      avg,
+      gap: b.price - avg
+    };
+  });
+}
+function computeAwards(d) {
+  const out = [];
+  const add = (id, emoji, title, team, why) => out.push({
+    id,
+    emoji,
+    title,
+    teamId: team.id,
+    team: team.name,
+    why
+  });
+  const fair = d.rules.budget / d.rules.slots.length;
+  const gaps = priceGaps(d);
+  if (gaps.length) {
+    const b = gaps.reduce((a, x) => x.gap < a.gap ? x : a);
+    if (b.gap <= -1) add('bargain', '🏷️', 'Best Bargain', b.team, b.item.name + ' for ' + money(b.price) + ', ' + money(Math.round(-b.gap)) + ' under the average paid for other ' + (b.item.pos || 'items') + ' this draft (' + money(Math.round(b.avg)) + ').');
+    const o = gaps.reduce((a, x) => x.gap > a.gap ? x : a);
+    if (o.gap >= 2) add('overpay', '💸', 'Biggest Overpay', o.team, o.item.name + ' for ' + money(o.price) + ', ' + money(Math.round(o.gap)) + ' over the average paid for other ' + (o.item.pos || 'items') + ' this draft (' + money(Math.round(o.avg)) + ').');
+  }
+  const spends = d.managers.map(m => ({
+    m,
+    s: d.rules.budget - m.budget
+  }));
+  const top = spends.reduce((a, x) => x.s > a.s ? x : a);
+  if (top.s > 0) add('spender', '🤑', 'Big Spender', top.m, 'Spent ' + money(top.s) + ', the most of anyone.');
+  if (d.votesRevealed) {
+    const {
+      counts,
+      winners
+    } = tally(d);
+    const sorted = Object.values(counts).sort((a, b) => b - a);
+    const median = sorted[Math.floor(sorted.length / 2)] || 0;
+    const strong = d.managers.filter(m => counts[m.id] >= Math.max(1, median));
+    if (strong.length) {
+      const p = strong.reduce((a, m) => m.budget > a.budget ? m : a);
+      if (p.budget > 0) add('pincher', '🪙', 'Penny Pincher', p, 'Kept ' + money(p.budget) + ' and still got ' + counts[p.id] + ' vote' + (counts[p.id] === 1 ? '' : 's') + '.');
+    }
+    if (winners.length === 1) {
+      const best = counts[winners[0].id];
+      d.managers.filter(m => counts[m.id] === best - 1 && best - 1 > 0).forEach(m => add('robbed', '😤', 'Most Robbed', m, 'Lost the vote by a single vote (' + counts[m.id] + ' to ' + best + ').'));
+    }
+  }
+  const countBy = fn => d.managers.map(m => ({
+    m,
+    n: fn(m)
+  })).filter(x => x.n > 0).sort((a, b) => b.n - a.n);
+  const log = d.cardLog || [];
+  const chaos = countBy(m => log.filter(e => e.by === m.id && e.result === 'done').length);
+  if (chaos.length) add('chaos', '🃏', 'Chaos Agent', chaos[0].m, chaos[0].n + ' Chaos Card' + (chaos[0].n === 1 ? '' : 's') + ' played successfully.');
+  const trades = d.trade ? d.trade.proposals.filter(t => t.status === 'accepted') : [];
+  const tm = countBy(m => trades.filter(t => t.from === m.id || t.to === m.id).length);
+  if (tm.length) add('trade', '🤝', 'Trade Master', tm[0].m, tm[0].n + ' trade' + (tm[0].n === 1 ? '' : 's') + ' completed.');
+  const mys = countBy(m => m.team.filter(t => t && d.items[t.itemId].mystery).length);
+  if (mys.length) add('mystery', '❓', 'Mystery Master', mys[0].m, 'Won ' + mys[0].n + ' mystery item' + (mys[0].n === 1 ? '' : 's') + '.');
+  const leg = countBy(m => m.team.filter(t => t && (d.rarity || {})[t.itemId] === 'legendary').length);
+  if (leg.length) add('legend', '★', 'Legend Hunter', leg[0].m, 'Owns ' + leg[0].n + ' Legendary item' + (leg[0].n === 1 ? '' : 's') + '.');
+  const unl = countBy(m => log.filter(e => e.target === m.id && e.result === 'done').length);
+  if (unl.length) add('unlucky', '🌧️', 'Unluckiest Manager', unl[0].m, 'Hit by ' + unl[0].n + ' rival Chaos Card' + (unl[0].n === 1 ? '' : 's') + '.');
+  void fair;
+  return out;
+}
+function computeShame(d) {
+  const out = [];
+  const gaps = priceGaps(d).filter(g => g.gap >= 2).sort((a, b) => b.gap - a.gap);
+  if (gaps[0]) out.push({
+    id: 'overpay',
+    emoji: '💸',
+    title: 'Biggest Overpay',
+    team: gaps[0].team.name,
+    item: gaps[0].item.name,
+    price: gaps[0].price,
+    why: 'Paid ' + money(Math.round(gaps[0].gap)) + ' more than the average for the same position this draft. Bold.'
+  });
+  const buys = [];
+  d.managers.forEach(m => m.team.forEach(t => {
+    if (t && !t.free) buys.push({
+      m,
+      item: d.items[t.itemId],
+      price: t.price
+    });
+  }));
+  const disaster = buys.filter(b => b.price >= d.rules.budget * 0.5).sort((a, b) => b.price - a.price)[0];
+  if (disaster) out.push({
+    id: 'budget',
+    emoji: '🔥',
+    title: 'Budget Disaster',
+    team: disaster.m.name,
+    item: disaster.item.name,
+    price: disaster.price,
+    why: 'Spent ' + Math.round(disaster.price / d.rules.budget * 100) + '% of the whole budget on one item.'
+  });
+  if (d.votesRevealed) {
+    const {
+      counts
+    } = tally(d);
+    const regret = buys.filter(b => counts[b.m.id] === 0 && b.price >= d.rules.budget / d.rules.slots.length).sort((a, b) => b.price - a.price)[0];
+    if (regret) out.push({
+      id: 'regret',
+      emoji: '🙈',
+      title: 'Most Regrettable Buy',
+      team: regret.m.name,
+      item: regret.item.name,
+      price: regret.price,
+      why: 'The priciest item on a team that got zero votes.'
+    });
+  }
+  return out.map(x => ({
+    ...x,
+    draftId: d.id,
+    date: d.createdAt,
+    topic: d.topic.name
+  }));
+}
+function careerStats(past, settings) {
+  const since = settings && settings.statsResetAt || 0;
+  const games = past.filter(d => finished(d) && (d.createdAt || 0) >= since).sort((a, b) => (a.createdAt || 0) - (b.createdAt || 0));
+  const sales = {};
+  games.forEach(d => d.managers.forEach(m => m.team.forEach(t => {
+    if (t && !t.free && !t.stolen) (sales[nameKey(d.items[t.itemId].name)] = sales[nameKey(d.items[t.itemId].name)] || []).push(t.price);
+  })));
+  const ref = name => {
+    const s = sales[nameKey(name)];
+    return s && s.length >= 2 ? s.reduce((a, b) => a + b, 0) / s.length : null;
+  };
+  const P = {};
+  games.forEach(d => {
+    const {
+      counts,
+      winners
+    } = tally(d);
+    const winIds = winners.map(w => w.id);
+    const awards = computeAwards(d);
+    humanPlayers(d).forEach(p => {
+      const r = P[p.key] || (P[p.key] = {
+        key: p.key,
+        name: p.name,
+        emoji: p.emoji,
+        games: 0,
+        wins: 0,
+        teamGames: 0,
+        teamWins: 0,
+        spent: 0,
+        picks: {},
+        buys: [],
+        awards: {},
+        best: null,
+        chaos: {},
+        legendary: 0,
+        trades: 0,
+        cardsUsed: 0,
+        lastAt: 0
+      });
+      const team = d.managers.find(m => m.id === p.teamId);
+      if (!team) return;
+      r.games++;
+      if (d.teamMode) r.teamGames++;
+      const won = winIds.includes(team.id);
+      if (won) {
+        r.wins++;
+        if (d.teamMode) r.teamWins++;
+      }
+      r.spent += (d.rules.budget - team.budget) * p.share;
+      team.team.forEach(t => {
+        if (!t) return;
+        const it = d.items[t.itemId];
+        r.picks[it.name] = (r.picks[it.name] || 0) + 1;
+        if ((d.rarity || {})[t.itemId] === 'legendary') r.legendary++;
+        if (!t.free && !t.stolen) r.buys.push({
+          name: it.name,
+          price: t.price,
+          date: d.createdAt,
+          topic: d.topic.name
+        });
+      });
+      (d.cardLog || []).filter(e => e.by === team.id).forEach(e => {
+        r.chaos[e.card] = (r.chaos[e.card] || 0) + 1;
+        r.cardsUsed++;
+      });
+      r.trades += d.trade ? d.trade.proposals.filter(t => t.status === 'accepted' && (t.from === team.id || t.to === team.id)).length : 0;
+      awards.filter(a => a.teamId === team.id).forEach(a => {
+        r.awards[a.title] = (r.awards[a.title] || 0) + 1;
+      });
+      const share = (counts[team.id] || 0) / Math.max(1, Object.keys(d.votes || {}).length);
+      if (won && (!r.best || share > r.best.share)) r.best = {
+        share,
+        votes: counts[team.id],
+        topic: d.topic.name,
+        date: d.createdAt,
+        team: team.name
+      };
+      if ((d.createdAt || 0) >= r.lastAt) {
+        r.lastAt = d.createdAt || 0;
+        r.name = p.name;
+        r.emoji = p.emoji || r.emoji;
+      }
+    });
+  });
+  return Object.values(P).map(r => {
+    const valued = r.buys.map(b => {
+      const avg = ref(b.name);
+      return avg == null ? null : {
+        ...b,
+        avg,
+        gap: b.price - avg
+      };
+    }).filter(Boolean);
+    const bargain = valued.length ? valued.reduce((a, x) => x.gap < a.gap ? x : a) : null;
+    const overpay = valued.length ? valued.reduce((a, x) => x.gap > a.gap ? x : a) : null;
+    const fav = Object.entries(r.picks).filter(([, n]) => n >= 2).sort((a, b) => b[1] - a[1]).slice(0, 5);
+    const topCard = Object.entries(r.chaos).sort((a, b) => b[1] - a[1])[0];
+    const custom = settings && settings.profiles && settings.profiles[r.key] || {};
+    return {
+      ...r,
+      name: custom.name || r.name,
+      emoji: custom.emoji || r.emoji || '🙂',
+      winRate: r.games ? r.wins / r.games : 0,
+      spent: Math.round(r.spent * 10) / 10,
+      bargain: bargain && bargain.gap < 0 ? bargain : null,
+      overpay: overpay && overpay.gap > 0 ? overpay : null,
+      favourites: fav,
+      topCard: topCard ? topCard[0] : null
+    };
+  }).sort((a, b) => b.wins - a.wins || b.games - a.games || a.name.localeCompare(b.name));
+}
+function hallOfShame(past, settings) {
+  const since = settings && settings.statsResetAt || 0;
+  return past.filter(d => finished(d) && (d.createdAt || 0) >= since).flatMap(computeShame).sort((a, b) => b.price - a.price).slice(0, 12);
+}
 const KITS = {
   'brazil': ['#FFDC02', '#1B7A3E'],
   'italy': ['#1F4FA8', '#ffffff'],
@@ -4359,6 +5100,25 @@ function TopBar({
     }
   }));
 }
+const AudioCtx = React.createContext({
+  cfg: AUDIO_DEFAULTS,
+  set: () => {}
+});
+function MuteButton() {
+  const {
+    cfg,
+    set
+  } = React.useContext(AudioCtx);
+  return React.createElement("button", {
+    className: 'iconbtn mute' + (cfg.muted ? ' on' : ''),
+    onClick: () => set({
+      ...cfg,
+      muted: !cfg.muted
+    }),
+    "aria-pressed": cfg.muted,
+    "aria-label": cfg.muted ? 'Unmute sound' : 'Mute all sound'
+  }, cfg.muted ? '🔇' : '🔊');
+}
 function Seg({
   value,
   options,
@@ -4559,6 +5319,7 @@ function Home({
   onPast,
   onAbandon,
   onSettings,
+  onPlayers,
   showInstall,
   onDismissInstall
 }) {
@@ -4656,9 +5417,12 @@ function Home({
     className: "btn",
     onClick: onPast
   }, "Past drafts", past.length ? ' (' + past.length + ')' : ''), React.createElement("button", {
+    className: "btn",
+    onClick: onPlayers
+  }, "Players & stats"), React.createElement("button", {
     className: "btn btn-ghost",
     onClick: onSettings
-  }, "Backup & app settings")), showInstall && React.createElement("div", {
+  }, "Settings, sound & backup")), showInstall && React.createElement("div", {
     className: "card row installcard"
   }, React.createElement("span", {
     style: {
@@ -4702,7 +5466,8 @@ function TopicsList({
   onDuplicate,
   onDelete,
   folder,
-  setFolder
+  setFolder,
+  onImport
 }) {
   const [del, setDel] = useState(null);
   const [q, setQ] = useState('');
@@ -4711,10 +5476,18 @@ function TopicsList({
   }, React.createElement(TopBar, {
     onBack: folder && !q ? () => setFolder(null) : onBack,
     title: 'Topics (' + topics.length + ')'
-  }), React.createElement("button", {
-    className: "btn btn-gold",
+  }), React.createElement("div", {
+    className: "row"
+  }, React.createElement("button", {
+    className: "btn btn-gold grow",
     onClick: () => onCreate(folder)
-  }, "+ New topic", folder ? ' in ' + folder : ''), React.createElement(TopicSearch, {
+  }, "+ New topic", folder ? ' in ' + folder : ''), React.createElement("button", {
+    className: "btn grow",
+    style: {
+      width: 'auto'
+    },
+    onClick: onImport
+  }, "Import")), React.createElement(TopicSearch, {
     q: q,
     setQ: setQ
   }), React.createElement(FolderBrowser, {
@@ -5178,6 +5951,7 @@ function TopicEditor({
   onDelete
 }) {
   const [newFolder, setNewFolder] = useState(false);
+  const [sharing, setSharing] = useState(false);
   const [editing, setEditing] = useState(null);
   const [bulk, setBulk] = useState('');
   const [bulkOpen, setBulkOpen] = useState(false);
@@ -5235,8 +6009,8 @@ function TopicEditor({
     title: "Edit topic",
     right: React.createElement("button", {
       className: "pillbtn",
-      onClick: onDuplicate
-    }, "Copy")
+      onClick: () => setSharing(true)
+    }, "Share")
   }), React.createElement("div", {
     className: "card stack"
   }, React.createElement("div", {
@@ -5431,10 +6205,18 @@ function TopicEditor({
     "aria-label": "Move down"
   }, "\u2193"))), !topic.items.length && React.createElement("p", {
     className: "muted"
-  }, "No items yet. Add them one by one or paste a list with Bulk add.")), React.createElement("button", {
-    className: "btn btn-danger",
+  }, "No items yet. Add them one by one or paste a list with Bulk add.")), React.createElement("div", {
+    className: "row"
+  }, React.createElement("button", {
+    className: "btn grow",
+    onClick: onDuplicate
+  }, "Duplicate topic"), React.createElement("button", {
+    className: "btn btn-danger grow",
     onClick: () => setDel(true)
-  }, "Delete topic"), editing && React.createElement(ItemEditor, {
+  }, "Delete topic")), sharing && React.createElement(ShareTopicSheet, {
+    topic: topic,
+    onClose: () => setSharing(false)
+  }), editing && React.createElement(ItemEditor, {
     item: editing,
     slots: topic.slots,
     topic: topic,
@@ -7138,6 +7920,25 @@ function Auction({
     buzz([40, 30, 160]);
     setGavel(true);
     setThinking(null);
+    const big = price >= d.rules.budget * ((audio.cfg.bigSale || 40) / 100);
+    info.big = big;
+    audio.play(big ? 'big' : 'gavel');
+    let line = callLine('sold', {
+      who: leader.name,
+      amt: money(price)
+    });
+    if (big) line += ' ' + callLine('big');
+    if (real.mystery) {
+      audio.play('drumroll');
+      line += ' ' + callLine('mysteryReveal', {
+        item: real.name
+      });
+    }
+    if (info.rarity === 'legendary') {
+      line += ' ' + callLine('legendary');
+      setTimeout(() => audio.play('cheer'), 900);
+    } else if (info.rarity === 'rare') line += ' ' + callLine('rare');else if (big) setTimeout(() => audio.play('cheer'), 500);
+    audio.say(line, 3, d.id + ':sold:' + d.reveal);
     setTimeout(() => {
       setGavel(false);
       onFlash(info);
@@ -7158,6 +7959,7 @@ function Auction({
     if (busy.current || flashing) return;
     const back = d.rules.noBids === 'back' && !d.passed.includes(d.queue[0]);
     setThinking(null);
+    audio.say(callLine('noBids'), 1, d.id + ':skip:' + d.reveal);
     onFlash({
       kind: 'skip',
       item: visibleItem(d, item.id).name,
@@ -7230,6 +8032,11 @@ function Auction({
   useEffect(() => {
     if (logLen > seenLog.current) {
       const e = d.cardLog[logLen - 1];
+      audio.play(e.result === 'done' ? 'card' : 'buzzer');
+      audio.say(e.result === 'vetoed' ? callLine('vetoed') : e.result === 'done' ? callLine('card', {
+        who: teamOf(d, e.by).name,
+        card: CARD_INFO[e.card].name
+      }) : '', 2, d.id + ':card:' + e.id);
       onFlash({
         kind: 'card',
         card: e.card,
@@ -7254,6 +8061,50 @@ function Auction({
       slot: money(limit)
     });else talk.say(a, 'pass');
   }, [d.reveal, flashing]);
+  useEffect(() => {
+    if (flashing || !item || d.bid) return;
+    const vis = visibleItem(d, item.id);
+    const r = rarityOf(d, item.id);
+    const line = vis.hidden ? callLine('mystery') : r === 'legendary' ? callLine('legendaryUp') + ' ' + callLine('next', {
+      item: vis.name
+    }) : callLine('next', {
+      item: vis.name
+    });
+    if (r === 'legendary') audio.play('drumroll');
+    audio.say(line, 1, d.id + ':next:' + d.reveal);
+  }, [d.reveal, flashing]);
+  const lastCall = useRef(0);
+  useEffect(() => {
+    if (!d.bid) return;
+    audio.play('bid');
+    const who = leader && leader.name || '';
+    const amt = money(d.bid.amount);
+    const leads = new Set(d.bids.filter(Boolean).map(b => b.leaderId).concat(d.bid.leaderId)).size;
+    if (d.bids.filter(Boolean).length === 0) {
+      audio.say(callLine('open', {
+        who,
+        amt
+      }), 1);
+      lastCall.current = Date.now();
+      return;
+    }
+    if (d.bids.filter(Boolean).length >= 4 && leads >= 2 && audio.say(callLine('war'), 1, d.id + ':war:' + d.reveal)) {
+      lastCall.current = Date.now();
+      return;
+    }
+    if (Date.now() - lastCall.current > 2200) {
+      audio.say(callLine('raise', {
+        who,
+        amt
+      }), 1);
+      lastCall.current = Date.now();
+    }
+  }, [bidKey]);
+  useEffect(() => {
+    if (!timer || !d.bid || hold || flashing || gavel) return;
+    if (left === 2) audio.say(callLine('once'), 2, d.id + ':once:' + bidKey);
+    if (left === 1) audio.say(callLine('twice'), 2, d.id + ':twice:' + bidKey);
+  }, [left]);
   useEffect(() => {
     if (!solo || flashing) return;
     if (d.processed === 0 && !d.bid) {
@@ -7288,7 +8139,7 @@ function Auction({
     "aria-label": "Home"
   }, "\u2302"), React.createElement("div", {
     className: "title num"
-  }, "Item ", d.processed + 1, " of ", total), ruleOn(d, 'chaos') && React.createElement("button", {
+  }, "Item ", d.processed + 1, " of ", total), React.createElement(MuteButton, null), ruleOn(d, 'chaos') && React.createElement("button", {
     className: "pillbtn",
     onClick: () => setCardsOpen(true),
     "aria-label": "Chaos Cards"
@@ -7487,7 +8338,7 @@ function Nominate({
     className: "iconbtn",
     onClick: goHome,
     "aria-label": "Home"
-  }, "\u2302"), React.createElement("div", {
+  }, "\u2302"), React.createElement(MuteButton, null), React.createElement("div", {
     className: "title"
   }, "Nomination \xB7 ", d.processed + 1, " of ", d.processed + d.queue.length), React.createElement("button", {
     className: "pillbtn",
@@ -7588,6 +8439,20 @@ function TradeWindow({
   const [handoff, setHandoff] = useState(null);
   const [msg, setMsg] = useState('');
   const left = Math.max(0, d.trade.endsAt - now);
+  const nOffers = d.trade.proposals.length,
+    nDone = d.trade.proposals.filter(x => x.status === 'accepted').length;
+  useEffect(() => {
+    if (nOffers) {
+      audio.play('bid');
+      audio.say(callLine('tradeOffer'), 1, d.id + ':offer:' + nOffers);
+    }
+  }, [nOffers]);
+  useEffect(() => {
+    if (nDone) {
+      audio.play('trade');
+      audio.say(callLine('tradeDone'), 2, d.id + ':deal:' + nDone);
+    }
+  }, [nDone]);
   useEffect(() => {
     const t = setInterval(() => setNow(Date.now()), ms(1000));
     return () => clearInterval(t);
@@ -7664,7 +8529,7 @@ function TradeWindow({
     className: "iconbtn",
     onClick: goHome,
     "aria-label": "Home"
-  }, "\u2302"), React.createElement("div", {
+  }, "\u2302"), React.createElement(MuteButton, null), React.createElement("div", {
     className: "title"
   }, "Trade window"), React.createElement("span", {
     className: 'tclock num' + (left < 30000 ? ' hot' : ''),
@@ -7911,7 +8776,7 @@ function FreePick({
     className: "iconbtn",
     onClick: goHome,
     "aria-label": "Home"
-  }, "\u2302"), React.createElement("div", {
+  }, "\u2302"), React.createElement(MuteButton, null), React.createElement("div", {
     className: "title"
   }, "Free picks \xB7 round ", cp.round + 1), React.createElement("button", {
     className: "pillbtn",
@@ -8348,6 +9213,98 @@ function Voting({
     onClick: onReveal
   }, voted === people.length ? 'Reveal winner' : 'Reveal (' + voted + '/' + people.length + ')')));
 }
+function ExportCard({
+  d,
+  kind,
+  showShame
+}) {
+  const {
+    counts,
+    winners
+  } = tally(d);
+  const ranked = [...d.managers].sort((a, b) => (counts[b.id] || 0) - (counts[a.id] || 0));
+  const head = React.createElement("div", {
+    className: "exhead"
+  }, React.createElement("span", {
+    className: "tag"
+  }, React.createElement("i", null), "$20 AUCTION"), React.createElement("b", null, "DRAFT NIGHT"), React.createElement("span", null, d.topic.emoji, " ", d.topic.name, " \xB7 ", new Date(d.createdAt).toLocaleDateString()));
+  if (kind === 'winner') {
+    const w = winners[0];
+    return React.createElement(React.Fragment, null, head, React.createElement("div", {
+      className: "exwin",
+      style: mStyle(w)
+    }, React.createElement("span", {
+      className: "exlabel"
+    }, winners.length > 1 ? 'JOINT CHAMPIONS' : 'CHAMPION'), React.createElement("span", {
+      className: "exname"
+    }, winners.map(x => x.emoji + ' ' + x.name).join(' & ')), w.members && React.createElement("span", {
+      className: "exmem"
+    }, w.members.map(p => p.name).join(' · ')), React.createElement("span", {
+      className: "exvotes"
+    }, counts[w.id], " vote", counts[w.id] === 1 ? '' : 's', " \xB7 ", money(d.rules.budget - w.budget), " spent \xB7 ", money(w.budget), " left")), React.createElement("div", {
+      className: "exroster"
+    }, d.rules.slots.map((sl, i) => {
+      const t = w.team[i];
+      const it = t && d.items[t.itemId];
+      const r = t && rarityOf(d, t.itemId);
+      return React.createElement("div", {
+        key: i,
+        className: "exrow"
+      }, React.createElement("span", {
+        className: "exslot"
+      }, sl), it ? React.createElement(ItemArt, {
+        item: it,
+        topic: d.topic,
+        size: 40,
+        radius: 8
+      }) : React.createElement("span", {
+        style: {
+          width: 40
+        }
+      }), React.createElement("span", {
+        className: "exitem"
+      }, it ? it.name : 'Empty', r && r !== 'common' ? React.createElement("span", {
+        className: 'rmark ' + r
+      }, " ", r === 'legendary' ? '★' : '◆') : null), React.createElement("span", {
+        className: "exprice"
+      }, t ? t.free ? 'FREE' : money(t.price) : ''));
+    })));
+  }
+  const awards = computeAwards(d);
+  const shame = showShame ? computeShame(d) : [];
+  return React.createElement(React.Fragment, null, head, React.createElement("div", {
+    className: "board"
+  }, React.createElement("h3", null, d.votesRevealed ? '🗳️ Final standings' : '💰 Teams'), ranked.map((m, i) => React.createElement("div", {
+    key: m.id,
+    className: "brow",
+    style: mStyle(m)
+  }, React.createElement("span", {
+    className: "rk num"
+  }, d.votesRevealed ? i + 1 : ''), React.createElement("span", {
+    className: "bn"
+  }, m.emoji, " ", m.name), React.createElement("span", {
+    className: "bw num",
+    style: {
+      fontSize: 18
+    }
+  }, d.votesRevealed ? (counts[m.id] || 0) + ' votes' : money(d.rules.budget - m.budget))))), awards.length > 0 && React.createElement("div", {
+    className: "board"
+  }, React.createElement("h3", null, "\uD83C\uDF96\uFE0F Awards"), awards.map((a, i) => React.createElement("p", {
+    key: a.id + i,
+    className: "award"
+  }, React.createElement("b", null, a.emoji, " ", a.title, ": ", a.team), React.createElement("br", null), React.createElement("span", {
+    className: "small"
+  }, a.why)))), shame.length > 0 && React.createElement("div", {
+    className: "board"
+  }, React.createElement("h3", null, "\uD83D\uDE48 Hall of Shame"), shame.map(a => React.createElement("p", {
+    key: a.id,
+    className: "award"
+  }, React.createElement("b", null, a.emoji, " ", a.title, ": ", a.team), React.createElement("br", null), React.createElement("span", {
+    className: "small"
+  }, a.item, " for ", money(a.price), ". ", a.why)))), React.createElement("p", {
+    className: "exportfoot"
+  }, "DRAFT NIGHT \xB7 ", (location.host + location.pathname).replace(/\/(index\.html)?$/, '')));
+}
 function Results({
   d,
   past,
@@ -8356,7 +9313,8 @@ function Results({
   onUndo,
   onFinish,
   onPlayAgain,
-  live
+  live,
+  showShame
 }) {
   const ref = useRef(null);
   const [voting, setVoting] = useState(false);
@@ -8374,13 +9332,26 @@ function Results({
   const solo = d.mode === 'solo';
   const doReveal = () => {
     setVoting(false);
-    setParty(x => x + 1);
-    buzz([60, 40, 60, 40, 200]);
-    window.scrollTo({
-      top: 0,
-      behavior: 'smooth'
-    });
+    audio.play('drumroll');
+    setTimeout(() => {
+      setParty(x => x + 1);
+      buzz([60, 40, 60, 40, 200]);
+      audio.play('fanfare');
+      setTimeout(() => audio.play('cheer'), 400);
+      window.scrollTo({
+        top: 0,
+        behavior: 'smooth'
+      });
+    }, 1100);
   };
+  useEffect(() => {
+    if (!revealed) return;
+    audio.say(winners.length > 1 ? callLine('tie', {
+      who: winners.map(w => w.name).join(' and ')
+    }) : callLine('winner', {
+      who: winners[0].name
+    }), 3, d.id + ':winner:' + Object.keys(d.votes || {}).length);
+  }, [revealed]);
   const soloVote = target => {
     setTimeout(() => {
       const votes = {
@@ -8409,7 +9380,36 @@ function Results({
   };
   const winIds = revealed ? winners.map(w => w.id) : [];
   const ordered = revealed ? [...d.managers].sort((a, b) => counts[b.id] - counts[a.id]) : d.managers;
-  const exportImg = async () => {
+  const stageRef = useRef(null);
+  const [exportKind, setExportKind] = useState(null);
+  const [pickFormat, setPickFormat] = useState(false);
+  const imagesReady = async node => {
+    const imgs = [...node.querySelectorAll('img')];
+    await Promise.all(imgs.map(im => im.complete ? Promise.resolve() : new Promise(r => {
+      im.addEventListener('load', r, {
+        once: true
+      });
+      im.addEventListener('error', r, {
+        once: true
+      });
+      setTimeout(r, 6000);
+    })));
+  };
+  const makeImage = async kind => {
+    setPickFormat(false);
+    if (kind === 'full') return exportImg(ref.current, 'results');
+    setExportKind(kind);
+  };
+  useEffect(() => {
+    if (!exportKind || !stageRef.current) return;
+    const node = stageRef.current;
+    (async () => {
+      await imagesReady(node);
+      await exportImg(node, exportKind);
+      setExportKind(null);
+    })();
+  }, [exportKind]);
+  const exportImg = async (node, kind) => {
     setImgBusy(true);
     setImgErr('');
     try {
@@ -8417,7 +9417,8 @@ function Results({
       try {
         if (document.fonts && document.fonts.ready) await document.fonts.ready;
       } catch (e) {}
-      const canvas = await window.html2canvas(ref.current, {
+      await imagesReady(node);
+      const canvas = await window.html2canvas(node, {
         backgroundColor: '#0f0c21',
         scale: Math.min(3, Math.max(2, window.devicePixelRatio || 2)),
         useCORS: true,
@@ -8430,7 +9431,7 @@ function Results({
       setImg({
         url: URL.createObjectURL(blob),
         blob,
-        name: 'draft-night-' + slug + '-' + todayStamp() + '.png'
+        name: 'draft-night-' + slug + '-' + (kind || 'results') + '-' + todayStamp() + '.png'
       });
     } catch (e) {
       setImgErr("The image couldn't be made. Try again, and if it keeps failing, take a screenshot instead.");
@@ -8460,7 +9461,7 @@ function Results({
     right: live && onUndo && d.history.length && !d.votesRevealed ? React.createElement("button", {
       className: "pillbtn",
       onClick: onUndo
-    }, "Undo") : null
+    }, "Undo") : React.createElement(MuteButton, null)
   }), React.createElement("div", {
     ref: ref,
     className: "resultwrap"
@@ -8569,7 +9570,10 @@ function Results({
     const t = d.votes && d.votes[m.id];
     const to = t && d.managers.find(x => x.id === t);
     return m.name + ' → ' + (to ? to.name : 'no vote');
-  }).join(' · ')), revealed && React.createElement(Leaderboard, {
+  }).join(' · ')), React.createElement(AwardsBoard, {
+    d: d,
+    showShame: showShame !== false
+  }), revealed && React.createElement(Leaderboard, {
     rows: winsBoard([...(past || []).filter(p => p.id !== d.id), d]),
     highlight: winners.map(w => w.name.trim().toLowerCase())
   }), d.trade && d.trade.proposals.some(t => t.status === 'accepted') && React.createElement("div", {
@@ -8600,7 +9604,7 @@ function Results({
     onClick: onPlayAgain
   }, "Play again"), React.createElement("button", {
     className: "btn",
-    onClick: exportImg,
+    onClick: () => setPickFormat(true),
     disabled: imgBusy
   }, imgBusy ? 'Making image…' : 'Save as image'), imgErr && React.createElement("p", {
     className: "warn"
@@ -8645,7 +9649,40 @@ function Results({
   }), party > 0 && revealed && React.createElement(Confetti, {
     key: party,
     colors: [...winners.map(w => w.color), '#ffc83d', '#ffffff']
-  }), img && React.createElement(Sheet, {
+  }), pickFormat && React.createElement(Sheet, {
+    center: true,
+    onClose: () => setPickFormat(false)
+  }, React.createElement("h2", {
+    className: "display",
+    style: {
+      fontSize: 30
+    }
+  }, "Which picture?"), React.createElement("button", {
+    className: "btn btn-gold",
+    onClick: () => makeImage('winner'),
+    disabled: !revealed
+  }, "\uD83C\uDFC6 Winner card"), !revealed && React.createElement("p", {
+    className: "hint"
+  }, "Reveal the vote first to make a winner card."), React.createElement("button", {
+    className: "btn",
+    onClick: () => makeImage('full')
+  }, "\uD83D\uDCCB Full results"), React.createElement("button", {
+    className: "btn",
+    onClick: () => makeImage('awards')
+  }, "\uD83C\uDF96\uFE0F Awards & standings"), React.createElement("button", {
+    className: "btn btn-ghost",
+    onClick: () => setPickFormat(false)
+  }, "Cancel")), exportKind && React.createElement("div", {
+    className: "exportstage",
+    "aria-hidden": "true"
+  }, React.createElement("div", {
+    ref: stageRef,
+    className: "excard"
+  }, React.createElement(ExportCard, {
+    d: d,
+    kind: exportKind,
+    showShame: showShame !== false
+  }))), img && React.createElement(Sheet, {
     center: true,
     onClose: closeImg
   }, React.createElement("h2", {
@@ -8755,7 +9792,7 @@ function Flash({
       '--fc': f.color || 'var(--muted)'
     }
   }, f.kind === 'sold' && React.createElement("div", {
-    className: 'inner' + (f.rarity === 'legendary' ? ' legendary' : '')
+    className: 'inner' + (f.rarity === 'legendary' ? ' legendary' : '') + (f.big ? ' bigsale' : '')
   }, React.createElement("div", {
     className: "big",
     style: {
@@ -8883,6 +9920,667 @@ function migrateTopics(stored) {
   store.set(K.seen, allIds);
   return out;
 }
+async function copyText(text) {
+  try {
+    await navigator.clipboard.writeText(text);
+    return true;
+  } catch (e) {
+    try {
+      const ta = document.createElement('textarea');
+      ta.value = text;
+      ta.style.position = 'fixed';
+      ta.style.opacity = '0';
+      document.body.appendChild(ta);
+      ta.select();
+      const ok = document.execCommand('copy');
+      ta.remove();
+      return ok;
+    } catch (e2) {
+      return false;
+    }
+  }
+}
+function ShareTopicSheet({
+  topic,
+  onClose
+}) {
+  const [withPhotos, setWithPhotos] = useState(false);
+  const [code, setCode] = useState('');
+  const [note, setNote] = useState('');
+  const hasPhotos = topic.items.some(i => i.photo);
+  useEffect(() => {
+    let live = true;
+    encodeTopic(topic, withPhotos).then(c => {
+      if (live) setCode(c);
+    });
+    return () => {
+      live = false;
+    };
+  }, [topic, withPhotos]);
+  const link = code ? shareLink(code) : '';
+  const tooLong = link.length > MAX_LINK;
+  const fp = topicCode(topic);
+  const copy = async (text, what) => setNote((await copyText(text)) ? what + ' copied.' : 'Couldn’t copy automatically. Press and hold the text to copy it.');
+  const file = () => {
+    downloadBlob(topicFile(topic), (topic.name || 'topic').toLowerCase().replace(/[^a-z0-9]+/g, '-').slice(0, 40) + '.dntopic.json');
+    setNote(isIOS() ? 'Saved to Files → Downloads. Send that file to your friend.' : 'Topic file saved.');
+  };
+  const share = async () => {
+    try {
+      if (navigator.share) {
+        await navigator.share({
+          title: topic.name + ' · Draft Night',
+          text: 'Import my Draft Night topic “' + topic.name + '”',
+          url: link
+        });
+        return;
+      }
+    } catch (e) {
+      if (e && e.name === 'AbortError') return;
+    }
+    copy(link, 'Link');
+  };
+  return React.createElement(Sheet, {
+    center: true,
+    onClose: onClose
+  }, React.createElement("p", {
+    className: "eyebrow"
+  }, "Share topic"), React.createElement("h2", {
+    className: "display",
+    style: {
+      fontSize: 30
+    }
+  }, topic.emoji, " ", topic.name), React.createElement("div", {
+    className: "row"
+  }, React.createElement("span", {
+    className: "fpcode num"
+  }, fp), React.createElement("span", {
+    className: "hint grow"
+  }, "Fingerprint: your friend sees the same code after importing, so you know it arrived intact.")), hasPhotos && React.createElement(Toggle, {
+    on: withPhotos,
+    onChange: setWithPhotos,
+    title: "Include uploaded photos",
+    sub: "Makes the link much longer. The topic file always includes them."
+  }), !code ? React.createElement("p", {
+    className: "hint"
+  }, "Preparing\u2026") : React.createElement(React.Fragment, null, React.createElement("div", {
+    className: "row"
+  }, React.createElement("button", {
+    className: "btn btn-gold grow",
+    onClick: share,
+    disabled: tooLong
+  }, "Share link"), React.createElement("button", {
+    className: "btn grow",
+    onClick: () => copy(link, 'Link'),
+    disabled: tooLong
+  }, "Copy link")), React.createElement("button", {
+    className: "btn",
+    onClick: () => copy(code, 'Share code')
+  }, "Copy share code (", Math.round(code.length / 100) / 10, "k characters)"), React.createElement("button", {
+    className: "btn",
+    onClick: file
+  }, "Download topic file"), tooLong ? React.createElement("p", {
+    className: "warn"
+  }, "This topic is too big for a link (", Math.round(link.length / 1000), "k characters). Send the topic file or the share code instead.") : React.createElement("p", {
+    className: "hint"
+  }, "The link holds the whole topic, so it works without any account or server. Image links and Wikipedia settings come along; uploaded photos only if you include them.")), note && React.createElement("p", {
+    className: "hint",
+    style: {
+      color: 'var(--ok)'
+    }
+  }, note), React.createElement("button", {
+    className: "btn btn-ghost",
+    onClick: onClose
+  }, "Done"));
+}
+function ImportTopicSheet({
+  topics,
+  initial,
+  onImport,
+  onClose
+}) {
+  const [text, setText] = useState(initial || '');
+  const [res, setRes] = useState(null);
+  const [busy, setBusy] = useState(false);
+  const fileRef = useRef(null);
+  const check = async t => {
+    setBusy(true);
+    setRes(await decodeShared(t));
+    setBusy(false);
+  };
+  useEffect(() => {
+    if (initial) check(initial);
+  }, []);
+  const fromFile = async e => {
+    const f = e.target.files && e.target.files[0];
+    e.target.value = '';
+    if (!f) return;
+    if (f.size > 20 * 1024 * 1024) {
+      setRes({
+        ok: false,
+        error: 'That file is too big to be a topic.'
+      });
+      return;
+    }
+    const t = await f.text();
+    setText('');
+    check(t);
+  };
+  const dup = res && res.ok && topics.find(t => topicCode(t) === topicCode(res.topic));
+  const sameName = res && res.ok && !dup && topics.find(t => t.name.trim().toLowerCase() === res.topic.name.trim().toLowerCase());
+  return React.createElement(Sheet, {
+    center: true,
+    onClose: onClose
+  }, React.createElement("p", {
+    className: "eyebrow"
+  }, "Import a topic"), React.createElement("h2", {
+    className: "display",
+    style: {
+      fontSize: 30
+    }
+  }, "Add a friend\u2019s topic"), !res || !res.ok ? React.createElement(React.Fragment, null, React.createElement("div", {
+    className: "field"
+  }, React.createElement("label", {
+    htmlFor: "import-text"
+  }, "Paste a share link or share code"), React.createElement("textarea", {
+    id: "import-text",
+    className: "input",
+    style: {
+      minHeight: 90
+    },
+    value: text,
+    onChange: e => setText(e.target.value),
+    placeholder: "https://\u2026#topic=DN1.\u2026"
+  })), React.createElement("div", {
+    className: "row"
+  }, React.createElement("button", {
+    className: "btn btn-gold grow",
+    disabled: !text.trim() || busy,
+    onClick: () => check(text)
+  }, busy ? 'Checking…' : 'Check'), React.createElement("button", {
+    className: "btn grow",
+    onClick: () => fileRef.current && fileRef.current.click()
+  }, "Open topic file")), React.createElement("input", {
+    ref: fileRef,
+    id: "import-file",
+    type: "file",
+    accept: "application/json,.json",
+    hidden: true,
+    onChange: fromFile
+  }), res && !res.ok && React.createElement("p", {
+    className: "warn"
+  }, res.error)) : React.createElement(React.Fragment, null, React.createElement("div", {
+    className: "card stack-sm",
+    style: {
+      background: 'var(--stage)'
+    }
+  }, React.createElement("b", {
+    style: {
+      fontFamily: 'var(--cond)',
+      fontSize: 20
+    }
+  }, res.topic.emoji, " ", res.topic.name), React.createElement("span", {
+    className: "small muted"
+  }, res.topic.items.length, " items \xB7 slots ", res.topic.slots.join(', '), " \xB7 ", res.topic.folder), React.createElement("span", {
+    className: "small"
+  }, res.topic.items.slice(0, 6).map(i => i.name).join(', '), res.topic.items.length > 6 ? '…' : ''), React.createElement("span", {
+    className: "fpcode num",
+    style: {
+      alignSelf: 'flex-start'
+    }
+  }, topicCode(res.topic))), dup && React.createElement("p", {
+    className: "warn"
+  }, "You already have this exact topic (\u201C", dup.name, "\u201D). Adding it again makes a second copy."), sameName && React.createElement("p", {
+    className: "hint"
+  }, "You have a different topic with the same name. This one is added alongside it; nothing is overwritten."), React.createElement("div", {
+    className: "row pin"
+  }, React.createElement("button", {
+    className: "btn btn-ghost grow",
+    onClick: () => setRes(null)
+  }, "Back"), React.createElement("button", {
+    className: "btn btn-gold grow",
+    onClick: () => {
+      onImport(dup ? {
+        ...res.topic,
+        name: res.topic.name + ' (copy)'
+      } : res.topic);
+      onClose();
+    }
+  }, dup ? 'Add a copy' : 'Add topic'))));
+}
+const pct = x => Math.round(x * 100) + '%';
+function ProfilesScreen({
+  past,
+  settings,
+  setSettings,
+  onBack,
+  onOpen,
+  onShame
+}) {
+  const rows = careerStats(past, settings);
+  const [ask, setAsk] = useState(false);
+  return React.createElement("div", {
+    className: "app"
+  }, React.createElement(TopBar, {
+    onBack: onBack,
+    title: "Players & stats"
+  }), React.createElement("p", {
+    className: "hint"
+  }, "Built from finished drafts on this device (after the vote is revealed). Bots aren\u2019t included. Stats don\u2019t sync between phones; use a backup to move them."), !rows.length && React.createElement("div", {
+    className: "card"
+  }, React.createElement("p", {
+    className: "muted",
+    style: {
+      margin: 0
+    }
+  }, "Finish a draft and reveal the vote, and everyone who played gets a profile here.")), React.createElement("div", {
+    className: "stack-sm"
+  }, rows.map((r, i) => React.createElement("button", {
+    key: r.key,
+    className: "tcard",
+    onClick: () => onOpen(r.key)
+  }, React.createElement("span", {
+    className: "em"
+  }, r.emoji), React.createElement("span", {
+    className: "meta"
+  }, React.createElement("span", {
+    className: "name"
+  }, i === 0 && r.wins ? '👑 ' : '', r.name), React.createElement("span", {
+    className: "sub"
+  }, r.wins, " win", r.wins === 1 ? '' : 's', " \xB7 ", r.games, " game", r.games === 1 ? '' : 's', " \xB7 ", pct(r.winRate), " \xB7 ", money(Math.round(r.spent)), " spent")), React.createElement("span", {
+    className: "muted",
+    style: {
+      fontSize: 22
+    }
+  }, "\u203A")))), settings.showShame !== false && React.createElement("button", {
+    className: "btn",
+    onClick: onShame
+  }, "\uD83D\uDE48 Hall of Shame"), React.createElement(Toggle, {
+    on: settings.showShame !== false,
+    onChange: v => setSettings(x => ({
+      ...x,
+      showShame: v
+    })),
+    title: "Show the Hall of Shame",
+    sub: "Funny awards for the worst buys. Turn off if your group prefers not to see it."
+  }), rows.length > 0 && React.createElement("button", {
+    className: "btn btn-danger",
+    onClick: () => setAsk(true)
+  }, "Reset stats"), ask && React.createElement(Confirm, {
+    title: "Reset all stats?",
+    body: "Profiles, wins and awards start from zero. Your Past Drafts stay saved and aren\u2019t deleted.",
+    yes: "Reset stats",
+    danger: true,
+    onYes: () => setSettings(x => ({
+      ...x,
+      statsResetAt: Date.now()
+    })),
+    onClose: () => setAsk(false)
+  }));
+}
+function ProfileView({
+  past,
+  settings,
+  setSettings,
+  pkey,
+  onBack
+}) {
+  const r = careerStats(past, settings).find(x => x.key === pkey);
+  const [name, setName] = useState(r ? r.name : '');
+  const [emoji, setEmoji] = useState(r ? r.emoji : '🙂');
+  if (!r) return React.createElement("div", {
+    className: "app"
+  }, React.createElement(TopBar, {
+    onBack: onBack,
+    title: "Player"
+  }), React.createElement("p", {
+    className: "muted"
+  }, "That player has no finished games."));
+  const save = (n, e) => setSettings(x => ({
+    ...x,
+    profiles: {
+      ...(x.profiles || {}),
+      [pkey]: {
+        name: n.trim() || r.name,
+        emoji: e || '🙂'
+      }
+    }
+  }));
+  const Stat = ({
+    k,
+    v,
+    d: sub
+  }) => React.createElement("div", {
+    className: "stat"
+  }, React.createElement("span", {
+    className: "k"
+  }, k), React.createElement("span", {
+    className: "v num"
+  }, v), sub && React.createElement("span", {
+    className: "d"
+  }, sub));
+  return React.createElement("div", {
+    className: "app"
+  }, React.createElement(TopBar, {
+    onBack: onBack,
+    title: "Player"
+  }), React.createElement("div", {
+    className: "card row",
+    style: {
+      gap: 10
+    }
+  }, React.createElement("button", {
+    className: "emo",
+    onClick: () => {
+      const e = EMOJIS[(EMOJIS.indexOf(emoji) + 1) % EMOJIS.length];
+      setEmoji(e);
+      save(name, e);
+    },
+    "aria-label": "Change avatar"
+  }, emoji), React.createElement("input", {
+    id: "profile-name",
+    className: "input grow",
+    maxLength: 16,
+    value: name,
+    onChange: e => setName(e.target.value),
+    onBlur: () => save(name, emoji)
+  })), React.createElement("p", {
+    className: "hint"
+  }, "Changing the display name only changes how it\u2019s shown. Games are matched by the name typed when playing."), React.createElement("div", {
+    className: "stat-grid"
+  }, React.createElement(Stat, {
+    k: "Wins",
+    v: r.wins,
+    d: pct(r.winRate) + ' win rate'
+  }), React.createElement(Stat, {
+    k: "Games",
+    v: r.games,
+    d: r.teamGames ? r.teamGames + ' in teams' : 'all individual'
+  }), React.createElement(Stat, {
+    k: "Team wins",
+    v: r.teamWins
+  }), React.createElement(Stat, {
+    k: "Money spent",
+    v: money(Math.round(r.spent)),
+    d: r.teamGames ? 'team spending split evenly' : null
+  }), React.createElement(Stat, {
+    k: "Legendaries",
+    v: r.legendary
+  }), React.createElement(Stat, {
+    k: "Trades done",
+    v: r.trades,
+    d: r.topCard ? 'Favourite card: ' + CARD_INFO[r.topCard].name : null
+  })), React.createElement("div", {
+    className: "board"
+  }, React.createElement("h3", null, "\u2764\uFE0F Favourite picks"), r.favourites.length ? r.favourites.map(([n, c]) => React.createElement("p", {
+    key: n,
+    className: "small",
+    style: {
+      margin: 0
+    }
+  }, n, " \xB7 drafted ", c, " times")) : React.createElement("p", {
+    className: "hint",
+    style: {
+      margin: 0
+    }
+  }, "Draft the same item twice and it shows up here.")), React.createElement("div", {
+    className: "board"
+  }, React.createElement("h3", null, "\uD83C\uDFF7\uFE0F Best bargain \xB7 \uD83D\uDCB8 Biggest overpay"), r.bargain ? React.createElement("p", {
+    className: "small",
+    style: {
+      margin: 0
+    }
+  }, "Bargain: ", r.bargain.name, " for ", money(r.bargain.price), " (usually ", money(Math.round(r.bargain.avg)), ") \xB7 ", r.bargain.topic) : React.createElement("p", {
+    className: "hint",
+    style: {
+      margin: 0
+    }
+  }, "No bargain on record yet."), r.overpay ? React.createElement("p", {
+    className: "small",
+    style: {
+      margin: 0
+    }
+  }, "Overpay: ", r.overpay.name, " for ", money(r.overpay.price), " (usually ", money(Math.round(r.overpay.avg)), ") \xB7 ", r.overpay.topic) : React.createElement("p", {
+    className: "hint",
+    style: {
+      margin: 0
+    }
+  }, "No overpay on record yet."), React.createElement("p", {
+    className: "hint",
+    style: {
+      margin: 0
+    }
+  }, "How it\u2019s worked out: each price is compared with the average that same item sold for across your saved drafts. Items need at least 2 sales to compare, so nothing is guessed.")), r.best && React.createElement("div", {
+    className: "board"
+  }, React.createElement("h3", null, "\uD83C\uDFC6 Best win"), React.createElement("p", {
+    className: "small",
+    style: {
+      margin: 0
+    }
+  }, r.best.team, " \xB7 ", r.best.topic, " \xB7 ", r.best.votes, " vote", r.best.votes === 1 ? '' : 's', " (", pct(r.best.share), ") \xB7 ", new Date(r.best.date).toLocaleDateString())), React.createElement("div", {
+    className: "board"
+  }, React.createElement("h3", null, "\uD83C\uDF96\uFE0F Awards"), Object.keys(r.awards).length ? Object.entries(r.awards).sort((a, b) => b[1] - a[1]).map(([t, n]) => React.createElement("p", {
+    key: t,
+    className: "small",
+    style: {
+      margin: 0
+    }
+  }, t, " \xD7 ", n)) : React.createElement("p", {
+    className: "hint",
+    style: {
+      margin: 0
+    }
+  }, "No awards yet.")));
+}
+function ShameScreen({
+  past,
+  settings,
+  onBack
+}) {
+  const rows = hallOfShame(past, settings);
+  return React.createElement("div", {
+    className: "app"
+  }, React.createElement(TopBar, {
+    onBack: onBack,
+    title: "Hall of Shame"
+  }), React.createElement("p", {
+    className: "hint"
+  }, "All in good fun. Each entry says exactly why it\u2019s here, using that draft\u2019s own prices."), !rows.length && React.createElement("div", {
+    className: "card"
+  }, React.createElement("p", {
+    className: "muted",
+    style: {
+      margin: 0
+    }
+  }, "Nobody has embarrassed themselves yet. Give it time.")), React.createElement("div", {
+    className: "stack-sm"
+  }, rows.map((x, i) => React.createElement("div", {
+    key: x.draftId + x.id + i,
+    className: "shame"
+  }, React.createElement("span", {
+    className: "se"
+  }, x.emoji), React.createElement("span", {
+    className: "grow",
+    style: {
+      minWidth: 0
+    }
+  }, React.createElement("b", null, x.title, ": ", x.item, " \xB7 ", money(x.price)), React.createElement("span", {
+    className: "small",
+    style: {
+      display: 'block'
+    }
+  }, x.team, " \xB7 ", x.topic, " \xB7 ", new Date(x.date).toLocaleDateString()), React.createElement("span", {
+    className: "small muted",
+    style: {
+      display: 'block'
+    }
+  }, x.why))))));
+}
+function AwardsBoard({
+  d,
+  showShame
+}) {
+  const awards = computeAwards(d);
+  const shame = showShame ? computeShame(d) : [];
+  if (!awards.length && !shame.length) return null;
+  return React.createElement(React.Fragment, null, awards.length > 0 && React.createElement("div", {
+    className: "board"
+  }, React.createElement("h3", null, "\uD83C\uDF96\uFE0F Awards"), awards.map((a, i) => React.createElement("p", {
+    key: a.id + i,
+    className: "award"
+  }, React.createElement("b", null, a.emoji, " ", a.title, ": ", a.team), React.createElement("span", {
+    className: "small muted"
+  }, " \u2014 ", a.why)))), shame.length > 0 && React.createElement("div", {
+    className: "board"
+  }, React.createElement("h3", null, "\uD83D\uDE48 Hall of Shame"), shame.map(a => React.createElement("p", {
+    key: a.id,
+    className: "award"
+  }, React.createElement("b", null, a.emoji, " ", a.title, ": ", a.team), React.createElement("span", {
+    className: "small muted"
+  }, " \u2014 ", a.item, " for ", money(a.price), ". ", a.why)))));
+}
+function AudioSettings() {
+  const {
+    cfg,
+    set
+  } = React.useContext(AudioCtx);
+  const [voices, setVoices] = useState(() => audio.voices());
+  useEffect(() => {
+    if (!audio.hasSpeech()) return undefined;
+    const upd = () => setVoices(audio.voices());
+    try {
+      window.speechSynthesis.addEventListener('voiceschanged', upd);
+    } catch (e) {}
+    const t = setTimeout(upd, 600);
+    return () => {
+      clearTimeout(t);
+      try {
+        window.speechSynthesis.removeEventListener('voiceschanged', upd);
+      } catch (e) {}
+    };
+  }, []);
+  const up = p => set({
+    ...cfg,
+    ...p
+  });
+  const Range = ({
+    id,
+    label,
+    value,
+    onChange
+  }) => React.createElement("div", {
+    className: "field"
+  }, React.createElement("label", {
+    htmlFor: id
+  }, label, " \xB7 ", Math.round(value * 100), "%"), React.createElement("input", {
+    id: id,
+    type: "range",
+    min: "0",
+    max: "1",
+    step: "0.05",
+    value: value,
+    onChange: e => onChange(parseFloat(e.target.value))
+  }));
+  return React.createElement("section", {
+    className: "card stack"
+  }, React.createElement("h3", null, "\uD83D\uDD0A Sound & voice"), React.createElement(Toggle, {
+    on: cfg.muted,
+    onChange: v => up({
+      muted: v
+    }),
+    title: "Mute everything",
+    sub: "Silences the auctioneer, sound effects and music right away. Also on the \uD83D\uDD0A button during games."
+  }), React.createElement(Toggle, {
+    on: cfg.voice,
+    onChange: v => up({
+      voice: v
+    }),
+    title: "Auctioneer voice",
+    sub: audio.hasSpeech() ? 'Calls out items, bids, “going once…” and SOLD.' : 'This browser can’t speak, so the auctioneer stays silent. Everything else still works.'
+  }), cfg.voice && audio.hasSpeech() && React.createElement(React.Fragment, null, React.createElement("div", {
+    className: "field"
+  }, React.createElement("span", {
+    className: "label"
+  }, "Voice speed"), React.createElement(Seg, {
+    label: "Voice speed",
+    value: cfg.rate,
+    options: [[0.95, 'Slow'], [1.15, 'Normal'], [1.35, 'Fast'], [1.55, 'Hype']],
+    onChange: v => up({
+      rate: v
+    })
+  })), voices.length > 0 && React.createElement("div", {
+    className: "field"
+  }, React.createElement("label", {
+    htmlFor: "voice-pick"
+  }, "Voice"), React.createElement("select", {
+    id: "voice-pick",
+    className: "input",
+    value: cfg.voiceName,
+    onChange: e => up({
+      voiceName: e.target.value
+    })
+  }, React.createElement("option", {
+    value: ""
+  }, "Best available"), voices.map(v => React.createElement("option", {
+    key: v.name,
+    value: v.name
+  }, v.name)))), Range({
+    id: 'voice-vol',
+    label: 'Voice volume',
+    value: cfg.voiceVol,
+    onChange: v => up({
+      voiceVol: v
+    })
+  })), React.createElement(Toggle, {
+    on: cfg.sfx,
+    onChange: v => up({
+      sfx: v
+    }),
+    title: "Sound effects",
+    sub: "Gavel, crowd cheers, buzzer, drumroll and small blips."
+  }), cfg.sfx && Range({
+    id: 'sfx-vol',
+    label: 'Effects volume',
+    value: cfg.sfxVol,
+    onChange: v => up({
+      sfxVol: v
+    })
+  }), React.createElement(Toggle, {
+    on: cfg.music,
+    onChange: v => up({
+      music: v
+    }),
+    title: "Background music",
+    sub: "An original looping game-show track, played quietly under everything."
+  }), cfg.music && Range({
+    id: 'music-vol',
+    label: 'Music volume',
+    value: cfg.musicVol,
+    onChange: v => up({
+      musicVol: v
+    })
+  }), React.createElement("div", {
+    className: "field"
+  }, React.createElement("span", {
+    className: "label"
+  }, "Big-money sale"), React.createElement(Seg, {
+    label: "Big sale threshold",
+    value: cfg.bigSale,
+    options: [[30, '30%'], [40, '40%'], [50, '50%']],
+    onChange: v => up({
+      bigSale: v
+    })
+  }), React.createElement("p", {
+    className: "hint"
+  }, "A sale for at least this share of the starting budget gets the extra-dramatic SOLD.")), React.createElement("button", {
+    className: "btn btn-sm",
+    style: {
+      alignSelf: 'flex-start'
+    },
+    disabled: cfg.muted,
+    onClick: () => audio.test()
+  }, "Test sound"));
+}
 const fmtBytes = n => n > 1048576 ? (n / 1048576).toFixed(1) + ' MB' : Math.max(1, Math.round(n / 1024)) + ' KB';
 function SettingsScreen({
   onBack,
@@ -9006,7 +10704,7 @@ function SettingsScreen({
     className: "hint"
   }, "On iPhone this only works in Safari, not inside other apps' browsers."))), React.createElement("p", {
     className: "hint"
-  }, "Updates arrive automatically. When a new version is ready you'll see a Reload button.")), React.createElement("section", {
+  }, "Updates arrive automatically. When a new version is ready you'll see a Reload button.")), React.createElement(AudioSettings, null), React.createElement("section", {
     className: "card stack"
   }, React.createElement("h3", null, "\uD83D\uDCBE Backup & restore"), React.createElement("p", {
     className: "hint"
@@ -9096,7 +10794,28 @@ function App() {
   const [flash, setFlash] = useState(null);
   const [toast, setToast] = useState(null);
   const [folder, setFolder] = useState(null);
+  const [importing, setImporting] = useState(null);
+  useEffect(() => {
+    const m = (location.hash || '').match(/^#topic=(.+)$/);
+    if (m) {
+      setImporting(decodeURIComponent(m[1]));
+      try {
+        history.replaceState(null, '', location.pathname + location.search);
+      } catch (e) {}
+    }
+  }, []);
   const [settings, setSettings] = useState(() => store.get(K.settings, {}));
+  const audioCfg = {
+    ...AUDIO_DEFAULTS,
+    ...(settings.audio || {})
+  };
+  const setAudioCfg = c => setSettings(x => ({
+    ...x,
+    audio: c
+  }));
+  useEffect(() => {
+    audio.set(audioCfg);
+  }, [JSON.stringify(audioCfg)]);
   const soloCfg = {
     ...DEFAULT_SOLO,
     ...(settings.solo || {})
@@ -9256,6 +10975,7 @@ function App() {
         topics: topics,
         folder: folder,
         setFolder: setFolder,
+        onImport: () => setImporting(''),
         onBack: () => go(screen.from || 'home'),
         onOpen: id => go('topic', {
           id,
@@ -9482,6 +11202,7 @@ function App() {
       });else view = React.createElement(Results, {
         d: draft,
         past: past,
+        showShame: settings.showShame,
         live: true,
         onChange: setDraft,
         onBack: () => go('home'),
@@ -9509,6 +11230,7 @@ function App() {
         view = p ? React.createElement(Results, {
           d: p,
           past: past,
+          showShame: settings.showShame,
           onChange: nd => {
             setPast(ps => ps.map(x => x.id === nd.id ? nd : x));
             if (draft && draft.id === nd.id) setDraft({
@@ -9521,6 +11243,35 @@ function App() {
         }) : null;
         break;
       }
+    case 'players':
+      view = React.createElement(ProfilesScreen, {
+        past: past,
+        settings: settings,
+        setSettings: setSettings,
+        onBack: () => go('home'),
+        onOpen: key => go('player', {
+          id: key
+        }),
+        onShame: () => go('shame')
+      });
+      break;
+    case 'player':
+      view = React.createElement(ProfileView, {
+        key: screen.id,
+        past: past,
+        settings: settings,
+        setSettings: setSettings,
+        pkey: screen.id,
+        onBack: () => go('players')
+      });
+      break;
+    case 'shame':
+      view = React.createElement(ShameScreen, {
+        past: past,
+        settings: settings,
+        onBack: () => go('players')
+      });
+      break;
     case 'settings':
       view = React.createElement(SettingsScreen, {
         onBack: () => go('home'),
@@ -9568,15 +11319,29 @@ function App() {
           setDraft(null);
           go('solo-setup');
         },
+        onPlayers: () => go('players'),
         onResume: () => go('draft'),
         onTopics: () => go('topics'),
         onPast: () => go('past'),
         onAbandon: () => setDraft(null)
       });
   }
-  return React.createElement(React.Fragment, null, view, flash && React.createElement(Flash, {
+  return React.createElement(AudioCtx.Provider, {
+    value: {
+      cfg: audioCfg,
+      set: setAudioCfg
+    }
+  }, view, flash && React.createElement(Flash, {
     f: flash,
     onDone: () => setFlash(null)
+  }), importing !== null && React.createElement(ImportTopicSheet, {
+    topics: topics,
+    initial: importing,
+    onClose: () => setImporting(null),
+    onImport: t => {
+      setTopics(ts => [...ts, t]);
+      setToast('Added “' + t.name + '” to ' + t.folder + '.');
+    }
   }), app.updateReady && !toast && React.createElement("div", {
     className: "toast ok",
     role: "status"
@@ -9633,6 +11398,24 @@ class Boundary extends React.Component {
   }
 }
 if (window.__DN_TEST__) window.__DN = {
+  audio,
+  AUDIO_DEFAULTS,
+  share: {
+    encodeTopic,
+    decodeShared,
+    packTopic,
+    unpackTopic,
+    topicCode,
+    shareLink,
+    MAX_LINK
+  },
+  stats: {
+    careerStats,
+    computeAwards,
+    computeShame,
+    hallOfShame,
+    humanPlayers
+  },
   bots: {
     makeBots,
     nextBotAction,
