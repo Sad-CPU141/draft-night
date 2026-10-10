@@ -53,7 +53,7 @@ async function tap(w, el) { el.dispatchEvent(new w.MouseEvent('pointerdown', { b
   {
     const { DN } = await boot();
     const ts = DN.starterTopics();
-    ok(ts.length === 48, '48 starter topics (' + ts.length + ')');
+    ok(ts.length >= 153, 'starter topics: ' + ts.length + ' (at least 153)');
     const ids = new Set(); let dup = false; ts.forEach((t) => { if (ids.has(t.id)) dup = true; ids.add(t.id); t.items.forEach((i) => { if (ids.has(i.id)) dup = true; ids.add(i.id); }); });
     ok(!dup, 'all topic and item ids unique');
     ok(ts.every((t) => t.items.every((i) => !i.pos || t.slots.some((s) => s.toUpperCase() === i.pos.toUpperCase()))), 'every item position matches a slot');
@@ -380,12 +380,12 @@ async function tap(w, el) { el.dispatchEvent(new w.MouseEvent('pointerdown', { b
     await click(w, btn(d, 'Sports')); await click(w, btn(d, 'Premier League Legends'));
     ok(/General/.test(d.body.textContent) && /Auction & bidding/.test(d.body.textContent) && /Chaos & surprises/.test(d.body.textContent) && /Teams & trading/.test(d.body.textContent) && /Winner/.test(d.body.textContent), 'rules are organised into tabs');
     await click(w, [...d.querySelectorAll('.seg button')].find((b) => b.textContent === 'Nomination'));
-    await click(w, [...d.querySelectorAll('.tab')].find((b) => /Teams & trading/.test(b.textContent)));
+    await click(w, [...d.querySelectorAll('.ttab')].find((b) => /Teams & trading/.test(b.textContent)));
     ok(/2v2/.test(d.body.textContent), 'Teams & trading tab shows the team setup (2v2)');
     const tradeSw = d.querySelector('[role=switch][aria-label^="Trade window after the draft"]');
     ok(tradeSw && tradeSw.getAttribute('aria-checked') === 'false', 'the trade window is off until switched on');
     await click(w, tradeSw);
-    await click(w, [...d.querySelectorAll('.tab')].find((b) => /Review/.test(b.textContent)));
+    await click(w, [...d.querySelectorAll('.ttab')].find((b) => /Review/.test(b.textContent)));
     ok(/Trade window: 3 min/.test(d.body.textContent) && /Nomination/.test(d.body.textContent) && /Chaos Cards: off/.test(d.body.textContent), 'Review lists the rules in play');
     await click(w, btn(d, 'Start the draft'));
     ok(/Nominating/.test(d.body.textContent), 'nomination mode: first team is asked to nominate');
@@ -979,6 +979,8 @@ async function tap(w, el) { el.dispatchEvent(new w.MouseEvent('pointerdown', { b
     const okVotes = s4.finale.bracket.rounds.flat().every((m) => Object.entries(m.votes || {}).every(([pid, t]) => pid !== t));
     ok(/Champions!/.test(b4.d.body.textContent) && okVotes, 'solo bracket: bots vote, nobody votes for their own team, a champion is crowned');
   }
+
+  await require('./topics.js')({ ok, boot, btn, click, sleep });
 
   if (!process.env.SKIP_ONLINE) await require('./online.js')({ ok, boot, btn, click, sleep });
 

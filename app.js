@@ -1,4 +1,4 @@
-/* Draft Night 246f6228cc — built from src/ by build.js. Edit src/, not this file. */
+/* Draft Night e316caa9e3 — built from src/ by build.js. Edit src/, not this file. */
 "use strict";
 (function(){
 function _extends() { return _extends = Object.assign ? Object.assign.bind() : function (n) { for (var e = 1; e < arguments.length; e++) { var t = arguments[e]; for (var r in t) ({}).hasOwnProperty.call(t, r) && (n[r] = t[r]); } return n; }, _extends.apply(null, arguments); }
@@ -614,12 +614,17 @@ function folderList(topics, includeDefaults) {
   });
 }
 function starterTopics() {
+  const v3 = [...sportsTopicsV3(), ...foodTopicsV3(), ...entTopicsV3(), ...travelTopicsV3(), ...animalTopicsV3(), ...styleTopicsV3(), ...funTopicsV3()];
   return [...baseTopics(), ...evenMoreTopics(), ...funTopics()].map(t => ({
     ...t,
     folder: STARTER_FOLDER[t.id] || 'My Topics',
     photos: Object.prototype.hasOwnProperty.call(PHOTO_TOPICS, t.id)
-  }));
+  })).concat(v3.map(t => ({
+    ...t,
+    builtin: true
+  })));
 }
+const isBuiltIn = t => !!t && (Object.prototype.hasOwnProperty.call(STARTER_FOLDER, t.id) || !!t.v3 || !!t.builtin);
 function funTopics() {
   return [mkTopic('t-island', 'Desert Island Items', '🏝️', 'Item 1, Item 2, Item 3', 'list', 'emoji', `
 Knife||Cut anything|🔪
@@ -2085,6 +2090,4336 @@ Recess||Disney · 1997|🏫
 Hey Arnold!||Nickelodeon · 1996|🏈
 Rugrats||Nickelodeon · 1991|🍼
 Jimmy Neutron||Nickelodeon · 2002|🧠`)];
+}
+function animalTopicsV3() {
+  const F = 'Animals';
+  return [mkT('t-cats', 'Big & Wild Cats', '🐆', F, 'Pick 1, Pick 2, Pick 3, Pick 4', 'ps', `
+Lion|Africa and India||🦁
+Tiger|Asia||🐅
+Leopard|Africa and Asia||🐆
+Jaguar|The Americas||🐆
+Cheetah|Fastest land animal||🐆
+Snow Leopard|Central Asia||🐆
+Cougar|The Americas||🐈
+Clouded Leopard|Southeast Asia||🐆
+Eurasian Lynx|Europe and Asia||🐈
+Canada Lynx|Canada||🐈
+Bobcat|North America||🐈
+Caracal|Africa and Middle East||🐈
+Serval|Africa||🐈
+Ocelot|The Americas||🐈
+Sand Cat|Arabian and Saharan deserts||🐈
+Fishing Cat|South Asia||🐟
+Pallas's Cat|Central Asia|Pallas's cat|🐈
+Margay|Central and South America||🐈
+Black-footed Cat|Southern Africa|Black-footed cat|🐈
+Jaguarundi|The Americas||🐈
+Iberian Lynx|Spain and Portugal||🐈
+Rusty-spotted Cat|Smallest wild cat|Rusty-spotted cat|🐈
+Arabian Leopard|Arabian Peninsula|Arabian leopard|🐆
+Siberian Tiger|Russian Far East|Siberian tiger|🐅`), mkT('t-dogbreeds', 'Dog Breeds', '🐕', F, 'Pick 1, Pick 2, Pick 3, Pick 4', 'ps', `
+Labrador Retriever|Friendly classic|Labrador Retriever|🐕
+Golden Retriever|Gentle and loyal|Golden Retriever|🐕
+German Shepherd|Smart worker|German Shepherd|🐕‍🦺
+French Bulldog|Small and charming|French Bulldog|🐶
+Bulldog|Wrinkly|Bulldog|🐶
+Poodle|Clever|Poodle|🐩
+Beagle|Nose to the ground|Beagle|🐶
+Rottweiler|Strong guardian|Rottweiler|🐕
+Dachshund|Sausage dog|Dachshund|🌭
+Siberian Husky|Sled dog|Siberian Husky|🐺
+Pembroke Welsh Corgi|Royal favourite|Pembroke Welsh Corgi|🐶
+Shiba Inu|Doge|Shiba Inu|🐕
+Pomeranian|Fluffy|Pomeranian dog|🐶
+Chihuahua|Tiny|Chihuahua (dog)|🐶
+Border Collie|Smartest breed|Border Collie|🐕
+Australian Shepherd|Herder|Australian Shepherd|🐕
+Dobermann|Sleek guardian|Dobermann|🐕
+Great Dane|Gentle giant|Great Dane|🐕
+Boxer|Playful|Boxer (dog)|🐶
+Pug|Squishy face|Pug|🐶
+Shih Tzu|Lap dog|Shih Tzu|🐶
+Yorkshire Terrier|Small terrier|Yorkshire Terrier|🐶
+Bernese Mountain Dog|Swiss giant|Bernese Mountain Dog|🐕
+Samoyed|Smiling fluff|Samoyed dog|☁️
+Cavalier King Charles Spaniel|Sweet|Cavalier King Charles Spaniel|🐶
+Saluki|Ancient Arabian hound|Saluki|🐕
+Akita|Loyal|Akita (dog)|🐕
+Dalmatian|Spots|Dalmatian dog|🐕
+Bull Terrier|Egg-shaped head|Bull Terrier|🐶
+Newfoundland|Water rescuer|Newfoundland dog|🐕
+Maltese|White and fluffy|Maltese dog|🐶
+Greyhound|Fastest dog|Greyhound|🐕
+Belgian Malinois|Working dog|Belgian Shepherd|🐕‍🦺
+Cocker Spaniel|Floppy ears|Cocker Spaniel|🐶
+Chow Chow|Blue tongue|Chow Chow|🦁`), mkT('t-catbreeds', 'Cat Breeds', '🐈', F, 'Pick 1, Pick 2, Pick 3, Pick 4', 'ps', `
+Persian|Long-haired and calm|Persian cat|🐈
+Maine Coon|Gentle giant||🐈
+Siamese|Talkative|Siamese cat|🐈
+Ragdoll|Floppy and friendly|Ragdoll|🐈
+British Shorthair|Round and plush||🐈
+Bengal|Wild-looking|Bengal cat|🐆
+Sphynx|Hairless|Sphynx cat|🐈
+Scottish Fold|Folded ears||🐈
+Russian Blue|Silver-blue||🐈
+Abyssinian|Active|Abyssinian cat|🐈
+Norwegian Forest Cat|Fluffy Viking cat||🐈
+Siberian|Fluffy|Siberian cat|🐈
+Birman|Sacred cat of Burma|Birman|🐈
+Exotic Shorthair|Short-haired Persian||🐈
+Devon Rex|Pixie cat||🐈
+Cornish Rex|Curly coat||🐈
+Savannah|Part serval|Savannah cat|🐆
+Turkish Angora|Elegant||🐈
+Turkish Van|Swimming cat||🐈
+Egyptian Mau|Spotted||🐈
+American Shorthair|Classic tabby||🐈
+Burmese|Affectionate|Burmese cat|🐈
+Himalayan|Colourpoint Persian|Himalayan cat|🐈
+Ragamuffin|Cuddly|Ragamuffin cat|🐈
+Munchkin|Short legs|Munchkin cat|🐈
+Tonkinese|Playful|Tonkinese cat|🐈
+Arabian Mau|Desert street cat|Arabian Mau|🐈`), mkT('t-sharks', 'Sharks', '🦈', F, 'Pick 1, Pick 2, Pick 3, Pick 4', 'ps', `
+Great White Shark|Apex predator||🦈
+Great Hammerhead|Hammer-shaped head||🦈
+Tiger Shark|Striped||🦈
+Bull Shark|Swims in rivers||🦈
+Whale Shark|Largest fish||🐋
+Basking Shark|Filter feeder||🦈
+Shortfin Mako|Fastest shark||🦈
+Blue Shark|Ocean wanderer||🦈
+Thresher Shark|Whip-like tail|Thresher shark|🦈
+Nurse Shark|Bottom dweller||🦈
+Lemon Shark|Yellowish||🍋
+Goblin Shark|Deep-sea oddity||👺
+Megamouth Shark|Rarely seen||🦈
+Greenland Shark|Lives 400 years||🧊
+Oceanic Whitetip|Open ocean|Oceanic whitetip shark|🦈
+Blacktip Reef Shark|Reef patrol||🦈
+Whitetip Reef Shark|Reef resident||🦈
+Wobbegong|Carpet shark||🟫
+Zebra Shark|Spotted adults||🦓
+Leopard Shark|Spotted|Leopard shark|🐆
+Sand Tiger Shark|Toothy grin|Sand tiger shark|🦈
+Frilled Shark|Living fossil||🦈
+Cookiecutter Shark|Takes round bites||🍪
+Angel Shark|Flat ambusher||👼
+Bonnethead|Small hammerhead||🦈
+Megalodon|Extinct giant||🦖`), mkT('t-whales', 'Whales & Dolphins', '🐋', F, 'Pick 1, Pick 2, Pick 3, Pick 4', 'ps', `
+Blue Whale|Largest animal ever||🐋
+Humpback Whale|Singer||🐋
+Orca|Killer whale||🐬
+Sperm Whale|Deep diver||🐋
+Beluga Whale|White whale||🤍
+Narwhal|Unicorn of the sea||🦄
+Bottlenose Dolphin|Classic dolphin|Common bottlenose dolphin|🐬
+Gray Whale|Long migration||🐋
+Fin Whale|Second largest||🐋
+Minke Whale|Small baleen whale||🐋
+Bowhead Whale|Lives 200 years||🐋
+North Atlantic Right Whale|Endangered||🐋
+Pilot Whale|Social|Pilot whale|🐋
+Risso's Dolphin|Scarred grey|Risso's dolphin|🐬
+Spinner Dolphin|Acrobat||🐬
+Amazon River Dolphin|Pink dolphin||🩷
+Hector's Dolphin|New Zealand||🐬
+Vaquita|Rarest porpoise||🐬
+Pacific White-sided Dolphin|Playful||🐬
+Common Dolphin|Hourglass pattern|Common dolphin|🐬
+Sei Whale|Fast baleen whale||🐋
+Cuvier's Beaked Whale|Record diver|Cuvier's beaked whale|🐋
+Irrawaddy Dolphin|Round head||🐬
+Commerson's Dolphin|Panda dolphin|Commerson's dolphin|🐼
+False Killer Whale|Dark and sleek||🐋`), mkT('t-raptors', 'Birds of Prey', '🦅', F, 'Pick 1, Pick 2, Pick 3, Pick 4', 'ps', `
+Bald Eagle|North America||🦅
+Golden Eagle|Northern hemisphere||🦅
+Harpy Eagle|Rainforest giant||🦅
+Peregrine Falcon|Fastest animal||🦅
+Saker Falcon|Falconry favourite in Arabia||🦅
+Gyrfalcon|Arctic falcon||🦅
+Osprey|Fish hunter||🐟
+Red-tailed Hawk|North America||🦅
+Harris's Hawk|Hunts in groups|Harris's hawk|🦅
+Snowy Owl|Arctic||🦉
+Great Horned Owl|The Americas||🦉
+Barn Owl|Heart-shaped face||🦉
+Eurasian Eagle-Owl|Huge owl||🦉
+Philippine Eagle|Monkey-eating eagle||🦅
+Andean Condor|Huge wingspan||🦅
+California Condor|Rare vulture||🦅
+Secretary Bird|Kicks snakes|Secretarybird|🦅
+Common Kestrel|Hovering hunter||🦅
+Steller's Sea Eagle|Giant sea eagle|Steller's sea eagle|🦅
+Martial Eagle|Africa's largest eagle||🦅
+Bearded Vulture|Eats bones||🦴
+Red Kite|Forked tail||🦅
+Northern Goshawk|Forest hunter||🦅
+Crowned Eagle|African forest eagle|Crowned eagle|🦅
+Turkey Vulture|Soaring scavenger||🦅
+Merlin|Small falcon|Merlin (bird)|🦅`), mkT('t-parrots', 'Parrots & Exotic Birds', '🦜', F, 'Pick 1, Pick 2, Pick 3, Pick 4', 'ps', `
+Scarlet Macaw|Red, yellow, blue||🦜
+Blue-and-yellow Macaw|Bright and loud|Blue-and-yellow macaw|🦜
+Hyacinth Macaw|Largest parrot||💙
+African Grey Parrot|Talking genius|Grey parrot|🦜
+Sulphur-crested Cockatoo|Australian||🦜
+Cockatiel|Crested pet||🦜
+Budgerigar|Budgie||🦜
+Lovebird|Small and social||💕
+Kea|Alpine parrot||🦜
+Kākāpō|Flightless parrot||🦜
+Toco Toucan|Huge orange beak||🐦
+Flamingo|Pink and on one leg||🦩
+Indian Peafowl|Peacock||🦚
+Greater Bird-of-paradise|Courtship dancer|Greater bird-of-paradise|🐦
+Resplendent Quetzal|Sacred to the Maya||🐦
+Great Hornbill|Casque on its bill||🐦
+Lilac-breasted Roller|Rainbow colours||🐦
+Golden Pheasant|Fiery colours||🐦
+Mandarin Duck|Most colourful duck||🦆
+Rainbow Lorikeet|Rainbow parrot||🌈
+Eclectus Parrot|Red and green|Eclectus parrot|🦜
+Sun Conure|Orange and yellow|Sun parakeet|🦜
+Gouldian Finch|Painted finch||🐦
+Shoebill|Prehistoric stare||🐦
+Atlantic Puffin|Sea parrot||🐧
+Common Kingfisher|Flash of blue||🐦`), mkT('t-reptiles', 'Reptiles', '🦎', F, 'Pick 1, Pick 2, Pick 3, Pick 4', 'ps', `
+Komodo Dragon|Largest lizard||🦎
+Saltwater Crocodile|Largest reptile||🐊
+Nile Crocodile|Africa||🐊
+American Alligator|USA||🐊
+Gharial|Thin snout||🐊
+Green Sea Turtle|Ocean traveller||🐢
+Leatherback Sea Turtle|Largest turtle||🐢
+Galápagos Tortoise|Giant tortoise||🐢
+Panther Chameleon|Colour changer||🦎
+Leopard Gecko|Spotty pet||🦎
+Bearded Dragon|Pet favourite|Pogona|🦎
+Green Iguana|Tree lizard||🦎
+Gila Monster|Venomous lizard||🦎
+Frilled Lizard|Neck frill|Frilled-neck lizard|🦎
+Thorny Devil|Spiky desert lizard||🦎
+Tuatara|Living fossil||🦎
+Nile Monitor|Big lizard||🦎
+Common Basilisk|Runs on water||🦎
+Alligator Snapping Turtle|Lure tongue||🐢
+Marine Iguana|Swims in the sea||🦎
+Horned Lizard|Squirts blood|Horned lizard|🦎
+Blue-tongued Skink|Blue tongue|Blue-tongued skink|🦎
+Spectacled Caiman|South America||🐊
+Aldabra Giant Tortoise|Seychelles||🐢
+Spiny-tailed Lizard|Arabian dhub|Uromastyx|🦎`), mkT('t-snakes', 'Snakes', '🐍', F, 'Pick 1, Pick 2, Pick 3, Pick 4', 'ps', `
+King Cobra|Longest venomous snake||🐍
+Black Mamba|Fast and deadly||🐍
+Green Anaconda|Heaviest snake||🐍
+Reticulated Python|Longest snake||🐍
+Burmese Python|Huge constrictor||🐍
+Inland Taipan|Most venomous||🐍
+Eastern Brown Snake|Australia||🐍
+Western Diamondback Rattlesnake|Rattle warning||🐍
+Boa Constrictor|Classic constrictor||🐍
+Gaboon Viper|Longest fangs||🐍
+Coral Snake|Red, yellow, black|Coral snake|🐍
+Yellow-bellied Sea Snake|Ocean snake||🌊
+Corn Snake|Pet favourite||🐍
+Ball Python|Curls into a ball||🐍
+Milk Snake|Banded|Milk snake|🐍
+Garter Snake|Common in Canada|Garter snake|🐍
+Green Tree Python|Bright green||🐍
+Russell's Viper|South Asia|Russell's viper|🐍
+Saw-scaled Viper|Rasping warning|Echis|🐍
+Fer-de-lance|Central America|Bothrops asper|🐍
+Copperhead|North America|Agkistrodon contortrix|🐍
+Cottonmouth|Water moccasin|Agkistrodon piscivorus|🐍
+Sidewinder|Sideways desert snake||🐍
+Desert Horned Viper|Horns over its eyes|Cerastes cerastes|🐍
+Arabian Cobra|Arabian Peninsula|Arabian cobra|🐍
+Titanoboa|Extinct giant||🦖`), mkT('t-dinos', 'Dinosaurs & Prehistoric Reptiles', '🦖', F, 'Pick 1, Pick 2, Pick 3, Pick 4, Pick 5', 'p', `
+Tyrannosaurus|Tyrant lizard king||🦖
+Triceratops|Three horns||🦕
+Velociraptor|Small and fast||🦖
+Stegosaurus|Back plates||🦕
+Brachiosaurus|Long neck||🦕
+Spinosaurus|Sail-backed||🦖
+Ankylosaurus|Club tail||🦕
+Diplodocus|Very long||🦕
+Allosaurus|Jurassic predator||🦖
+Parasaurolophus|Head crest||🦕
+Iguanodon|Thumb spikes||🦕
+Pachycephalosaurus|Dome head||🦕
+Carnotaurus|Horned predator||🦖
+Giganotosaurus|Giant predator||🦖
+Argentinosaurus|Among the largest ever||🦕
+Therizinosaurus|Giant claws||🦖
+Dilophosaurus|Double crest||🦖
+Baryonyx|Fish eater||🦖
+Utahraptor|Big raptor||🦖
+Gallimimus|Ostrich-like||🦖
+Deinonychus|Terrible claw||🦖
+Archaeopteryx|Feathered link to birds||🪶
+Edmontosaurus|Duck-billed||🦕
+Apatosaurus|Long-necked giant||🦕
+Pteranodon|Flying reptile (pterosaur)||🦅
+Quetzalcoatlus|Giant pterosaur||🦅
+Mosasaurus|Marine reptile||🌊
+Plesiosaurus|Marine reptile||🌊`), mkT('t-prehistmammals', 'Prehistoric Mammals', '🦣', F, 'Pick 1, Pick 2, Pick 3, Pick 4', 'p', `
+Woolly Mammoth|Ice age giant|Woolly mammoth|🦣
+Smilodon|Sabre-toothed cat||🐅
+Woolly Rhinoceros|Ice age rhino|Woolly rhinoceros|🦏
+Megatherium|Giant ground sloth||🦥
+Glyptodon|Armoured giant||🛡️
+Dire Wolf|Ice age wolf|Dire wolf|🐺
+Cave Bear|Ice age bear|Cave bear|🐻
+Irish Elk|Giant antlers|Irish elk|🦌
+Paraceratherium|Giant hornless rhino||🦏
+Andrewsarchus|Huge-skulled hunter||🦴
+Deinotherium|Downward tusks||🐘
+American Mastodon|Cousin of mammoths|American mastodon|🦣
+Short-faced Bear|Giant bear|Arctodus|🐻
+Macrauchenia|Odd trunk-nosed grazer||🦙
+Basilosaurus|Early whale||🐋
+Ambulocetus|Walking whale||🐊
+Entelodont|Hell pig|Entelodont|🐗
+Diprotodon|Giant wombat||🐻
+Thylacoleo|Marsupial lion||🦁
+Gigantopithecus|Giant ape||🦍
+Chalicotherium|Clawed horse relative||🐴
+Steller's Sea Cow|Giant sea cow|Steller's sea cow|🐄
+Elasmotherium|Giant unicorn rhino||🦄
+Hyaenodon|Ancient predator||🐺
+Doedicurus|Spiked tail||🛡️`), mkT('t-insects', 'Insects & Bugs', '🐞', F, 'Pick 1, Pick 2, Pick 3, Pick 4', 'ps', `
+Honey Bee|Makes honey|Western honey bee|🐝
+Bumblebee|Fuzzy pollinator||🐝
+Monarch Butterfly|Long migration|Monarch butterfly|🦋
+Ladybird|Spotted beetle|Coccinellidae|🐞
+Dragonfly|Aerial hunter||🪰
+Praying Mantis|Ambush predator|Mantis|🦗
+Firefly|Glows at night||✨
+Bullet Ant|Painful sting|Paraponera clavata|🐜
+Leafcutter Ant|Farms fungus|Leafcutter ant|🐜
+Atlas Moth|Huge wings|Attacus atlas|🦋
+Hercules Beetle|Strongest beetle|Dynastes hercules|🪲
+Stag Beetle|Giant jaws|Lucanus cervus|🪲
+Dung Beetle|Rolls dung||🪲
+Grasshopper|Big jumper||🦗
+Cicada|Loud summer song||🦗
+Stick Insect|Master of disguise|Phasmatodea|🪵
+Orchid Mantis|Looks like a flower|Hymenopus coronatus|🌸
+Termite|Mound builder||🐜
+Mosquito|Bites||🦟
+Asian Giant Hornet|Huge hornet|Asian giant hornet|🐝
+Cockroach|Survivor||🪳
+Weta|Giant cricket||🦗
+Luna Moth|Pale green||🦋
+Goliath Beetle|Heaviest insect|Goliathus|🪲
+Bombardier Beetle|Chemical spray||🪲
+Desert Locust|Swarms|Desert locust|🦗`), mkT('t-farm', 'Farm Animals', '🐄', F, 'Pick 1, Pick 2, Pick 3, Pick 4', 'ps', `
+Cow|Milk and moo|Cattle|🐄
+Pig|Clever and muddy||🐖
+Sheep|Wool||🐑
+Goat|Climbs everything||🐐
+Chicken|Eggs||🐔
+Duck|Quack||🦆
+Horse|Gallops||🐎
+Donkey|Hee-haw||🫏
+Llama|Spits||🦙
+Alpaca|Fluffy fleece||🦙
+Rabbit|Hops||🐇
+Turkey|Gobble|Domestic turkey|🦃
+Goose|Honks|Domestic goose|🪿
+Camel|Ship of the desert|Dromedary|🐪
+Water Buffalo|Asia||🐃
+Yak|High altitude||🐂
+Ox|Strong worker||🐂
+Quail|Small bird||🐦
+Guinea Fowl|Spotted|Helmeted guineafowl|🐔
+Highland Cow|Shaggy Scottish cow|Highland cattle|🐄
+Mule|Donkey and horse||🫏
+Ostrich|Largest bird||🐦
+Honey Bee|Hive|Western honey bee|🐝
+Sheepdog|Farm helper|Border Collie|🐕`), mkT('t-safari', 'African Safari Animals', '🦒', F, 'Pick 1, Pick 2, Pick 3, Pick 4, Pick 5', 'ps', `
+Lion|King of the savanna||🦁
+African Elephant|Largest land animal|African bush elephant|🐘
+Giraffe|Tallest animal||🦒
+Zebra|Stripes|Plains zebra|🦓
+White Rhinoceros|Square-lipped|White rhinoceros|🦏
+Hippopotamus|River giant||🦛
+Leopard|Climbs trees||🐆
+Cheetah|Speed||🐆
+African Buffalo|One of the Big Five||🐃
+Wildebeest|Great migration|Blue wildebeest|🐃
+Mountain Gorilla|Rwanda and Uganda||🦍
+Chimpanzee|Close relative||🐒
+Spotted Hyena|Laughing hunter||🐺
+African Wild Dog|Painted wolf||🐕
+Meerkat|Sentry duty||🐿️
+Warthog|Tusks|Common warthog|🐗
+Ostrich|Fastest bird on land|Common ostrich|🐦
+Nile Crocodile|River ambusher||🐊
+Lesser Flamingo|Pink lakes||🦩
+Impala|Leaping antelope||🦌
+Greater Kudu|Spiral horns||🦌
+Okapi|Forest giraffe||🦓
+Aardvark|Ant eater||🐽
+Ground Pangolin|Scaly|Ground pangolin|🦔
+Secretary Bird|Snake stomper|Secretarybird|🦅
+Gemsbok|Long straight horns||🦌`), mkT('t-arctic', 'Arctic Animals', '🐻‍❄️', F, 'Pick 1, Pick 2, Pick 3, Pick 4', 'ps', `
+Polar Bear|Sea ice hunter||🐻‍❄️
+Arctic Fox|White winter coat||🦊
+Walrus|Tusks||🦭
+Narwhal|Spiral tusk||🦄
+Beluga Whale|White whale||🤍
+Snowy Owl|White owl||🦉
+Caribou|Reindeer|Reindeer|🦌
+Muskox|Shaggy coat||🐂
+Arctic Wolf|White wolf||🐺
+Harp Seal|White pups||🦭
+Ringed Seal|Lives under ice||🦭
+Arctic Hare|White hare||🐇
+Lemming|Tiny rodent||🐹
+Rock Ptarmigan|Snowy bird||🐦
+Bowhead Whale|Breaks ice||🐋
+Arctic Tern|Longest migration||🐦
+Atlantic Puffin|Colourful beak||🐧
+Stoat|Ermine in winter||🐾
+Wolverine|Fierce||🐾
+Greenland Shark|Slow and ancient||🦈
+Snow Goose|Huge flocks||🪿
+Orca|Arctic visitor||🐬`), mkT('t-aussie', 'Australian Wildlife', '🦘', F, 'Pick 1, Pick 2, Pick 3, Pick 4', 'ps', `
+Red Kangaroo|Largest marsupial||🦘
+Koala|Eucalyptus eater||🐨
+Common Wombat|Cube poo||🐻
+Platypus|Duck-billed mammal||🦆
+Short-beaked Echidna|Spiny anteater||🦔
+Tasmanian Devil|Fierce scavenger||😈
+Emu|Big flightless bird||🐦
+Laughing Kookaburra|Laughing call||🐦
+Dingo|Wild dog||🐕
+Quokka|Smiling marsupial||😊
+Southern Cassowary|Dangerous bird||🐦
+Wallaby|Small kangaroo||🦘
+Sugar Glider|Gliding possum||🐿️
+Saltwater Crocodile|Huge croc||🐊
+Frilled Lizard|Neck frill|Frilled-neck lizard|🦎
+Thorny Devil|Spiky lizard||🦎
+Bilby|Easter bunny of Australia|Greater bilby|🐰
+Numbat|Termite eater||🐾
+Superb Lyrebird|Master mimic||🐦
+Galah|Pink cockatoo||🦜
+Inland Taipan|Most venomous snake||🐍
+Sydney Funnel-web Spider|Dangerous spider|Sydney funnel-web spider|🕷️
+Box Jellyfish|Deadly sting||🪼
+Common Brushtail Possum|Night visitor||🐾
+Dugong|Sea cow||🐄`), mkT('t-primates', 'Monkeys & Apes', '🐒', F, 'Pick 1, Pick 2, Pick 3, Pick 4', 'ps', `
+Gorilla|Largest primate||🦍
+Chimpanzee|Tool user||🐒
+Bonobo|Peaceful ape||🐒
+Orangutan|Red ape||🦧
+Gibbon|Swinging acrobat||🐒
+Hamadryas Baboon|Arabia and Africa||🐒
+Mandrill|Colourful face||🐒
+Capuchin Monkey|Clever|Capuchin monkey|🐒
+Howler Monkey|Loudest call|Howler monkey|📢
+Spider Monkey|Long limbs|Spider monkey|🐒
+Squirrel Monkey|Small and quick|Squirrel monkey|🐒
+Proboscis Monkey|Big nose||👃
+Japanese Macaque|Snow monkey||♨️
+Golden Snub-nosed Monkey|China||🐒
+Golden Lion Tamarin|Golden mane||🦁
+Pygmy Marmoset|Smallest monkey||🐒
+Gelada|Bleeding-heart monkey||🐒
+Black-and-white Colobus|Long white tail|Mantled guereza|🐒
+Vervet Monkey|Africa||🐒
+Rhesus Macaque|Asia||🐒
+Bald Uakari|Red face||🐒
+Philippine Tarsier|Huge eyes||👀
+Siamang|Throat pouch||🐒
+Ring-tailed Lemur|Madagascar||🦝`), mkT('t-deepsea', 'Deep-Sea Creatures', '🐙', F, 'Pick 1, Pick 2, Pick 3, Pick 4', 'ps', `
+Anglerfish|Glowing lure||🎣
+Giant Squid|Kraken||🦑
+Colossal Squid|Heaviest invertebrate||🦑
+Vampire Squid|Cloak of webbing||🧛
+Gulper Eel|Huge mouth|Pelican eel|🐍
+Frilled Shark|Living fossil||🦈
+Goblin Shark|Shooting jaws||👺
+Blobfish|Saddest fish||😢
+Dumbo Octopus|Ear-like fins|Grimpoteuthis|🐙
+Giant Isopod|Huge sea bug||🐛
+Barreleye|See-through head||👀
+Viperfish|Needle teeth||🐟
+Fangtooth|Biggest teeth for its size|Anoplogaster|🐟
+Hatchetfish|Silver and thin|Marine hatchetfish|🐟
+Lanternfish|Glowing dots||💡
+Yeti Crab|Hairy claws|Kiwa hirsuta|🦀
+Giant Tube Worm|Lives at vents|Riftia|🪱
+Sea Pig|Deep-sea cucumber|Scotoplanes|🐷
+Coelacanth|Living fossil||🐟
+Giant Oarfish|Sea serpent|Giant oarfish|🐉
+Japanese Spider Crab|Longest legs||🦀
+Chimaera|Ghost shark||👻
+Black Swallower|Eats bigger fish||🐟
+Siphonophore|Colony creature||🪼`), mkT('t-extinct', 'Extinct Animals', '🦤', F, 'Pick 1, Pick 2, Pick 3, Pick 4', 'ps', `
+Dodo|Mauritius||🦤
+Thylacine|Tasmanian tiger||🐅
+Passenger Pigeon|Once in billions||🕊️
+Great Auk|Northern penguin-like bird||🐧
+Steller's Sea Cow|Giant sea cow|Steller's sea cow|🐄
+Quagga|Half-striped zebra||🦓
+Moa|Giant flightless bird||🐦
+Haast's Eagle|Giant eagle||🦅
+Aurochs|Wild ancestor of cattle||🐂
+Baiji|Yangtze river dolphin||🐬
+Western Black Rhinoceros|Declared extinct 2011|Western black rhinoceros|🦏
+Pyrenean Ibex|Spain||🐐
+Golden Toad|Costa Rica||🐸
+Caribbean Monk Seal|Caribbean||🦭
+Javan Tiger|Indonesia||🐅
+Elephant Bird|Madagascar giant||🥚
+Carolina Parakeet|North America's parrot||🦜
+Irish Elk|Giant deer|Irish elk|🦌
+Cave Lion|Ice age lion||🦁
+Woolly Mammoth|Ice age|Woolly mammoth|🦣
+Megalodon|Giant shark||🦈
+Labrador Duck|Canada||🦆
+Arabian Ostrich|Extinct in the 1940s|Arabian ostrich|🐦
+Bramble Cay Melomys|First climate-change extinction|Bramble Cay melomys|🐭`), mkT('t-cute', 'Cutest Animals', '🥰', F, 'Pick 1, Pick 2, Pick 3, Pick 4, Pick 5', 'ps', `
+Red Panda|Fluffy tree climber||🐼
+Quokka|Always smiling||😊
+Sea Otter|Holds hands while sleeping||🦦
+Fennec Fox|Giant ears||🦊
+Hedgehog|Tiny spikes||🦔
+Koala|Sleepy||🐨
+Giant Panda|Bamboo lover||🐼
+Kitten|Tiny cat|Kitten|🐱
+Puppy|Tiny dog|Puppy|🐶
+Bunny|Fluffy|Rabbit|🐰
+Hamster|Cheek pouches|Golden hamster|🐹
+Sloth|Slow and smiley||🦥
+Penguin Chick|Fluffy|Penguin|🐧
+Axolotl|Smiling salamander||🩷
+Harp Seal Pup|White fluff|Harp seal|🦭
+Pygmy Marmoset|Finger monkey||🐒
+Meerkat|On lookout||🐿️
+Chinchilla|Softest fur||🐭
+Capybara|Chill with everyone||😌
+Corgi|Short legs|Pembroke Welsh Corgi|🐶
+Duckling|Follows in a line|Duck|🐥
+Lamb|Bouncy|Sheep|🐑
+Baby Elephant|Floppy trunk|Elephant|🐘
+Pygmy Goat|Tiny goat||🐐
+Arctic Fox|Snowball||🦊
+Shiba Inu|Smiling dog||🐕`)];
+}
+function entTopicsV3() {
+  const F = 'Entertainment';
+  return [mkT('t-singers', 'Singers', '🎤', F, 'Pick 1, Pick 2, Pick 3, Pick 4, Pick 5', 'p', `
+Michael Jackson|King of Pop
+Whitney Houston|The Voice
+Beyoncé|Queen Bey
+Adele|British soul
+Taylor Swift|Pop and country
+Rihanna|Barbados superstar
+Ariana Grande|Pop and R&B
+Bruno Mars|Pop and funk
+The Weeknd|Toronto's R&B star
+Ed Sheeran|Singer-songwriter
+Justin Bieber|Stratford, Ontario
+Billie Eilish|Alt-pop
+Freddie Mercury|Queen frontman
+Elvis Presley|The King
+Frank Sinatra|Ol' Blue Eyes
+Mariah Carey|Five-octave range
+Celine Dion|Quebec's icon
+Lady Gaga|Pop and jazz
+Harry Styles|Ex-One Direction
+Dua Lipa|Dance-pop
+SZA|R&B
+Olivia Rodrigo|Pop-rock
+Sabrina Carpenter|Pop
+Shakira|Colombian star
+Bad Bunny|Puerto Rican star
+Stevie Wonder|Soul legend
+Prince|Purple Rain|Prince (musician)
+Aretha Franklin|Queen of Soul
+Amy Winehouse|Back to Black
+Alicia Keys|R&B and piano
+Usher|R&B|Usher (musician)
+Shawn Mendes|Pickering, Ontario
+Miley Cyrus|Pop
+Lana Del Rey|Dream pop
+Fairuz|Lebanese legend
+Umm Kulthum|Egyptian legend
+Amr Diab|Egyptian pop star
+Mohammed Abdu|Saudi legend`), mkT('t-bands', 'Bands & Groups', '🎸', F, 'Pick 1, Pick 2, Pick 3, Pick 4', 'p', `
+The Beatles|Liverpool
+Queen|We Will Rock You|Queen (band)
+The Rolling Stones|Rock legends
+Led Zeppelin|Rock
+Pink Floyd|Prog rock
+Nirvana|Grunge|Nirvana (band)
+Coldplay|Stadium pop-rock
+Linkin Park|Nu metal
+Metallica|Metal
+AC/DC|Hard rock
+U2|Irish rock
+Oasis|Britpop|Oasis (band)
+Radiohead|Alternative
+Red Hot Chili Peppers|Funk rock
+Guns N' Roses|Hard rock
+Maroon 5|Pop rock
+Imagine Dragons|Pop rock
+Arctic Monkeys|Indie rock
+Foo Fighters|Rock
+Green Day|Punk rock
+BTS|K-pop
+Blackpink|K-pop
+One Direction|Boy band
+Backstreet Boys|Boy band
+Spice Girls|Girl group
+ABBA|Swedish pop
+Fleetwood Mac|Rock
+The Killers|Mr. Brightside
+Daft Punk|French house
+Gorillaz|Virtual band
+Twenty One Pilots|Alt-pop
+Fall Out Boy|Pop punk
+Paramore|Pop punk
+Bee Gees|Disco
+Destiny's Child|R&B group
+Fugees|Hip hop
+Bon Jovi|Rock`), mkT('t-actors', 'Actors', '🎬', F, 'Pick 1, Pick 2, Pick 3, Pick 4, Pick 5', 'p', `
+Leonardo DiCaprio|Titanic, Inception
+Denzel Washington|Training Day
+Tom Hanks|Forrest Gump
+Brad Pitt|Fight Club
+Robert Downey Jr.|Iron Man
+Will Smith|Bad Boys
+Dwayne Johnson|Fast & Furious
+Tom Cruise|Mission: Impossible
+Morgan Freeman|The Shawshank Redemption
+Keanu Reeves|John Wick
+Johnny Depp|Pirates of the Caribbean
+Samuel L. Jackson|Pulp Fiction
+Al Pacino|The Godfather
+Robert De Niro|Taxi Driver
+Christian Bale|The Dark Knight
+Matt Damon|The Bourne Identity
+Ryan Reynolds|Deadpool
+Ryan Gosling|Drive
+Cillian Murphy|Oppenheimer
+Timothée Chalamet|Dune
+Tom Holland|Spider-Man
+Chris Hemsworth|Thor
+Chris Evans|Captain America
+Jackie Chan|Rush Hour
+Hugh Jackman|Wolverine
+Idris Elba|Luther
+Jason Statham|The Transporter
+Vin Diesel|Fast & Furious
+Adam Sandler|Happy Gilmore
+Jim Carrey|The Mask
+Eddie Murphy|Coming to America
+Kevin Hart|Jumanji
+Michael B. Jordan|Creed
+Shah Rukh Khan|Bollywood's King Khan
+Pedro Pascal|The Last of Us
+Joaquin Phoenix|Joker
+Heath Ledger|The Dark Knight
+Anthony Hopkins|The Silence of the Lambs`), mkT('t-actresses', 'Actresses', '🎬', F, 'Pick 1, Pick 2, Pick 3, Pick 4, Pick 5', 'p', `
+Meryl Streep|The Devil Wears Prada
+Margot Robbie|Barbie
+Scarlett Johansson|Black Widow
+Zendaya|Euphoria, Dune
+Jennifer Lawrence|The Hunger Games
+Emma Stone|La La Land
+Natalie Portman|Black Swan
+Angelina Jolie|Maleficent
+Julia Roberts|Pretty Woman
+Sandra Bullock|Gravity
+Viola Davis|Fences
+Florence Pugh|Little Women
+Anne Hathaway|The Devil Wears Prada
+Emma Watson|Harry Potter
+Nicole Kidman|Moulin Rouge!
+Cate Blanchett|Tár
+Charlize Theron|Mad Max: Fury Road
+Halle Berry|Monster's Ball
+Gal Gadot|Wonder Woman
+Zoe Saldaña|Avatar
+Sydney Sweeney|Euphoria
+Jenna Ortega|Wednesday
+Anya Taylor-Joy|The Queen's Gambit
+Millie Bobby Brown|Stranger Things
+Audrey Hepburn|Breakfast at Tiffany's
+Marilyn Monroe|Some Like It Hot
+Jennifer Aniston|Friends
+Kate Winslet|Titanic
+Keira Knightley|Pirates of the Caribbean
+Michelle Yeoh|Everything Everywhere All at Once
+Lupita Nyong'o|Black Panther
+Priyanka Chopra|Bollywood and Hollywood
+Deepika Padukone|Bollywood star
+Saoirse Ronan|Lady Bird
+Emily Blunt|A Quiet Place`), mkT('t-franchise', 'Movie Franchises', '🎞️', F, 'Pick 1, Pick 2, Pick 3, Pick 4', 'p', `
+Marvel Cinematic Universe|Avengers assemble
+Star Wars|A galaxy far, far away
+Harry Potter|Wizarding World|Harry Potter (film series)
+The Lord of the Rings|Middle-earth|The Lord of the Rings (film series)
+Fast & Furious|Family|Fast & Furious
+James Bond|007|James Bond in film
+Jurassic Park|Dinosaurs|Jurassic Park (franchise)
+Mission: Impossible|Tom Cruise stunts|Mission: Impossible (film series)
+The Dark Knight Trilogy|Nolan's Batman|The Dark Knight Trilogy
+Toy Story|Pixar|Toy Story (franchise)
+Shrek|DreamWorks|Shrek (franchise)
+Pirates of the Caribbean|Captain Jack Sparrow|Pirates of the Caribbean (film series)
+The Hunger Games|Panem|The Hunger Games (film series)
+Transformers|Robots in disguise|Transformers (film series)
+John Wick|Keanu Reeves|John Wick (franchise)
+Indiana Jones|Adventure|Indiana Jones (franchise)
+Back to the Future|Time travel|Back to the Future (franchise)
+The Matrix|Red pill or blue pill|The Matrix (franchise)
+Rocky|Creed too|Rocky (franchise)
+Despicable Me|Minions|Despicable Me (franchise)
+X-Men|Mutants|X-Men (film series)
+Alien|In space no one can hear you scream|Alien (franchise)
+Terminator|I'll be back|Terminator (franchise)
+The Godfather|Corleone family|The Godfather (film series)
+Kung Fu Panda|Po|Kung Fu Panda (franchise)
+Ice Age|Scrat|Ice Age (franchise)
+Planet of the Apes|Apes rule|Planet of the Apes
+The Conjuring Universe|Horror|The Conjuring Universe
+Avatar|Pandora|Avatar (franchise)
+Dune|Arrakis|Dune (franchise)`), mkT('t-tvshows', 'TV Shows', '📺', F, 'Pick 1, Pick 2, Pick 3, Pick 4, Pick 5', 'p', `
+Breaking Bad|Crime drama
+Game of Thrones|Fantasy
+The Sopranos|Crime drama
+Stranger Things|Sci-fi horror
+Squid Game|Korean thriller
+The Walking Dead|Zombies|The Walking Dead (TV series)
+Peaky Blinders|By order of the Peaky Blinders|Peaky Blinders (TV series)
+Prison Break|Escape drama
+The Boys|Superhero satire|The Boys (TV series)
+Succession|Family power struggle|Succession (TV series)
+The Last of Us|Post-apocalyptic|The Last of Us (TV series)
+House of the Dragon|Targaryens
+Money Heist|Spanish heist|Money Heist
+Wednesday|Addams Family|Wednesday (TV series)
+The Crown|British royals|The Crown (TV series)
+Better Call Saul|Saul Goodman
+Dexter|Serial killer drama|Dexter (TV series)
+Lost|Island mystery|Lost (TV series)
+Sherlock|Modern Holmes|Sherlock (TV series)
+The Wire|Baltimore
+Narcos|Pablo Escobar
+Ozark|Money laundering|Ozark (TV series)
+Black Mirror|Tech nightmares
+The Mandalorian|Star Wars
+Severance|Work-life split|Severance (TV series)
+The Bear|Chicago kitchen|The Bear (TV series)
+Yellowstone|Ranch drama|Yellowstone (American TV series)
+Euphoria|Teen drama|Euphoria (American TV series)
+Suits|Lawyers|Suits (American TV series)
+House|Medical drama|House (TV series)
+Arcane|League of Legends|Arcane (TV series)
+Shōgun|Feudal Japan|Shōgun (2024 TV series)`), mkT('t-sitcoms', 'Sitcoms', '😂', F, 'Pick 1, Pick 2, Pick 3, Pick 4', 'p', `
+Friends|New York friends
+The Office|Dunder Mifflin|The Office (American TV series)
+Seinfeld|A show about nothing
+Brooklyn Nine-Nine|Police comedy
+The Big Bang Theory|Science nerds
+How I Met Your Mother|Legendary
+Parks and Recreation|Pawnee
+Modern Family|Three families
+Arrested Development|The Bluths
+It's Always Sunny in Philadelphia|Paddy's Pub
+The Fresh Prince of Bel-Air|Will Smith
+Everybody Loves Raymond|Family comedy
+Frasier|Radio psychiatrist
+Cheers|Boston bar
+Two and a Half Men|Malibu
+Malcolm in the Middle|Chaotic family
+Community|Greendale
+Scrubs|Hospital comedy
+That '70s Show|Basement hangouts
+New Girl|Loft mates
+Schitt's Creek|Canadian comedy
+Abbott Elementary|School mockumentary
+Curb Your Enthusiasm|Larry David
+Fawlty Towers|Basil Fawlty
+Only Fools and Horses|Del Boy
+Mr. Bean|Rowan Atkinson
+The Inbetweeners|British teens
+Kim's Convenience|Toronto family
+Corner Gas|Saskatchewan
+Letterkenny|Ontario
+Ted Lasso|Football coach
+The Simpsons|Springfield
+Family Guy|Quahog`), mkT('t-anime', 'Anime Series', '🍥', F, 'Pick 1, Pick 2, Pick 3, Pick 4, Pick 5', '', `
+One Piece|Pirates||🏴‍☠️
+Naruto|Ninjas||🍥
+Dragon Ball Z|Saiyans||🐉
+Attack on Titan|Titans||🧱
+Death Note|The notebook||📓
+Demon Slayer|Demon hunters||⚔️
+Jujutsu Kaisen|Cursed energy||👁️
+My Hero Academia|Heroes with quirks||🦸
+Hunter × Hunter|Hunters||🎣
+Fullmetal Alchemist: Brotherhood|Alchemy||⚗️
+Bleach|Soul Reapers||⚔️
+One-Punch Man|Saitama||👊
+Pokémon|Gotta catch 'em all||⚡
+Spy × Family|The Forgers||🕵️
+Chainsaw Man|Denji||🪚
+Tokyo Ghoul|Ghouls||🎭
+Haikyu!!|Volleyball||🏐
+Neon Genesis Evangelion|Mechas||🤖
+Cowboy Bebop|Space bounty hunters||🚀
+Sword Art Online|Virtual reality||🗡️
+Mob Psycho 100|Psychic powers||💯
+Code Geass|Lelouch||♟️
+Steins;Gate|Time travel||⏳
+Vinland Saga|Vikings||🛶
+Black Clover|Magic||🍀
+Blue Lock|Football||⚽
+Solo Leveling|Hunters and dungeons||🗝️
+Frieren|Elf mage's journey||🧝
+JoJo's Bizarre Adventure|Stands||⭐
+Sailor Moon|Magical girls||🌙
+Yu-Gi-Oh!|Card duels||🃏
+Dr. Stone|Science rebuilds the world||🧪`), mkT('t-animechars', 'Anime Characters', '⚡', F, 'Pick 1, Pick 2, Pick 3, Pick 4, Pick 5', '', `
+Goku|Dragon Ball||🐉
+Vegeta|Dragon Ball||👑
+Naruto Uzumaki|Naruto||🍥
+Sasuke Uchiha|Naruto||⚡
+Itachi Uchiha|Naruto||🌙
+Kakashi Hatake|Naruto||📙
+Monkey D. Luffy|One Piece||👒
+Roronoa Zoro|One Piece||⚔️
+Light Yagami|Death Note||📓
+L|Death Note||🍰
+Eren Yeager|Attack on Titan||🧱
+Levi Ackerman|Attack on Titan||🗡️
+Mikasa Ackerman|Attack on Titan||🧣
+Satoru Gojo|Jujutsu Kaisen||🕶️
+Yuji Itadori|Jujutsu Kaisen||👊
+Ryomen Sukuna|Jujutsu Kaisen||👹
+Tanjiro Kamado|Demon Slayer||🌊
+Nezuko Kamado|Demon Slayer||🎋
+Ichigo Kurosaki|Bleach||⚔️
+Saitama|One-Punch Man||👊
+Edward Elric|Fullmetal Alchemist||⚗️
+Gon Freecss|Hunter × Hunter||🎣
+Killua Zoldyck|Hunter × Hunter||⚡
+Izuku Midoriya|My Hero Academia||💥
+All Might|My Hero Academia||💪
+Denji|Chainsaw Man||🪚
+Spike Spiegel|Cowboy Bebop||🚬
+Lelouch Lamperouge|Code Geass||♟️
+Anya Forger|Spy × Family||🥜
+Sung Jinwoo|Solo Leveling||🗝️
+Frieren|Frieren||🧝
+Yoichi Isagi|Blue Lock||⚽`), mkT('t-heroes', 'Superheroes', '🦸', F, 'Pick 1, Pick 2, Pick 3, Pick 4, Pick 5', '', `
+Spider-Man|Marvel||🕷️
+Batman|DC||🦇
+Superman|DC||🦸
+Iron Man|Marvel||🤖
+Captain America|Marvel||🛡️
+Thor|Marvel||🔨
+Hulk|Marvel||💚
+Black Panther|Marvel||🐆
+Wonder Woman|DC||⭐
+The Flash|DC||⚡
+Wolverine|Marvel||🐺
+Deadpool|Marvel||⚔️
+Doctor Strange|Marvel||🪄
+Black Widow|Marvel||🕸️
+Aquaman|DC||🔱
+Green Lantern|DC||💚
+Captain Marvel|Marvel||✨
+Scarlet Witch|Marvel||🔮
+Ant-Man|Marvel||🐜
+Daredevil|Marvel||😈
+Hawkeye|Marvel||🏹
+Vision|Marvel||💎
+Star-Lord|Marvel||🎧
+Groot|Marvel||🌳
+Rocket Raccoon|Marvel||🦝
+Shazam|DC||⚡
+Cyborg|DC||🦾
+Storm|Marvel||🌩️
+Professor X|Marvel||🧠
+Moon Knight|Marvel||🌙
+Ms. Marvel|Marvel||💫
+Silver Surfer|Marvel||🏄
+Invincible|Image Comics||💛
+Green Arrow|DC||🏹`), mkT('t-villains', 'Supervillains', '😈', F, 'Pick 1, Pick 2, Pick 3, Pick 4', '', `
+The Joker|DC||🃏
+Thanos|Marvel||🧤
+Lex Luthor|DC||🧑‍💼
+Magneto|Marvel||🧲
+Loki|Marvel||🐍
+Green Goblin|Marvel||🎃
+Venom|Marvel||🖤
+Doctor Doom|Marvel||🎭
+Bane|DC||💪
+Ultron|Marvel||🤖
+Red Skull|Marvel||💀
+Doctor Octopus|Marvel||🐙
+Two-Face|DC||🪙
+Harley Quinn|DC||🔨
+Catwoman|DC||🐈‍⬛
+The Penguin|DC||🐧
+Scarecrow|DC||🌾
+The Riddler|DC||❓
+Killmonger|Marvel||🐆
+Kang the Conqueror|Marvel||⏳
+Galactus|Marvel||🪐
+Mysterio|Marvel||🫧
+Deathstroke|DC||⚔️
+Darkseid|DC||🌑
+Brainiac|DC||🧠
+Poison Ivy|DC||🌿
+Kingpin|Marvel||👔
+Homelander|The Boys||🦅
+Hela|Marvel||💀
+Apocalypse|Marvel||🏺
+Mystique|Marvel||💙`), mkT('t-pixar', 'Pixar Characters', '💡', F, 'Pick 1, Pick 2, Pick 3, Pick 4, Pick 5', '', `
+Woody|Toy Story||🤠
+Buzz Lightyear|Toy Story||🚀
+Jessie|Toy Story||🐄
+Rex|Toy Story||🦖
+Lightning McQueen|Cars||🏎️
+Mater|Cars||🚛
+Nemo|Finding Nemo||🐠
+Dory|Finding Nemo||🐟
+Sulley|Monsters, Inc.||💙
+Mike Wazowski|Monsters, Inc.||👁️
+Boo|Monsters, Inc.||🚪
+Mr. Incredible|The Incredibles||💪
+Elastigirl|The Incredibles||🤸
+Dash|The Incredibles||⚡
+Edna Mode|The Incredibles||🕶️
+Frozone|The Incredibles||❄️
+WALL-E|WALL-E||🤖
+EVE|WALL-E||🛸
+Remy|Ratatouille||🐀
+Carl Fredricksen|Up||🎈
+Russell|Up||🏕️
+Dug|Up||🐕
+Joy|Inside Out||😄
+Sadness|Inside Out||😢
+Anger|Inside Out||😡
+Anxiety|Inside Out 2||😬
+Bing Bong|Inside Out||🐘
+Miguel|Coco||🎸
+Héctor|Coco||💀
+Luca|Luca||🐟
+Mei Lee|Turning Red||🐼
+Merida|Brave||🏹
+Ember|Elemental||🔥`), mkT('t-disney', 'Disney Characters', '🏰', F, 'Pick 1, Pick 2, Pick 3, Pick 4, Pick 5', '', `
+Mickey Mouse|The original||🐭
+Minnie Mouse|Classic||🎀
+Donald Duck|Classic||🦆
+Goofy|Classic||🐶
+Simba|The Lion King||🦁
+Scar|The Lion King||🦁
+Timon|The Lion King||🦦
+Pumbaa|The Lion King||🐗
+Elsa|Frozen||❄️
+Anna|Frozen||🌷
+Olaf|Frozen||⛄
+Moana|Moana||🌊
+Maui|Moana||🪝
+Stitch|Lilo & Stitch||👽
+Ariel|The Little Mermaid||🧜‍♀️
+Ursula|The Little Mermaid||🐙
+Belle|Beauty and the Beast||📚
+Aladdin|Aladdin||🧞
+Genie|Aladdin||🧞
+Jasmine|Aladdin||🐯
+Jafar|Aladdin||🐍
+Mulan|Mulan||⚔️
+Rapunzel|Tangled||👱‍♀️
+Cinderella|Cinderella||👠
+Tiana|The Princess and the Frog||🐸
+Hercules|Hercules||💪
+Baloo|The Jungle Book||🐻
+Maleficent|Sleeping Beauty||🖤
+Captain Hook|Peter Pan||🪝
+Winnie the Pooh|Hundred Acre Wood||🍯
+Mirabel|Encanto||🦋
+Judy Hopps|Zootopia||🐰
+Nick Wilde|Zootopia||🦊`), mkT('t-streaming', 'Streaming Services', '📡', F, 'Pick 1, Pick 2, Pick 3, Pick 4', 'p', `
+Netflix|Series and films
+YouTube|Everything
+Disney+|Disney, Marvel, Star Wars
+Amazon Prime Video|Prime originals
+HBO Max|HBO series
+Apple TV+|Apple originals
+Hulu|US series
+Paramount+|Paramount and CBS
+Peacock|NBCUniversal|Peacock (streaming service)
+Crave|Canadian streaming|Crave (streaming service)
+Crunchyroll|Anime
+Twitch|Live streams
+Kick|Live streams|Kick (service)
+Shahid|Arabic series and films|Shahid (streaming service)
+Tubi|Free films
+DAZN|Sports
+ESPN+|Sports
+Spotify|Music and podcasts
+Apple Music|Music
+YouTube Music|Music
+Amazon Music|Music
+SoundCloud|Music
+Tidal|Music|Tidal (service)
+Deezer|Music
+Anghami|Arabic music
+Rakuten Viki|Asian dramas
+OSN+|Middle East streaming|OSN+`), mkT('t-youtubers', 'YouTubers', '▶️', F, 'Pick 1, Pick 2, Pick 3, Pick 4, Pick 5', 'p', `
+MrBeast|Challenges and giveaways
+KSI|Sidemen
+Miniminter|Sidemen|Miniminter
+Zerkaa|Sidemen
+Behzinga|Sidemen
+TBJZL|Sidemen
+Vikkstar123|Sidemen
+W2S|Sidemen
+PewDiePie|Gaming legend
+Markiplier|Gaming
+Jacksepticeye|Gaming
+Dude Perfect|Trick shots
+Logan Paul|Vlogs and wrestling
+Jake Paul|Vlogs and boxing
+Mark Rober|Engineering builds
+Marques Brownlee|Tech reviews
+Casey Neistat|Vlogs
+Lilly Singh|Comedy
+Smosh|Comedy
+Rhett & Link|Good Mythical Morning|Rhett & Link
+Dream|Minecraft|Dream (YouTuber)
+Technoblade|Minecraft
+Ali-A|Fortnite and Call of Duty
+Airrack|Stunts
+Danny Duncan|Pranks and vlogs
+Emma Chamberlain|Lifestyle
+Sam Sulek|Gym vlogs
+Ryan Trahan|Challenges`), mkT('t-streamers', 'Internet Streamers', '🎮', F, 'Pick 1, Pick 2, Pick 3, Pick 4', 'p', `
+IShowSpeed|Speed
+Kai Cenat|Mafiathons
+xQc|Variety streamer
+Ninja|Fortnite pioneer|Ninja (gamer)
+Pokimane|Variety streamer
+Shroud|FPS legend|Shroud (gamer)
+TimTheTatman|Variety streamer
+Dr Disrespect|Two-time champion|Dr Disrespect
+Valkyrae|Variety streamer
+Ibai Llanos|Spanish streamer
+Sykkuno|Variety streamer
+Ludwig|Variety streamer|Ludwig Ahgren
+Hasan Piker|Politics and chat
+Adin Ross|Variety streamer
+Asmongold|MMO streamer
+Summit1g|Variety streamer
+Tyler1|League of Legends
+Duke Dennis|AMP
+Jynxzi|Rainbow Six Siege
+CaseOh|Variety streamer
+Fanum|AMP
+Lirik|Variety streamer
+Sodapoppin|Variety streamer
+Mizkif|Variety streamer
+Nickmercs|Call of Duty and Fortnite
+TommyInnit|Minecraft`), mkT('t-consoles', 'Video Game Consoles', '🕹️', F, 'Pick 1, Pick 2, Pick 3, Pick 4', 'p', `
+PlayStation 5|Sony, 2020
+PlayStation 4|Sony, 2013
+PlayStation 2|Best-selling console ever
+PlayStation|The original, 1994|PlayStation (console)
+PlayStation Portable|PSP
+Xbox Series X|Microsoft, 2020|Xbox Series X and Series S
+Xbox 360|Microsoft, 2005
+Xbox One|Microsoft, 2013
+Xbox|The original, 2001|Xbox (console)
+Nintendo Switch|Hybrid console, 2017
+Nintendo Switch 2|Nintendo, 2025
+Wii|Motion controls, 2006
+Wii U|Nintendo, 2012
+Nintendo 64|Nintendo, 1996
+GameCube|Nintendo, 2001
+Super Nintendo|SNES, 1990|Super Nintendo Entertainment System
+NES|Nintendo, 1983|Nintendo Entertainment System
+Game Boy|Nintendo handheld, 1989
+Game Boy Advance|Nintendo handheld, 2001
+Nintendo DS|Dual screens
+Nintendo 3DS|3D without glasses
+Sega Genesis|Mega Drive
+Dreamcast|Sega's last console
+Atari 2600|1977
+Steam Deck|Valve handheld PC
+PlayStation Vita|Sony handheld
+Meta Quest 3|VR headset`), mkT('t-gamechars', 'Video Game Characters', '👾', F, 'Pick 1, Pick 2, Pick 3, Pick 4, Pick 5', '', `
+Mario|Super Mario||🍄
+Luigi|Super Mario||💚
+Princess Peach|Super Mario||👑
+Bowser|Super Mario||🐢
+Yoshi|Super Mario||🦖
+Link|The Legend of Zelda||🗡️
+Princess Zelda|The Legend of Zelda||🔺
+Pikachu|Pokémon||⚡
+Sonic the Hedgehog|Sonic||💨
+Master Chief|Halo||🪖
+Kratos|God of War||🪓
+Lara Croft|Tomb Raider||🏺
+Steve|Minecraft||⛏️
+Pac-Man|Pac-Man||🟡
+Donkey Kong|Donkey Kong||🦍
+Kirby|Kirby||🩷
+Samus Aran|Metroid||🚀
+Cloud Strife|Final Fantasy VII||⚔️
+Solid Snake|Metal Gear||📦
+Arthur Morgan|Red Dead Redemption 2||🤠
+Geralt of Rivia|The Witcher||🐺
+Ezio Auditore|Assassin's Creed||🗡️
+Nathan Drake|Uncharted||🧗
+Joel|The Last of Us||🎸
+Ellie|The Last of Us||🎒
+Crash Bandicoot|Crash Bandicoot||🦊
+Spyro|Spyro||🐉
+Mega Man|Mega Man||🤖
+Doomguy|Doom||😠
+Ryu|Street Fighter||🥋
+Scorpion|Mortal Kombat||🦂
+CJ|GTA: San Andreas||🚲
+Agent 47|Hitman||🎯
+Leon S. Kennedy|Resident Evil||🔫
+Aloy|Horizon||🏹`), mkT('t-pokemon', 'Pokémon', '⚡', F, 'Pick 1, Pick 2, Pick 3, Pick 4, Pick 5, Pick 6', '', `
+Pikachu|Electric||⚡
+Charizard|Fire/Flying||🔥
+Mewtwo|Psychic||🧬
+Mew|Psychic||🩷
+Bulbasaur|Grass/Poison||🌱
+Squirtle|Water||💧
+Charmander|Fire||🔥
+Gengar|Ghost/Poison||👻
+Eevee|Normal||🦊
+Snorlax|Normal||😴
+Lucario|Fighting/Steel||🥋
+Greninja|Water/Dark||🐸
+Gyarados|Water/Flying||🐉
+Dragonite|Dragon/Flying||🐲
+Blastoise|Water||💦
+Venusaur|Grass/Poison||🌺
+Jigglypuff|Normal/Fairy||🎤
+Psyduck|Water||🦆
+Rayquaza|Dragon/Flying||🐉
+Lugia|Psychic/Flying||🌊
+Arceus|Normal||✨
+Garchomp|Dragon/Ground||🦈
+Umbreon|Dark||🌙
+Sylveon|Fairy||🎀
+Mimikyu|Ghost/Fairy||👻
+Magikarp|Water||🐟
+Ditto|Normal||🟣
+Meowth|Normal||🐱
+Machamp|Fighting||💪
+Alakazam|Psychic||🥄
+Lapras|Water/Ice||🦕
+Tyranitar|Rock/Dark||🦖
+Blaziken|Fire/Fighting||🐔
+Gardevoir|Psychic/Fairy||💃
+Zapdos|Electric/Flying||⚡
+Articuno|Ice/Flying||❄️
+Moltres|Fire/Flying||🔥`), mkT('t-horror', 'Horror Movies', '👻', F, 'Pick 1, Pick 2, Pick 3, Pick 4', 'p', `
+The Exorcist|1973
+Halloween|1978|Halloween (1978 film)
+A Nightmare on Elm Street|1984
+The Shining|1980|The Shining (film)
+Scream|1996|Scream (1996 film)
+It|2017|It (2017 film)
+Get Out|2017
+The Conjuring|2013
+Hereditary|2018|Hereditary (film)
+Saw|2004|Saw (2004 film)
+Psycho|1960|Psycho (1960 film)
+The Texas Chain Saw Massacre|1974
+Friday the 13th|1980|Friday the 13th (1980 film)
+Insidious|2010|Insidious (film)
+Paranormal Activity|2007
+The Ring|2002|The Ring (2002 film)
+Us|2019|Us (2019 film)
+A Quiet Place|2018
+Sinister|2012|Sinister (film)
+The Babadook|2014
+Midsommar|2019
+Smile|2022|Smile (2022 film)
+Five Nights at Freddy's|2023|Five Nights at Freddy's (film)
+Annabelle|2014|Annabelle (film)
+Child's Play|1988|Child's Play (1988 film)
+Jaws|1975
+The Blair Witch Project|1999
+28 Days Later|2002
+Night of the Living Dead|1968
+The Thing|1982|The Thing (1982 film)
+Talk to Me|2023|Talk to Me (2022 film)
+Barbarian|2022|Barbarian (2022 film)
+M3GAN|2022
+Sinners|2025|Sinners (2025 film)`), mkT('t-scifi', 'Sci-Fi Movies', '🚀', F, 'Pick 1, Pick 2, Pick 3, Pick 4', 'p', `
+Interstellar|2014|Interstellar (film)
+Inception|2010
+The Matrix|1999
+Blade Runner|1982
+Blade Runner 2049|2017
+2001: A Space Odyssey|1968|2001: A Space Odyssey (film)
+Star Wars|1977|Star Wars (film)
+The Empire Strikes Back|1980
+Alien|1979|Alien (film)
+Aliens|1986|Aliens (film)
+The Terminator|1984
+Terminator 2: Judgment Day|1991
+Back to the Future|1985
+E.T. the Extra-Terrestrial|1982
+Jurassic Park|1993|Jurassic Park (film)
+Avatar|2009|Avatar (2009 film)
+Dune|2021|Dune (2021 film)
+Dune: Part Two|2024
+Arrival|2016|Arrival (film)
+Gravity|2013|Gravity (2013 film)
+The Martian|2015|The Martian (film)
+District 9|2009
+Edge of Tomorrow|2014
+Ex Machina|2014|Ex Machina (film)
+Minority Report|2002|Minority Report (film)
+Independence Day|1996|Independence Day (1996 film)
+Men in Black|1997|Men in Black (1997 film)
+Close Encounters of the Third Kind|1977
+Tenet|2020|Tenet (film)
+Everything Everywhere All at Once|2022
+Ready Player One|2018|Ready Player One (film)`)];
+}
+function foodTopicsV3() {
+  const F = 'Food & Drink';
+  return [mkT('t-ffchains', 'Fast Food Restaurants', '🍟', F, 'Pick 1, Pick 2, Pick 3, Pick 4', 'p', `
+McDonald's|Big Mac and fries
+KFC|Original Recipe chicken
+Burger King|Whopper
+Wendy's|Square patties, Frosty
+Taco Bell|Crunchwrap Supreme
+Subway|Footlong subs|Subway (restaurant)
+Popeyes|Chicken sandwich
+Chick-fil-A|Chicken sandwich
+Five Guys|Burgers and Cajun fries
+In-N-Out Burger|Double-Double
+Shake Shack|ShackBurger
+Domino's|Pizza delivery|Domino's
+Pizza Hut|Stuffed crust
+Tim Hortons|Double-double and Timbits
+Starbucks|Coffee
+Dunkin'|Doughnuts and coffee|Dunkin'
+Chipotle|Burrito bowls|Chipotle Mexican Grill
+Panda Express|Orange chicken
+Jollibee|Chickenjoy
+Nando's|Peri-peri chicken
+Wingstop|Wings
+Raising Cane's|Chicken fingers|Raising Cane's Chicken Fingers
+Whataburger|Texas burgers
+Arby's|Roast beef
+Sonic Drive-In|Drive-in classics
+Jack in the Box|Tacos and burgers
+Dairy Queen|Blizzards
+Krispy Kreme|Original Glazed
+Greggs|Sausage rolls
+Harvey's|Canadian burgers|Harvey's
+Mary Brown's|Canadian fried chicken
+A&W|Teen Burger and root beer|A&W (Canada)
+Al Baik|Saudi broasted chicken`), mkT('t-icecream', 'Ice Cream Flavours', '🍨', F, 'Scoop 1, Scoop 2, Scoop 3', '', `
+Vanilla|The classic||🍦
+Chocolate|Rich and creamy||🍫
+Strawberry|Fruity pink||🍓
+Mint Choc Chip|Mint with chocolate chips||🌿
+Cookies and Cream|Cookie chunks||🍪
+Cookie Dough|Raw dough bites||🍪
+Salted Caramel|Sweet and salty||🧂
+Pistachio|Nutty green||🟢
+Rocky Road|Marshmallow, nuts, chocolate||🪨
+Neapolitan|Three in one||🍨
+Butter Pecan|Buttery pecans||🥜
+Coffee|Coffee kick||☕
+Mango|Tropical||🥭
+Coconut|Creamy coconut||🥥
+Rum and Raisin|Grown-up classic||🍇
+Bubblegum|Bright and sweet||🫧
+Cotton Candy|Fairground flavour||🍭
+Birthday Cake|Sprinkles||🎂
+Black Sesame|Toasty and nutty||⚫
+Matcha|Green tea||🍵
+Lemon Sorbet|Zesty||🍋
+Raspberry Ripple|Vanilla with raspberry swirl||🫐
+Moose Tracks|Fudge and peanut butter cups||🦌
+Stracciatella|Chocolate flecks||🍨
+Dulce de Leche|Caramelised milk||🍮
+Hazelnut|Nutty||🌰
+Peanut Butter Cup|Peanut butter and chocolate||🥜
+Tiger Tail|Orange with liquorice swirl||🐯
+Rainbow Sherbet|Three fruit flavours||🌈
+Ube|Purple yam||💜`), mkT('t-chocbars', 'Chocolate Bars', '🍫', F, 'Bar 1, Bar 2, Bar 3, Bar 4', 'p', `
+KitKat|Have a break|Kit Kat
+Snickers|Peanuts and caramel
+Twix|Left or right?
+Mars|Nougat and caramel|Mars (chocolate bar)
+Bounty|Coconut|Bounty (chocolate bar)
+Milky Way|Light and fluffy|Milky Way (chocolate bar)
+Galaxy|Smooth milk chocolate|Galaxy (chocolate)
+Dairy Milk|Cadbury classic
+Toblerone|Triangles
+Kinder Bueno|Hazelnut wafer
+Reese's Peanut Butter Cups|Peanut butter
+Hershey's Milk Chocolate|American classic|Hershey bar
+Aero|Bubbly|Aero (chocolate)
+Coffee Crisp|Canadian favourite
+Crunchie|Honeycomb
+Wunderbar|Peanut butter and caramel|Wunderbar (chocolate bar)
+Caramilk|Caramel inside
+Oh Henry!|Peanuts and fudge
+Mr. Big|Long Canadian bar|Mr. Big (chocolate bar)
+Butterfinger|Crispy peanut butter
+Baby Ruth|Peanuts and nougat
+3 Musketeers|Whipped nougat|3 Musketeers (chocolate bar)
+Milka|Alpine milk chocolate
+Lion|Wafer and caramel|Lion (chocolate bar)
+Double Decker|Nougat and cereal|Double Decker (chocolate bar)
+Picnic|Peanuts, raisins, wafer|Picnic (chocolate bar)
+Wispa|Bubbly Cadbury
+Twirl|Flaky swirls|Twirl (chocolate bar)
+Flake|Crumbly|Flake (chocolate bar)
+Toffee Crisp|Toffee and crisp rice
+Yorkie|Chunky|Yorkie (chocolate bar)`), mkT('t-crisps', 'Chips & Crisps', '🥔', F, 'Bag 1, Bag 2, Bag 3, Bag 4', 'p', `
+Doritos|Nacho Cheese and Cool Ranch
+Lay's|Classic potato chips
+Pringles|Stackable
+Cheetos|Cheesy puffs
+Ruffles|Ridged
+Takis|Rolled and spicy
+Kettle Brand|Thick-cut|Kettle Foods
+Walkers|UK crisps
+Hula Hoops|Wear them on your fingers
+Quavers|Melt-in-the-mouth|Quavers
+Monster Munch|Pickled onion|Monster Munch
+Wotsits|Cheesy|Wotsits
+Frazzles|Bacon flavour
+SunChips|Wavy multigrain
+Fritos|Corn chips
+Funyuns|Onion rings
+Tostitos|Tortilla chips
+Old Dutch|Canadian chips|Old Dutch Foods
+Miss Vickie's|Kettle-cooked
+Kurkure|Indian spicy snack
+Bugles|Cone-shaped
+Popchips|Popped
+Smith's|Australian chips|Smith's Snackfood Company
+Lay's Ketchup|Canadian favourite flavour|Lay's
+Hot Cheetos|Flamin' Hot|Cheetos
+Pringles Sour Cream & Onion|Fan favourite flavour|Pringles`), mkT('t-cereal', 'Breakfast Cereals', '🥣', F, 'Bowl 1, Bowl 2, Bowl 3, Bowl 4', 'p', `
+Frosted Flakes|They're grrreat
+Corn Flakes|The original
+Cheerios|Little Os
+Honey Nut Cheerios|Buzz the Bee|Cheerios
+Lucky Charms|Marshmallows
+Froot Loops|Toucan Sam
+Cinnamon Toast Crunch|Cinnamon squares
+Cocoa Puffs|Chocolatey
+Rice Krispies|Snap, crackle, pop
+Coco Pops|Chocolate rice
+Cap'n Crunch|Crunchy corn squares
+Reese's Puffs|Peanut butter and chocolate
+Frosted Mini-Wheats|Wheat biscuits
+Special K|Light flakes
+Weetabix|Wheat biscuits
+Shreddies|Wheat squares
+Golden Grahams|Honey graham squares
+Trix|Silly rabbit
+Apple Jacks|Apple cinnamon
+Corn Pops|Sweet corn puffs
+Raisin Bran|Bran and raisins
+Shredded Wheat|Big biscuits
+Crunchy Nut|Honey and nuts|Crunchy Nut
+Cookie Crisp|Mini cookies
+Fruity Pebbles|Flintstones cereal|Pebbles cereal
+Count Chocula|Monster cereal
+Chex|Rice squares
+Kix|Corn puffs`), mkT('t-street', 'Street Food', '🌮', F, 'Pick 1, Pick 2, Pick 3, Pick 4', 'ps', `
+Tacos al Pastor|Mexico City|Al pastor|🌮
+Döner Kebab|Turkey and Germany|Doner kebab|🥙
+Shawarma|Middle East||🌯
+Falafel|Middle East||🧆
+Pad Thai|Thailand||🍜
+Bánh Mì|Vietnam||🥖
+Takoyaki|Osaka octopus balls||🐙
+Churros|Spain and Mexico|Churro|🍩
+Hot Dog|New York||🌭
+Soft Pretzel|Germany and Philadelphia|Pretzel|🥨
+Arepa|Venezuela and Colombia||🫓
+Empanada|Latin America||🥟
+Samosa|South Asia||🥟
+Pani Puri|India|Panipuri|🫧
+Bunny Chow|Durban, South Africa||🍞
+Jerk Chicken|Jamaica|Jerk (cooking)|🍗
+Satay|Southeast Asia||🍢
+Elote|Mexican street corn||🌽
+Crêpe|Paris||🥞
+Currywurst|Berlin||🌭
+Poutine|Quebec||🍟
+Gua Bao|Taiwan||🥟
+Tteokbokki|Korea||🌶️
+Pupusa|El Salvador||🫓
+Gözleme|Turkey||🫓
+Arancini|Sicily||🍙
+Fish and Chips|Britain||🐟
+Choripán|Argentina||🌭
+Corn Dog|USA||🌭
+Lángos|Hungary||🍕`), mkT('t-mideast', 'Middle Eastern Food', '🧆', F, 'Pick 1, Pick 2, Pick 3, Pick 4', 'ps', `
+Hummus|Chickpeas and tahini||🥣
+Mansaf|Jordan's national dish||🍚
+Kabsa|Spiced rice and meat||🍛
+Mandi|Yemeni slow-cooked rice and meat|Mandi (food)|🍗
+Maqluba|Upside-down rice||🍲
+Fattoush|Bread salad||🥗
+Tabbouleh|Parsley salad||🥗
+Baba Ghanoush|Smoky aubergine dip||🍆
+Kibbeh|Bulgur and meat||🧆
+Manakish|Za'atar flatbread|Manakish|🫓
+Kunafa|Cheese pastry in syrup|Knafeh|🧀
+Baklava|Layers of filo and nuts||🍯
+Shakshouka|Eggs in tomato sauce||🍳
+Ful Medames|Fava beans|Ful medames|🫘
+Koshari|Egypt's rice and lentils|Koshary|🍝
+Fatteh|Bread, chickpeas, yogurt||🥣
+Musakhan|Palestinian sumac chicken||🍗
+Mutabbaq|Stuffed pan bread|Murtabak|🥟
+Harees|Wheat and meat porridge||🥣
+Luqaimat|Sweet dumplings|Luqaimat|🍯
+Molokhia|Jute leaf stew|Mulukhiyah|🥬
+Kofta|Spiced meatballs||🍢
+Shish Taouk|Chicken skewers|Shish taouk|🍢
+Labneh|Strained yogurt|Strained yogurt|🥛
+Halloumi|Grilling cheese||🧀
+Muhammara|Red pepper dip||🌶️
+Umm Ali|Egyptian bread pudding||🍮
+Basbousa|Semolina cake||🍰
+Ma'amoul|Date-filled cookies|Maamoul|🍪
+Dolma|Stuffed vine leaves||🍃`), mkT('t-saudi', 'Saudi Foods', '🇸🇦', F, 'Pick 1, Pick 2, Pick 3, Pick 4', 'ps', `
+Kabsa|The national dish||🍛
+Mandi|Slow-cooked rice and meat|Mandi (food)|🍗
+Mathbi|Meat grilled on hot stones||🔥
+Madfoon|Meat cooked underground||🍖
+Haneeth|Slow-roasted lamb||🍖
+Jareesh|Cracked wheat dish||🥣
+Saleeg|Creamy rice from Hejaz||🍚
+Harees|Wheat and meat porridge||🥣
+Margoog|Vegetable and dough stew||🍲
+Qursan|Thin bread in stew||🫓
+Masoub|Banana and bread dish||🍌
+Areeka|Bread with dates and honey||🍯
+Mutabbaq|Stuffed pan bread|Murtabak|🥟
+Kleija|Qassim date cookies|Kleicha|🍪
+Luqaimat|Sweet dumplings|Luqaimat|🍯
+Sambusa|Ramadan favourite|Samosa|🥟
+Ful|Fava beans for breakfast|Ful medames|🫘
+Tamees|Afghan-style bread|Tameez|🫓
+Balaleet|Sweet vermicelli and egg||🍝
+Dates|Sukkari, Ajwa, Khalas|Date palm|🌴
+Saudi Coffee|Gahwa with cardamom|Arabic coffee|☕
+Shawarma|Late-night favourite||🌯
+Al Baik Broasted Chicken|Jeddah's famous chicken|Al Baik|🍗
+Hininy|Dates, bread and ghee||🍯
+Fattah|Bread soaked in broth|Fatteh|🥣
+Maqshush|Sweet layered bread||🥞`), mkT('t-turkish', 'Turkish Foods', '🇹🇷', F, 'Pick 1, Pick 2, Pick 3, Pick 4', 'ps', `
+Döner Kebab|Rotating grilled meat|Doner kebab|🥙
+İskender Kebap|Döner on bread with butter|İskender kebap|🍖
+Adana Kebab|Spicy minced meat|Adana kebabı|🍢
+Lahmacun|Thin meat flatbread||🫓
+Pide|Turkish boat pizza|Pide|🍕
+Börek|Filo pastry||🥐
+Simit|Sesame bread ring||🥯
+Menemen|Scrambled eggs and tomatoes|Menemen (food)|🍳
+Baklava|Pistachio pastry||🍯
+Künefe|Hot cheese dessert|Knafeh|🧀
+Turkish Delight|Lokum||🍬
+Mantı|Tiny dumplings|Manti (food)|🥟
+Köfte|Meatballs||🍢
+Çiğ Köfte|Spicy bulgur balls||🌶️
+Kumpir|Loaded baked potato||🥔
+Gözleme|Stuffed flatbread||🫓
+Dolma|Stuffed vegetables||🫑
+İmam Bayıldı|Stuffed aubergine||🍆
+Karnıyarık|Aubergine with mince||🍆
+Lentil Soup|Mercimek çorbası|Lentil soup|🥣
+Ayran|Yogurt drink||🥛
+Turkish Tea|Çay in tulip glasses||🍵
+Turkish Coffee|Thick and strong||☕
+Kokoreç|Grilled offal||🔥
+Midye Dolma|Stuffed mussels||🦪
+Sütlaç|Rice pudding|Rice pudding|🍮
+Tavuk Göğsü|Chicken pudding||🍮
+Çılbır|Poached eggs and yogurt||🍳
+Balık Ekmek|Fish sandwich||🐟
+Pişmaniye|Cotton candy sweet||🍭`), mkT('t-japanese', 'Japanese Foods', '🍣', F, 'Pick 1, Pick 2, Pick 3, Pick 4', 'ps', `
+Sushi|Rice and fish||🍣
+Ramen|Noodle soup||🍜
+Tempura|Battered and fried||🍤
+Tonkatsu|Breaded pork cutlet||🍖
+Udon|Thick noodles||🍜
+Soba|Buckwheat noodles||🍜
+Gyoza|Pan-fried dumplings|Jiaozi|🥟
+Onigiri|Rice balls||🍙
+Okonomiyaki|Savoury pancake||🥞
+Takoyaki|Octopus balls||🐙
+Yakitori|Grilled skewers||🍢
+Karaage|Fried chicken||🍗
+Japanese Curry|Thick and mild|Japanese curry|🍛
+Miso Soup|Classic side||🥣
+Sashimi|Raw fish slices||🐟
+Gyudon|Beef rice bowl||🍚
+Katsudon|Pork cutlet rice bowl||🍚
+Oyakodon|Chicken and egg rice bowl||🍳
+Unagi Don|Grilled eel on rice|Unadon|🐍
+Shabu-shabu|Hot pot||🍲
+Sukiyaki|Sweet hot pot||🍲
+Mochi|Rice cake||🍡
+Dorayaki|Red bean pancake||🥞
+Taiyaki|Fish-shaped cake||🐟
+Wagyu|Marbled beef||🥩
+Edamame|Soybeans||🫛
+Yakisoba|Fried noodles||🍝
+Omurice|Omelette rice||🍳
+Tamagoyaki|Rolled omelette||🍳
+Matcha|Green tea||🍵`), mkT('t-korean', 'Korean Foods', '🇰🇷', F, 'Pick 1, Pick 2, Pick 3, Pick 4', 'ps', `
+Kimchi|Fermented cabbage||🥬
+Bibimbap|Mixed rice bowl||🍚
+Bulgogi|Marinated beef||🥩
+Korean Fried Chicken|Double-fried and glazed||🍗
+Tteokbokki|Spicy rice cakes||🌶️
+Japchae|Glass noodles||🍝
+Samgyeopsal|Grilled pork belly||🥓
+Kimbap|Seaweed rice rolls|Gimbap|🍙
+Jjajangmyeon|Black bean noodles||🍜
+Kimchi Jjigae|Kimchi stew||🍲
+Sundubu-jjigae|Soft tofu stew||🍲
+Galbi|Grilled short ribs||🍖
+Naengmyeon|Cold noodles||🍜
+Hotteok|Sweet pancake||🥞
+Bingsu|Shaved ice dessert||🍧
+Pajeon|Spring onion pancake||🥞
+Dakgalbi|Spicy stir-fried chicken||🍗
+Budae-jjigae|Army stew||🍲
+Samgyetang|Ginseng chicken soup||🍲
+Mandu|Dumplings||🥟
+Jjamppong|Spicy seafood noodles||🍜
+Bungeoppang|Fish-shaped pastry||🐟
+Ramyeon|Instant noodles|Ramyeon|🍜
+Seolleongtang|Ox bone soup||🥣
+Gyeran-ppang|Egg bread||🥚
+Yukgaejang|Spicy beef soup||🍲`), mkT('t-italian', 'Italian Foods', '🇮🇹', F, 'Pick 1, Pick 2, Pick 3, Pick 4', 'ps', `
+Pizza Margherita|Naples classic||🍕
+Spaghetti Carbonara|Egg, cheese, guanciale|Carbonara|🍝
+Lasagne||Lasagna|🍝
+Risotto|Creamy rice||🍚
+Tiramisu|Coffee dessert||☕
+Gelato|Italian ice cream||🍨
+Cannoli|Sicilian pastry||🥐
+Arancini|Fried rice balls||🍙
+Bruschetta|Toasted bread||🍅
+Cacio e Pepe|Cheese and pepper pasta||🧀
+Pesto|Basil sauce from Genoa||🌿
+Ossobuco|Braised veal shanks|Ossobuco|🍖
+Gnocchi|Potato dumplings||🥔
+Ravioli|Stuffed pasta||🥟
+Tortellini|Ring-shaped pasta||🥟
+Panna Cotta|Set cream||🍮
+Focaccia|Olive oil bread||🍞
+Prosciutto|Cured ham||🥓
+Burrata|Creamy mozzarella||🧀
+Parmigiano-Reggiano|The king of cheeses||🧀
+Minestrone|Vegetable soup||🥣
+Caprese Salad|Tomato and mozzarella||🍅
+Saltimbocca|Veal with sage and ham||🍖
+Ragù alla Bolognese|Meat sauce|Bolognese sauce|🍝
+Polenta|Cornmeal||🌽
+Biscotti|Twice-baked biscuits||🍪
+Panettone|Christmas bread||🎄
+Calzone|Folded pizza||🥟
+Amatriciana|Tomato and guanciale pasta|Amatriciana sauce|🍝
+Pasta alla Puttanesca|Olives and capers|Puttanesca|🍝`), mkT('t-mexican', 'Mexican Foods', '🇲🇽', F, 'Pick 1, Pick 2, Pick 3, Pick 4', 'ps', `
+Tacos|Street classic|Taco|🌮
+Burrito|Wrapped and stuffed||🌯
+Enchiladas|Rolled and sauced|Enchilada|🌯
+Quesadilla|Cheesy tortilla||🧀
+Tamales|Steamed masa|Tamale|🫔
+Pozole|Hominy stew||🍲
+Mole Poblano|Chocolate-chilli sauce|Mole poblano|🍫
+Chiles en Nogada|Patriotic stuffed peppers||🌶️
+Guacamole|Avocado dip||🥑
+Elote|Street corn||🌽
+Churros|Fried dough||🍩
+Nachos|Chips and cheese||🧀
+Chilaquiles|Breakfast tortilla chips||🍳
+Tostadas|Crunchy flat tortillas|Tostada (tortilla)|🌮
+Sopes|Thick masa cakes|Sope|🫓
+Gorditas|Stuffed masa pockets|Gordita|🫓
+Huevos Rancheros|Ranch-style eggs||🍳
+Cochinita Pibil|Yucatán pulled pork||🐖
+Birria|Stewed meat for tacos||🌮
+Carnitas|Slow-cooked pork||🐖
+Barbacoa|Slow-cooked meat||🍖
+Tlayuda|Oaxacan pizza||🫓
+Pico de Gallo|Fresh salsa||🍅
+Flautas|Rolled fried tacos|Taquito|🌮
+Tres Leches Cake|Three-milk cake||🍰
+Horchata|Rice drink||🥛
+Menudo|Tripe soup|Menudo (soup)|🍲
+Torta Ahogada|Drowned sandwich||🥖
+Conchas|Sweet bread|Concha (bread)|🍞
+Aguachile|Spicy shrimp||🦐`), mkT('t-indian', 'Indian Foods', '🇮🇳', F, 'Pick 1, Pick 2, Pick 3, Pick 4', 'ps', `
+Butter Chicken|Creamy tomato curry||🍛
+Biryani|Layered rice||🍚
+Chicken Tikka Masala|Spiced tomato curry||🍛
+Tandoori Chicken|Clay-oven chicken||🍗
+Palak Paneer|Spinach and cheese||🥬
+Chana Masala|Chickpea curry||🫘
+Dal Makhani|Buttery lentils||🍲
+Rogan Josh|Kashmiri lamb curry||🍖
+Vindaloo|Hot Goan curry||🌶️
+Korma|Mild and creamy||🍛
+Samosa|Spiced pastry||🥟
+Pani Puri|Crispy water balls|Panipuri|🫧
+Dosa|Crispy crepe||🫓
+Idli|Steamed rice cakes||⚪
+Vada Pav|Mumbai burger||🍔
+Pav Bhaji|Spiced veg with bread||🍞
+Naan|Leavened flatbread||🫓
+Paratha|Layered flatbread||🫓
+Chole Bhature|Chickpeas and fried bread||🫓
+Gulab Jamun|Syrup-soaked balls||🍯
+Jalebi|Spiral sweets||🍥
+Rasgulla|Spongy sweets||⚪
+Kheer|Rice pudding||🍮
+Lassi|Yogurt drink||🥛
+Masala Chai|Spiced tea||🍵
+Pakora|Fritters||🧅
+Aloo Gobi|Potato and cauliflower||🥔
+Malai Kofta|Dumplings in gravy||🍛
+Rajma|Kidney bean curry|Rajma|🫘
+Dhokla|Steamed savoury cake||🟨
+Kulfi|Indian ice cream||🍦`), mkT('t-chinese', 'Chinese Foods', '🥡', F, 'Pick 1, Pick 2, Pick 3, Pick 4', 'ps', `
+Peking Duck|Crispy roast duck||🦆
+Kung Pao Chicken|Peanuts and chillies||🌶️
+Sweet and Sour Pork|Cantonese classic||🍍
+Mapo Tofu|Sichuan tofu||🌶️
+Dim Sum|Cantonese small plates||🥟
+Xiaolongbao|Soup dumplings||🥟
+Har Gow|Shrimp dumplings||🦐
+Siu Mai|Pork dumplings|Shumai|🥟
+Char Siu|Barbecued pork||🍖
+Chow Mein|Stir-fried noodles||🍜
+Fried Rice|Wok-fried rice||🍚
+Dan Dan Noodles|Sichuan spicy noodles||🍜
+Hot Pot|Shared simmering broth||🍲
+Wonton Soup|Dumplings in broth|Wonton|🥣
+Spring Rolls|Crispy rolls|Spring roll|🌯
+Egg Tart|Custard tart||🥧
+Hainanese Chicken Rice|Poached chicken and rice||🍗
+General Tso's Chicken|Sweet and spicy||🍗
+Zongzi|Sticky rice parcels||🍙
+Jiaozi|Boiled dumplings||🥟
+Baozi|Steamed buns||🥟
+Congee|Rice porridge||🥣
+Lanzhou Beef Noodles|Hand-pulled noodles|Lanzhou beef noodle soup|🍜
+Twice-Cooked Pork|Sichuan pork||🐖
+Orange Chicken|American-Chinese favourite||🍊
+Scallion Pancake|Flaky flatbread||🥞
+Mooncake|Mid-Autumn treat||🥮
+Tangyuan|Sweet rice balls||⚪
+Beef Chow Fun|Wide rice noodles||🍜
+Lo Mein|Soft noodles||🍜`), mkT('t-sauces', 'Sauces & Condiments', '🥫', F, 'Pick 1, Pick 2, Pick 3, Pick 4', 'ps', `
+Ketchup|Tomato classic||🍅
+Mayonnaise|Creamy||🥚
+Mustard|Tangy yellow||🌭
+Sriracha|Chilli garlic||🌶️
+BBQ Sauce|Smoky and sweet|Barbecue sauce|🍖
+Ranch|Herby dressing|Ranch dressing|🥗
+Hot Sauce|Fiery||🔥
+Soy Sauce|Salty umami||🥢
+Garlic Sauce|Toum|Toum|🧄
+Tahini|Sesame paste||🥜
+Pesto|Basil and pine nuts||🌿
+Chimichurri|Herb and vinegar||🌿
+Salsa|Tomato and chilli|Salsa (sauce)|🍅
+Sweet Chilli Sauce|Sticky and sweet|Sweet chili sauce|🌶️
+Teriyaki|Sweet soy glaze||🍗
+Hoisin|Sweet and savoury|Hoisin sauce|🥢
+Worcestershire Sauce|Tangy and dark||🍶
+Buffalo Sauce|Wing sauce|Buffalo wing|🍗
+Honey Mustard|Sweet and tangy||🍯
+Aioli|Garlic mayo||🧄
+Tzatziki|Yogurt and cucumber||🥒
+Harissa|North African chilli paste||🌶️
+Gochujang|Korean chilli paste||🌶️
+Peri-Peri|Portuguese-African chilli|Piri piri|🔥
+Gravy|Meat sauce||🍲
+Tartar Sauce|For fish and chips||🐟
+Brown Sauce|HP-style||🟫
+Mint Sauce|For lamb||🌿
+Chilli Crisp|Crunchy chilli oil|Chili oil|🌶️
+Maple Syrup|Canadian gold||🍁`), mkT('t-coffee', 'Coffee Drinks', '☕', F, 'Cup 1, Cup 2, Cup 3, Cup 4', 'ps', `
+Espresso|Short and strong||☕
+Americano|Espresso and water|Caffè Americano|☕
+Latte|Espresso and steamed milk|Caffè latte|🥛
+Cappuccino|Foamy||☕
+Flat White|Velvety microfoam||☕
+Mocha|Coffee and chocolate|Caffè mocha|🍫
+Macchiato|Espresso with a dash of foam|Caffè macchiato|☕
+Cortado|Equal espresso and milk||☕
+Iced Coffee|Chilled||🧊
+Cold Brew|Steeped overnight|Cold brew coffee|🧊
+Frappuccino|Blended iced coffee||🥤
+Affogato|Espresso over ice cream||🍨
+Irish Coffee|Coffee, whiskey and cream||☕
+Turkish Coffee|Thick and unfiltered||☕
+Saudi Coffee|Gahwa with cardamom|Arabic coffee|☕
+Vietnamese Iced Coffee|With condensed milk|Vietnamese iced coffee|🧊
+Dalgona Coffee|Whipped coffee||☁️
+Pumpkin Spice Latte|Autumn favourite||🎃
+Caramel Macchiato|Vanilla and caramel|Caffè macchiato|🍮
+Iced Capp|Tim Hortons classic|Tim Hortons|🥤
+Double-Double|Two cream, two sugar|Tim Hortons|☕
+Ristretto|Extra short espresso||☕
+Spanish Latte|Sweetened condensed milk|Caffè latte|🥛
+Café au Lait|Coffee with hot milk||☕
+Nitro Cold Brew|Creamy and fizzy|Nitro cold brew coffee|🧊
+Café de Olla|Mexican spiced coffee||☕
+Greek Frappé|Foamy iced instant coffee|Frappé coffee|🧊`), mkT('t-boba', 'Bubble Tea Flavours', '🧋', F, 'Cup 1, Cup 2, Cup 3', '', `
+Classic Milk Tea|Black tea with milk||🧋
+Brown Sugar Boba|Tiger stripes||🐯
+Taro|Purple and nutty||💜
+Matcha Milk Tea|Green tea||🍵
+Thai Tea|Orange and spiced||🧡
+Mango|Tropical||🥭
+Strawberry|Fruity||🍓
+Passion Fruit|Tangy||💛
+Honeydew|Melon||🍈
+Lychee|Floral fruit||🌸
+Jasmine Green Tea|Light and floral||🌼
+Oolong Milk Tea|Roasted||🍂
+Wintermelon|Caramel-like||🍈
+Hokkaido Milk Tea|Creamy caramel||🐄
+Okinawa Milk Tea|Brown sugar milk||🟤
+Coconut|Creamy||🥥
+Peach|Juicy||🍑
+Chocolate|Rich||🍫
+Coffee Milk Tea|Yuanyang style||☕
+Cheese Foam Tea|Salty cream top||🧀
+Ube|Purple yam||💜
+Peach Oolong|Fruity and roasted||🍑
+Grapefruit Green Tea|Zesty||🍊
+Rose Milk Tea|Floral||🌹
+Almond Milk Tea|Nutty||🌰
+Pineapple|Sweet and sharp||🍍`), mkT('t-bakery', 'Bakery Items', '🥐', F, 'Pick 1, Pick 2, Pick 3, Pick 4', 'ps', `
+Croissant|Buttery and flaky||🥐
+Pain au Chocolat|Chocolate croissant||🍫
+Bagel|Boiled then baked||🥯
+Cinnamon Roll|Sticky swirls|Cinnamon roll|🌀
+Doughnut|Glazed or filled||🍩
+Muffin|Blueberry or chocolate||🧁
+Danish Pastry|Fruit or custard|Danish pastry|🥐
+Baguette|French stick||🥖
+Sourdough|Tangy loaf|Sourdough|🍞
+Brioche|Rich and buttery||🍞
+Scone|With jam and cream||🫓
+Éclair|Choux with chocolate|Éclair|🍫
+Macaron|Colourful almond cookies|Macaron|🌈
+Banana Bread|Moist loaf||🍌
+Kouign-Amann|Caramelised butter pastry|Kouign-amann|🥐
+Pastel de Nata|Portuguese custard tart|Pastel de nata|🥧
+Apple Turnover|Fruit pastry|Turnover (food)|🍎
+Ensaïmada|Spiral pastry||🌀
+Canelé|Caramelised custard cake|Canelé|🟤
+Madeleine|Shell-shaped cake|Madeleine (cake)|🐚
+Sausage Roll|Savoury classic||🌭
+Cornish Pasty|Hand pie||🥟
+Bear Claw|Almond pastry|Bear claw (pastry)|🐻
+Cruller|Twisted doughnut||🍩
+Babka|Chocolate swirl bread||🍫
+Challah|Braided bread||🍞
+Rugelach|Rolled pastries||🥐
+Concha|Mexican sweet bread|Concha (bread)|🐚`), mkT('t-noodles', 'Instant Noodles', '🍜', F, 'Pack 1, Pack 2, Pack 3', 'p', `
+Shin Ramyun|Korean spicy|Shin Ramyun
+Buldak Ramen|Fire noodles|Buldak-bokkeum-myeon
+Indomie Mi Goreng|Indonesian fried noodles|Mi goreng
+Maggi 2-Minute Noodles|India and beyond|Maggi
+Cup Noodles|Nissin original|Cup Noodles
+Top Ramen|Nissin classic|Top Ramen
+Maruchan Ramen|College classic|Maruchan
+Nissin Chow Mein|Stir-fry style|Nissin Foods
+Neoguri|Seafood udon-style|Nongshim
+Chapagetti|Black bean noodles|Chapagetti
+Jin Ramen|Ottogi classic|Ottogi
+Samyang Ramen|The original Korean instant|Samyang Foods
+Nongshim Tonkotsu|Pork broth|Nongshim
+Mama Noodles|Thai favourite|Mama (instant noodle)
+Koka Noodles|Singapore|Koka (noodles)
+Nissin Demae Ramen|Hong Kong favourite|Nissin Foods
+Paldo Bibimmyeon|Cold sweet-spicy|Paldo (company)
+Indomie Soto|Indonesian soup|Indomie
+Pot Noodle|UK student staple|Pot Noodle
+Mr. Noodles|Canadian staple|Mr. Noodles
+Ottogi Jin Jjambbong|Spicy seafood|Ottogi
+Sapporo Ichiban|Japanese classic|Sapporo Ichiban
+Nongshim Kimchi Ramyun|Kimchi flavour|Nongshim
+Wai Wai|Nepalese noodles|Wai Wai (noodles)`), mkT('t-cheese', 'Cheese Types', '🧀', F, 'Pick 1, Pick 2, Pick 3, Pick 4', 'ps', `
+Cheddar|Sharp and versatile|Cheddar cheese|🧀
+Mozzarella|Stretchy pizza cheese||🍕
+Brie|Soft French||🧀
+Camembert|Soft and earthy||🧀
+Parmesan|Hard and nutty|Parmigiano Reggiano|🧀
+Gouda|Dutch classic||🧀
+Feta|Greek brined||🥗
+Halloumi|Grilling cheese||🔥
+Roquefort|French blue||🔵
+Gorgonzola|Italian blue||🔵
+Stilton|English blue|Stilton cheese|🔵
+Emmental|Swiss with holes|Emmental cheese|🧀
+Gruyère|Alpine and nutty|Gruyère cheese|🧀
+Manchego|Spanish sheep's cheese|Manchego|🐑
+Ricotta|Soft and fresh||🥄
+Mascarpone|Creamy (tiramisu)||🥄
+Paneer|Indian fresh cheese||🧀
+Burrata|Mozzarella with cream inside||🧀
+Provolone|Italian sandwich cheese||🧀
+Monterey Jack|Mild American|Monterey Jack|🧀
+Havarti|Danish buttery||🧀
+Edam|Red-wax Dutch|Edam cheese|🔴
+Comté|French Alpine|Comté cheese|🧀
+Raclette|Melted and scraped||🧀
+Pecorino Romano|Salty sheep's cheese||🐑
+Akkawi|Middle Eastern white cheese||🧀
+Cream Cheese|Bagel spread||🥯
+Cottage Cheese|Curds||🥣
+Goat Cheese|Tangy chèvre|Goat cheese|🐐
+Cheese Curds|Squeaky (poutine)||🧀`)];
+}
+function funTopicsV3() {
+  const F = 'Just for Fun';
+  const list = (id, name, emoji, slots, text) => mkT(id, name, emoji, F, slots, '', text);
+  return [list('t-redflags', 'Biggest Red Flags', '🚩', 'Pick 1, Pick 2, Pick 3, Pick 4', `
+Rude to waiters|||🚩
+Never says sorry|||🙅
+Always on their phone|||📱
+Only talks about themselves|||🗣️
+Lies about small things|||🤥
+Ghosts people|||👻
+Never pays you back|||💸
+Jealous of your friends|||😒
+Hates all animals|||🐾
+Chews with mouth open|||😬
+Spoils films on purpose|||🎬
+Always late|||⏰
+Reads your messages|||👀
+Bad-mouths every ex|||💬
+Cheats at board games|||🎲
+Never texts back|||📵
+Can't take a joke|||😤
+Rude to their parents|||👪
+Rage-quits every game|||🎮
+Talks during films|||🍿
+Never tries new food|||🥦
+Leaves dishes for days|||🍽️
+Takes credit for your work|||🏆
+Copies your homework, then gets a better mark|||📝
+Says "no offence" before being offensive|||😶`), list('t-greenflags', 'Green Flags', '💚', 'Pick 1, Pick 2, Pick 3, Pick 4', `
+Remembers small details|||🧠
+Kind to waiters|||🍽️
+Good with kids and animals|||🐶
+Laughs at your jokes|||😂
+Says sorry and means it|||🙏
+Keeps promises|||🤝
+Texts back|||💬
+Makes plans|||📅
+Supports your goals|||🚀
+Cooks for you|||🍳
+Great listener|||👂
+Respects boundaries|||🚧
+Gets on with your friends|||🧑‍🤝‍🧑
+Honest even when it's hard|||💯
+Shares food|||🍕
+Has their own hobbies|||🎨
+Calls their mum|||📞
+Always on time|||⏱️
+Admits when they're wrong|||🙋
+Hypes you up|||📣
+Keeps their room clean|||🧹
+Good playlist|||🎧
+Patient driver|||🚗
+Generous with their time|||⌛
+Celebrates your wins|||🎉`), list('t-skills', 'Skills Everyone Should Learn', '🧰', 'Pick 1, Pick 2, Pick 3, Pick 4', `
+Cooking|||🍳
+Swimming|||🏊
+First aid and CPR|||⛑️
+Driving|||🚗
+Budgeting|||💰
+Changing a tyre|||🛞
+Basic coding|||💻
+Public speaking|||🎤
+Touch typing|||⌨️
+A second language|||🗣️
+Negotiating|||🤝
+Time management|||⏰
+Basic car maintenance|||🔧
+Ironing|||👔
+Sewing a button|||🪡
+Self-defence|||🥋
+Reading a map|||🗺️
+Writing a CV|||📄
+Cleaning properly|||🧽
+Saving and investing|||📈
+Starting a fire safely|||🔥
+Gardening|||🌱
+Photography|||📷
+Cooking for a group|||🍲
+Fixing things yourself|||🔨`), list('t-splurge', 'Things Worth Splurging On', '💳', 'Pick 1, Pick 2, Pick 3, Pick 4', `
+A good mattress|||🛏️
+Good shoes|||👟
+Your phone|||📱
+Headphones|||🎧
+A winter coat|||🧥
+An office chair|||🪑
+Travel|||✈️
+Concert tickets|||🎫
+Gaming setup|||🎮
+Dental care|||🦷
+Gym membership|||🏋️
+Kitchen knives|||🔪
+Laptop|||💻
+A good haircut|||💈
+A watch|||⌚
+A reliable car|||🚗
+Suitcase|||🧳
+Fragrance|||🧴
+Coffee machine|||☕
+Bedsheets|||🛌
+Glasses|||👓
+Tyres|||🛞
+Experiences with friends|||🧑‍🤝‍🧑
+Courses and education|||🎓
+Running shoes|||🏃`), list('t-waste', 'Biggest Wastes of Money', '🗑️', 'Pick 1, Pick 2, Pick 3, Pick 4', `
+Extended warranties|||📜
+Lottery tickets|||🎟️
+Unused gym membership|||🏋️
+Bottled water at home|||💧
+Hotel minibar|||🍫
+Airport food|||✈️
+Impulse buys|||🛒
+Late fees|||⏰
+Subscriptions you forgot about|||🔁
+Fast-fashion hauls|||👗
+NFTs|||🖼️
+Loot boxes|||🎁
+Fancy gift wrap|||🎀
+Cinema snacks|||🍿
+Delivery fees|||🛵
+New phone every year|||📱
+Resale ticket mark-ups|||🎫
+Skins you never use|||🎮
+Car add-ons nobody needs|||🚗
+Designer phone cases|||📱
+Bank fees|||🏦
+Diet teas and fads|||🍵
+Novelty gadgets|||🔌
+Paying for apps you never open|||📲`), list('t-partybring', 'Things to Bring to a Party', '🎉', 'Pick 1, Pick 2, Pick 3, Pick 4', `
+Speaker|||🔊
+Snacks|||🍿
+Pizza|||🍕
+Drinks|||🥤
+Ice|||🧊
+Cups|||🥤
+Board game|||🎲
+Uno cards|||🃏
+Phone charger|||🔌
+A great playlist|||🎶
+Games console|||🎮
+Dessert|||🍰
+Chips and dip|||🥣
+Glow sticks|||✨
+Balloons|||🎈
+Cake|||🎂
+Extra chairs|||🪑
+Fairy lights|||💡
+Karaoke mic|||🎤
+Instant camera|||📸
+A football|||⚽
+Napkins|||🧻
+Your best friend|||🧑‍🤝‍🧑
+Good energy|||⚡`), list('t-business', 'Dream Businesses', '🏪', 'Pick 1, Pick 2, Pick 3, Pick 4', `
+Coffee shop|||☕
+Bakery|||🥐
+Gaming café|||🎮
+Sneaker store|||👟
+Food truck|||🚚
+Car dealership|||🚗
+Clothing brand|||👕
+Restaurant|||🍽️
+Gym|||🏋️
+Barbershop|||💈
+Tech startup|||💻
+YouTube channel|||▶️
+Bookshop|||📚
+Hotel|||🏨
+Travel agency|||✈️
+Ice cream parlour|||🍦
+Car wash|||🧽
+Phone repair shop|||📱
+Record label|||🎵
+Esports team|||🏆
+Football club|||⚽
+Bubble tea shop|||🧋
+Real estate company|||🏠
+Mobile app|||📲
+Theme park|||🎢
+Dessert café|||🍰
+Car detailing studio|||✨`), list('t-worldslive', 'Fictional Worlds to Live In', '🌈', 'Pick 1, Pick 2, Pick 3, Pick 4', `
+Hogwarts|Harry Potter||🧙
+The Shire|The Lord of the Rings||🏡
+Wakanda|Black Panther||🐆
+Pandora|Avatar||🌿
+Narnia|The Chronicles of Narnia||🦁
+Naboo|Star Wars||🌌
+The Pokémon World|Pokémon||⚡
+Hyrule|The Legend of Zelda||🗡️
+Mushroom Kingdom|Super Mario||🍄
+Bikini Bottom|SpongeBob||🍍
+Springfield|The Simpsons||🍩
+Asgard|Marvel||⚡
+Willy Wonka's Chocolate Factory|Charlie and the Chocolate Factory||🍫
+Neverland|Peter Pan||🧚
+Arendelle|Frozen||❄️
+Animal Crossing Island|Animal Crossing||🏝️
+A Minecraft World|Minecraft||⛏️
+Zootopia|Zootopia||🦊
+Monstropolis|Monsters, Inc.||👁️
+The Four Nations|Avatar: The Last Airbender||🌊
+Hidden Leaf Village|Naruto||🍥
+The Grand Line|One Piece||🏴‍☠️
+Pelican Town|Stardew Valley||🌾
+Themyscira|Wonder Woman||🏛️
+Atlantis|Aquaman||🔱`), list('t-worldsavoid', 'Fictional Worlds to Avoid', '☠️', 'Pick 1, Pick 2, Pick 3, Pick 4', `
+Gotham City|Batman||🦇
+Panem|The Hunger Games||🏹
+The Upside Down|Stranger Things||🙃
+Westeros|Game of Thrones||🐉
+Mordor|The Lord of the Rings||🌋
+Raccoon City|Resident Evil||🧟
+Isla Nublar|Jurassic Park||🦖
+The Matrix|The Matrix||💊
+Silent Hill|Silent Hill||🌫️
+Rapture|BioShock||🌊
+The Wasteland|Fallout||☢️
+Night City|Cyberpunk 2077||🌃
+The Purge|The Purge||🔪
+The Fury Road|Mad Max||🚗
+The Squid Game Island|Squid Game||🦑
+The Walking Dead World|The Walking Dead||🧟
+Jumanji|Jumanji||🎲
+Azkaban|Harry Potter||⛓️
+Arrakis|Dune||🏜️
+Lordran|Dark Souls||🔥
+Los Santos|GTA V||🚓
+The Hunger Games Arena|The Hunger Games||🔥
+Hellfire Club Hawkins|Stranger Things||🎲`), list('t-annoying', 'Most Annoying Things', '😤', 'Pick 1, Pick 2, Pick 3, Pick 4', `
+Slow walkers|||🐢
+Loud chewing|||😬
+Phone at 1%|||🪫
+Stubbing your toe|||🦶
+Lag in online games|||📶
+Spoilers|||🙉
+Buffering|||⏳
+Popcorn in your teeth|||🍿
+Wet socks|||🧦
+Tangled earphones|||🎧
+Someone reading your screen|||👀
+Autocorrect fails|||🔤
+Mosquito at night|||🦟
+Reply-all emails|||📧
+Pop-up ads|||🪧
+Losing the remote|||📺
+Unskippable ads|||⏭️
+Group chat spam|||💬
+Sand in your shoes|||🏖️
+Brain freeze|||🧊
+Paper cuts|||📄
+Forgetting why you walked in|||🚪
+Traffic|||🚗
+Hold music|||☎️
+A song stuck in your head|||🎶`), list('t-satisfying', 'Most Satisfying Things', '😌', 'Pick 1, Pick 2, Pick 3, Pick 4', `
+Peeling the film off a new screen|||📱
+Popping bubble wrap|||🫧
+First sip of cold water|||💧
+Perfect parallel park|||🅿️
+A clean room|||🧹
+Fresh sheets|||🛏️
+Ticking off a to-do list|||✅
+A fresh haircut|||💈
+Pressure washing|||🚿
+Kinetic sand|||⏳
+The last puzzle piece|||🧩
+A perfectly ripe avocado|||🥑
+Unboxing new tech|||📦
+Game-winning shot|||🏀
+Rain on the window|||🌧️
+Fresh snow, no footprints|||❄️
+Phone at 100%|||🔋
+Warm laundry from the dryer|||🧺
+Perfect toast|||🍞
+Opening a new jar|||🫙
+Cleaning the lint filter|||🌀
+Mechanical keyboard clicks|||⌨️
+Ice cracking in a drink|||🧊
+Everything fitting in one trip|||🛍️
+A perfect free kick|||⚽`), list('t-dayimprovers', 'Things That Make Your Day', '☀️', 'Pick 1, Pick 2, Pick 3, Pick 4', `
+Sunshine|||☀️
+Good coffee|||☕
+A compliment|||💬
+Payday|||💵
+Your song on the radio|||📻
+Finding money in old jeans|||👖
+A nap|||😴
+Free food|||🍕
+Your team winning|||⚽
+A text from a friend|||📱
+A dog saying hi|||🐕
+No traffic|||🛣️
+Shower after the gym|||🚿
+Snow day|||❄️
+A good laugh|||😂
+Finishing early|||🏃
+Your order arriving|||📦
+Clean sheets|||🛏️
+Beating your high score|||🕹️
+Hot chocolate|||☕
+Long weekend|||📅
+A sunset|||🌇
+Good hair day|||💇
+Getting the last slice|||🍰
+A surprise from family|||🎁`), list('t-spend100', 'Best Ways to Spend $100', '💵', 'Pick 1, Pick 2, Pick 3, Pick 4', `
+A nice dinner|||🍽️
+Concert ticket|||🎫
+A new video game|||🎮
+Sneakers|||👟
+A gift for someone|||🎁
+A day trip|||🚗
+Go-karting|||🏎️
+Escape room|||🔐
+Books|||📚
+Gym gear|||🏋️
+Groceries for two weeks|||🛒
+Theme park ticket|||🎢
+A class or workshop|||🎓
+Save it|||🐷
+Donate it|||💝
+Haircut and skincare|||💈
+Board games|||🎲
+A massage|||💆
+New clothes|||👕
+Plants|||🪴
+Kitchen gear|||🍳
+Film night with friends|||🍿
+Trampoline park|||🤸
+Paintball|||🔫
+Bowling night|||🎳`), list('t-spend1000', 'Best Ways to Spend $1,000', '💰', 'Pick 1, Pick 2, Pick 3, Pick 4', `
+A weekend trip|||✈️
+Gaming PC upgrade|||🖥️
+A new phone|||📱
+A designer piece|||👜
+Front-row concert tickets|||🎤
+Invest it|||📈
+A laptop|||💻
+A bike|||🚲
+A course or certification|||🎓
+A watch|||⌚
+New furniture|||🛋️
+Family dinner out|||🍽️
+Emergency fund|||🛟
+A camera|||📷
+Festival tickets|||🎪
+A road trip|||🚗
+Skydiving|||🪂
+Start a side business|||💼
+Sneaker collection|||👟
+A big TV|||📺
+Personal trainer|||🏋️
+Give to charity|||💝
+Driving lessons|||🚙
+Hotel staycation|||🏨
+Umrah or a family trip|||🕋`), list('t-3am', 'Things to Do at 3 AM', '🌙', 'Pick 1, Pick 2, Pick 3, Pick 4', `
+Raid the fridge|||🧀
+Gaming|||🎮
+Deep conversations|||💭
+Stargazing|||✨
+YouTube rabbit hole|||▶️
+Late-night drive|||🚗
+Order fast food|||🍔
+Read a book|||📖
+Doomscroll|||📱
+Start a new series|||📺
+Plan your whole life|||🗒️
+Clean your room|||🧹
+Work out|||💪
+Make instant noodles|||🍜
+Spam the group chat|||💬
+Listen to music|||🎧
+Wikipedia deep dive|||🌐
+Night prayer|||🤲
+Actually sleep|||😴
+Write something|||✍️
+Draw|||🎨
+Make a playlist|||🎶
+Bake cookies|||🍪
+Rearrange the furniture|||🛋️
+Watch the sunrise later|||🌅`), list('t-worstpowers', 'Worst Superpowers', '🙃', 'Pick 1, Pick 2, Pick 3, Pick 4', `
+Talk to fish (they're boring)|||🐟
+Invisible only when nobody's looking|||🫥
+Super speed, but backwards|||⏪
+Teleport one metre|||📏
+Read pigeons' minds|||🐦
+Turn into a chair|||🪑
+Super strength in your little toe|||🦶
+X-ray vision through socks only|||🧦
+Fly 2 cm off the ground|||🪶
+Control the weather in one room|||⛅
+Predict the past|||🔮
+Glow in the dark|||💡
+Hair changes colour at random|||🌈
+Super hearing you can't switch off|||👂
+Shoot spaghetti from your hands|||🍝
+Summon one random sock|||🧦
+Endless hiccups|||😮
+Breathe underwater, in bathtubs only|||🛁
+Talk to plants that ignore you|||🌱
+Freeze time, but you freeze too|||⏸️
+Invisible to cats only|||🐈
+Make toast slightly warmer|||🍞
+Always know the time (to the second)|||⏱️
+Change the TV channel with your mind (only to the news)|||📺`), list('t-powercombos', 'Best Superpower Combos', '💥', 'Combo 1, Combo 2, Combo 3', `
+Flight + Super Strength|||🦸
+Teleportation + Invisibility|||🫥
+Time Travel + Healing|||⏳
+Mind Reading + Shapeshifting|||🧠
+Super Speed + Intangibility|||⚡
+Telekinesis + Flight|||🪄
+Immortality + Healing Others|||❤️‍🩹
+Weather Control + Flight|||🌩️
+Invisibility + Super Hearing|||👂
+Elemental Powers + Teleportation|||🔥
+Animal Talk + Shapeshifting|||🐺
+Duplication + Super Intelligence|||👥
+Time Freeze + Super Speed|||⏸️
+Laser Eyes + Flight|||👀
+Regeneration + Super Strength|||💪
+Portals + Mind Control|||🌀
+Ice Powers + Water Breathing|||❄️
+Telepathy + Teleportation|||📡
+Luck Manipulation + Charisma|||🍀
+Gravity Control + Flight|||🌍
+Technopathy + Invisibility|||💻
+Size Changing + Super Strength|||🐜`), list('t-shouldexist', 'Things That Should Exist', '💡', 'Pick 1, Pick 2, Pick 3, Pick 4', `
+A phone battery that lasts a week|||🔋
+Teleporters|||🌀
+Healthy food that tastes like junk food|||🍔
+Self-cleaning rooms|||🧹
+A pause button for life|||⏸️
+A snooze button for Mondays|||⏰
+One charger for everything|||🔌
+Real hoverboards|||🛹
+An umbrella that never flips|||☂️
+Lag-free internet everywhere|||📶
+Zero-calorie pizza|||🍕
+Laundry that folds itself|||👕
+Socks that never go missing|||🧦
+A button that skips traffic|||🚗
+Clothes that never wrinkle|||👔
+Instant hair-drying|||💨
+A fridge that restocks itself|||🧊
+Silent mosquitoes|||🦟
+Download skills straight to your brain|||🧠
+A remote that can't get lost|||📺
+Rain that only falls at night|||🌧️
+A save point for real life|||💾
+Time-travelling post|||📮
+Shoes that never get dirty|||👟`), list('t-collect', 'Things to Collect', '🗃️', 'Pick 1, Pick 2, Pick 3, Pick 4', `
+Sneakers|||👟
+Pokémon cards|||🃏
+Football shirts|||👕
+Vinyl records|||💿
+Coins|||🪙
+Stamps|||📮
+Lego sets|||🧱
+Funko Pops|||🧸
+Watches|||⌚
+Comic books|||📚
+Retro video games|||🕹️
+Action figures|||🦸
+Fridge magnets|||🧲
+Hot Wheels|||🏎️
+Signed memorabilia|||✍️
+Plushies|||🧸
+Keychains|||🔑
+Rocks and crystals|||💎
+Film posters|||🎞️
+Mugs|||☕
+Stickers|||🏷️
+Books|||📖
+Art prints|||🖼️
+Snow globes|||🔮
+Trading pins|||📍`), list('t-overrated', 'Most Overrated Things', '🙄', 'Pick 1, Pick 2, Pick 3, Pick 4', `
+Brunch|||🥞
+$7 coffee|||☕
+New Year's Eve|||🎆
+Black Friday deals|||🏷️
+Influencer restaurants|||📸
+Avocado toast|||🥑
+Valentine's Day|||💘
+Camping|||⛺
+Fancy water|||💧
+Pumpkin spice everything|||🎃
+Queueing for a launch|||🧍
+Selfie sticks|||🤳
+Ice baths|||🧊
+Rooftop bars|||🏙️
+Gender reveal parties|||🎈
+Giant logos on clothes|||👕
+Sleeping 12 hours|||😴
+Cruise ship buffets|||🛳️
+Super-long films|||🎬
+Hype sneakers you never wear|||👟
+Airport lounges|||✈️
+Smart fridges|||🧊
+Escape rooms|||🔐
+Cold showers|||🚿`), list('t-underrated', 'Most Underrated Things', '🌟', 'Pick 1, Pick 2, Pick 3, Pick 4', `
+Naps|||😴
+Libraries|||📚
+Public parks|||🌳
+Walking|||🚶
+Water|||💧
+Leftovers|||🍱
+Sunrises|||🌅
+A really good pen|||🖊️
+Board games|||🎲
+Slow cookers|||🍲
+Thank-you notes|||💌
+Long phone calls|||📞
+Local restaurants|||🍽️
+Frozen grapes|||🍇
+Sitting in silence|||🤫
+Going to bed early|||🛏️
+Rainy days|||🌧️
+Grandparents' stories|||👴
+Public transit|||🚌
+Stretching|||🧘
+Tea|||🍵
+Fresh bread|||🍞
+Old songs|||📻
+Clean shoes|||👟
+Saying no|||🙅`)];
+}
+function mkT(id, name, emoji, folder, slots, flags, text) {
+  const photos = flags.includes('p'),
+    sentence = flags.includes('s');
+  const items = text.trim().split('\n').map((line, i) => {
+    const [n, d, w, e, p] = line.split('|').map(x => (x || '').trim());
+    const it = {
+      id: id + '-' + i,
+      name: n,
+      pos: p || '',
+      desc: d || '',
+      emoji: e || '',
+      photo: ''
+    };
+    if (w) it.wiki = w;else if (photos && sentence) it.wiki = n.charAt(0) + n.slice(1).toLowerCase();
+    return it;
+  });
+  return {
+    id,
+    name,
+    emoji,
+    slots: parseSlots(slots),
+    layout: 'list',
+    art: 'emoji',
+    folder,
+    photos,
+    items,
+    v3: true
+  };
+}
+function sportsTopicsV3() {
+  const F = 'Sports';
+  return [mkT('t-ucl', 'Champions League Legends', '🏆', F, 'Pick 1, Pick 2, Pick 3, Pick 4, Pick 5', 'p', `
+Cristiano Ronaldo|All-time top scorer, 5 wins
+Lionel Messi|4 wins with Barcelona
+Paolo Maldini|5 European Cups with Milan
+Karim Benzema|5 wins with Real Madrid
+Luka Modrić|6 wins with Real Madrid|Luka Modrić
+Toni Kroos|6 wins (Bayern, Real Madrid)
+Clarence Seedorf|Won with 3 different clubs
+Alfredo Di Stéfano|5 straight European Cups
+Raúl|Real Madrid legend|Raúl (footballer)
+Iker Casillas|Real Madrid captain
+Xavi|Barcelona midfield maestro|Xavi
+Andrés Iniesta|4 wins with Barcelona
+Steven Gerrard|Istanbul 2005
+Zinedine Zidane|2002 final volley
+Ronaldinho|2006 winner with Barcelona
+Thierry Henry|2009 winner
+Andriy Shevchenko|2003 winner with Milan
+Filippo Inzaghi|Two-goal 2007 final
+Kaká|2007 Ballon d'Or winner
+Robert Lewandowski|Bayern goal machine
+Thomas Müller|Bayern stalwart
+Sergio Ramos|92:48 in Lisbon
+Didier Drogba|2012 final hero
+Frank Lampard|Chelsea 2012 winner
+Ryan Giggs|Manchester United winger
+Gerd Müller|Bayern 1970s
+Johan Cruyff|Ajax three-peat
+Franz Beckenbauer|Bayern captain
+Kylian Mbappé|PSG and Real Madrid star
+Mohamed Salah|Liverpool 2019 winner
+Gianluigi Buffon|Juventus keeper
+Manuel Neuer|Bayern keeper
+Marcelo|Real Madrid left back|Marcelo (footballer, born 1988)
+Gareth Bale|2018 final overhead kick
+Vinícius Júnior|2022 and 2024 winner`), mkT('t-plclubs', 'Premier League Clubs (2025–26)', '🦁', F, 'Pick 1, Pick 2, Pick 3, Pick 4', 'p', `
+Arsenal|The Gunners|Arsenal F.C.
+Aston Villa|The Villans|Aston Villa F.C.
+Bournemouth|The Cherries|AFC Bournemouth
+Brentford|The Bees|Brentford F.C.
+Brighton & Hove Albion|The Seagulls|Brighton & Hove Albion F.C.
+Burnley|The Clarets|Burnley F.C.
+Chelsea|The Blues|Chelsea F.C.
+Crystal Palace|The Eagles|Crystal Palace F.C.
+Everton|The Toffees|Everton F.C.
+Fulham|The Cottagers|Fulham F.C.
+Leeds United|The Whites|Leeds United F.C.
+Liverpool|The Reds|Liverpool F.C.
+Manchester City|The Citizens|Manchester City F.C.
+Manchester United|The Red Devils|Manchester United F.C.
+Newcastle United|The Magpies|Newcastle United F.C.
+Nottingham Forest|Two-time European champions|Nottingham Forest F.C.
+Sunderland|The Black Cats|Sunderland A.F.C.
+Tottenham Hotspur|Spurs|Tottenham Hotspur F.C.
+West Ham United|The Hammers|West Ham United F.C.
+Wolverhampton Wanderers|Wolves|Wolverhampton Wanderers F.C.`), mkT('t-intl', 'International Football Teams', '🌍', F, 'Pick 1, Pick 2, Pick 3, Pick 4', 'p', `
+Brazil|5 World Cups|Brazil national football team|🇧🇷
+Argentina|3 World Cups|Argentina national football team|🇦🇷
+France|2 World Cups|France national football team|🇫🇷
+Germany|4 World Cups|Germany national football team|🇩🇪
+Spain|2010 World Cup, 4 Euros|Spain national football team|🇪🇸
+Italy|4 World Cups|Italy national football team|🇮🇹
+England|1966 World Cup|England national football team|🏴󠁧󠁢󠁥󠁮󠁧󠁿
+Portugal|Euro 2016 winners|Portugal national football team|🇵🇹
+Netherlands|Total Football|Netherlands national football team|🇳🇱
+Uruguay|2 World Cups|Uruguay national football team|🇺🇾
+Belgium|Golden generation|Belgium national football team|🇧🇪
+Croatia|2018 finalists|Croatia national football team|🇭🇷
+Morocco|2022 semi-finalists|Morocco national football team|🇲🇦
+Saudi Arabia|Beat Argentina in 2022|Saudi Arabia national football team|🇸🇦
+Japan|Samurai Blue|Japan national football team|🇯🇵
+South Korea|2002 semi-finalists|South Korea national football team|🇰🇷
+USA|2026 co-hosts|United States men's national soccer team|🇺🇸
+Mexico|El Tri|Mexico national football team|🇲🇽
+Canada|2026 co-hosts|Canada men's national soccer team|🇨🇦
+Nigeria|Super Eagles|Nigeria national football team|🇳🇬
+Senegal|2022 AFCON winners|Senegal national football team|🇸🇳
+Egypt|7 AFCON titles|Egypt national football team|🇪🇬
+Colombia|Los Cafeteros|Colombia national football team|🇨🇴
+Denmark|Euro 1992 winners|Denmark national football team|🇩🇰
+Switzerland|Nati|Switzerland national football team|🇨🇭
+Turkey|2002 third place|Turkey national football team|🇹🇷
+Ghana|Black Stars|Ghana national football team|🇬🇭
+Australia|Socceroos|Australia men's national soccer team|🇦🇺
+Cameroon|Indomitable Lions|Cameroon national football team|🇨🇲
+Algeria|2019 AFCON winners|Algeria national football team|🇩🇿`), mkT('t-mgr', 'Football Managers', '📋', F, 'Pick 1, Pick 2, Pick 3, Pick 4', 'p', `
+Pep Guardiola|Barcelona, Bayern, Man City
+Alex Ferguson|26 years at Manchester United
+Jürgen Klopp|Dortmund and Liverpool
+José Mourinho|Porto, Chelsea, Inter, Real Madrid
+Carlo Ancelotti|Record 5 Champions Leagues
+Arsène Wenger|Arsenal's Invincibles
+Zinedine Zidane|3 straight Champions Leagues
+Diego Simeone|Atlético Madrid
+Johan Cruyff|Barcelona Dream Team
+Mikel Arteta|Arsenal
+Luis Enrique|PSG and Barcelona treble winner|Luis Enrique (footballer, born 1970)
+Hansi Flick|Bayern sextuple, Barcelona
+Xabi Alonso|Unbeaten Leverkusen champions
+Antonio Conte|Juventus, Chelsea, Inter, Napoli
+Rafael Benítez|Istanbul 2005
+Vicente del Bosque|World Cup and Euro with Spain
+Didier Deschamps|2018 World Cup with France
+Lionel Scaloni|2022 World Cup with Argentina
+Marcelo Bielsa|El Loco
+Mauricio Pochettino|Tottenham and Chelsea
+Thomas Tuchel|Chelsea 2021 Champions League
+Unai Emery|Europa League specialist
+Ange Postecoglou|Celtic and Tottenham
+Brian Clough|Two European Cups with Forest
+Bob Paisley|Three European Cups with Liverpool
+Arrigo Sacchi|AC Milan revolution
+Jupp Heynckes|Bayern 2013 treble
+Louis van Gaal|Ajax 1995
+Gareth Southgate|Two Euro finals with England
+Roberto Mancini|Euro 2020 with Italy`), mkT('t-stadia', 'Football Stadiums', '🏟️', F, 'Pick 1, Pick 2, Pick 3, Pick 4', 'p', `
+Camp Nou|Barcelona
+Santiago Bernabéu|Real Madrid|Santiago Bernabéu Stadium
+Old Trafford|Manchester United
+Anfield|Liverpool
+Wembley|London|Wembley Stadium
+Signal Iduna Park|Borussia Dortmund|Westfalenstadion
+San Siro|Milan|San Siro
+Allianz Arena|Bayern Munich
+Maracanã|Rio de Janeiro|Maracanã Stadium
+La Bombonera|Boca Juniors
+Estadio Azteca|Mexico City
+Emirates Stadium|Arsenal
+Tottenham Hotspur Stadium|Spurs
+Etihad Stadium|Manchester City|City of Manchester Stadium
+Stamford Bridge|Chelsea|Stamford Bridge (stadium)
+Celtic Park|Celtic
+Parc des Princes|Paris Saint-Germain
+Stade Vélodrome|Marseille|Stade Vélodrome
+Metropolitano|Atlético Madrid|Metropolitano Stadium
+Juventus Stadium|Juventus|Juventus Stadium
+Johan Cruyff Arena|Ajax
+Estádio da Luz|Benfica|Estádio da Luz
+King Fahd International Stadium|Riyadh
+Lusail Stadium|2022 World Cup final
+St James' Park|Newcastle United
+Goodison Park|Everton's old home
+Rose Bowl|Pasadena
+MetLife Stadium|2026 World Cup final
+BC Place|Vancouver
+Türk Telekom Stadium|Galatasaray|Rams Park`), mkT('t-kits', 'Iconic Football Kits', '👕', F, 'Kit 1, Kit 2, Kit 3, Kit 4', '', `
+Brazil 1970 Home|Pelé's yellow||🇧🇷
+Netherlands 1988 Home|Orange with the famous pattern||🇳🇱
+Nigeria 2018 Home|Green zig-zag sell-out||🇳🇬
+Germany 1990 Home|Tricolour stripes||🇩🇪
+Argentina 1986 Home|Maradona's World Cup||🇦🇷
+France 1998 Home|First World Cup win||🇫🇷
+Italy 2006 Home|Azzurri world champions||🇮🇹
+England 1996 Home|Euro 96||🏴󠁧󠁢󠁥󠁮󠁧󠁿
+Arsenal 2003–04 Home|The Invincibles||🔴
+Manchester United 1999 Home|Treble season||🔴
+Barcelona 2008–09 Home|Sextuple squad||🔵
+Real Madrid 2016–17 Home|Back-to-back champions||⚪
+AC Milan 1988–89 Home|Sacchi's Milan||⚫
+Liverpool 2005 Home|Istanbul night||🔴
+Chelsea 2012 Home|Munich champions||🔵
+Juventus 1996 Home|Del Piero era||⚫
+Inter 2010 Home|Mourinho's treble||🔵
+Mexico 1998 Goalkeeper|Jorge Campos' colours||🧤
+Colombia 1990 Home|Valderrama style||🇨🇴
+Denmark 1986 Home|Hummel halves||🇩🇰
+Japan 1998 Home|Flame sleeves||🇯🇵
+Cameroon 2002 Home|Sleeveless shirt||🇨🇲
+Croatia 1998 Home|Checkerboard||🇭🇷
+Saudi Arabia 1994 Home|First World Cup||🇸🇦
+Borussia Dortmund 1997 Home|Champions League winners||🟡
+Ajax 1995 Home|Young champions||⚪
+Newcastle 1995–96 Home|Black and white stripes||⚫
+Parma 1999 Home|Yellow and blue||🟡`), mkT('t-wonder', 'Football Wonderkids', '🌟', F, 'Pick 1, Pick 2, Pick 3, Pick 4, Pick 5', 'p', `
+Lamine Yamal|Barcelona, born 2007
+Pau Cubarsí|Barcelona defender, born 2007
+Gavi|Barcelona midfielder, born 2004|Gavi (footballer)
+Désiré Doué|PSG, born 2005
+Warren Zaïre-Emery|PSG, born 2006
+João Neves|PSG midfielder, born 2004|João Neves (footballer, born 2004)
+Endrick|Real Madrid, born 2006|Endrick (footballer)
+Arda Güler|Real Madrid, born 2005
+Franco Mastantuono|Real Madrid, born 2007
+Estêvão|Chelsea, born 2007|Estêvão (footballer, born 2007)
+Kobbie Mainoo|Manchester United, born 2005
+Alejandro Garnacho|Born 2004
+Ethan Nwaneri|Arsenal, born 2007
+Myles Lewis-Skelly|Arsenal, born 2006
+Archie Gray|Tottenham, born 2006
+Lucas Bergvall|Tottenham, born 2006
+Rico Lewis|Manchester City, born 2004
+Kenan Yıldız|Juventus, born 2005
+Nico Paz|Born 2004
+Jobe Bellingham|Born 2005
+Leny Yoro|Manchester United, born 2005
+Jorrel Hato|Born 2006
+Mathys Tel|Born 2005
+Claudio Echeverri|Born 2006
+Adam Wharton|Crystal Palace, born 2004
+Ayyoub Bouaddi|Lille, born 2007`), mkT('t-wfoot', 'Women’s Football Stars', '⚽', F, 'Pick 1, Pick 2, Pick 3, Pick 4, Pick 5', 'p', `
+Aitana Bonmatí|Spain, Ballon d'Or winner
+Alexia Putellas|Spain, Ballon d'Or winner
+Sam Kerr|Australia striker
+Marta|Brazil legend|Marta (footballer)
+Alex Morgan|USA legend
+Megan Rapinoe|USA legend
+Ada Hegerberg|Norway, first women's Ballon d'Or
+Lucy Bronze|England defender
+Vivianne Miedema|Netherlands goalscorer
+Lauren James|England forward|Lauren James (footballer)
+Alessia Russo|England striker
+Lauren Hemp|England winger
+Chloe Kelly|Euro 2022 winner
+Leah Williamson|England captain
+Mary Earps|England goalkeeper
+Beth Mead|England forward
+Trinity Rodman|USA forward
+Sophia Smith|USA forward|Sophia Smith (soccer)
+Mallory Swanson|USA forward
+Caroline Graham Hansen|Norway winger
+Wendie Renard|France captain
+Kadidiatou Diani|France forward
+Salma Paralluelo|Spain forward
+Khadija Shaw|Jamaica striker
+Christine Sinclair|Canada, all-time top scorer
+Pernille Harder|Denmark forward
+Ewa Pajor|Poland striker
+Linda Caicedo|Colombia forward
+Hinata Miyazawa|Japan midfielder
+Alexandra Popp|Germany captain`), mkT('t-nbagreat', 'Greatest NBA Teams Ever', '🏀', F, 'Team 1, Team 2, Team 3, Team 4', 'p', `
+1995–96 Chicago Bulls|72–10, Jordan & Pippen|1995–96 Chicago Bulls season
+2016–17 Golden State Warriors|Durant joins the Splash Brothers|2016–17 Golden State Warriors season
+1985–86 Boston Celtics|Bird's best team|1985–86 Boston Celtics season
+1986–87 Los Angeles Lakers|Showtime|1986–87 Los Angeles Lakers season
+1971–72 Los Angeles Lakers|33-game win streak|1971–72 Los Angeles Lakers season
+1966–67 Philadelphia 76ers|Wilt Chamberlain|1966–67 Philadelphia 76ers season
+1982–83 Philadelphia 76ers|Fo', Fo', Fo'|1982–83 Philadelphia 76ers season
+2000–01 Los Angeles Lakers|Shaq & Kobe, 15–1 playoffs|2000–01 Los Angeles Lakers season
+1991–92 Chicago Bulls|67 wins|1991–92 Chicago Bulls season
+1996–97 Chicago Bulls|69 wins|1996–97 Chicago Bulls season
+2012–13 Miami Heat|27-game streak|2012–13 Miami Heat season
+2013–14 San Antonio Spurs|Beautiful game|2013–14 San Antonio Spurs season
+2007–08 Boston Celtics|Big Three|2007–08 Boston Celtics season
+2015–16 Golden State Warriors|73–9|2015–16 Golden State Warriors season
+2015–16 Cleveland Cavaliers|Came back from 3–1|2015–16 Cleveland Cavaliers season
+1988–89 Detroit Pistons|Bad Boys|1988–89 Detroit Pistons season
+2003–04 Detroit Pistons|Team over stars|2003–04 Detroit Pistons season
+1969–70 New York Knicks|Willis Reed game|1969–70 New York Knicks season
+1976–77 Portland Trail Blazers|Bill Walton|1976–77 Portland Trail Blazers season
+1993–94 Houston Rockets|Hakeem's title|1993–94 Houston Rockets season
+2010–11 Dallas Mavericks|Dirk beats the Heat|2010–11 Dallas Mavericks season
+2018–19 Toronto Raptors|Kawhi and The Shot|2018–19 Toronto Raptors season
+2020–21 Milwaukee Bucks|Giannis's 50 in Game 6|2020–21 Milwaukee Bucks season
+2022–23 Denver Nuggets|Jokić's first title|2022–23 Denver Nuggets season
+2023–24 Boston Celtics|Banner 18|2023–24 Boston Celtics season
+2024–25 Oklahoma City Thunder|SGA's champions|2024–25 Oklahoma City Thunder season
+1964–65 Boston Celtics|Bill Russell dynasty|1964–65 Boston Celtics season
+2016–17 Cleveland Cavaliers|LeBron and Kyrie|2016–17 Cleveland Cavaliers season`), mkT('t-nbateams', 'NBA Teams', '🏀', F, 'Pick 1, Pick 2, Pick 3, Pick 4', 'p', `
+Atlanta Hawks|East
+Boston Celtics|East · 18 titles
+Brooklyn Nets|East
+Charlotte Hornets|East
+Chicago Bulls|East · 6 titles
+Cleveland Cavaliers|East
+Detroit Pistons|East
+Indiana Pacers|East
+Miami Heat|East
+Milwaukee Bucks|East
+New York Knicks|East
+Orlando Magic|East
+Philadelphia 76ers|East
+Toronto Raptors|East · 2019 champions
+Washington Wizards|East
+Dallas Mavericks|West
+Denver Nuggets|West
+Golden State Warriors|West
+Houston Rockets|West
+Los Angeles Clippers|West
+Los Angeles Lakers|West · 17 titles
+Memphis Grizzlies|West
+Minnesota Timberwolves|West
+New Orleans Pelicans|West
+Oklahoma City Thunder|West · 2025 champions
+Phoenix Suns|West
+Portland Trail Blazers|West
+Sacramento Kings|West
+San Antonio Spurs|West
+Utah Jazz|West`), mkT('t-oly', 'Olympic Athletes', '🥇', F, 'Pick 1, Pick 2, Pick 3, Pick 4, Pick 5', 'p', `
+Usain Bolt|Jamaica, sprint
+Michael Phelps|USA, swimming · 23 golds
+Simone Biles|USA, gymnastics
+Carl Lewis|USA, sprint and long jump
+Jesse Owens|USA, Berlin 1936
+Nadia Comăneci|Romania, first perfect 10
+Katie Ledecky|USA, distance swimming
+Eliud Kipchoge|Kenya, marathon
+Mo Farah|Great Britain, distance running
+Allyson Felix|USA, sprint
+Florence Griffith Joyner|USA, sprint
+Armand Duplantis|Sweden, pole vault
+Sydney McLaughlin-Levrone|USA, 400m hurdles
+Faith Kipyegon|Kenya, middle distance
+Shelly-Ann Fraser-Pryce|Jamaica, sprint
+Larisa Latynina|Soviet gymnast
+Paavo Nurmi|Finland, distance running
+Mark Spitz|USA, swimming
+Ian Thorpe|Australia, swimming
+Léon Marchand|France, swimming
+Caeleb Dressel|USA, swimming
+Jessica Ennis-Hill|Great Britain, heptathlon
+Chris Hoy|Great Britain, cycling
+Kelly Holmes|Great Britain, middle distance
+Noah Lyles|USA, sprint
+Sifan Hassan|Netherlands, distance running
+Rebeca Andrade|Brazil, gymnastics
+Shaun White|USA, snowboarding
+Marit Bjørgen|Norway, cross-country skiing
+Steve Redgrave|Great Britain, rowing
+Greg Louganis|USA, diving
+Daley Thompson|Great Britain, decathlon`), mkT('t-wwe', 'WWE Superstars', '🤼', F, 'Pick 1, Pick 2, Pick 3, Pick 4', 'p', `
+The Rock|The People's Champ|Dwayne Johnson
+John Cena|You can't see me
+Stone Cold Steve Austin|Austin 3:16
+The Undertaker|The Deadman
+Hulk Hogan|Hulkamania
+Randy Orton|The Viper
+Triple H|The Game
+Shawn Michaels|Mr. WrestleMania
+Roman Reigns|The Tribal Chief
+Rey Mysterio|619
+Brock Lesnar|The Beast Incarnate
+CM Punk|Best in the World
+Cody Rhodes|The American Nightmare
+Seth Rollins|The Visionary
+Becky Lynch|The Man
+Charlotte Flair|The Queen
+Rhea Ripley|Mami
+Bianca Belair|The EST
+Ric Flair|The Nature Boy
+Randy Savage|Macho Man
+André the Giant|The Eighth Wonder of the World
+Bret Hart|The Hitman
+Edge|The Rated-R Superstar|Edge (wrestler)
+Kane|The Big Red Machine|Kane (wrestler)
+Batista|The Animal|Dave Bautista
+Kurt Angle|Olympic gold medallist
+Eddie Guerrero|Lie, cheat, steal
+Gunther|The Ring General|Gunther (wrestler)
+Kofi Kingston|New Day
+Trish Stratus|Seven-time women's champion
+Drew McIntyre|The Scottish Warrior
+Logan Paul|The Maverick`), mkT('t-golf', 'Golfers', '⛳', F, 'Pick 1, Pick 2, Pick 3, Pick 4', 'p', `
+Tiger Woods|15 majors
+Jack Nicklaus|18 majors
+Arnold Palmer|The King
+Rory McIlroy|Northern Ireland
+Scottie Scheffler|USA
+Phil Mickelson|Lefty
+Gary Player|South Africa
+Seve Ballesteros|Spain
+Jon Rahm|Spain
+Brooks Koepka|USA
+Dustin Johnson|USA
+Jordan Spieth|USA
+Bryson DeChambeau|USA
+Xander Schauffele|USA
+Justin Rose|England
+Ben Hogan|USA
+Sam Snead|USA
+Bobby Jones|Grand Slam 1930|Bobby Jones (golfer)
+Nick Faldo|England
+Ernie Els|South Africa
+Vijay Singh|Fiji
+Annika Sörenstam|Sweden
+Nelly Korda|USA
+Lydia Ko|New Zealand
+Collin Morikawa|USA
+Tommy Fleetwood|England
+Ludvig Åberg|Sweden
+Hideki Matsuyama|Japan
+Shane Lowry|Ireland
+Tom Watson|USA|Tom Watson (golfer)`), mkT('t-mlb', 'MLB Players', '⚾', F, 'Pick 1, Pick 2, Pick 3, Pick 4, Pick 5', 'p', `
+Shohei Ohtani|Pitcher and hitter
+Aaron Judge|Outfielder
+Mookie Betts|Infielder/outfielder
+Juan Soto|Outfielder
+Freddie Freeman|First baseman
+Bryce Harper|First baseman
+Mike Trout|Outfielder
+Ronald Acuña Jr.|Outfielder
+Vladimir Guerrero Jr.|First baseman
+Bobby Witt Jr.|Shortstop
+Gunnar Henderson|Shortstop
+Corey Seager|Shortstop
+Fernando Tatís Jr.|Outfielder
+Yoshinobu Yamamoto|Pitcher
+Paul Skenes|Pitcher
+Tarik Skubal|Pitcher
+Gerrit Cole|Pitcher
+Zack Wheeler|Pitcher
+Jacob deGrom|Pitcher
+Julio Rodríguez|Outfielder|Julio Rodríguez (baseball)
+Francisco Lindor|Shortstop
+José Ramírez|Third baseman|José Ramírez (infielder)
+Pete Alonso|First baseman
+Cal Raleigh|Catcher
+Kyle Schwarber|Designated hitter
+Elly De La Cruz|Shortstop
+Corbin Carroll|Outfielder
+Manny Machado|Third baseman
+Rafael Devers|Infielder
+Yordan Alvarez|Designated hitter
+José Altuve|Second baseman
+Adley Rutschman|Catcher`), mkT('t-mlbl', 'MLB Legends', '⚾', F, 'Pick 1, Pick 2, Pick 3, Pick 4, Pick 5', 'p', `
+Babe Ruth|The Sultan of Swat
+Jackie Robinson|Broke the colour barrier
+Hank Aaron|755 home runs
+Willie Mays|The Say Hey Kid
+Mickey Mantle|Yankees
+Lou Gehrig|The Iron Horse
+Ted Williams|Last .400 hitter
+Joe DiMaggio|56-game hit streak
+Ty Cobb|Tigers
+Roberto Clemente|Pirates
+Derek Jeter|Yankees captain
+Ken Griffey Jr.|The Kid
+Barry Bonds|762 home runs
+Cal Ripken Jr.|2,632 straight games
+Nolan Ryan|5,714 strikeouts
+Sandy Koufax|Dodgers
+Randy Johnson|The Big Unit
+Pedro Martínez|Red Sox
+Mariano Rivera|Unanimous Hall of Famer
+Greg Maddux|Braves
+Stan Musial|Cardinals
+Rickey Henderson|Stolen base king
+Ichiro Suzuki|Mariners
+David Ortiz|Big Papi
+Albert Pujols|Cardinals
+Johnny Bench|Reds catcher
+Yogi Berra|Yankees catcher
+Tony Gwynn|Mr. Padre
+Cy Young|511 wins
+Walter Johnson|The Big Train
+Honus Wagner|Pirates
+Chipper Jones|Braves`), mkT('t-rugby', 'Rugby Players', '🏉', F, 'Pick 1, Pick 2, Pick 3, Pick 4, Pick 5', 'p', `
+Jonah Lomu|New Zealand
+Richie McCaw|New Zealand
+Dan Carter|New Zealand
+Jonny Wilkinson|England
+Brian O'Driscoll|Ireland
+Antoine Dupont|France
+Siya Kolisi|South Africa
+Johnny Sexton|Ireland
+Martin Johnson|England|Martin Johnson (rugby union)
+Gareth Edwards|Wales|Gareth Edwards (rugby union)
+Shane Williams|Wales
+Beauden Barrett|New Zealand
+Cheslin Kolbe|South Africa
+Eben Etzebeth|South Africa
+Maro Itoje|England
+Alun Wyn Jones|Wales
+Bryan Habana|South Africa
+David Pocock|Australia
+George Gregan|Australia
+Sergio Parisse|Italy
+Owen Farrell|England
+Ardie Savea|New Zealand
+Handré Pollard|South Africa
+Pieter-Steph du Toit|South Africa
+Finn Russell|Scotland
+Faf de Klerk|South Africa
+Michael Hooper|Australia
+Jason Robinson|England|Jason Robinson (rugby)`), mkT('t-moments', 'Greatest Sports Moments', '🎬', F, 'Pick 1, Pick 2, Pick 3, Pick 4', '', `
+Miracle on Ice|USA beat the USSR, 1980||🏒
+Hand of God and Goal of the Century|Maradona v England, 1986||⚽
+Rumble in the Jungle|Ali beats Foreman, 1974||🥊
+Bolt runs 9.58|Berlin, 2009||⚡
+Agüero 93:20|Man City win the league, 2012||⚽
+Istanbul comeback|Liverpool from 3–0 down, 2005||🏆
+Leicester City win the Premier League|5000–1 shot, 2016||🦊
+Jordan's Flu Game|1997 Finals||🏀
+Comăneci's perfect 10|Montreal, 1976||🤸
+Bannister's four-minute mile|Oxford, 1954||🏃
+Jesse Owens wins four golds|Berlin, 1936||🥇
+Phelps wins eight golds|Beijing, 2008||🏊
+Messi lifts the World Cup|Qatar, 2022||🏆
+Cavaliers come back from 3–1|2016 Finals||🏀
+Red Sox reverse the curse|2004||⚾
+The Helmet Catch|Super Bowl XLII, 2008||🏈
+Brady's 28–3 comeback|Super Bowl LI, 2017||🏈
+Tiger wins the 2019 Masters|Comeback major||⛳
+Federer v Nadal at Wimbledon|2008 final||🎾
+Man United's injury-time treble|1999 Champions League final||⚽
+Barcelona 6–1 PSG|La Remontada, 2017||⚽
+Germany 7–1 Brazil|2014 World Cup semi-final||⚽
+Kobe scores 81|2006||🏀
+Ray Allen's corner three|2013 Finals||🏀
+Bob Beamon's long jump|Mexico City, 1968||🦘
+Kerri Strug's vault|Atlanta, 1996||🤸
+Saudi Arabia beat Argentina|2022 World Cup||⚽
+Raptors win the title|2019||🏀
+Kawhi's buzzer-beater bounce|2019 playoffs||🏀`), mkT('t-goals', 'Greatest Football Goals', '🥅', F, 'Goal 1, Goal 2, Goal 3, Goal 4', '', `
+Maradona v England|1986 World Cup solo run||⚽
+Zidane volley|2002 Champions League final||⚽
+Van Basten volley|Euro 88 final||⚽
+Ibrahimović bicycle kick v England|2012 friendly||⚽
+Rooney overhead kick v Man City|2011 derby||⚽
+Roberto Carlos free kick v France|1997||⚽
+Bergkamp turn v Newcastle|2002||⚽
+Messi solo goal v Getafe|2007||⚽
+Ronaldo bicycle kick v Juventus|2018||⚽
+Bale overhead kick|2018 Champions League final||⚽
+Gerrard's FA Cup final equaliser|2006 v West Ham||⚽
+Henry volley v Man United|2000||⚽
+Papiss Cissé v Chelsea|2012||⚽
+Yeboah v Liverpool|1995||⚽
+Giggs solo goal v Arsenal|1999 FA Cup semi-final||⚽
+James Rodríguez volley v Uruguay|2014 World Cup||⚽
+Van Persie header v Spain|2014 World Cup||⚽
+Pavard half-volley v Argentina|2018 World Cup||⚽
+Bergkamp v Argentina|1998 World Cup||⚽
+Al-Owairan solo goal v Belgium|1994 World Cup||⚽
+Cambiasso 24-pass goal|2006 World Cup||⚽
+Lamela rabona v Arsenal|2021||⚽
+Garnacho overhead kick v Everton|2023||⚽
+Agüero v QPR|2012 title winner||⚽
+Iniesta's World Cup winner|2010 final||⚽
+Messi chip v Bayern|2015 semi-final||⚽
+Ronaldo free kick v Spain|2018 World Cup||⚽`), mkT('t-rivals', 'Football Rivalries', '⚔️', F, 'Pick 1, Pick 2, Pick 3, Pick 4', '', `
+El Clásico|Real Madrid v Barcelona||🇪🇸
+North West Derby|Liverpool v Manchester United||🔴
+Manchester Derby|City v United||🔵
+North London Derby|Arsenal v Tottenham||⚪
+Merseyside Derby|Liverpool v Everton||🔵
+Old Firm|Celtic v Rangers||🍀
+Derby della Madonnina|Inter v AC Milan||⚫
+Derby della Capitale|Roma v Lazio||🟡
+Derby d'Italia|Inter v Juventus||⚫
+Der Klassiker|Bayern v Dortmund||🟡
+Revierderby|Dortmund v Schalke||🟡
+Le Classique|PSG v Marseille||🔵
+Superclásico|Boca Juniors v River Plate||🇦🇷
+Intercontinental Derby|Fenerbahçe v Galatasaray||🇹🇷
+Madrid Derby|Real v Atlético||⚪
+De Klassieker|Ajax v Feyenoord||🇳🇱
+Eternal Derby|Red Star v Partizan||🔴
+Cairo Derby|Al Ahly v Zamalek||🇪🇬
+Riyadh Derby|Al Hilal v Al Nassr||🇸🇦
+Tyne–Wear Derby|Newcastle v Sunderland||⚫
+Seville Derby|Sevilla v Real Betis||🟢
+Lisbon Derby|Benfica v Sporting||🦅
+O Clássico|Benfica v Porto||🐉
+Argentina v Brazil|South American classic||🌎
+England v Germany|Penalties and heartbreak||🏴󠁧󠁢󠁥󠁮󠁧󠁿
+Netherlands v Germany|Neighbours at war||🟠
+USA v Mexico|Dos a Cero||🌎`)];
+}
+function styleTopicsV3() {
+  const F = 'Style & Rides';
+  return [mkT('t-luxcars', 'Luxury Cars', '🚘', F, 'Pick 1, Pick 2, Pick 3, Pick 4', 'p', `
+Rolls-Royce Phantom|Ultimate limousine
+Rolls-Royce Cullinan|Luxury SUV
+Rolls-Royce Ghost|Sleek Rolls
+Rolls-Royce Spectre|Electric Rolls
+Bentley Continental GT|Grand tourer
+Bentley Bentayga|Luxury SUV
+Mercedes-Benz S-Class|Flagship saloon
+Mercedes-Maybach S-Class|Extra luxury|Mercedes-Maybach
+Mercedes-Benz G-Class|The G-Wagon
+BMW 7 Series|Flagship saloon
+Audi A8|Flagship saloon
+Lexus LS|Japanese luxury
+Porsche Panamera|Sports saloon
+Range Rover|British luxury SUV|Range Rover (L460)
+Aston Martin DB12|Grand tourer
+Genesis G90|Korean flagship
+Cadillac Escalade|Big American SUV
+Lincoln Navigator|American luxury SUV
+Maserati Quattroporte|Italian saloon
+BMW 8 Series|Grand tourer|BMW 8 Series (G15)
+Lamborghini Urus|Super SUV
+Ferrari Purosangue|Ferrari's four-door
+Lucid Air|Electric luxury
+Porsche 911|Everyday supercar
+Mercedes-AMG GT|Sports car`), mkT('t-supercars', 'Supercars', '🏎️', F, 'Pick 1, Pick 2, Pick 3, Pick 4', 'p', `
+Ferrari SF90 Stradale|Hybrid Ferrari
+Ferrari 296 GTB|V6 hybrid
+Ferrari F8 Tributo|Mid-engine V8
+Ferrari 812 Superfast|V12
+Lamborghini Huracán|V10
+Lamborghini Aventador|V12
+Lamborghini Revuelto|V12 hybrid
+Lamborghini Countach|Wedge icon
+McLaren 720S|British supercar
+McLaren 750S|Track-ready
+McLaren Artura|Hybrid McLaren
+Porsche 911 GT3 RS|Track weapon|Porsche 911 GT3
+Audi R8|V10
+Mercedes-AMG GT Black Series|Track monster|Mercedes-AMG GT
+Chevrolet Corvette C8|Mid-engine Vette|Chevrolet Corvette (C8)
+Ford GT|Le Mans legend|Ford GT
+Nissan GT-R|Godzilla
+Acura NSX|Japanese supercar|Honda NSX
+Aston Martin Vantage|British sports car|Aston Martin Vantage (2018)
+Maserati MC20|Italian supercar
+Lexus LFA|V10 masterpiece
+Ferrari F40|1987 icon
+Ferrari Enzo|Named after the founder|Enzo Ferrari (automobile)
+McLaren F1|1990s record breaker
+Dodge Viper|American V10`), mkT('t-hypercars', 'Hypercars', '🚀', F, 'Pick 1, Pick 2, Pick 3, Pick 4', 'p', `
+Bugatti Chiron|1,500 hp
+Bugatti Veyron|First 1,000 hp road car
+Bugatti Tourbillon|V16 hybrid
+Bugatti Divo|Track-focused Bugatti
+Bugatti Bolide|Track-only
+Koenigsegg Jesko|Swedish rocket
+Koenigsegg Agera RS|Former speed record
+Koenigsegg Regera|Direct drive
+Pagani Huayra|Italian art
+Pagani Zonda|Legendary V12
+Pagani Utopia|Manual hypercar
+Rimac Nevera|Electric hypercar
+McLaren P1|Hybrid holy trinity
+McLaren Senna|Track focus
+McLaren Speedtail|Three seats
+LaFerrari|Hybrid holy trinity
+Ferrari F80|Ferrari's newest flagship
+Porsche 918 Spyder|Hybrid holy trinity
+Aston Martin Valkyrie|F1-inspired
+Mercedes-AMG One|F1 engine for the road
+Hennessey Venom F5|American speed
+SSC Tuatara|Speed record attempt
+Lotus Evija|Electric hypercar
+Gordon Murray T.50|Fan car|Gordon Murray Automotive T.50
+Lamborghini Sián|Hybrid Lamborghini|Lamborghini Sián FKP 37`), mkT('t-jdm', 'JDM Cars', '🇯🇵', F, 'Pick 1, Pick 2, Pick 3, Pick 4', 'p', `
+Toyota Supra MK4|A80 legend|Toyota Supra
+Nissan Skyline GT-R R34|Godzilla's ancestor|Nissan Skyline GT-R
+Nissan GT-R R35|Modern Godzilla|Nissan GT-R
+Mazda RX-7 FD|Rotary icon|Mazda RX-7
+Honda NSX|Senna-tuned|Honda NSX
+Honda Civic Type R|Hot hatch|Honda Civic Type R
+Mitsubishi Lancer Evolution|Evo|Mitsubishi Lancer Evolution
+Subaru Impreza WRX STI|Rally legend|Subaru Impreza WRX STI
+Toyota AE86|Drift hero|Toyota AE86
+Nissan Silvia S15|Drift favourite|Nissan Silvia
+Honda S2000|9,000 rpm roadster
+Mazda MX-5 Miata|Best-selling roadster|Mazda MX-5
+Nissan 350Z|Affordable Z
+Toyota GR86|Light and fun|Toyota GR86
+Lexus LFA|V10 supercar
+Toyota Land Cruiser|Unbreakable|Toyota Land Cruiser
+Mazda RX-8|Rotary with suicide doors
+Toyota Celica GT-Four|Rally homologation|Toyota Celica GT-Four
+Mitsubishi 3000GT|Tech-heavy GT
+Honda Integra Type R|Front-wheel legend|Honda Integra Type R
+Toyota MR2|Mid-engine fun
+Nissan 300ZX|Twin turbo Z
+Toyota GR Yaris|Rally hatch
+Suzuki Jimny|Tiny off-roader
+Datsun 240Z|The original Z|Nissan S30`), mkT('t-classics', 'Classic Cars', '🚗', F, 'Pick 1, Pick 2, Pick 3, Pick 4', 'p', `
+Ford Mustang (1964)|Pony car|Ford Mustang (first generation)
+Chevrolet Corvette Sting Ray (1963)|C2 split window|Chevrolet Corvette (C2)
+Volkswagen Beetle|People's car
+Mini|Original Mini|Mini
+Jaguar E-Type|Most beautiful car
+Ferrari 250 GTO|Priceless
+Shelby Cobra|AC Cobra|AC Cobra
+Aston Martin DB5|James Bond
+Chevrolet Camaro (1969)|Muscle car|Chevrolet Camaro (first generation)
+Dodge Charger (1969)|Muscle car|Dodge Charger (1968)
+Mercedes-Benz 300 SL|Gullwing
+Lamborghini Miura|First supercar
+DeLorean DMC-12|Back to the Future
+Chevrolet Bel Air (1957)|Tailfins|Chevrolet Bel Air
+Cadillac Eldorado|American luxury
+Ford Model T|Car for everyone
+Ford GT40|Le Mans winner
+Pontiac GTO|First muscle car
+Plymouth Barracuda|Muscle car
+Citroën DS|French icon
+Fiat 500 (1957)|Little Italian|Fiat 500 (1957)
+Land Rover Series|Off-road original|Land Rover Series
+Toyota 2000GT|Japan's first supercar
+BMW 2002|Sporty saloon|BMW 02 Series
+Volkswagen Type 2|The VW bus
+Porsche 356|First Porsche`), mkT('t-evs', 'Electric Cars', '⚡', F, 'Pick 1, Pick 2, Pick 3, Pick 4', 'p', `
+Tesla Model S|Electric saloon
+Tesla Model 3|Best-selling EV
+Tesla Model X|Falcon doors
+Tesla Model Y|Electric SUV
+Tesla Cybertruck|Stainless steel
+Rivian R1T|Adventure truck
+Rivian R1S|Adventure SUV
+Lucid Air|Long range
+Porsche Taycan|Electric Porsche
+Audi e-tron GT|Electric GT
+BMW i4|Electric gran coupé
+BMW iX|Electric SUV
+Mercedes-Benz EQS|Electric S-Class
+Hyundai Ioniq 5|Retro hatch|Hyundai Ioniq 5
+Hyundai Ioniq 6|Streamliner|Hyundai Ioniq 6
+Kia EV6|Sporty crossover
+Kia EV9|Three-row SUV
+Ford Mustang Mach-E|Electric Mustang SUV
+Ford F-150 Lightning|Electric pickup
+Chevrolet Bolt|Affordable EV|Chevrolet Bolt EV
+Nissan Leaf|EV pioneer
+Polestar 2|Swedish EV
+Volkswagen ID.4|Electric SUV
+BYD Seal|Chinese saloon
+Xiaomi SU7|Phone maker's car
+Rimac Nevera|Electric hypercar`), mkT('t-suvs', 'SUVs', '🚙', F, 'Pick 1, Pick 2, Pick 3, Pick 4', 'p', `
+Range Rover|British luxury|Range Rover (L460)
+Mercedes-Benz G-Class|G-Wagon
+Toyota Land Cruiser|Go anywhere
+Nissan Patrol|Desert favourite|Nissan Patrol
+Lexus LX|Luxury Land Cruiser
+Jeep Wrangler|Doors off
+Jeep Grand Cherokee|American classic
+Toyota RAV4|Best seller
+Honda CR-V|Practical
+Ford Bronco|Back from the 90s|Ford Bronco (sixth generation)
+Ford Explorer|Family SUV
+Chevrolet Tahoe|Full size
+GMC Yukon|Full size
+Cadillac Escalade|Bling
+Lamborghini Urus|Super SUV
+Porsche Cayenne|Sporty SUV
+BMW X5|Luxury SUV
+Audi Q7|Three-row luxury
+Tesla Model Y|Electric
+Toyota 4Runner|Rugged
+Kia Telluride|Family favourite
+Hyundai Palisade|Family favourite
+Rolls-Royce Cullinan|Ultimate luxury
+Bentley Bentayga|Luxury
+Land Rover Defender|Reborn icon|Land Rover Defender (L663)
+Volvo XC90|Safe and stylish`), mkT('t-pickups', 'Pickup Trucks', '🛻', F, 'Pick 1, Pick 2, Pick 3, Pick 4', 'p', `
+Ford F-150|Best-selling truck
+Ford F-150 Raptor|Desert runner|Ford F-150 Raptor
+Ram 1500|Smooth ride
+Ram 1500 TRX|Supercharged|Ram 1500 TRX
+Chevrolet Silverado|Workhorse
+GMC Sierra|Premium truck
+Toyota Tacoma|Midsize favourite
+Toyota Tundra|Full size
+Toyota Hilux|Indestructible
+Nissan Frontier|Midsize|Nissan Navara
+Ford Ranger|Midsize
+Jeep Gladiator|Wrangler truck
+Honda Ridgeline|Unibody truck
+Tesla Cybertruck|Stainless steel
+Rivian R1T|Electric
+Ford F-150 Lightning|Electric
+Chevrolet Colorado|Midsize
+GMC Canyon|Midsize
+GMC Hummer EV|Electric supertruck
+Ford Maverick|Compact hybrid
+Hyundai Santa Cruz|Sport adventure vehicle
+Isuzu D-Max|Global workhorse
+Mitsubishi Triton|L200|Mitsubishi Triton
+Volkswagen Amarok|Midsize
+Ford Super Duty|Heavy duty`), mkT('t-motorbikes', 'Motorcycles', '🏍️', F, 'Pick 1, Pick 2, Pick 3, Pick 4', 'p', `
+Harley-Davidson Fat Boy|American cruiser|Harley-Davidson Softail
+Ducati Panigale V4|Italian superbike|Ducati Panigale V4
+Yamaha YZF-R1|Superbike
+Kawasaki Ninja H2|Supercharged|Kawasaki Ninja H2
+Honda CBR1000RR Fireblade|Superbike|Honda CBR1000RR
+BMW S1000RR|Superbike|BMW S1000RR
+Suzuki Hayabusa|Speed icon
+Triumph Bonneville|British classic
+Indian Scout|American cruiser|Indian Scout (motorcycle)
+Royal Enfield Classic 350|Retro classic|Royal Enfield Classic
+Honda Gold Wing|Touring king
+KTM 1290 Super Duke R|The Beast|KTM 1290 Super Duke R
+Aprilia RSV4|Superbike
+MV Agusta F4|Italian beauty
+Ducati Monster|Naked bike
+Kawasaki Z900|Naked bike
+Yamaha MT-09|Naked bike
+BMW R 1250 GS|Adventure bike|BMW R1250GS
+Harley-Davidson Sportster|Classic|Harley-Davidson Sportster
+Vespa|Italian scooter
+Honda Africa Twin|Adventure|Honda Africa Twin
+Triumph Speed Triple|Naked bike
+Ducati Scrambler|Retro|Ducati Scrambler
+Honda CB750|First superbike
+Suzuki GSX-R1000|Gixxer|Suzuki GSX-R1000`), mkT('t-carbrands', 'Car Brands', '🔰', F, 'Pick 1, Pick 2, Pick 3, Pick 4, Pick 5', 'p', `
+Toyota|Japan
+Honda|Japan
+Ford|USA|Ford Motor Company
+Chevrolet|USA
+BMW|Germany
+Mercedes-Benz|Germany
+Audi|Germany
+Volkswagen|Germany
+Porsche|Germany
+Ferrari|Italy
+Lamborghini|Italy
+McLaren|UK|McLaren Automotive
+Bugatti|France
+Rolls-Royce|UK|Rolls-Royce Motor Cars
+Bentley|UK
+Aston Martin|UK
+Tesla|USA|Tesla, Inc.
+Nissan|Japan
+Hyundai|South Korea|Hyundai Motor Company
+Kia|South Korea
+Lexus|Japan
+Jeep|USA
+Land Rover|UK
+Jaguar|UK|Jaguar Cars
+Mazda|Japan
+Subaru|Japan
+Volvo|Sweden|Volvo Cars
+Cadillac|USA
+Dodge|USA
+Maserati|Italy
+Genesis|South Korea|Genesis Motor
+BYD|China|BYD Auto
+Rivian|USA
+Koenigsegg|Sweden`), mkT('t-luxbrands', 'Luxury Fashion Brands', '👜', F, 'Pick 1, Pick 2, Pick 3, Pick 4', 'p', `
+Louis Vuitton|Paris
+Gucci|Florence
+Chanel|Paris
+Hermès|Paris
+Prada|Milan
+Dior|Paris
+Balenciaga|Paris
+Versace|Milan
+Burberry|London
+Saint Laurent|Paris|Yves Saint Laurent (brand)
+Fendi|Rome
+Givenchy|Paris
+Valentino|Rome|Valentino (fashion house)
+Bottega Veneta|Italy
+Dolce & Gabbana|Milan
+Celine|Paris|Celine (brand)
+Loewe|Madrid
+Moncler|Puffer jackets
+Tom Ford|American luxury|Tom Ford (brand)
+Ralph Lauren|American classic|Ralph Lauren Corporation
+Off-White|Virgil Abloh|Off-White (company)
+Alexander McQueen|London
+Giorgio Armani|Milan|Armani
+Miu Miu|Prada's sister brand
+Balmain|Paris
+Loro Piana|Quiet luxury
+Brunello Cucinelli|Cashmere
+Coach|New York|Tapestry, Inc.
+Michael Kors|New York|Michael Kors (brand)`), mkT('t-streetwear', 'Streetwear Brands', '🧢', F, 'Pick 1, Pick 2, Pick 3, Pick 4', 'p', `
+Supreme|New York|Supreme (brand)
+Stüssy|California
+Palace|London|Palace Skateboards
+BAPE|Tokyo|A Bathing Ape
+Kith|New York|Kith (brand)
+Fear of God|Essentials|Fear of God (brand)
+Nike|Just Do It
+Jordan Brand|Jumpman|Air Jordan
+Adidas|Three stripes
+Carhartt WIP|Workwear streetwear|Carhartt
+The North Face|Outdoor icon
+Stone Island|Compass badge
+Corteiz|London|Corteiz
+Trapstar|London|Trapstar
+Represent|Manchester|Represent (clothing)
+Palm Angels|Milan
+Rhude|Los Angeles|Rhude
+Aimé Leon Dore|New York|Aimé Leon Dore
+Chrome Hearts|Silver and crosses
+Gallery Dept.|Paint-splattered|Gallery Dept.
+Billionaire Boys Club|Pharrell|Billionaire Boys Club (clothing retailer)
+Vans|Off the Wall
+Champion|Classic sportswear|Champion (sportswear)
+New Balance|Dad shoes to grails
+Puma|Big cat
+Denim Tears|Cotton wreath|Denim Tears
+Hellstar|Streetwear|Hellstar`), mkT('t-watches', 'Watch Brands', '⌚', F, 'Pick 1, Pick 2, Pick 3, Pick 4', 'p', `
+Rolex|Crown
+Patek Philippe|Holy trinity
+Audemars Piguet|Royal Oak
+Vacheron Constantin|Holy trinity
+Omega|Moonwatch|Omega SA
+Cartier|Tank and Santos
+Richard Mille|Tennis and F1
+TAG Heuer|Monaco and Carrera
+Breitling|Navitimer
+IWC Schaffhausen|Pilot's watches
+Jaeger-LeCoultre|Reverso
+Hublot|Big Bang
+Panerai|Italian divers
+Tudor|Rolex's sister|Tudor (watch company)
+Longines|Elegance
+Seiko|Japan|Seiko
+Grand Seiko|Japanese luxury
+Casio G-Shock|Indestructible|G-Shock
+Citizen|Eco-Drive|Citizen Watch
+Tissot|Swiss value
+Zenith|El Primero|Zenith (watchmaker)
+A. Lange & Söhne|German luxury
+Bulgari|Octo|Bulgari
+Swatch|Fun Swiss
+Apple Watch|Smartwatch
+Garmin|Sports watches
+Breguet|Since 1775|Breguet (brand)
+Chopard|Happy Diamonds
+Hamilton|American-Swiss|Hamilton Watch Company`), mkT('t-fragrance', 'Fragrances', '🧴', F, 'Pick 1, Pick 2, Pick 3, Pick 4', '', `
+Dior Sauvage|Fresh and spicy||🧴
+Bleu de Chanel|Woody and fresh||🧴
+Chanel No. 5|Iconic floral||🌸
+Creed Aventus|Pineapple and smoke||🍍
+Acqua di Giò|Aquatic classic||🌊
+YSL Y|Fresh and woody||🧴
+Versace Eros|Mint and vanilla||🧴
+Paco Rabanne 1 Million|Sweet and spicy||🪙
+Tom Ford Oud Wood|Oud and wood||🪵
+Tom Ford Tobacco Vanille|Warm and sweet||🍂
+Baccarat Rouge 540|Amber and saffron||🧴
+Le Labo Santal 33|Sandalwood||🪵
+Jean Paul Gaultier Le Male|Sailor bottle||⚓
+Dior J'adore|Floral||🌸
+Lancôme La Vie Est Belle|Sweet iris||🌸
+Carolina Herrera Good Girl|Stiletto bottle||👠
+YSL Black Opium|Coffee and vanilla||☕
+Armani Code|Warm and elegant||🧴
+Valentino Born in Roma|Studded bottle||🧴
+Prada Luna Rossa|Fresh and sporty||⛵
+Hugo Boss Bottled|Office classic||🧴
+Parfums de Marly Layton|Apple and vanilla||🍎
+Initio Oud for Greatness|Oud||🪵
+Kilian Angels' Share|Cognac and cinnamon||🥃
+Xerjoff Naxos|Honey and tobacco||🍯
+Lattafa Khamrah|Dates and spice||🌴
+Armaf Club de Nuit Intense Man|Smoky citrus||🧴
+Rasasi Hawas|Fresh aquatic||🌊
+Arabian Oud Kalemat|Amber and oud||🪵
+Swiss Arabian Shaghaf Oud|Rose and oud||🌹`), mkT('t-hairstyles', 'Men’s Hairstyles', '💈', F, 'Pick 1, Pick 2, Pick 3, Pick 4', '', `
+Buzz Cut|Short all over||💈
+Crew Cut|Classic short||💈
+Skin Fade|Down to the skin||💈
+Taper Fade|Subtle fade||💈
+Burst Fade|Around the ear||💈
+Undercut|Short sides, long top||💈
+Quiff|Volume up front||💈
+Pompadour|Swept up and back||💈
+Slick Back|Combed back||💈
+Side Part|Smart classic||💈
+French Crop|Short fringe||💈
+Caesar Cut|Short and forward||💈
+Textured Fringe|Messy front||💈
+Modern Mullet|Business in front||💈
+Man Bun|Tied up||💈
+Cornrows|Braided close to the head||💈
+Box Braids|Square-parted braids||💈
+Dreadlocks|Locs||💈
+Twists|Two-strand twists||💈
+Afro|Natural volume||💈
+360 Waves|Brushed waves||🌊
+Mohawk|Strip down the middle||💈
+Faux Hawk|Subtle mohawk||💈
+Curtains|Middle part||💈
+Ivy League|Grown-out crew cut||💈
+Flow|Long and swept back||💈
+Shaved Head|Clean||💈
+Edgar Cut|Straight fringe and fade||💈
+Line-up|Sharp edges||✂️
+Hair Design|Shaved pattern||✂️`), mkT('t-bballshoes', 'Basketball Sneakers', '🏀', F, 'Pair 1, Pair 2, Pair 3, Pair 4', 'p', `
+Air Jordan 1|1985 original
+Air Jordan 3|Elephant print|Air Jordan III
+Air Jordan 4|Classic silhouette|Air Jordan IV
+Air Jordan 11|Patent leather|Air Jordan XI
+Air Jordan 12|Flu Game|Air Jordan XII
+Air Jordan 13|Panther-inspired|Air Jordan XIII
+Nike LeBron|LeBron's signature line|Nike LeBron
+Nike Kobe 6|Grinch|Nike Kobe
+Nike KD|Kevin Durant's line|Nike KD
+Nike Air Force 1|Started on the court
+Nike Air Foamposite One|Penny's bubble shoe|Nike Air Foamposite
+Reebok Question|Allen Iverson|Reebok Question
+Reebok Shaq Attaq|Shaq's signature
+Adidas Harden|James Harden's line
+Adidas D Rose 1|Derrick Rose|Adidas D Rose
+Curry Brand|Stephen Curry's line|Under Armour Curry
+Nike Kyrie|Kyrie Irving's line
+Puma MB.01|LaMelo Ball|Puma MB.01
+Converse Chuck Taylor All-Star|The original basketball shoe|Chuck Taylor All-Stars
+Nike Air More Uptempo|Big AIR letters
+Nike Zoom Freak|Giannis|Nike Zoom Freak
+Nike Ja 1|Ja Morant
+Anta KT|Klay Thompson|Anta Sports
+Adidas AE 1|Anthony Edwards
+Nike Sabrina 1|Sabrina Ionescu
+Nike Air Penny|Penny Hardaway|Nike Air Penny
+Adidas Crazy 8|Kobe's early shoe|Adidas Crazy 8
+Nike Book 1|Devin Booker`), mkT('t-bags', 'Designer Bags', '👛', F, 'Pick 1, Pick 2, Pick 3, Pick 4', '', `
+Hermès Birkin|The grail||👜
+Hermès Kelly|Elegant top handle||👜
+Chanel Classic Flap|Quilted icon||👜
+Chanel Boy Bag|Edgy Chanel||👜
+Louis Vuitton Speedy|Monogram classic||👜
+Louis Vuitton Neverfull|Everyday tote||👜
+Louis Vuitton Keepall|Weekender||🧳
+Dior Saddle Bag|Curved icon||👜
+Lady Dior|Cannage stitching||👜
+Gucci Jackie|Hobo bag||👜
+Gucci Marmont|Double G||👜
+Fendi Baguette|Under the arm||🥖
+Prada Re-Edition|Nylon mini||👜
+Balenciaga City Bag|Motorcycle bag||🏍️
+Bottega Veneta Cassette|Woven leather||👜
+Celine Triomphe|Triomphe clasp||👜
+Loewe Puzzle|Geometric||🧩
+YSL Loulou|Quilted shoulder bag||👜
+Goyard St. Louis|Chevron tote||👜
+Telfar Shopping Bag|Bushwick Birkin||🛍️
+Coach Tabby|Coach classic||👜
+Jacquemus Le Chiquito|Tiny bag||🤏
+Valentino Rockstud|Studded||👜
+Givenchy Antigona|Structured||👜
+Miu Miu Wander|Matelassé||👜
+Prada Galleria|Saffiano leather||👜`), mkT('t-outerwear', 'Jackets & Outerwear', '🧥', F, 'Pick 1, Pick 2, Pick 3, Pick 4', 'ps', `
+Puffer Jacket|Warm and puffy|Down jacket|🧥
+Leather Jacket|Timeless|Leather jacket|🧥
+Denim Jacket|Jean jacket|Jean jacket|🧥
+Bomber Jacket|Flight style|Flight jacket|🧥
+Trench Coat|Rain-ready classic|Trench coat|🧥
+Parka|Winter warmth||🧥
+Peacoat|Navy wool||🧥
+Varsity Jacket|Letterman|Letterman jacket|🧥
+Windbreaker|Light shell||🧥
+Fleece Jacket|Soft and warm|Polar fleece|🧥
+Hoodie|Everyday essential||🧥
+Overcoat|Smart and long||🧥
+Harrington Jacket|Mod classic||🧥
+Shacket|Shirt-jacket|Overshirt|🧥
+Gilet|Sleeveless|Waistcoat|🦺
+Raincoat|Waterproof||☔
+Ski Jacket|Slope-ready|Ski suit|⛷️
+Blazer|Smart casual||🧥
+Biker Jacket|Asymmetric zip|Leather jacket|🏍️
+Field Jacket|M-65|M-1965 field jacket|🧥
+Teddy Coat|Fluffy||🧸
+Anorak|Pullover shell||🧥
+Track Jacket|Sporty|Tracksuit|🧥
+Chore Coat|Workwear||🧥
+Duffle Coat|Toggles||🧥
+Corduroy Jacket|Ribbed||🧥
+Quilted Jacket|Diamond quilting||🧥
+Canada Goose Parka|Arctic-ready|Canada Goose|🧥`), mkT('t-sunglasses', 'Sunglasses', '🕶️', F, 'Pick 1, Pick 2, Pick 3', '', `
+Ray-Ban Wayfarer|Timeless||🕶️
+Ray-Ban Aviator|Pilot classic||🕶️
+Ray-Ban Clubmaster|Browline||🕶️
+Oakley Holbrook|Sporty classic||🕶️
+Oakley Frogskins|80s throwback||🕶️
+Oakley Radar|Sports wrap||🕶️
+Persol 714|Folding icon||🕶️
+Tom Ford FT0237|Snowdon style||🕶️
+Gentle Monster|Korean fashion frames||🕶️
+Cartier Santos|Luxury aviators||🕶️
+Prada Linea Rossa|Sporty luxury||🕶️
+Gucci GG|Logo frames||🕶️
+Celine Triomphe|Thick acetate||🕶️
+Dior Blacksuit|Sleek||🕶️
+Maui Jim|Polarised||🕶️
+Oliver Peoples|Vintage-inspired||🕶️
+Warby Parker|Affordable||🕶️
+Quay|Festival favourite||🕶️
+Costa del Mar|Fishing favourite||🎣
+Randolph Engineering|Military aviator||✈️
+Moscot Lemtosh|New York classic||🕶️
+Jacques Marie Mage|Collector frames||🕶️`)];
+}
+function travelTopicsV3() {
+  const F = 'Travel & Places';
+  return [mkT('t-capitals', 'Capital Cities', '🏛️', F, 'Pick 1, Pick 2, Pick 3, Pick 4, Pick 5', 'p', `
+London|United Kingdom
+Paris|France
+Tokyo|Japan
+Washington, D.C.|United States
+Ottawa|Canada
+Riyadh|Saudi Arabia
+Rome|Italy
+Madrid|Spain
+Berlin|Germany
+Beijing|China
+Seoul|South Korea
+Cairo|Egypt
+Abu Dhabi|United Arab Emirates
+Doha|Qatar
+Amman|Jordan
+Ankara|Türkiye
+Moscow|Russia
+Mexico City|Mexico
+Buenos Aires|Argentina
+Lisbon|Portugal
+Amsterdam|Netherlands
+Athens|Greece
+Vienna|Austria
+Prague|Czech Republic
+Stockholm|Sweden
+Oslo|Norway
+Copenhagen|Denmark
+Dublin|Ireland
+Bangkok|Thailand
+Singapore|Singapore
+Kuala Lumpur|Malaysia
+New Delhi|India
+Islamabad|Pakistan
+Nairobi|Kenya
+Rabat|Morocco
+Canberra|Australia
+Wellington|New Zealand
+Brasília|Brazil
+Lima|Peru
+Havana|Cuba`), mkT('t-landmarks', 'Famous Landmarks', '🗽', F, 'Pick 1, Pick 2, Pick 3, Pick 4, Pick 5', 'p', `
+Eiffel Tower|Paris
+Statue of Liberty|New York
+Great Wall of China|China
+Taj Mahal|Agra, India
+Colosseum|Rome
+Pyramids of Giza|Egypt|Giza pyramid complex
+Burj Khalifa|Dubai
+Machu Picchu|Peru
+Christ the Redeemer|Rio de Janeiro|Christ the Redeemer (statue)
+Petra|Jordan
+Big Ben|London
+Sydney Opera House|Sydney
+Golden Gate Bridge|San Francisco
+Stonehenge|England
+Leaning Tower of Pisa|Italy
+Sagrada Família|Barcelona
+Acropolis of Athens|Greece
+Angkor Wat|Cambodia
+Mount Rushmore|South Dakota
+CN Tower|Toronto
+Kaaba|Mecca
+Prophet's Mosque|Medina
+Hagia Sophia|Istanbul
+Chichén Itzá|Mexico
+Neuschwanstein Castle|Germany
+Tower Bridge|London
+Times Square|New York
+Empire State Building|New York
+Forbidden City|Beijing
+Sheikh Zayed Grand Mosque|Abu Dhabi
+Alhambra|Granada
+Edge of Diriyah|Riyadh|Diriyah
+Hegra|AlUla, Saudi Arabia|Hegra (Mada'in Salih)
+Mont-Saint-Michel|France
+Niagara Falls|Ontario and New York
+Brandenburg Gate|Berlin
+Moai|Easter Island
+Burj Al Arab|Dubai`), mkT('t-wonders', 'Natural Wonders', '🌋', F, 'Pick 1, Pick 2, Pick 3, Pick 4', 'p', `
+Grand Canyon|Arizona
+Great Barrier Reef|Australia
+Victoria Falls|Zambia and Zimbabwe
+Mount Everest|Nepal and China
+Aurora Borealis|Northern lights|Aurora
+Niagara Falls|Canada and USA
+Iguazu Falls|Argentina and Brazil
+Ha Long Bay|Vietnam
+Paricutín|Mexico's young volcano
+Harbour of Rio de Janeiro|Brazil|Guanabara Bay
+Amazon Rainforest|South America|Amazon rainforest
+Sahara Desert|North Africa|Sahara
+Uluru|Australia
+Matterhorn|Switzerland
+Angel Falls|Venezuela
+Galápagos Islands|Ecuador
+Plitvice Lakes|Croatia|Plitvice Lakes National Park
+Pamukkale|Türkiye
+Cappadocia|Türkiye
+Zhangjiajie|China|Zhangjiajie National Forest Park
+Moraine Lake|Banff, Canada
+Giant's Causeway|Northern Ireland
+Salar de Uyuni|Bolivia
+Antelope Canyon|Arizona
+Mount Fuji|Japan
+Table Mountain|Cape Town
+Dead Sea|Jordan and Israel
+Edge of the World|Riyadh, Saudi Arabia|Jebel Fihrayn
+Bay of Fundy|Canada
+Torres del Paine|Chile|Torres del Paine National Park`), mkT('t-islands', 'Islands', '🏝️', F, 'Pick 1, Pick 2, Pick 3, Pick 4', 'p', `
+Maldives|Indian Ocean
+Bali|Indonesia
+Santorini|Greece
+Mykonos|Greece
+Bora Bora|French Polynesia
+Hawaii|Big Island|Hawaii (island)
+Maui|Hawaii
+Iceland|North Atlantic
+Sicily|Italy
+Sardinia|Italy
+Ibiza|Spain
+Mallorca|Spain
+Tenerife|Canary Islands
+Madeira|Portugal
+Crete|Greece
+Phuket|Thailand
+Zanzibar|Tanzania
+Mauritius|Indian Ocean
+Seychelles|Indian Ocean
+Jamaica|Caribbean
+Barbados|Caribbean
+Bahamas|Caribbean|The Bahamas
+Fiji|South Pacific
+Sri Lanka|Indian Ocean
+Prince Edward Island|Canada
+Vancouver Island|Canada
+Galápagos Islands|Ecuador
+Capri|Italy
+Jeju Island|South Korea
+Farasan Islands|Red Sea, Saudi Arabia`), mkT('t-beaches', 'Beaches', '🏖️', F, 'Pick 1, Pick 2, Pick 3, Pick 4', 'p', `
+Bondi Beach|Sydney
+Copacabana|Rio de Janeiro|Copacabana, Rio de Janeiro
+Whitehaven Beach|Australia
+Navagio Beach|Greece|Navagio
+Maya Bay|Thailand
+Grace Bay|Turks and Caicos
+Seven Mile Beach|Grand Cayman|Seven Mile Beach, Cayman Islands
+Waikiki|Honolulu
+Miami Beach|Florida
+Malibu|California|Malibu, California
+Santa Monica Beach|California|Santa Monica State Beach
+Tulum|Mexico
+Cancún|Mexico
+Anse Source d'Argent|Seychelles
+Pink Sands Beach|Bahamas|Harbour Island, Bahamas
+Nusa Dua|Bali
+Camps Bay|Cape Town
+Praia da Marinha|Portugal
+Cala Macarella|Mallorca
+Elafonissi|Crete
+Reynisfjara|Iceland
+Long Beach|Tofino, Canada|Long Beach (Pacific Rim National Park Reserve)
+Sauble Beach|Ontario
+Jumeirah Beach|Dubai
+Al Fanateer Beach|Jubail, Saudi Arabia|Jubail
+Durdle Door|England
+Matira Beach|Bora Bora
+Railay Beach|Thailand|Railay Beach`), mkT('t-themeparks', 'Theme Parks', '🎢', F, 'Pick 1, Pick 2, Pick 3, Pick 4', 'p', `
+Magic Kingdom|Walt Disney World
+Disneyland|California
+Disneyland Paris|France
+Tokyo Disneyland|Japan
+Universal Studios Hollywood|California
+Universal Studios Florida|Orlando
+Islands of Adventure|Orlando|Universal Islands of Adventure
+Epic Universe|Orlando, 2025|Universal Epic Universe
+Universal Studios Japan|Osaka
+Europa-Park|Germany
+Cedar Point|Ohio
+Six Flags Magic Mountain|California
+Canada's Wonderland|Vaughan, Ontario
+Alton Towers|England
+Thorpe Park|England
+PortAventura World|Spain
+Efteling|Netherlands
+Tivoli Gardens|Copenhagen
+Ferrari World|Abu Dhabi
+Warner Bros. World Abu Dhabi|Abu Dhabi
+Lotte World|Seoul
+Everland|South Korea
+Ocean Park|Hong Kong|Ocean Park Hong Kong
+Busch Gardens Tampa Bay|Florida
+Dollywood|Tennessee
+Phantasialand|Germany
+Liseberg|Sweden
+Kings Island|Ohio
+Gardaland|Italy
+Hersheypark|Pennsylvania`), mkT('t-europe', 'European Cities', '🇪🇺', F, 'Pick 1, Pick 2, Pick 3, Pick 4, Pick 5', 'p', `
+Paris|France
+London|United Kingdom
+Rome|Italy
+Barcelona|Spain
+Madrid|Spain
+Amsterdam|Netherlands
+Berlin|Germany
+Munich|Germany
+Vienna|Austria
+Prague|Czech Republic
+Budapest|Hungary
+Lisbon|Portugal
+Porto|Portugal
+Istanbul|Türkiye
+Athens|Greece
+Venice|Italy
+Florence|Italy
+Milan|Italy
+Naples|Italy
+Edinburgh|Scotland
+Dublin|Ireland
+Copenhagen|Denmark
+Stockholm|Sweden
+Oslo|Norway
+Reykjavík|Iceland
+Zurich|Switzerland
+Geneva|Switzerland
+Brussels|Belgium
+Bruges|Belgium
+Seville|Spain
+Kraków|Poland
+Dubrovnik|Croatia
+Monaco|Monaco
+Manchester|England
+Liverpool|England`), mkT('t-asia', 'Asian Cities', '🏯', F, 'Pick 1, Pick 2, Pick 3, Pick 4, Pick 5', 'p', `
+Tokyo|Japan
+Kyoto|Japan
+Osaka|Japan
+Seoul|South Korea
+Busan|South Korea
+Beijing|China
+Shanghai|China
+Hong Kong|China
+Taipei|Taiwan
+Singapore|Singapore
+Bangkok|Thailand
+Chiang Mai|Thailand
+Kuala Lumpur|Malaysia
+Hanoi|Vietnam
+Ho Chi Minh City|Vietnam
+Manila|Philippines
+Jakarta|Indonesia
+Mumbai|India
+New Delhi|India
+Jaipur|India
+Kathmandu|Nepal
+Colombo|Sri Lanka
+Lahore|Pakistan
+Karachi|Pakistan
+Dhaka|Bangladesh
+Macau|China
+Shenzhen|China
+Siem Reap|Cambodia
+Almaty|Kazakhstan
+Ulaanbaatar|Mongolia`), mkT('t-mecities', 'Middle Eastern Cities', '🕌', F, 'Pick 1, Pick 2, Pick 3, Pick 4, Pick 5', 'p', `
+Dubai|UAE
+Abu Dhabi|UAE
+Sharjah|UAE
+Riyadh|Saudi Arabia
+Jeddah|Saudi Arabia
+Mecca|Saudi Arabia
+Medina|Saudi Arabia
+Dammam|Saudi Arabia
+AlUla|Saudi Arabia
+Doha|Qatar
+Kuwait City|Kuwait
+Manama|Bahrain
+Muscat|Oman
+Salalah|Oman
+Amman|Jordan
+Beirut|Lebanon
+Damascus|Syria
+Aleppo|Syria
+Baghdad|Iraq
+Erbil|Iraq
+Tehran|Iran
+Isfahan|Iran
+Shiraz|Iran
+Istanbul|Türkiye
+Ankara|Türkiye
+Cairo|Egypt
+Alexandria|Egypt
+Jerusalem|Holy city
+Taif|Saudi Arabia
+Abha|Saudi Arabia`), mkT('t-nacities', 'North American Cities', '🌆', F, 'Pick 1, Pick 2, Pick 3, Pick 4, Pick 5', 'p', `
+New York City|New York
+Los Angeles|California
+Chicago|Illinois
+Toronto|Ontario
+Vancouver|British Columbia
+Montreal|Quebec
+Mississauga|Ontario
+Miami|Florida
+Las Vegas|Nevada
+San Francisco|California
+Mexico City|Mexico
+Houston|Texas
+Seattle|Washington
+Boston|Massachusetts
+Washington, D.C.|USA
+Atlanta|Georgia
+New Orleans|Louisiana
+Nashville|Tennessee
+Austin|Texas
+Dallas|Texas
+Denver|Colorado
+Calgary|Alberta
+Ottawa|Ontario
+Quebec City|Quebec
+Philadelphia|Pennsylvania
+San Diego|California
+Orlando|Florida
+Honolulu|Hawaii
+Cancún|Mexico
+Guadalajara|Mexico
+Phoenix|Arizona|Phoenix, Arizona
+Edmonton|Alberta
+Winnipeg|Manitoba
+Halifax|Nova Scotia|Halifax, Nova Scotia`), mkT('t-africa', 'African Destinations', '🌍', F, 'Pick 1, Pick 2, Pick 3, Pick 4', 'p', `
+Cape Town|South Africa
+Marrakesh|Morocco
+Cairo|Egypt
+Zanzibar|Tanzania
+Serengeti|Tanzania|Serengeti National Park
+Victoria Falls|Zambia and Zimbabwe
+Kruger National Park|South Africa
+Maasai Mara|Kenya
+Mount Kilimanjaro|Tanzania
+Nairobi|Kenya
+Lagos|Nigeria
+Accra|Ghana
+Dakar|Senegal
+Casablanca|Morocco
+Fez|Morocco
+Chefchaouen|Morocco
+Tunis|Tunisia
+Seychelles|Indian Ocean
+Mauritius|Indian Ocean
+Madagascar|Lemurs and baobabs
+Okavango Delta|Botswana
+Sossusvlei|Namibia
+Luxor|Egypt
+Sharm El Sheikh|Egypt
+Addis Ababa|Ethiopia
+Lalibela|Ethiopia
+Kigali|Rwanda
+Johannesburg|South Africa
+Durban|South Africa
+Essaouira|Morocco`), mkT('t-states', 'US States', '🇺🇸', F, 'Pick 1, Pick 2, Pick 3, Pick 4, Pick 5', 'p', `
+Alabama
+Alaska
+Arizona
+Arkansas
+California
+Colorado
+Connecticut
+Delaware
+Florida
+Georgia||Georgia (U.S. state)
+Hawaii
+Idaho
+Illinois
+Indiana
+Iowa
+Kansas
+Kentucky
+Louisiana
+Maine
+Maryland
+Massachusetts
+Michigan
+Minnesota
+Mississippi
+Missouri
+Montana
+Nebraska
+Nevada
+New Hampshire
+New Jersey
+New Mexico
+New York||New York (state)
+North Carolina
+North Dakota
+Ohio
+Oklahoma
+Oregon
+Pennsylvania
+Rhode Island
+South Carolina
+South Dakota
+Tennessee
+Texas
+Utah
+Vermont
+Virginia
+Washington||Washington (state)
+West Virginia
+Wisconsin
+Wyoming`), mkT('t-canada', 'Canada: Provinces & Places', '🍁', F, 'Province, Province, Place, Place, FLEX', 'p', `
+Ontario|Province|||Province
+Quebec|Province|||Province
+British Columbia|Province|||Province
+Alberta|Province|||Province
+Manitoba|Province|||Province
+Saskatchewan|Province|||Province
+Nova Scotia|Province|||Province
+New Brunswick|Province|||Province
+Prince Edward Island|Province|||Province
+Newfoundland and Labrador|Province|||Province
+Yukon|Territory|||Province
+Northwest Territories|Territory|||Province
+Nunavut|Territory|||Province
+Banff National Park|Alberta|||Place
+Lake Louise|Alberta|||Place
+Jasper National Park|Alberta|||Place
+Niagara Falls|Ontario|||Place
+CN Tower|Toronto|||Place
+Old Quebec|Quebec City|||Place
+Whistler|British Columbia|Whistler, British Columbia||Place
+Stanley Park|Vancouver|||Place
+Peggy's Cove|Nova Scotia|||Place
+Churchill|Polar bear capital, Manitoba|Churchill, Manitoba||Place
+Algonquin Park|Ontario|Algonquin Provincial Park||Place
+Parliament Hill|Ottawa|||Place
+Bay of Fundy|Highest tides|||Place
+Tofino|British Columbia|Tofino, British Columbia||Place
+Moraine Lake|Alberta|||Place`), mkT('t-saudicities', 'Saudi Cities & Places', '🇸🇦', F, 'Pick 1, Pick 2, Pick 3, Pick 4', 'p', `
+Riyadh|The capital
+Jeddah|Red Sea gateway
+Mecca|Holy city
+Medina|Holy city
+Dammam|Eastern Province
+Khobar|Eastern Province|Khobar
+Dhahran|Eastern Province
+Taif|City of roses
+Abha|Asir mountains
+Tabuk|North-west
+AlUla|Ancient wonders
+Al-Ahsa|World's largest oasis|Al-Ahsa Oasis
+Jazan|South-west coast
+Najran|South
+Ha'il|North|Ha'il
+Buraidah|Qassim
+Unaizah|Qassim
+Yanbu|Red Sea
+Al Bahah|Mountains|Al Bahah
+Khamis Mushait|Asir
+Jubail|Industrial coast
+Qatif|Eastern Province
+Sakakah|Al Jawf
+Diriyah|Birthplace of the first Saudi state
+NEOM|Future megaproject
+Edge of the World|Near Riyadh|Jebel Fihrayn
+Hegra|Nabataean tombs|Hegra (Mada'in Salih)`), mkT('t-airports', 'Airports', '✈️', F, 'Pick 1, Pick 2, Pick 3, Pick 4', 'p', `
+Dubai International|DXB|Dubai International Airport
+Singapore Changi|SIN|Changi Airport
+Hamad International|Doha, DOH|Hamad International Airport
+Istanbul Airport|IST
+London Heathrow|LHR|Heathrow Airport
+Hartsfield–Jackson Atlanta|ATL|Hartsfield–Jackson Atlanta International Airport
+Los Angeles International|LAX|Los Angeles International Airport
+JFK|New York|John F. Kennedy International Airport
+Toronto Pearson|Mississauga, YYZ|Toronto Pearson International Airport
+Vancouver International|YVR|Vancouver International Airport
+Montréal–Trudeau|YUL|Montréal–Trudeau International Airport
+Paris Charles de Gaulle|CDG|Charles de Gaulle Airport
+Frankfurt Airport|FRA
+Amsterdam Schiphol|AMS|Amsterdam Airport Schiphol
+Tokyo Haneda|HND|Haneda Airport
+Incheon International|Seoul, ICN|Incheon International Airport
+Hong Kong International|HKG|Hong Kong International Airport
+King Abdulaziz International|Jeddah, JED|King Abdulaziz International Airport
+King Khalid International|Riyadh, RUH|King Khalid International Airport
+Zayed International|Abu Dhabi, AUH|Zayed International Airport
+Sydney Airport|SYD
+Madrid–Barajas|MAD|Adolfo Suárez Madrid–Barajas Airport
+Munich Airport|MUC
+Zurich Airport|ZRH
+Chicago O'Hare|ORD|O'Hare International Airport
+Denver International|DEN|Denver International Airport
+Dallas/Fort Worth|DFW|Dallas Fort Worth International Airport
+Beijing Daxing|PKX|Beijing Daxing International Airport
+Helsinki Airport|HEL`), mkT('t-mountains', 'Famous Mountains', '🏔️', F, 'Pick 1, Pick 2, Pick 3, Pick 4', 'p', `
+Mount Everest|Himalayas, 8,849 m
+K2|Karakoram
+Kangchenjunga|Himalayas
+Mont Blanc|Alps
+Matterhorn|Alps
+Mount Kilimanjaro|Tanzania
+Mount Fuji|Japan
+Denali|Alaska
+Aconcagua|Andes
+Mount Elbrus|Caucasus
+Table Mountain|Cape Town
+Mount Rainier|Washington
+Mount Olympus|Greece
+Mount Kenya|Kenya
+Ben Nevis|Scotland
+Mount Sinai|Egypt
+Annapurna|Nepal|Annapurna Massif
+Eiger|Alps
+Mount Vesuvius|Italy
+Mount Etna|Sicily
+Half Dome|Yosemite
+Aoraki / Mount Cook|New Zealand|Aoraki / Mount Cook
+Mount Kosciuszko|Australia
+Toubkal|Morocco|Jbel Toubkal
+Mount Logan|Canada's highest
+Mount Robson|Canadian Rockies
+Mount St. Helens|Washington
+Grand Teton|Wyoming
+Jabal Sawda|Saudi Arabia's highest|Jabal Sawda`), mkT('t-deserts', 'Deserts', '🏜️', F, 'Pick 1, Pick 2, Pick 3, Pick 4', 'p', `
+Sahara|North Africa
+Arabian Desert|Arabian Peninsula
+Rub' al Khali|The Empty Quarter|Empty Quarter
+Gobi Desert|Mongolia and China
+Kalahari Desert|Southern Africa
+Namib|Namibia
+Atacama Desert|Chile
+Mojave Desert|USA
+Sonoran Desert|USA and Mexico
+Great Victoria Desert|Australia
+Antarctic Desert|Largest of all|Antarctica
+Thar Desert|India and Pakistan
+Taklamakan Desert|China
+Chihuahuan Desert|USA and Mexico
+Great Basin Desert|USA
+Syrian Desert|Middle East
+Negev|Southern Levant
+Wadi Rum|Jordan
+Death Valley|California
+Patagonian Desert|Argentina
+Karakum Desert|Turkmenistan
+Kyzylkum Desert|Central Asia
+Simpson Desert|Australia
+Great Sandy Desert|Australia
+Danakil Desert|Ethiopia and Eritrea
+An Nafud|Saudi Arabia|Nefud Desert
+Dasht-e Kavir|Iran
+White Desert|Egypt|White Desert National Park`), mkT('t-natparks', 'National Parks', '🌲', F, 'Pick 1, Pick 2, Pick 3, Pick 4', 'p', `
+Yellowstone|USA|Yellowstone National Park
+Yosemite|USA|Yosemite National Park
+Grand Canyon|USA|Grand Canyon National Park
+Banff|Canada|Banff National Park
+Jasper|Canada|Jasper National Park
+Zion|USA|Zion National Park
+Glacier|USA|Glacier National Park (U.S.)
+Arches|USA|Arches National Park
+Great Smoky Mountains|USA|Great Smoky Mountains National Park
+Rocky Mountain|USA|Rocky Mountain National Park
+Acadia|USA|Acadia National Park
+Everglades|USA|Everglades National Park
+Serengeti|Tanzania|Serengeti National Park
+Kruger|South Africa|Kruger National Park
+Torres del Paine|Chile|Torres del Paine National Park
+Plitvice Lakes|Croatia|Plitvice Lakes National Park
+Fiordland|New Zealand|Fiordland National Park
+Kakadu|Australia|Kakadu National Park
+Uluṟu-Kata Tjuṯa|Australia|Uluṟu-Kata Tjuṯa National Park
+Galápagos|Ecuador|Galápagos National Park
+Lake District|England|Lake District National Park
+Eryri (Snowdonia)|Wales|Snowdonia
+Sequoia|USA|Sequoia National Park
+Joshua Tree|USA|Joshua Tree National Park
+Bryce Canyon|USA|Bryce Canyon National Park
+Pacific Rim|Canada|Pacific Rim National Park Reserve
+Gros Morne|Canada|Gros Morne National Park
+Bruce Peninsula|Canada|Bruce Peninsula National Park
+Chitwan|Nepal|Chitwan National Park
+Komodo|Indonesia|Komodo National Park`), mkT('t-lakes', 'Beautiful Lakes', '🏞️', F, 'Pick 1, Pick 2, Pick 3, Pick 4', 'p', `
+Lake Louise|Canada|Lake Louise (Alberta)
+Moraine Lake|Canada
+Peyto Lake|Canada
+Lake Como|Italy
+Lake Garda|Italy
+Lake Bled|Slovenia
+Lake Tahoe|USA
+Crater Lake|USA
+Lake Baikal|Russia
+Lake Titicaca|Peru and Bolivia
+Lake Victoria|East Africa
+Lake Geneva|Switzerland and France
+Lake Lucerne|Switzerland
+Hallstätter See|Austria
+Königssee|Germany
+Lake Annecy|France
+Lake Superior|Canada and USA
+Loch Ness|Scotland
+Lake Malawi|Africa
+Lake Atitlán|Guatemala
+Lake Hillier|Pink lake, Australia
+Spotted Lake|British Columbia
+Lake Pukaki|New Zealand
+Lake Tekapo|New Zealand
+Dead Sea|Jordan and Israel
+Lake Kawaguchi|Japan|Lake Kawaguchi
+Lake Ohrid|North Macedonia and Albania
+Lake Powell|USA
+Plitvice Lakes|Croatia|Plitvice Lakes National Park
+Lake Ontario|Canada and USA`), mkT('t-rivers', 'Famous Rivers', '🌊', F, 'Pick 1, Pick 2, Pick 3, Pick 4', 'p', `
+Nile|Africa
+Amazon|South America|Amazon River
+Yangtze|China
+Mississippi|USA|Mississippi River
+Thames|London|River Thames
+Seine|Paris
+Danube|Europe
+Rhine|Europe
+Ganges|India
+Mekong|Southeast Asia
+Colorado River|USA
+St. Lawrence River|Canada|Saint Lawrence River
+Volga|Russia
+Tigris|Iraq
+Euphrates|Middle East
+Jordan River|Middle East
+Zambezi|Africa
+Congo River|Africa
+Niger River|Africa
+Yukon River|Canada and Alaska
+Hudson River|New York
+Rio Grande|USA and Mexico
+Yellow River|China
+Indus River|Pakistan
+Murray River|Australia
+Tiber|Rome
+River Shannon|Ireland
+Fraser River|British Columbia
+Missouri River|USA
+Douro|Spain and Portugal`), mkT('t-ski', 'Ski Resorts', '⛷️', F, 'Pick 1, Pick 2, Pick 3, Pick 4', 'p', `
+Whistler Blackcomb|Canada
+Zermatt|Switzerland
+Chamonix|France
+Aspen|Colorado|Aspen, Colorado
+Vail|Colorado|Vail Ski Resort
+St. Moritz|Switzerland
+Courchevel|France
+Val d'Isère|France
+Verbier|Switzerland
+Niseko|Japan
+Jackson Hole|Wyoming|Jackson Hole Mountain Resort
+Park City|Utah|Park City Mountain Resort
+Banff Sunshine|Canada|Sunshine Village
+Lake Louise Ski Resort|Canada|Lake Louise Ski Resort
+Mont-Tremblant|Quebec|Mont Tremblant Resort
+Kitzbühel|Austria
+St. Anton am Arlberg|Austria
+Cortina d'Ampezzo|Italy
+Breckenridge|Colorado|Breckenridge Ski Resort
+Big Sky|Montana|Big Sky Resort
+Mammoth Mountain|California
+Telluride|Colorado|Telluride Ski Resort
+Revelstoke|Canada|Revelstoke Mountain Resort
+Val Thorens|France
+Méribel|France
+Lech|Austria|Lech am Arlberg
+Hakuba|Japan|Hakuba, Nagano
+Gstaad|Switzerland
+Ischgl|Austria
+Blue Mountain|Ontario|Blue Mountain Resort`)];
+}
+const POPULARITY = {
+  't-cf': 99,
+  't-goat': 96,
+  't-pl': 92,
+  't-nba': 93,
+  't-nbal': 88,
+  't-ucl': 89,
+  't-club': 86,
+  't-intl': 85,
+  't-wonder': 80,
+  't-goals': 82,
+  't-moments': 81,
+  't-rivals': 78,
+  't-mgr': 72,
+  't-plclubs': 79,
+  't-stadia': 70,
+  't-kits': 68,
+  't-wfoot': 71,
+  't-nbagreat': 74,
+  't-nbateams': 73,
+  't-f1': 83,
+  't-fight': 84,
+  't-wwe': 80,
+  't-nfl': 77,
+  't-nhl': 69,
+  't-ten': 72,
+  't-oly': 75,
+  't-crk': 66,
+  't-golf': 60,
+  't-mlb': 62,
+  't-mlbl': 63,
+  't-rugby': 58,
+  't-ff': 97,
+  't-ffchains': 95,
+  't-snk': 92,
+  't-dess': 88,
+  't-pizza': 90,
+  't-chocbars': 89,
+  't-crisps': 86,
+  't-bfast': 84,
+  't-drink': 83,
+  't-icecream': 85,
+  't-cereal': 82,
+  't-street': 81,
+  't-dish': 80,
+  't-japanese': 78,
+  't-italian': 79,
+  't-mexican': 77,
+  't-korean': 74,
+  't-indian': 76,
+  't-chinese': 75,
+  't-mideast': 73,
+  't-saudi': 68,
+  't-turkish': 70,
+  't-coffee': 74,
+  't-boba': 72,
+  't-sauces': 76,
+  't-bakery': 71,
+  't-noodles': 73,
+  't-fruit': 69,
+  't-cheese': 64,
+  't-game': 98,
+  't-rap': 94,
+  't-heroes': 91,
+  't-singers': 90,
+  't-anime': 89,
+  't-animechars': 87,
+  't-franchise': 88,
+  't-tvshows': 87,
+  't-actors': 86,
+  't-youtubers': 85,
+  't-toon': 86,
+  't-anim': 84,
+  't-villains': 83,
+  't-gamechars': 85,
+  't-pokemon': 84,
+  't-sitcoms': 80,
+  't-actresses': 79,
+  't-disney': 81,
+  't-pixar': 80,
+  't-streamers': 78,
+  't-app': 82,
+  't-bands': 77,
+  't-consoles': 79,
+  't-horror': 74,
+  't-scifi': 72,
+  't-streaming': 70,
+  't-trav': 87,
+  't-ctry': 86,
+  't-landmarks': 80,
+  't-themeparks': 78,
+  't-islands': 74,
+  't-beaches': 73,
+  't-capitals': 72,
+  't-europe': 73,
+  't-asia': 70,
+  't-nacities': 71,
+  't-mecities': 69,
+  't-wonders': 72,
+  't-africa': 64,
+  't-states': 66,
+  't-canada': 65,
+  't-saudicities': 63,
+  't-airports': 58,
+  't-mountains': 61,
+  't-natparks': 62,
+  't-ski': 57,
+  't-lakes': 56,
+  't-deserts': 55,
+  't-rivers': 54,
+  't-ani': 90,
+  't-pet': 84,
+  't-dinos': 85,
+  't-cute': 82,
+  't-cats': 80,
+  't-sharks': 79,
+  't-dogbreeds': 81,
+  't-safari': 76,
+  't-catbreeds': 72,
+  't-snakes': 70,
+  't-deepsea': 71,
+  't-raptors': 68,
+  't-extinct': 69,
+  't-whales': 66,
+  't-reptiles': 64,
+  't-arctic': 63,
+  't-aussie': 65,
+  't-primates': 62,
+  't-prehistmammals': 64,
+  't-parrots': 60,
+  't-insects': 58,
+  't-farm': 61,
+  't-shoe': 94,
+  't-car': 91,
+  't-supercars': 86,
+  't-hypercars': 84,
+  't-carbrands': 83,
+  't-luxbrands': 82,
+  't-jdm': 80,
+  't-streetwear': 81,
+  't-watches': 76,
+  't-luxcars': 78,
+  't-bballshoes': 77,
+  't-fragrance': 74,
+  't-motorbikes': 70,
+  't-classics': 71,
+  't-evs': 66,
+  't-suvs': 67,
+  't-pickups': 62,
+  't-hairstyles': 69,
+  't-bags': 65,
+  't-outerwear': 63,
+  't-sunglasses': 59,
+  't-pow': 96,
+  't-zomb': 90,
+  't-island': 87,
+  't-redflags': 91,
+  't-myth': 85,
+  't-house': 84,
+  't-job': 82,
+  't-greenflags': 83,
+  't-worstpowers': 86,
+  't-powercombos': 85,
+  't-worldslive': 84,
+  't-worldsavoid': 80,
+  't-annoying': 81,
+  't-satisfying': 79,
+  't-board': 78,
+  't-toys': 77,
+  't-emoji': 76,
+  't-spend1000': 79,
+  't-spend100': 77,
+  't-3am': 78,
+  't-business': 74,
+  't-shouldexist': 75,
+  't-overrated': 76,
+  't-underrated': 72,
+  't-inv': 72,
+  't-gadget': 73,
+  't-dayimprovers': 71,
+  't-road': 70,
+  't-holi': 69,
+  't-skills': 68,
+  't-splurge': 67,
+  't-waste': 66,
+  't-partybring': 65,
+  't-wknd': 66,
+  't-smell': 64,
+  't-collect': 63,
+  't-hobby': 62,
+  't-school': 60
+};
+const popScore = t => t && Object.prototype.hasOwnProperty.call(POPULARITY, t.id) ? POPULARITY[t.id] : null;
+function byPopularity(a, b) {
+  const pa = popScore(a),
+    pb = popScore(b);
+  if (pa != null && pb != null) return pb - pa || a.name.localeCompare(b.name);
+  if (pa != null) return -1;
+  if (pb != null) return 1;
+  return a.name.localeCompare(b.name);
+}
+const prefsOf = settings => ({
+  fav: [],
+  pin: [],
+  ...(settings && settings.topicPrefs || {})
+});
+function folderOrder(topics, prefs) {
+  const pin = new Set(prefs.pin || []);
+  return [...topics].sort((a, b) => (pin.has(b.id) ? 1 : 0) - (pin.has(a.id) ? 1 : 0) || byPopularity(a, b));
+}
+function favouritesOrder(topics, prefs) {
+  const fav = new Set(prefs.fav || []);
+  return folderOrder(topics.filter(t => fav.has(t.id)), prefs);
+}
+function toggleIn(list, id) {
+  const s = new Set(list || []);
+  if (s.has(id)) s.delete(id);else s.add(id);
+  return [...s];
 }
 const PHOTO_TOPICS = {
   't-pl': {
@@ -6549,7 +10884,9 @@ function TopicsList({
   onDelete,
   folder,
   setFolder,
-  onImport
+  onImport,
+  prefs,
+  setPrefs
 }) {
   const [del, setDel] = useState(null);
   const [q, setQ] = useState('');
@@ -6577,6 +10914,8 @@ function TopicsList({
     q: q,
     folder: folder,
     setFolder: setFolder,
+    prefs: prefs,
+    setPrefs: setPrefs,
     renderTopic: t => React.createElement("div", {
       key: t.id,
       className: "card stack-sm",
@@ -6597,7 +10936,9 @@ function TopicsList({
       className: "meta"
     }, React.createElement("span", {
       className: "name"
-    }, t.name), React.createElement("span", {
+    }, t.name, !isBuiltIn(t) && React.createElement("span", {
+      className: "yours"
+    }, "Yours")), React.createElement("span", {
       className: "sub"
     }, t.items.length, " items \xB7 ", t.slots.join(', '))), React.createElement("span", {
       className: "muted",
@@ -7965,24 +12306,140 @@ const matchTopic = (t, q) => {
   const s = q.trim().toLowerCase();
   return !s || t.name.toLowerCase().includes(s) || folderOf(t).toLowerCase().includes(s);
 };
+function TopicMarks({
+  t,
+  prefs,
+  setPrefs
+}) {
+  if (!setPrefs) return null;
+  const fav = (prefs.fav || []).includes(t.id),
+    pin = (prefs.pin || []).includes(t.id);
+  return React.createElement("div", {
+    className: "tmarks"
+  }, React.createElement("button", {
+    type: "button",
+    className: 'tmark' + (fav ? ' on' : ''),
+    "aria-pressed": fav,
+    "aria-label": (fav ? 'Remove ' : 'Add ') + t.name + (fav ? ' from' : ' to') + ' favourites',
+    title: fav ? 'Favourite (tap to remove)' : 'Favourite: keep it in your Favourites tab',
+    onClick: () => setPrefs({
+      ...prefs,
+      fav: toggleIn(prefs.fav, t.id)
+    })
+  }, fav ? '★' : '☆'), React.createElement("button", {
+    type: "button",
+    className: 'tmark' + (pin ? ' on' : ''),
+    "aria-pressed": pin,
+    "aria-label": (pin ? 'Unpin ' : 'Pin ') + t.name + (pin ? '' : ' to the top of ' + folderOf(t)),
+    title: pin ? 'Pinned to the top of ' + folderOf(t) + ' (tap to unpin)' : 'Pin to the top of ' + folderOf(t),
+    onClick: () => setPrefs({
+      ...prefs,
+      pin: toggleIn(prefs.pin, t.id)
+    })
+  }, "\uD83D\uDCCC"));
+}
+const TOPIC_VIEWS = [['folders', 'Folders'], ['popular', 'Popular'], ['favs', 'Favourites']];
 function FolderBrowser({
   topics,
   q,
   folder,
   setFolder,
-  renderTopic
+  renderTopic,
+  prefs: prefsIn,
+  setPrefs,
+  view: viewIn,
+  setView: setViewIn,
+  onRandom
 }) {
+  const [viewLocal, setViewLocal] = useState('folders');
+  const view = viewIn || viewLocal;
+  const setView = setViewIn || setViewLocal;
+  const prefs = prefsIn || {
+    fav: [],
+    pin: []
+  };
+  const pinned = new Set(prefs.pin || []);
+  const row = (t, extra) => React.createElement("div", {
+    key: t.id,
+    className: 'trow2' + (pinned.has(t.id) ? ' pinned' : '')
+  }, React.createElement("div", {
+    className: "grow",
+    style: {
+      minWidth: 0
+    }
+  }, renderTopic(t), extra), React.createElement(TopicMarks, {
+    t: t,
+    prefs: prefs,
+    setPrefs: setPrefs
+  }));
+  const tabs = React.createElement("div", {
+    className: "tabs",
+    role: "tablist",
+    "aria-label": "Browse topics"
+  }, TOPIC_VIEWS.map(([k, label]) => React.createElement("button", {
+    key: k,
+    role: "tab",
+    "aria-selected": view === k,
+    className: 'ttab' + (view === k ? ' on' : ''),
+    onClick: () => {
+      setView(k);
+      setFolder(null);
+    }
+  }, label, k === 'favs' && (prefs.fav || []).length ? React.createElement("span", {
+    className: "tabcount"
+  }, topics.filter(t => (prefs.fav || []).includes(t.id)).length) : null)), onRandom && React.createElement("button", {
+    className: "ttab",
+    onClick: onRandom,
+    "aria-label": "Pick a random topic"
+  }, "\uD83C\uDFB2 Random"));
   if (q.trim()) {
-    const r = topics.filter(t => matchTopic(t, q));
+    const r = topics.filter(t => matchTopic(t, q)).sort(byPopularity);
     return React.createElement("div", {
       className: "stack-sm"
-    }, r.map(renderTopic), !r.length && React.createElement("p", {
+    }, r.map(t => row(t, React.createElement("span", {
+      className: "tfolder small muted"
+    }, folderEmoji(folderOf(t)), " ", folderOf(t)))), !r.length && React.createElement("p", {
       className: "muted"
     }, "No topics match \u201C", q.trim(), "\u201D."));
   }
+  if (view === 'popular') {
+    const ranked = topics.filter(t => popScore(t) != null).sort(byPopularity);
+    const yours = topics.filter(t => popScore(t) == null).sort(byPopularity);
+    return React.createElement("div", {
+      className: "stack-sm"
+    }, tabs, React.createElement("p", {
+      className: "hint",
+      style: {
+        margin: 0
+      }
+    }, "Our ranking of the built-in topics, from most to least crowd-pleasing. It\u2019s fixed: picking, starring or pinning never changes it."), ranked.map((t, i) => row(t, React.createElement("span", {
+      className: "tfolder small muted"
+    }, "#", i + 1, " \xB7 ", folderEmoji(folderOf(t)), " ", folderOf(t)))), yours.length > 0 && React.createElement(React.Fragment, null, React.createElement("h3", {
+      style: {
+        marginTop: 8
+      }
+    }, "Your topics"), yours.map(t => row(t, React.createElement("span", {
+      className: "tfolder small muted"
+    }, folderEmoji(folderOf(t)), " ", folderOf(t))))));
+  }
+  if (view === 'favs') {
+    const r = favouritesOrder(topics, prefs);
+    return React.createElement("div", {
+      className: "stack-sm"
+    }, tabs, r.length ? r.map(t => row(t, React.createElement("span", {
+      className: "tfolder small muted"
+    }, pinned.has(t.id) ? '📌 ' : '', folderEmoji(folderOf(t)), " ", folderOf(t)))) : React.createElement("p", {
+      className: "muted"
+    }, "No favourites yet \u2014 tap \u2606 on any topic to keep it here."), React.createElement("p", {
+      className: "hint",
+      style: {
+        margin: 0
+      }
+    }, "\u2606 Favourite keeps a topic in this tab. \uD83D\uDCCC Pin moves it to the top of its own folder. They\u2019re separate, saved on this device, and never shared with an online room."));
+  }
   const names = folderList(topics);
   if (folder && names.includes(folder)) {
-    const r = topics.filter(t => folderOf(t) === folder);
+    const r = folderOrder(topics.filter(t => folderOf(t) === folder), prefs);
     return React.createElement("div", {
       className: "stack-sm"
     }, React.createElement("div", {
@@ -7998,12 +12455,14 @@ function FolderBrowser({
       }
     }, folderEmoji(folder), " ", folder), React.createElement("span", {
       className: "small muted"
-    }, r.length, " topic", r.length === 1 ? '' : 's')), r.map(renderTopic));
+    }, r.length, " topic", r.length === 1 ? '' : 's')), r.map(t => row(t)));
   }
   return React.createElement("div", {
+    className: "stack-sm"
+  }, tabs, React.createElement("div", {
     className: "foldergrid"
   }, names.map(f => {
-    const ts = topics.filter(t => folderOf(t) === f);
+    const ts = folderOrder(topics.filter(t => folderOf(t) === f), prefs);
     return React.createElement("button", {
       key: f,
       className: "folder",
@@ -8016,10 +12475,10 @@ function FolderBrowser({
       className: "fn"
     }, f), React.createElement("span", {
       className: "fc"
-    }, ts.length, " topic", ts.length === 1 ? '' : 's'), React.createElement("span", {
+    }, ts.length, " topic", ts.length === 1 ? '' : 's', f === 'My Topics' ? ' · yours' : ''), React.createElement("span", {
       className: "fm"
     }, ts.slice(0, 5).map(t => t.emoji).join(' ')));
-  }));
+  })));
 }
 function SetupTopic({
   topics,
@@ -8027,9 +12486,20 @@ function SetupTopic({
   onPick,
   onTopics,
   folder,
-  setFolder
+  setFolder,
+  prefs,
+  setPrefs
 }) {
   const [q, setQ] = useState('');
+  const [view, setView] = useState('folders');
+  const random = () => {
+    const playable = t => t.items.length && t.slots.length;
+    const p = prefs || {
+      fav: []
+    };
+    const pool = (view === 'favs' ? topics.filter(t => (p.fav || []).includes(t.id)) : folder ? topics.filter(t => folderOf(t) === folder) : topics).filter(playable);
+    if (pool.length) onPick(pool[Math.floor(Math.random() * pool.length)].id);
+  };
   return React.createElement("div", {
     className: "app"
   }, React.createElement(TopBar, {
@@ -8045,6 +12515,11 @@ function SetupTopic({
     q: q,
     folder: folder,
     setFolder: setFolder,
+    prefs: prefs,
+    setPrefs: setPrefs,
+    view: view,
+    setView: setView,
+    onRandom: random,
     renderTopic: t => React.createElement("button", {
       key: t.id,
       className: "tcard",
@@ -8059,15 +12534,20 @@ function SetupTopic({
       className: "meta"
     }, React.createElement("span", {
       className: "name"
-    }, t.name), React.createElement("span", {
+    }, t.name, !isBuiltIn(t) && React.createElement("span", {
+      className: "yours"
+    }, "Yours")), React.createElement("span", {
       className: "sub"
-    }, t.items.length, " items \xB7 ", t.slots.length, " slots", q ? ' · ' + folderOf(t) : '')), React.createElement("span", {
+    }, t.items.length, " items \xB7 ", t.slots.length, " slots")), React.createElement("span", {
       className: "muted",
       style: {
         fontSize: 22
       }
     }, "\u203A"))
-  }), React.createElement("button", {
+  }), folder && !q && React.createElement("button", {
+    className: "btn",
+    onClick: random
+  }, "\uD83C\uDFB2 Random topic from ", folder), React.createElement("button", {
     className: "btn btn-ghost",
     onClick: onTopics
   }, "Manage topics"));
@@ -8255,7 +12735,7 @@ function SetupRules({
     key: k,
     role: "tab",
     "aria-selected": tab === k,
-    className: 'tab' + (tab === k ? ' on' : ''),
+    className: 'ttab' + (tab === k ? ' on' : ''),
     onClick: () => setTab(k)
   }, label, onCount[k] ? React.createElement("span", {
     className: "tabcount"
@@ -12327,7 +16807,7 @@ function SettingsScreen({
     key: k,
     role: "tab",
     "aria-selected": tab === k,
-    className: 'tab' + (tab === k ? ' on' : ''),
+    className: 'ttab' + (tab === k ? ' on' : ''),
     onClick: () => setTab(k)
   }, label))), tab === 'rules' && React.createElement("section", {
     className: "card stack",
@@ -12775,6 +17255,14 @@ function App() {
     }, extra));
     go('draft');
   };
+  const topicPrefs = prefsOf(settings);
+  const setTopicPrefs = p => setSettings(x => ({
+    ...x,
+    topicPrefs: {
+      fav: p.fav || [],
+      pin: p.pin || []
+    }
+  }));
   const profile = {
     ...defaultProfile(),
     ...(settings.online || {})
@@ -12846,6 +17334,7 @@ function App() {
     case 'online':
       view = React.createElement(OnlineScreen, {
         key: screen.k,
+        setSettings: setSettings,
         start: screen.start,
         onRetry: () => go('online', {
           start: screen.start,
@@ -12865,6 +17354,8 @@ function App() {
         topics: topics,
         folder: folder,
         setFolder: setFolder,
+        prefs: topicPrefs,
+        setPrefs: setTopicPrefs,
         onImport: () => setImporting(''),
         onBack: () => go(screen.from || 'home'),
         onOpen: id => go('topic', {
@@ -12969,6 +17460,8 @@ function App() {
           topics: topics,
           folder: folder,
           setFolder: setFolder,
+          prefs: topicPrefs,
+          setPrefs: setTopicPrefs,
           onBack: () => go('solo-setup'),
           onTopics: () => go('topics', {
             from: 'solo-setup'
@@ -12987,6 +17480,8 @@ function App() {
         topics: topics,
         folder: folder,
         setFolder: setFolder,
+        prefs: topicPrefs,
+        setPrefs: setTopicPrefs,
         onBack: () => go('setup-managers'),
         onTopics: () => go('topics', {
           from: 'setup-topic'
@@ -13423,6 +17918,19 @@ if (window.__DN_TEST__) window.__DN = {
     ownerInfo,
     migrateSettings,
     rulesLines
+  },
+  topicsLib: {
+    POPULARITY,
+    popScore,
+    byPopularity,
+    folderOrder,
+    favouritesOrder,
+    prefsOf,
+    isBuiltIn,
+    folderOf,
+    folderList,
+    matchTopic,
+    toggleIn
   },
   DEFAULT_SOLO,
   isFlex,
@@ -16200,7 +20708,9 @@ function Lobby({
   rulePrefs,
   onLeave: leaveNow,
   onStart,
-  tv: tvProp
+  tv: tvProp,
+  topicPrefs,
+  setTopicPrefs
 }) {
   const isHost = room.amHost;
   const [tvView, setTvView] = useState(false);
@@ -16238,6 +20748,8 @@ function Lobby({
     topics: topics,
     folder: folder,
     setFolder: setFolder,
+    prefs: topicPrefs,
+    setPrefs: setTopicPrefs,
     onBack: () => setView('lobby'),
     onTopics: () => setView('lobby'),
     onPick: id => {
@@ -16658,6 +21170,7 @@ function OnlineScreen({
   rulePrefs,
   past,
   settings,
+  setSettings,
   onExit,
   onFinished,
   onRetry
@@ -16859,6 +21372,14 @@ function OnlineScreen({
     room: room,
     topics: topics,
     rulePrefs: rulePrefs,
+    topicPrefs: prefsOf(settings),
+    setTopicPrefs: setSettings ? p => setSettings(x => ({
+      ...x,
+      topicPrefs: {
+        fav: p.fav || [],
+        pin: p.pin || []
+      }
+    })) : null,
     tv: room.kind === 'tv',
     onLeave: () => amHost ? room.close().then(onExit) : leave(true),
     onStart: () => {

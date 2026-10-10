@@ -117,7 +117,7 @@ function PlayerRow({ p, me, host, isHost, teamMode, cfg, room }) {
   );
 }
 
-function Lobby({ room, topics, rulePrefs, onLeave: leaveNow, onStart, tv: tvProp }) {
+function Lobby({ room, topics, rulePrefs, onLeave: leaveNow, onStart, tv: tvProp, topicPrefs, setTopicPrefs }) {
   const isHost = room.amHost;
   const [tvView, setTvView] = useState(false);
   const tv = tvProp || tvView;
@@ -133,7 +133,7 @@ function Lobby({ room, topics, rulePrefs, onLeave: leaveNow, onStart, tv: tvProp
   const tvs = people.filter((p) => p.kind === 'tv' && p.online);
   if (!cfg) return <div className="app"><TopBar onBack={onLeave} title="Lobby" /><p className="muted">Setting up the room…</p></div>;
   const topicObj = cfg.topic ? unpackTopic(cfg.topic).topic : null;
-  if (isHost && view === 'topic') return <SetupTopic topics={topics} folder={folder} setFolder={setFolder} onBack={() => setView('lobby')} onTopics={() => setView('lobby')}
+  if (isHost && view === 'topic') return <SetupTopic topics={topics} folder={folder} setFolder={setFolder} prefs={topicPrefs} setPrefs={setTopicPrefs} onBack={() => setView('lobby')} onTopics={() => setView('lobby')}
     onPick={(id) => { const t = topics.find((x) => x.id === id); set({ topic: packTopic(onlineTopic(t), false), topicName: t.name, topicEmoji: t.emoji, rules: { ...cfg.rules, ...twistRules(cfg.rules), slots: [...t.slots] } }); setView('lobby'); }} />;
   if (isHost && view === 'rules' && topicObj) {
     const seats = seatsFromLobby(room, cfg);
@@ -270,7 +270,7 @@ function RoomGame({ room, d, setHd, onLeave, onPlayAgain, onFinished, past, sett
 }
 
 // Connects, then shows the lobby or the game. Holds the host's copy of the draft.
-function OnlineScreen({ start, profile, topics, rulePrefs, past, settings, onExit, onFinished, onRetry }) {
+function OnlineScreen({ start, profile, topics, rulePrefs, past, settings, setSettings, onExit, onFinished, onRetry }) {
   const [room, setRoom] = useState(null);
   const [slow, setSlow] = useState(false);
   useEffect(() => { const t = setTimeout(() => setSlow(true), 12000); return () => clearTimeout(t); }, []);
@@ -340,7 +340,7 @@ function OnlineScreen({ start, profile, topics, rulePrefs, past, settings, onExi
   if (!room || !room.meta) return <div className="app"><TopBar onBack={onExit} title="Online" /><p className="muted" style={{ textAlign: 'center' }}>Connecting…</p>{slow && <p className="hint" style={{ textAlign: 'center' }}>This is taking a while. Check your internet connection{typeof navigator !== 'undefined' && navigator.onLine === false ? ' — this device looks offline' : ''}.</p>}</div>;
   if (status === 'closed') return <div className="app"><TopBar onBack={() => leave(true)} title="Online" /><div className="card stack"><b>This room has ended</b><button className="btn" onClick={() => leave(true)}>Back</button></div></div>;
   if (joined.current && !room.players[room.uid]) return <div className="app"><TopBar onBack={() => leave(true)} title="Online" /><div className="card stack"><b>You were removed from the room</b><button className="btn" onClick={() => leave(true)}>Back</button></div></div>;
-  if (status === 'lobby') return <Lobby room={room} topics={topics} rulePrefs={rulePrefs} tv={room.kind === 'tv'} onLeave={() => (amHost ? room.close().then(onExit) : leave(true))}
+  if (status === 'lobby') return <Lobby room={room} topics={topics} rulePrefs={rulePrefs} topicPrefs={prefsOf(settings)} setTopicPrefs={setSettings ? (p) => setSettings((x) => ({ ...x, topicPrefs: { fav: p.fav || [], pin: p.pin || [] } })) : null} tv={room.kind === 'tv'} onLeave={() => (amHost ? room.close().then(onExit) : leave(true))}
     onStart={() => {
       const cfg = room.lobby; const t = unpackTopic(cfg.topic).topic;
       const managers = seatsFromLobby(room, cfg);

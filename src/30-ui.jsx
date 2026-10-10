@@ -569,7 +569,7 @@ function Home({ draft, past, onNew, onSolo, onOnline, onResume, onTopics, onPast
 /* ============================================================
    TOPICS
    ============================================================ */
-function TopicsList({ topics, onBack, onOpen, onCreate, onDuplicate, onDelete, folder, setFolder, onImport }) {
+function TopicsList({ topics, onBack, onOpen, onCreate, onDuplicate, onDelete, folder, setFolder, onImport, prefs, setPrefs }) {
   const [del, setDel] = useState(null);
   const [q, setQ] = useState('');
   return (
@@ -580,11 +580,11 @@ function TopicsList({ topics, onBack, onOpen, onCreate, onDuplicate, onDelete, f
         <button className="btn grow" style={{ width: 'auto' }} onClick={onImport}>Import</button>
       </div>
       <TopicSearch q={q} setQ={setQ} />
-      <FolderBrowser topics={topics} q={q} folder={folder} setFolder={setFolder} renderTopic={(t) => (
+      <FolderBrowser topics={topics} q={q} folder={folder} setFolder={setFolder} prefs={prefs} setPrefs={setPrefs} renderTopic={(t) => (
         <div key={t.id} className="card stack-sm" style={{ padding: 12 }}>
           <button className="tcard" style={{ border: 0, padding: 0, background: 'none' }} onClick={() => onOpen(t.id)}>
             <span className="em">{t.emoji || '🎲'}</span>
-            <span className="meta"><span className="name">{t.name}</span><span className="sub">{t.items.length} items · {t.slots.join(', ')}</span></span>
+            <span className="meta"><span className="name">{t.name}{!isBuiltIn(t) && <span className="yours">Yours</span>}</span><span className="sub">{t.items.length} items · {t.slots.join(', ')}</span></span>
             <span className="muted" style={{ fontSize: 22 }}>›</span>
           </button>
           <div className="row">
@@ -1004,15 +1004,66 @@ function TopicSearch({ q, setQ }) {
 }
 const matchTopic = (t, q) => { const s = q.trim().toLowerCase(); return !s || t.name.toLowerCase().includes(s) || folderOf(t).toLowerCase().includes(s); };
 
-// Folder grid → topics inside one folder. A search shows matching topics from every folder.
-function FolderBrowser({ topics, q, folder, setFolder, renderTopic }) {
+// Star (favourite) and pin, personal to this device. Pinning lifts a topic to the top of its own folder.
+function TopicMarks({ t, prefs, setPrefs }) {
+  if (!setPrefs) return null;
+  const fav = (prefs.fav || []).includes(t.id), pin = (prefs.pin || []).includes(t.id);
+  return (
+    <div className="tmarks">
+      <button type="button" className={'tmark' + (fav ? ' on' : '')} aria-pressed={fav} aria-label={(fav ? 'Remove ' : 'Add ') + t.name + (fav ? ' from' : ' to') + ' favourites'} title={fav ? 'Favourite (tap to remove)' : 'Favourite: keep it in your Favourites tab'} onClick={() => setPrefs({ ...prefs, fav: toggleIn(prefs.fav, t.id) })}>{fav ? '★' : '☆'}</button>
+      <button type="button" className={'tmark' + (pin ? ' on' : '')} aria-pressed={pin} aria-label={(pin ? 'Unpin ' : 'Pin ') + t.name + (pin ? '' : ' to the top of ' + folderOf(t))} title={pin ? 'Pinned to the top of ' + folderOf(t) + ' (tap to unpin)' : 'Pin to the top of ' + folderOf(t)} onClick={() => setPrefs({ ...prefs, pin: toggleIn(prefs.pin, t.id) })}>📌</button>
+    </div>
+  );
+}
+const TOPIC_VIEWS = [['folders', 'Folders'], ['popular', 'Popular'], ['favs', 'Favourites']];
+// Folders · Popular · Favourites, plus search. Pins and stars come from this device's settings.
+function FolderBrowser({ topics, q, folder, setFolder, renderTopic, prefs: prefsIn, setPrefs, view: viewIn, setView: setViewIn, onRandom }) {
+  const [viewLocal, setViewLocal] = useState('folders');
+  const view = viewIn || viewLocal; const setView = setViewIn || setViewLocal;
+  const prefs = prefsIn || { fav: [], pin: [] };
+  const pinned = new Set(prefs.pin || []);
+  const row = (t, extra) => (
+    <div key={t.id} className={'trow2' + (pinned.has(t.id) ? ' pinned' : '')}>
+      <div className="grow" style={{ minWidth: 0 }}>{renderTopic(t)}{extra}</div>
+      <TopicMarks t={t} prefs={prefs} setPrefs={setPrefs} />
+    </div>
+  );
+  const tabs = (
+    <div className="tabs" role="tablist" aria-label="Browse topics">
+      {TOPIC_VIEWS.map(([k, label]) => <button key={k} role="tab" aria-selected={view === k} className={'ttab' + (view === k ? ' on' : '')} onClick={() => { setView(k); setFolder(null); }}>{label}{k === 'favs' && (prefs.fav || []).length ? <span className="tabcount">{topics.filter((t) => (prefs.fav || []).includes(t.id)).length}</span> : null}</button>)}
+      {onRandom && <button className="ttab" onClick={onRandom} aria-label="Pick a random topic">🎲 Random</button>}
+    </div>
+  );
   if (q.trim()) {
-    const r = topics.filter((t) => matchTopic(t, q));
-    return <div className="stack-sm">{r.map(renderTopic)}{!r.length && <p className="muted">No topics match “{q.trim()}”.</p>}</div>;
+    const r = topics.filter((t) => matchTopic(t, q)).sort(byPopularity);
+    return <div className="stack-sm">{r.map((t) => row(t, <span className="tfolder small muted">{folderEmoji(folderOf(t))} {folderOf(t)}</span>))}{!r.length && <p className="muted">No topics match “{q.trim()}”.</p>}</div>;
+  }
+  if (view === 'popular') {
+    const ranked = topics.filter((t) => popScore(t) != null).sort(byPopularity);
+    const yours = topics.filter((t) => popScore(t) == null).sort(byPopularity);
+    return (
+      <div className="stack-sm">
+        {tabs}
+        <p className="hint" style={{ margin: 0 }}>Our ranking of the built-in topics, from most to least crowd-pleasing. It’s fixed: picking, starring or pinning never changes it.</p>
+        {ranked.map((t, i) => row(t, <span className="tfolder small muted">#{i + 1} · {folderEmoji(folderOf(t))} {folderOf(t)}</span>))}
+        {yours.length > 0 && <><h3 style={{ marginTop: 8 }}>Your topics</h3>{yours.map((t) => row(t, <span className="tfolder small muted">{folderEmoji(folderOf(t))} {folderOf(t)}</span>))}</>}
+      </div>
+    );
+  }
+  if (view === 'favs') {
+    const r = favouritesOrder(topics, prefs);
+    return (
+      <div className="stack-sm">
+        {tabs}
+        {r.length ? r.map((t) => row(t, <span className="tfolder small muted">{pinned.has(t.id) ? '📌 ' : ''}{folderEmoji(folderOf(t))} {folderOf(t)}</span>))
+          : <p className="muted">No favourites yet — tap ☆ on any topic to keep it here.</p>}
+        <p className="hint" style={{ margin: 0 }}>☆ Favourite keeps a topic in this tab. 📌 Pin moves it to the top of its own folder. They’re separate, saved on this device, and never shared with an online room.</p>
+      </div>
+    );
   }
   const names = folderList(topics);
   if (folder && names.includes(folder)) {
-    const r = topics.filter((t) => folderOf(t) === folder);
+    const r = folderOrder(topics.filter((t) => folderOf(t) === folder), prefs);
     return (
       <div className="stack-sm">
         <div className="row">
@@ -1020,42 +1071,54 @@ function FolderBrowser({ topics, q, folder, setFolder, renderTopic }) {
           <h3 className="grow" style={{ fontSize: 24 }}>{folderEmoji(folder)} {folder}</h3>
           <span className="small muted">{r.length} topic{r.length === 1 ? '' : 's'}</span>
         </div>
-        {r.map(renderTopic)}
+        {r.map((t) => row(t))}
       </div>
     );
   }
   return (
-    <div className="foldergrid">
-      {names.map((f) => {
-        const ts = topics.filter((t) => folderOf(t) === f);
-        return (
-          <button key={f} className="folder" onClick={() => setFolder(f)}>
-            <span className="tab" />
-            <span className="fe">{folderEmoji(f)}</span>
-            <span className="fn">{f}</span>
-            <span className="fc">{ts.length} topic{ts.length === 1 ? '' : 's'}</span>
-            <span className="fm">{ts.slice(0, 5).map((t) => t.emoji).join(' ')}</span>
-          </button>
-        );
-      })}
+    <div className="stack-sm">
+      {tabs}
+      <div className="foldergrid">
+        {names.map((f) => {
+          const ts = folderOrder(topics.filter((t) => folderOf(t) === f), prefs);
+          return (
+            <button key={f} className="folder" onClick={() => setFolder(f)}>
+              <span className="tab" />
+              <span className="fe">{folderEmoji(f)}</span>
+              <span className="fn">{f}</span>
+              <span className="fc">{ts.length} topic{ts.length === 1 ? '' : 's'}{f === 'My Topics' ? ' · yours' : ''}</span>
+              <span className="fm">{ts.slice(0, 5).map((t) => t.emoji).join(' ')}</span>
+            </button>
+          );
+        })}
+      </div>
     </div>
   );
 }
 
-function SetupTopic({ topics, onBack, onPick, onTopics, folder, setFolder }) {
+function SetupTopic({ topics, onBack, onPick, onTopics, folder, setFolder, prefs, setPrefs }) {
   const [q, setQ] = useState('');
+  const [view, setView] = useState('folders');
+  // 🎲 Random: any playable topic from what you're looking at (a folder, Popular or Favourites).
+  const random = () => {
+    const playable = (t) => t.items.length && t.slots.length;
+    const p = prefs || { fav: [] };
+    const pool = (view === 'favs' ? topics.filter((t) => (p.fav || []).includes(t.id)) : folder ? topics.filter((t) => folderOf(t) === folder) : topics).filter(playable);
+    if (pool.length) onPick(pool[Math.floor(Math.random() * pool.length)].id);
+  };
   return (
     <div className="app">
       <TopBar onBack={folder && !q ? () => setFolder(null) : onBack} title="2 · Topic" />
       <h2 className="display">What are we drafting?</h2>
       <TopicSearch q={q} setQ={setQ} />
-      <FolderBrowser topics={topics} q={q} folder={folder} setFolder={setFolder} renderTopic={(t) => (
+      <FolderBrowser topics={topics} q={q} folder={folder} setFolder={setFolder} prefs={prefs} setPrefs={setPrefs} view={view} setView={setView} onRandom={random} renderTopic={(t) => (
         <button key={t.id} className="tcard" onClick={() => onPick(t.id)} disabled={!t.items.length || !t.slots.length} style={{ opacity: t.items.length ? 1 : 0.4 }}>
           <span className="em">{t.emoji || '🎲'}</span>
-          <span className="meta"><span className="name">{t.name}</span><span className="sub">{t.items.length} items · {t.slots.length} slots{q ? ' · ' + folderOf(t) : ''}</span></span>
+          <span className="meta"><span className="name">{t.name}{!isBuiltIn(t) && <span className="yours">Yours</span>}</span><span className="sub">{t.items.length} items · {t.slots.length} slots</span></span>
           <span className="muted" style={{ fontSize: 22 }}>›</span>
         </button>
       )} />
+      {folder && !q && <button className="btn" onClick={random}>🎲 Random topic from {folder}</button>}
       <button className="btn btn-ghost" onClick={onTopics}>Manage topics</button>
     </div>
   );
@@ -1133,7 +1196,7 @@ function SetupRules({ topic, managers, rules, setRules, onBack, onStart, startLa
       <TopBar onBack={onBack} title={title} />
       <div><p className="eyebrow">{defaultsMode ? 'Your defaults for new games' : topic.emoji + ' ' + topic.name}</p><h2 className="display">House rules</h2><p className="hint">{defaultsMode ? 'New games start with these. You can still change them when setting up a game.' : 'Changes apply to this new draft. A game in progress keeps its rules.'} Optional extras are off until you switch them on.</p></div>
       <div className="tabs" role="tablist" aria-label="Rule sections">
-        {RULE_TABS.map(([k, label]) => <button key={k} role="tab" aria-selected={tab === k} className={'tab' + (tab === k ? ' on' : '')} onClick={() => setTab(k)}>{label}{onCount[k] ? <span className="tabcount">{onCount[k]} on</span> : null}</button>)}
+        {RULE_TABS.map(([k, label]) => <button key={k} role="tab" aria-selected={tab === k} className={'ttab' + (tab === k ? ' on' : '')} onClick={() => setTab(k)}>{label}{onCount[k] ? <span className="tabcount">{onCount[k]} on</span> : null}</button>)}
       </div>
 
       {tab === 'general' && <div className="stack" role="tabpanel">
@@ -2791,7 +2854,7 @@ function SettingsScreen({ onBack, state, onRestore, settings, setSettings, ruleP
     <div className="app">
       <TopBar onBack={onBack} title="Rules & settings" />
       <div className="tabs" role="tablist" aria-label="Settings sections">
-        {SETTINGS_TABS.map(([k, label]) => <button key={k} role="tab" aria-selected={tab === k} className={'tab' + (tab === k ? ' on' : '')} onClick={() => setTab(k)}>{label}</button>)}
+        {SETTINGS_TABS.map(([k, label]) => <button key={k} role="tab" aria-selected={tab === k} className={'ttab' + (tab === k ? ' on' : '')} onClick={() => setTab(k)}>{label}</button>)}
       </div>
 
       {tab === 'rules' && <section className="card stack" role="tabpanel">
@@ -2964,6 +3027,8 @@ function App() {
     go('draft');
   };
 
+  const topicPrefs = prefsOf(settings);
+  const setTopicPrefs = (p) => setSettings((x) => ({ ...x, topicPrefs: { fav: p.fav || [], pin: p.pin || [] } }));
   const profile = { ...defaultProfile(), ...(settings.online || {}) };
   const setProfile = (p) => setSettings((x) => ({ ...x, online: p }));
   // Every phone files a finished online game in its own Past Drafts.
@@ -2979,10 +3044,10 @@ function App() {
         onRejoin={(l) => go('online', { start: { kind: l.kind === 'tv' ? 'tv' : 'join', code: l.code }, k: uid() })} />;
       break;
     case 'online':
-      view = <OnlineScreen key={screen.k} start={screen.start} onRetry={() => go('online', { start: screen.start, k: uid() })} profile={profile} topics={topics} rulePrefs={rulePrefs} past={past} settings={settings} onFinished={fileOnline} onExit={() => go('online-home')} />;
+      view = <OnlineScreen key={screen.k} setSettings={setSettings} start={screen.start} onRetry={() => go('online', { start: screen.start, k: uid() })} profile={profile} topics={topics} rulePrefs={rulePrefs} past={past} settings={settings} onFinished={fileOnline} onExit={() => go('online-home')} />;
       break;
     case 'topics':
-      view = <TopicsList topics={topics} folder={folder} setFolder={setFolder} onImport={() => setImporting('')} onBack={() => go(screen.from || 'home')} onOpen={(id) => go('topic', { id, from: screen.from })}
+      view = <TopicsList topics={topics} folder={folder} setFolder={setFolder} prefs={topicPrefs} setPrefs={setTopicPrefs} onImport={() => setImporting('')} onBack={() => go(screen.from || 'home')} onOpen={(id) => go('topic', { id, from: screen.from })}
         onCreate={(f) => { const t = { id: uid(), name: 'New topic', emoji: '🎲', slots: ['Pick 1', 'Pick 2', 'Pick 3'], layout: 'list', art: 'emoji', folder: f || 'My Topics', items: [] }; setTopics((ts) => [...ts, t]); go('topic', { id: t.id, from: screen.from }); }}
         onDuplicate={dupTopic} onDelete={(id) => setTopics((ts) => ts.filter((x) => x.id !== id))} />;
       break;
@@ -3009,11 +3074,11 @@ function App() {
     }
     case 'setup-topic':
       if (screen.from === 'solo') {
-        view = <SetupTopic topics={topics} folder={folder} setFolder={setFolder} onBack={() => go('solo-setup')} onTopics={() => go('topics', { from: 'solo-setup' })}
+        view = <SetupTopic topics={topics} folder={folder} setFolder={setFolder} prefs={topicPrefs} setPrefs={setTopicPrefs} onBack={() => go('solo-setup')} onTopics={() => go('topics', { from: 'solo-setup' })}
           onPick={(id) => { setSoloCfg({ ...soloCfg, topicId: id }); go('solo-setup'); }} />;
         break;
       }
-      view = <SetupTopic topics={topics} folder={folder} setFolder={setFolder} onBack={() => go('setup-managers')} onTopics={() => go('topics', { from: 'setup-topic' })}
+      view = <SetupTopic topics={topics} folder={folder} setFolder={setFolder} prefs={topicPrefs} setPrefs={setTopicPrefs} onBack={() => go('setup-managers')} onTopics={() => go('topics', { from: 'setup-topic' })}
         onPick={(id) => { const t = topics.find((x) => x.id === id); setTopicId(id); setRules({ ...rulePrefs(), slots: [...t.slots] }); go('setup-rules'); }} />;
       break;
     case 'setup-rules': {
@@ -3111,7 +3176,7 @@ class Boundary extends React.Component {
   }
 }
 
-if (window.__DN_TEST__) window.__DN = { finale: { buildBracket, advanceBracket, nextMatchup, matchVoters, canVoteFor, decideMatchup, simulateMatch, playerRating, teamRating, matchupVoteBot, finaleMode, isFootball, startFinale, castMatchVote, botMatchVotes, playMatchup, resolveMatchup, getMatchup, needsVote, needsMatch, votingDone, finaleStandings, finaleRecord, championStory, goldenBoot, matchVoteProblem, roundName, FINALE_DEFAULTS, validRating, matchScript, revealedEvents, matchFrame, lineupOf, expectedGoals, strength2, squad }, audio, AUDIO_DEFAULTS, share: { encodeTopic, decodeShared, packTopic, unpackTopic, topicCode, shareLink, MAX_LINK }, stats: { careerStats, computeAwards, computeShame, hallOfShame, humanPlayers }, bots: { makeBots, nextBotAction, botDecision, botFreePickChoice, botVote, teamScore, voteChoices, itemFame, seeded, BOT_LEVELS, BOT_TYPES, botCardPlay, botVeto, botNominate, botTradeDecision, botTradeOffer }, twists: { twistRules, TWIST_DEFAULTS, playCard, answerCard, cardProblem, doubleProblem, nominate, currentNominator, nominationPool, botActors, botAdvisers, participants, visibleItem, isHidden, rarityOf, frozenNow, proposeTrade, acceptTrade, rejectTrade, cancelTrade, closeTrades, tradeProblem, openTrades, hasCard }, auction: { withdraw, isOut, auctionEnd, owesBid, withdrawProblem, outIds, owing, botPassers, botForcedBid, runAction, ownerInfo, migrateSettings, rulesLines }, DEFAULT_SOLO, isFlex, canBid, createDraft, placeBid, sell, skipItem, undo, freePick, currentPicker, canTake, nextAmount, isDraftOver, draftStats, winsBoard, tally, starterTopics, migrateTopics, validateBackup, makeBackup, wikiTitleFor, PHOTO_TOPICS, store, wiki, DEFAULT_RULES, COLORS, emptyCount, assignSlot, maxBid };
+if (window.__DN_TEST__) window.__DN = { finale: { buildBracket, advanceBracket, nextMatchup, matchVoters, canVoteFor, decideMatchup, simulateMatch, playerRating, teamRating, matchupVoteBot, finaleMode, isFootball, startFinale, castMatchVote, botMatchVotes, playMatchup, resolveMatchup, getMatchup, needsVote, needsMatch, votingDone, finaleStandings, finaleRecord, championStory, goldenBoot, matchVoteProblem, roundName, FINALE_DEFAULTS, validRating, matchScript, revealedEvents, matchFrame, lineupOf, expectedGoals, strength2, squad }, audio, AUDIO_DEFAULTS, share: { encodeTopic, decodeShared, packTopic, unpackTopic, topicCode, shareLink, MAX_LINK }, stats: { careerStats, computeAwards, computeShame, hallOfShame, humanPlayers }, bots: { makeBots, nextBotAction, botDecision, botFreePickChoice, botVote, teamScore, voteChoices, itemFame, seeded, BOT_LEVELS, BOT_TYPES, botCardPlay, botVeto, botNominate, botTradeDecision, botTradeOffer }, twists: { twistRules, TWIST_DEFAULTS, playCard, answerCard, cardProblem, doubleProblem, nominate, currentNominator, nominationPool, botActors, botAdvisers, participants, visibleItem, isHidden, rarityOf, frozenNow, proposeTrade, acceptTrade, rejectTrade, cancelTrade, closeTrades, tradeProblem, openTrades, hasCard }, auction: { withdraw, isOut, auctionEnd, owesBid, withdrawProblem, outIds, owing, botPassers, botForcedBid, runAction, ownerInfo, migrateSettings, rulesLines }, topicsLib: { POPULARITY, popScore, byPopularity, folderOrder, favouritesOrder, prefsOf, isBuiltIn, folderOf, folderList, matchTopic, toggleIn }, DEFAULT_SOLO, isFlex, canBid, createDraft, placeBid, sell, skipItem, undo, freePick, currentPicker, canTake, nextAmount, isDraftOver, draftStats, winsBoard, tally, starterTopics, migrateTopics, validateBackup, makeBackup, wikiTitleFor, PHOTO_TOPICS, store, wiki, DEFAULT_RULES, COLORS, emptyCount, assignSlot, maxBid };
 store.init().finally(() => {
   ReactDOM.createRoot(document.getElementById('root')).render(<Boundary><App /></Boundary>);
 });

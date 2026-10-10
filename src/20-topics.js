@@ -26,8 +26,12 @@ function folderList(topics, includeDefaults) {
   return [...names].sort((a, b) => { const ia = order.indexOf(a), ib = order.indexOf(b); return (ia < 0 ? 99 : ia) - (ib < 0 ? 99 : ib) || a.localeCompare(b); });
 }
 function starterTopics() {
-  return [...baseTopics(), ...evenMoreTopics(), ...funTopics()].map((t) => ({ ...t, folder: STARTER_FOLDER[t.id] || 'My Topics', photos: Object.prototype.hasOwnProperty.call(PHOTO_TOPICS, t.id) }));
+  const v3 = [...sportsTopicsV3(), ...foodTopicsV3(), ...entTopicsV3(), ...travelTopicsV3(), ...animalTopicsV3(), ...styleTopicsV3(), ...funTopicsV3()];
+  return [...baseTopics(), ...evenMoreTopics(), ...funTopics()].map((t) => ({ ...t, folder: STARTER_FOLDER[t.id] || 'My Topics', photos: Object.prototype.hasOwnProperty.call(PHOTO_TOPICS, t.id) }))
+    .concat(v3.map((t) => ({ ...t, builtin: true })));
 }
+// Built-in topics have ids from this library; anything else is the user's own (created or imported).
+const isBuiltIn = (t) => !!t && (Object.prototype.hasOwnProperty.call(STARTER_FOLDER, t.id) || !!t.v3 || !!t.builtin);
 
 function funTopics() {
   return [

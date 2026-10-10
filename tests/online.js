@@ -17,7 +17,8 @@ module.exports = async function onlineTests({ ok, boot, btn, click, sleep }) {
 
   console.log('Step 8: online rooms (simulated phones)');
   // Host creates a room.
-  const H = await phone('host1');
+  // The host has personal favourites/pins on this phone (they must stay on this phone).
+  const H = await phone('host1', { dn_settings_v1: JSON.stringify({ rulesV: 3, topicPrefs: { fav: ['t-rivers'], pin: ['t-lakes'] } }) });
   await click(H.w, btn(H.d, 'Online'));
   ok(/Create a room/.test(text(H)), 'Online opens the room screen (no longer “coming soon”)');
   await setVal(H, H.d.querySelector('#on-name'), 'Hana');
@@ -65,6 +66,18 @@ module.exports = async function onlineTests({ ok, boot, btn, click, sleep }) {
   ].map(([name, pos, desc], i) => ({ id: 'it' + i, name, pos, desc })) };
   const DN = H.w.__DN;
   const hr = room(H);
+  // Host picks one of the new topics from their Favourites tab in the lobby; it syncs to everyone.
+  const rivers = DN.starterTopics().find((t) => t.id === 't-rivers');
+  await click(H.w, H.d.querySelector('.tcard'));
+  await click(H.w, [...H.d.querySelectorAll('.ttab')].find((b) => /Favourites/.test(b.textContent)));
+  const favCard = [...H.d.querySelectorAll('.tcard')].find((b) => b.textContent.includes(rivers.name));
+  ok(!!favCard && H.d.querySelectorAll('.trow2').length === 1, 'online lobby: the host’s Favourites tab shows their starred topic');
+  await click(H.w, favCard);
+  ok(await until(() => text(A).includes(rivers.name) && text(B).includes(rivers.name)), 'a new built-in topic picked in the lobby syncs to every phone (' + rivers.name + ')');
+  const roomJson = JSON.stringify(roomData(code));
+  ok(!/topicPrefs|t-lakes/.test(roomJson) && !roomJson.includes('"fav"'), 'favourites and pins are never written to the online room');
+  const prefsA = (A.DN.store.get('dn_settings_v1', {}) || {}).topicPrefs;
+  ok(!prefsA || (!(prefsA.fav || []).length && !(prefsA.pin || []).length), 'other phones don’t receive the host’s favourites or pins');
   const setup = (extra) => hr.setLobby({ ...hr.lobby, topic: DN.share.packTopic(tiny, false), topicName: tiny.name, topicEmoji: tiny.emoji, clock: 6, bots: 1, ...(extra || {}), rules: { ...hr.lobby.rules, slots: ['GK', 'FWD'], ...((extra && extra.rules) || {}) } });
   await setup({ rules: { chaos: { ...DN.twists.TWIST_DEFAULTS.chaos, count: 1 }, mystery: { on: true, every: 4 }, rarity: { on: true, rare: 25, legendary: 5 }, trades: { on: true, minutes: 3, money: true }, order: 'random' } });
   await until(() => /Tiny Football/.test(text(A)));

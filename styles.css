@@ -1,4 +1,4 @@
-/* Draft Night 246f6228cc — built from src/styles.css */
+/* Draft Night e316caa9e3 — built from src/styles.css */
 /* Layout: one phone-width column, a stage-lit backdrop, the auction screen as a full-height console with a sticky gavel bar. */
 :root{
   --ink:#0f0c21; --stage:#19153a; --panel:#221d47; --panel2:#2c2659; --line:#3d3672;
@@ -102,6 +102,7 @@ textarea.input{min-height:140px;resize:vertical;line-height:1.45}
 .tcard .meta{flex:1;min-width:0}
 .tcard .name{font-family:var(--cond);font-weight:800;font-size:20px;line-height:1.1}
 .tcard .sub{font-size:14px;color:var(--muted);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.tcard .name,.tcard .sub{display:block}
 button.tcard:active{transform:scale(.98)}
 .foldergrid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}
 .folder{position:relative;text-align:left;display:flex;flex-direction:column;gap:2px;min-height:138px;padding:16px 14px 12px;border-radius:6px 18px 18px 18px;border:2px solid var(--line);background:linear-gradient(165deg,var(--panel2),var(--panel));margin-top:10px;transition:transform .12s}
@@ -492,11 +493,11 @@ input[type=range]{width:100%;accent-color:var(--gold);min-height:32px}
 /* ---------- tabs, rules summary, motion ---------- */
 .tabs{display:flex;gap:6px;overflow-x:auto;padding-bottom:4px;scrollbar-width:none;position:sticky;top:0;z-index:5;background:var(--ink);padding-top:4px}
 .tabs::-webkit-scrollbar{display:none}
-.tab{flex:none;min-height:40px;padding:6px 14px;border-radius:999px;border:2px solid var(--line);background:var(--panel);font-family:var(--cond);font-weight:800;font-size:15px;letter-spacing:.03em;display:flex;align-items:center;gap:6px;white-space:nowrap}
-.tab.on{background:var(--gold);color:var(--gold-ink);border-color:var(--gold)}
-.tab:focus-visible{outline:3px solid var(--gold);outline-offset:2px}
+.ttab{flex:none;min-height:40px;padding:6px 14px;border-radius:999px;border:2px solid var(--line);background:var(--panel);font-family:var(--cond);font-weight:800;font-size:15px;letter-spacing:.03em;display:flex;align-items:center;gap:6px;white-space:nowrap}
+.ttab.on{background:var(--gold);color:var(--gold-ink);border-color:var(--gold)}
+.ttab:focus-visible{outline:3px solid var(--gold);outline-offset:2px}
 .tabcount{font-size:11px;font-weight:800;background:rgba(0,0,0,.25);border-radius:99px;padding:1px 6px}
-.tab.on .tabcount{background:rgba(0,0,0,.15)}
+.ttab.on .tabcount{background:rgba(0,0,0,.15)}
 .rulelist{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:6px;font-size:14px}
 .rulelist li{display:flex;gap:8px;align-items:flex-start;line-height:1.35}
 .duo-note{grid-column:1/-1;margin:2px 0 0;text-align:center}
@@ -526,3 +527,13 @@ html[data-motion="reduce"] *,html[data-motion="reduce"] *::before,html[data-moti
 
 .tvmode .topbar button{visibility:hidden}
 .tvmode .tvbar button{visibility:visible}
+
+/* ---------- topic browser: favourites, pins, popular ---------- */
+.trow2{display:flex;align-items:center;gap:8px}
+.trow2.pinned .tcard{border-color:var(--gold)}
+.tmarks{display:flex;flex-direction:column;gap:6px;flex:none}
+.tmark{width:40px;height:40px;border-radius:12px;border:2px solid var(--line);background:var(--panel);font-size:18px;display:grid;place-items:center;filter:grayscale(1);opacity:.7}
+.tmark.on{filter:none;opacity:1;border-color:var(--gold);background:color-mix(in srgb,var(--gold) 18%,var(--panel));color:var(--gold)}
+.tmark:focus-visible{outline:3px solid var(--gold)}
+.tfolder{display:block;margin:4px 0 0 4px}
+.yours{display:inline-block;margin-left:8px;font-family:var(--body);font-size:11px;font-weight:800;letter-spacing:.06em;text-transform:uppercase;padding:2px 7px;border-radius:99px;background:#2fd17c;color:#0f2a1b;vertical-align:middle}
