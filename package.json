@@ -1,0 +1,8 @@
+{
+  "name": "draft-night",
+  "version": "2.0.0",
+  "private": true,
+  "description": "Draft Night — a pass-and-play $20 auction draft party game.",
+  "scripts": { "build": "node build.js", "test": "node tests/run.js" },
+  "devDependencies": { "@babel/standalone": "7.24.7", "jsdom": "24.1.0" }
+}
