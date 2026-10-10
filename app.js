@@ -1,4 +1,4 @@
-/* Draft Night 14c0e9aea9 — built from src/ by build.js. Edit src/, not this file. */
+/* Draft Night 80ec4c2d3d — built from src/ by build.js. Edit src/, not this file. */
 "use strict";
 (function(){
 function _extends() { return _extends = Object.assign ? Object.assign.bind() : function (n) { for (var e = 1; e < arguments.length; e++) { var t = arguments[e]; for (var r in t) ({}).hasOwnProperty.call(t, r) && (n[r] = t[r]); } return n; }, _extends.apply(null, arguments); }
@@ -7086,7 +7086,7 @@ function botPassers(d) {
   });
   return Object.keys(byTeam).filter(id => {
     const m = d.managers.find(x => x.id === id);
-    if (!m || isOut(d, id) || d.bid && d.bid.leaderId === id || !canBid(d, m, nextAmount(d)) || owesBid(d, m)) return false;
+    if (!m || isOut(d, id) || d.bid && d.bid.leaderId === id || !canBid(d, m, nextAmount(d)) || owesBid(d, m) || skipWithdrawProblem(d, id)) return false;
     return byTeam[id].every(a => !botDecision(d, a, {
       noMiss: true
     }));
@@ -7421,6 +7421,504 @@ function botTradeOffer(d, bot) {
     amount: Math.min(bot.budget, Math.max(1, Math.round(gain * 0.25)))
   };
   return offer;
+}
+const SKIP_DEFAULTS = {
+  on: true,
+  max: 3,
+  runOut: 'must',
+  nmd: false,
+  warn: true,
+  endgame: {
+    on: true,
+    at: 3,
+    allow: 0,
+    style: 'must'
+  },
+  style: 'next',
+  pref: 'rating',
+  pickSecs: 20,
+  debt: {
+    on: false,
+    clear: 'each'
+  }
+};
+const SKIP_MAXES = [0, 1, 2, 3, 5, 10, -1];
+function skipCfg(src) {
+  const r = src && src.rules ? src.rules : src;
+  const s = r && r.skip;
+  if (!s) return {
+    ...SKIP_DEFAULTS,
+    on: false,
+    endgame: {
+      ...SKIP_DEFAULTS.endgame,
+      on: false
+    },
+    debt: {
+      ...SKIP_DEFAULTS.debt
+    }
+  };
+  return {
+    ...SKIP_DEFAULTS,
+    ...s,
+    endgame: {
+      ...SKIP_DEFAULTS.endgame,
+      ...(s.endgame || {})
+    },
+    debt: {
+      ...SKIP_DEFAULTS.debt,
+      ...(s.debt || {})
+    }
+  };
+}
+const skipRulesOn = d => {
+  const c = skipCfg(d);
+  return c.on || c.endgame.on;
+};
+const emptySk = () => ({
+  used: {},
+  extra: {},
+  owe: {},
+  debt: {},
+  debtProg: {},
+  taken: {},
+  endUsed: {},
+  turn: 0,
+  cur: null,
+  offer: null,
+  log: []
+});
+const skOf = d => ({
+  ...emptySk(),
+  ...(d.sk || {})
+});
+const cloneSk = d => JSON.parse(JSON.stringify(skOf(d)));
+const maxSkipsOf = c => !c.on ? Infinity : c.max < 0 ? Infinity : c.max;
+function eligibleFor(d, m, id) {
+  const it = d.items[id];
+  return !!(m && it && !isFull(m) && assignSlot(m, it, d.rules.slots) >= 0 && maxBid(m, d.rules) >= d.rules.minBid);
+}
+const endgameNow = d => {
+  const c = skipCfg(d);
+  return c.endgame.on && d.queue.length > 0 && d.queue.length <= c.endgame.at;
+};
+const endgameSoon = d => {
+  const c = skipCfg(d);
+  return c.endgame.on && c.endgame.style === 'pressure' && d.queue.length > c.endgame.at && d.queue.length <= c.endgame.at + 3;
+};
+function skipVerdict(d, mid) {
+  const c = skipCfg(d);
+  const s = skOf(d);
+  if (!c.on && !c.endgame.on) return {
+    ok: true,
+    cost: null,
+    left: Infinity
+  };
+  const left = Math.max(0, maxSkipsOf(c) - (s.used[mid] || 0));
+  const end = endgameNow(d);
+  if (end && (s.endUsed[mid] || 0) >= c.endgame.allow) return {
+    ok: false,
+    forced: true,
+    why: 'endgame',
+    left
+  };
+  if (!c.on) return {
+    ok: true,
+    cost: end ? 'end' : null,
+    left
+  };
+  if (left > 0) return {
+    ok: true,
+    cost: 'normal',
+    left,
+    end
+  };
+  if (c.nmd) return {
+    ok: false,
+    forced: true,
+    why: 'nmd',
+    left
+  };
+  if (c.debt.on) return (s.debt[mid] || 0) > 0 ? {
+    ok: false,
+    forced: true,
+    why: 'debt',
+    left
+  } : {
+    ok: true,
+    cost: 'debt',
+    left,
+    end
+  };
+  if (c.runOut === 'final') return (s.extra[mid] || 0) < 1 ? {
+    ok: true,
+    cost: 'final',
+    left,
+    end
+  } : {
+    ok: false,
+    forced: true,
+    why: 'out',
+    left
+  };
+  if (c.runOut === 'escalate') {
+    if ((s.owe[mid] || 0) > 0) return {
+      ok: false,
+      forced: true,
+      why: 'escalate',
+      left
+    };
+    return (s.extra[mid] || 0) < 2 ? {
+      ok: true,
+      cost: 'escalate',
+      left,
+      end
+    } : {
+      ok: false,
+      forced: true,
+      why: 'out',
+      left
+    };
+  }
+  if (c.runOut === 'none') return {
+    ok: false,
+    forced: false,
+    why: 'none',
+    left
+  };
+  return {
+    ok: false,
+    forced: true,
+    why: 'out',
+    left
+  };
+}
+function presenter(d) {
+  const s = d.sk;
+  if (!s || !s.cur || s.cur.reveal !== d.reveal || d.phase !== 'auction') return null;
+  const m = d.managers.find(x => x.id === s.cur.mid);
+  return m ? {
+    m,
+    forced: !!s.cur.forced,
+    why: s.cur.why,
+    chosen: !!s.cur.chosen
+  } : null;
+}
+const forcedPresenter = d => {
+  const p = presenter(d);
+  return p && p.forced ? p.m : null;
+};
+function forcedTakeOk(d, m) {
+  const id = d.queue[0];
+  return !!(id && eligibleFor(d, m, id) && !frozenNow(d, m.id));
+}
+const pickRand = (d, salt, arr) => {
+  if (!arr.length) return null;
+  const r = seeded(d.seed || d.id, 'skip', salt, d.reveal);
+  return arr[Math.floor(r() * arr.length) % arr.length];
+};
+function assignPresenter(n, nominatorId) {
+  if (!skipRulesOn(n) || n.phase !== 'auction' || !n.queue.length) {
+    if (n.sk) n.sk = {
+      ...n.sk,
+      cur: null
+    };
+    return n;
+  }
+  const s = cloneSk(n);
+  const N = n.managers.length;
+  const id = n.queue[0];
+  let start = nominatorId ? Math.max(0, n.managers.findIndex(m => m.id === nominatorId)) : (s.turn || 0) % N;
+  let mid = null;
+  if (nominatorId) {
+    const nm = n.managers[start];
+    if (eligibleFor(n, nm, id)) mid = nm.id;
+  } else for (let k = 0; k < N; k++) {
+    const m = n.managers[(start + k) % N];
+    if (eligibleFor(n, m, id)) {
+      mid = m.id;
+      s.turn = (start + k + 1) % N;
+      break;
+    }
+  }
+  n.sk = s;
+  if (!mid) {
+    s.cur = null;
+    return n;
+  }
+  const v = skipVerdict(n, mid);
+  s.cur = {
+    reveal: n.reveal,
+    mid,
+    forced: !!v.forced,
+    why: v.why || null
+  };
+  const c = skipCfg(n);
+  if (!v.forced || nominatorId || n.rules.order === 'nominate' || c.style === 'next') return n;
+  const m = n.managers.find(x => x.id === mid);
+  const cands = n.queue.filter(x => eligibleFor(n, m, x));
+  if (!cands.length) return n;
+  let pick = null;
+  if (c.style === 'choose3') {
+    const pool = [...cands];
+    const ids = [];
+    while (ids.length < 3 && pool.length) {
+      const x = pickRand(n, 'c3:' + ids.length, pool);
+      ids.push(x);
+      pool.splice(pool.indexOf(x), 1);
+    }
+    n.phase = 'forcepick';
+    s.offer = {
+      mid,
+      ids,
+      reveal: n.reveal,
+      why: v.why || null
+    };
+    return n;
+  }
+  if (c.style === 'auctioneer' && c.pref === 'rating' && isFootball(n.topic)) {
+    const visible = cands.filter(x => !n.items[x].mystery);
+    const pool = visible.length ? visible : cands;
+    pick = pool.slice().sort((a, b) => playerRating(n.items[b]).ovr - playerRating(n.items[a]).ovr || (a < b ? -1 : 1))[0];
+  } else pick = pickRand(n, 'rand', cands);
+  if (pick && pick !== n.queue[0]) n.queue = [pick, ...n.queue.filter(x => x !== pick)];
+  return n;
+}
+function chooseForced(d, itemId) {
+  const o = d.sk && d.sk.offer;
+  if (d.phase !== 'forcepick' || !o || !o.ids.includes(itemId) || !d.queue.includes(itemId)) return d;
+  const m = d.managers.find(x => x.id === o.mid);
+  if (!eligibleFor(d, m, itemId)) return d;
+  const s = cloneSk(d);
+  s.offer = null;
+  const n = {
+    ...d,
+    queue: [itemId, ...d.queue.filter(x => x !== itemId)],
+    phase: 'auction',
+    reveal: d.reveal + 1,
+    bid: null,
+    bids: [],
+    sk: s
+  };
+  s.cur = {
+    reveal: n.reveal,
+    mid: o.mid,
+    forced: true,
+    why: o.why,
+    chosen: true
+  };
+  return n;
+}
+function autoChooseForced(d) {
+  const o = d.sk && d.sk.offer;
+  if (d.phase !== 'forcepick' || !o) return d;
+  const m = d.managers.find(x => x.id === o.mid);
+  const ok = o.ids.filter(x => eligibleFor(d, m, x));
+  return ok.length ? chooseForced(d, pickRand(d, 'auto', ok)) : {
+    ...d,
+    phase: 'auction',
+    sk: {
+      ...cloneSk(d),
+      offer: null,
+      cur: null
+    }
+  };
+}
+function unsoldOutcome(d) {
+  const p = presenter(d);
+  if (!p) return {
+    kind: 'plain'
+  };
+  if (p.forced) return forcedTakeOk(d, p.m) ? {
+    kind: 'forced',
+    m: p.m
+  } : {
+    kind: 'plain'
+  };
+  const v = skipVerdict(d, p.m.id);
+  if (v.ok) return {
+    kind: v.cost ? 'charge' : 'plain',
+    m: p.m,
+    cost: v.cost,
+    end: !!v.end
+  };
+  if (v.why === 'none') return {
+    kind: 'bounce',
+    m: p.m
+  };
+  return forcedTakeOk(d, p.m) ? {
+    kind: 'forced',
+    m: p.m
+  } : {
+    kind: 'plain'
+  };
+}
+function chargeSkip(n, mid, cost, end) {
+  const s = cloneSk(n);
+  if (cost === 'normal') s.used[mid] = (s.used[mid] || 0) + 1;
+  if (cost === 'final' || cost === 'escalate') s.extra[mid] = (s.extra[mid] || 0) + 1;
+  if (cost === 'escalate') s.owe[mid] = 1;
+  if (cost === 'debt') s.debt[mid] = (s.debt[mid] || 0) + 1;
+  if (end || cost === 'end') s.endUsed[mid] = (s.endUsed[mid] || 0) + 1;
+  s.log = [...(s.log || []), {
+    t: 'skip',
+    mid,
+    cost,
+    item: n.queue[0]
+  }].slice(-60);
+  n.sk = s;
+  return Math.max(0, maxSkipsOf(skipCfg(n)) - (s.used[mid] || 0));
+}
+function repayForced(n, mid, itemId) {
+  const s = cloneSk(n);
+  const c = skipCfg(n);
+  s.taken[mid] = (s.taken[mid] || 0) + 1;
+  if ((s.owe[mid] || 0) > 0) s.owe[mid] = 0;
+  if ((s.debt[mid] || 0) > 0) {
+    if (c.debt.clear === 'each') s.debt[mid] -= 1;else if (c.debt.clear === 'two') {
+      s.debtProg[mid] = (s.debtProg[mid] || 0) + 1;
+      if (s.debtProg[mid] >= 2) {
+        s.debt[mid] -= 1;
+        s.debtProg[mid] = 0;
+      }
+    }
+  }
+  s.log = [...(s.log || []), {
+    t: 'forced',
+    mid,
+    item: itemId
+  }].slice(-60);
+  n.sk = s;
+}
+function skipChip(d, m) {
+  const c = skipCfg(d);
+  if (!skipRulesOn(d)) return null;
+  const s = skOf(d);
+  const p = presenter(d);
+  if (p && p.m.id === m.id && p.forced) return {
+    text: 'FORCED PICK',
+    tone: 'hot'
+  };
+  if (isFull(m)) return null;
+  const v = skipVerdict(d, m.id);
+  if ((s.debt[m.id] || 0) > 0) return {
+    text: 'Skip debt ' + s.debt[m.id],
+    tone: 'hot'
+  };
+  if (!v.ok && v.forced) return {
+    text: v.why === 'endgame' ? 'NO SKIPS (endgame)' : 'FORCED PICK NEXT',
+    tone: 'hot'
+  };
+  if (!v.ok) return {
+    text: 'NO SKIPS LEFT',
+    tone: 'warn'
+  };
+  if (!c.on) return endgameNow(d) ? {
+    text: 'Endgame skips ' + Math.max(0, c.endgame.allow - (s.endUsed[m.id] || 0)),
+    tone: 'warn'
+  } : null;
+  if (c.max < 0) return null;
+  if (v.cost === 'final') return {
+    text: 'Final chance',
+    tone: 'warn'
+  };
+  if (v.cost === 'escalate') return {
+    text: 'Last-ditch skip',
+    tone: 'warn'
+  };
+  if (v.cost === 'debt') return {
+    text: 'Next skip = debt',
+    tone: 'warn'
+  };
+  return {
+    text: 'Skips ' + v.left + '/' + c.max,
+    tone: v.left <= 1 ? 'warn' : ''
+  };
+}
+function presenterLine(d) {
+  const p = presenter(d);
+  if (!p) return null;
+  const who = p.m.name;
+  if (p.forced) return {
+    forced: true,
+    text: '🔒 ' + who + ' is out of skips' + (p.why === 'endgame' ? ' (endgame)' : '') + ': if nobody bids, ' + who + ' takes it for ' + money(d.rules.minBid) + '.'
+  };
+  const v = skipVerdict(d, p.m.id);
+  const c = skipCfg(d);
+  if (!v.ok && v.why === 'none') return {
+    text: '🎯 ' + who + '’s item · no skips left: if nobody bids it goes to the back'
+  };
+  if (!v.cost) return {
+    text: '🎯 ' + who + '’s item'
+  };
+  const tail = v.cost === 'normal' ? c.max < 0 ? '' : ' (' + v.left + ' left)' : v.cost === 'debt' ? ' · it adds 1 skip debt' : v.cost === 'final' ? ' · their final chance' : v.cost === 'escalate' ? ' · a last-ditch skip' : '';
+  return {
+    text: '🎯 ' + who + '’s item · if nobody bids, it uses one of their skips' + tail
+  };
+}
+function skipWithdrawProblem(d, id) {
+  const f = forcedPresenter(d);
+  return f && f.id === id && forcedTakeOk(d, f) ? 'No more dodging: you’re out of skips, so you can’t drop out of this item. If nobody bids, you take it for ' + money(d.rules.minBid) + '.' : null;
+}
+function nominationAllowed(d, mid, id) {
+  if (!skipRulesOn(d)) return true;
+  const v = skipVerdict(d, mid);
+  return !v.forced || eligibleFor(d, d.managers.find(m => m.id === mid), id);
+}
+function botSkipSave(d) {
+  const p = presenter(d);
+  if (!p || p.forced || d.bid || !skipRulesOn(d)) return null;
+  const a = botActors(d).find(x => x.id === p.m.id);
+  if (!a || !canBid(d, p.m, d.rules.minBid)) return null;
+  const v = skipVerdict(d, p.m.id);
+  const precious = v.cost && (v.cost !== 'normal' || v.left <= 1) || endgameNow(d);
+  if (!precious) return null;
+  const type = a.bot.type;
+  if (type === 'chaos' && seeded(d.seed || d.id, 'save', d.reveal)() < 0.5) return null;
+  return {
+    botId: a.id,
+    speaker: a.speaker || a.id,
+    amount: d.rules.minBid,
+    delay: 1600,
+    event: 'bid'
+  };
+}
+function botForcedChoice(d) {
+  const o = d.sk && d.sk.offer;
+  if (!o) return null;
+  const a = botActors(d).find(x => x.id === o.mid) || d.managers.find(m => m.id === o.mid);
+  if (!a) return null;
+  const m = d.managers.find(x => x.id === o.mid);
+  const ok = o.ids.filter(x => eligibleFor(d, m, x));
+  const best = ok.map(id => ({
+    id,
+    s: botValue(d, a, visibleItem(d, id), () => 0.5)
+  })).sort((x, y) => y.s - x.s)[0];
+  return best ? best.id : null;
+}
+function skipRulesLines(rules) {
+  const c = skipCfg(rules);
+  const L = [];
+  if (!c.on && !c.endgame.on) return [['🔁', 'Skip limits: off (anyone can let items go unsold)']];
+  if (c.on) {
+    L.push(['🔁', 'Skip limit: ' + (c.max < 0 ? 'unlimited' : c.max) + ' per manager' + (c.nmd ? ' · No More Dodging: then you must take your next item' : c.debt.on ? ' · then Skip Debt (' + {
+      each: 'each forced pick repays 1',
+      two: 'every 2 forced picks repay 1',
+      end: 'never repaid'
+    }[c.debt.clear] + ')' : ' · then ' + {
+      must: 'must take the next item',
+      final: 'one final chance, then must take',
+      escalate: 'escalating: 2 last-ditch skips with a forced pick between',
+      none: 'no forced picks (unbid items go to the back)'
+    }[c.runOut])]);
+    if (rules.order !== 'nominate') L.push(['🎯', 'Forced pick style: ' + {
+      next: 'the next item',
+      choose3: 'choose from 3 (' + c.pickSecs + 's)',
+      auctioneer: 'auctioneer’s choice (' + (c.pref === 'rating' ? 'highest rated on football topics, random otherwise' : 'random') + ')',
+      random: 'random eligible item'
+    }[c.style]]);
+  } else L.push(['🔁', 'Skip limit: off']);
+  if (c.endgame.on) L.push(['⏳', 'Endgame Anti-Dodging: last ' + c.endgame.at + ' items · ' + c.endgame.allow + ' skip' + (c.endgame.allow === 1 ? '' : 's') + ' allowed' + (c.endgame.style === 'pressure' ? ' · warnings 3 items before' : '')]);
+  return L;
 }
 const TWIST_DEFAULTS = {
   chaos: {
@@ -7784,12 +8282,15 @@ function currentNominator(d) {
   }
   return null;
 }
-const nominationPool = d => d.queue.filter(id => d.managers.some(m => !isFull(m) && assignSlot(m, d.items[id], d.rules.slots) >= 0));
+const nominationPool = d => {
+  const cur = currentNominator(d);
+  return d.queue.filter(id => d.managers.some(m => !isFull(m) && assignSlot(m, d.items[id], d.rules.slots) >= 0) && (!cur || nominationAllowed(d, cur.m.id, id)));
+};
 function nominate(d, itemId) {
   if (d.phase !== 'nominate') return d;
   const cur = currentNominator(d);
-  if (!cur || !d.queue.includes(itemId)) return d;
-  return {
+  if (!cur || !d.queue.includes(itemId) || !nominationAllowed(d, cur.m.id, itemId)) return d;
+  const n = {
     ...d,
     queue: [itemId, ...d.queue.filter(x => x !== itemId)],
     nominated: itemId,
@@ -7798,8 +8299,11 @@ function nominate(d, itemId) {
       by: cur.m.id
     },
     phase: 'auction',
-    reveal: d.reveal + 1
+    reveal: d.reveal + 1,
+    bid: null,
+    bids: []
   };
+  return assignPresenter(n, cur.m.id);
 }
 function openTrades(n, now) {
   n.phase = 'trade';
@@ -8235,6 +8739,9 @@ const CALLS = {
   legendary: ['LEGENDARY! What a pull!'],
   rare: ['We’ve got a RARE card!'],
   noBids: ['No takers! Moving on.'],
+  skipUsed: ['No takers. {who} uses a skip!', '{who} lets it go. That’s a skip!'],
+  dodge: ['No more dodging! {who}, this one’s yours unless someone outbids you!', 'No skips left for {who}! Bid, or it’s yours!'],
+  forced: ['No takers, so it goes to {who} for {amt}!', '{who} has to take it! {amt}!'],
   card: ['{who} plays {card}!'],
   vetoed: ['VETOED! Denied!'],
   tradeOffer: ['We’ve got a trade on the table!'],
@@ -9975,7 +10482,7 @@ function withdrawProblem(d, id) {
   if (!m || d.phase !== 'auction' || !currentItem(d)) return 'There’s no item up right now.';
   if (isOut(d, id)) return 'Already out on this item.';
   if (owesBid(d, m)) return 'Require every manager to bid is on: bid at least once on this item before dropping out.';
-  return null;
+  return skipWithdrawProblem(d, id);
 }
 function withdraw(d, id) {
   return withdrawProblem(d, id) ? d : {
@@ -9989,7 +10496,9 @@ function withdraw(d, id) {
 function auctionEnd(d) {
   if (d.phase !== 'auction' || d.pending || !currentItem(d)) return null;
   if (d.bid) return d.managers.some(m => m.id !== d.bid.leaderId && canBid(d, m, nextAmount(d))) ? null : 'sell';
-  return d.managers.some(m => canBid(d, m, d.rules.minBid)) ? null : 'skip';
+  const can = d.managers.filter(m => canBid(d, m, d.rules.minBid));
+  const f = forcedPresenter(d);
+  return !can.length || f && can.length === 1 && can[0].id === f.id ? 'skip' : null;
 }
 function canBid(d, m, amount) {
   const item = currentItem(d);
@@ -10008,7 +10517,7 @@ function bidBlocker(d, m) {
   return null;
 }
 const canTake = (d, m, id) => !isFull(m) && assignSlot(m, d.items[id], d.rules.slots) >= 0;
-const SNAP_KEYS = ['managers', 'queue', 'leftover', 'passed', 'processed', 'fp', 'phase', 'autoSkipped', 'cards', 'frozen', 'revealed', 'cardLog', 'nom', 'nominated', 'pending', 'trade'];
+const SNAP_KEYS = ['managers', 'queue', 'leftover', 'passed', 'processed', 'fp', 'phase', 'autoSkipped', 'cards', 'frozen', 'revealed', 'cardLog', 'nom', 'nominated', 'pending', 'trade', 'sk'];
 function snap(d) {
   const o = {};
   SNAP_KEYS.forEach(k => {
@@ -10076,6 +10585,7 @@ function advance(n) {
     n.phase = 'freepick';
   }
   n.reveal = (n.reveal || 0) + 1;
+  if (n.phase === 'auction') assignPresenter(n, n.rules.order === 'nominate' && n.nom ? n.nom.by : null);
   return n;
 }
 function finishDraft(n) {
@@ -10239,10 +10749,31 @@ function sell(d) {
 function skipItem(d) {
   const id = d.queue[0];
   if (!id) return d;
-  const n = withHistory(d, 'Undo skip');
+  const out = d.phase === 'auction' ? unsoldOutcome(d) : {
+    kind: 'plain'
+  };
+  const n = withHistory(d, out.kind === 'forced' ? 'Undo forced pick' : 'Undo skip');
+  if (out.kind === 'forced') {
+    const m = n.managers.find(x => x.id === out.m.id);
+    const slot = assignSlot(m, n.items[id], n.rules.slots);
+    m.team[slot] = {
+      itemId: id,
+      price: n.rules.minBid,
+      forced: true
+    };
+    m.budget -= n.rules.minBid;
+    if (n.items[id].mystery) n.revealed = [...(n.revealed || []), id];
+    repayForced(n, m.id, id);
+    n.queue = n.queue.slice(1);
+    n.processed++;
+    n.nominated = null;
+    return advance(n);
+  }
+  if (out.kind === 'charge') chargeSkip(n, out.m.id, out.cost, out.end);
   n.queue = n.queue.slice(1);
   n.nominated = null;
-  if (n.rules.noBids === 'back' && !n.passed.includes(id)) {
+  const back = out.kind === 'bounce' || n.rules.noBids === 'back';
+  if (back && !n.passed.includes(id)) {
     n.queue.push(id);
     n.passed.push(id);
   } else {
@@ -10278,13 +10809,21 @@ function undo(d) {
   if (!d.history.length) return d;
   const h = d.history[d.history.length - 1];
   const s = JSON.parse(h.s);
+  const reveal = (d.reveal || 0) + 1;
+  if (s.sk && s.sk.cur) s.sk = {
+    ...s.sk,
+    cur: {
+      ...s.sk.cur,
+      reveal
+    }
+  };
   return {
     ...d,
     ...s,
     history: d.history.slice(0, -1),
     bid: null,
     bids: [],
-    reveal: (d.reveal || 0) + 1,
+    reveal,
     votes: {},
     votesRevealed: false,
     finale: null
@@ -10746,7 +11285,7 @@ function Home({
   onDismissInstall
 }) {
   const [ask, setAsk] = useState(null);
-  const status = draft && (draft.phase === 'auction' ? 'Item ' + (draft.processed + 1) + ' of ' + (draft.processed + draft.queue.length) : draft.phase === 'nominate' ? 'Nominating' : draft.phase === 'trade' ? 'Trade window' : draft.phase === 'freepick' ? 'Free picks' : 'Results & voting');
+  const status = draft && (draft.phase === 'auction' ? 'Item ' + (draft.processed + 1) + ' of ' + (draft.processed + draft.queue.length) : draft.phase === 'nominate' ? 'Nominating' : draft.phase === 'forcepick' ? 'Forced pick' : draft.phase === 'trade' ? 'Trade window' : draft.phase === 'freepick' ? 'Free picks' : 'Results & voting');
   return React.createElement("div", {
     className: "app"
   }, React.createElement("div", {
@@ -12631,6 +13170,7 @@ function rulesLines(rules, opts) {
   L.push(['✋', rules.mustBid ? 'Require every manager to bid: ON — everyone must bid once on each item before dropping out' : 'Anyone can drop out of an item without bidding']);
   L.push(['🧭', rules.order === 'nominate' ? 'Nomination: teams take turns picking what goes up' : rules.order === 'saved' ? 'Items come up in topic order' : 'Items come up in random order']);
   L.push(['↩️', rules.noBids === 'back' ? 'Unbid items go to the back of the queue' : 'Unbid items are skipped (leftovers become free picks)']);
+  skipRulesLines(rules).forEach(x => L.push(x));
   if (rules.mustFill) L.push(['🧮', 'You must keep enough money to fill your team']);
   L.push(['🃏', tw.chaos.on ? 'Chaos Cards: ' + tw.chaos.count + ' per ' + per + ' — ' + CARD_TYPES.filter(c => tw.chaos[c]).map(c => CARD_INFO[c].name).join(', ') : 'Chaos Cards: off']);
   L.push(['❓', tw.mystery.on ? 'Mystery items: 1 in ' + tw.mystery.every : 'Mystery items: off']);
@@ -12656,7 +13196,7 @@ function RulesSummary({
     "aria-hidden": "true"
   }, e), " ", t)));
 }
-const RULE_TABS = [['general', 'General'], ['auction', 'Auction & bidding'], ['chaos', 'Chaos & surprises'], ['teams', 'Teams & trading'], ['winner', 'Winner'], ['review', 'Review']];
+const RULE_TABS = [['general', 'General'], ['auction', 'Auction & bidding'], ['skips', 'Skip rules'], ['chaos', 'Chaos & surprises'], ['teams', 'Teams & trading'], ['winner', 'Winner'], ['review', 'Review']];
 function SetupRules({
   topic,
   managers,
@@ -12712,10 +13252,21 @@ function SetupRules({
     }
   });
   const foot = defaultsMode || isFootball(topic);
+  const sk = skipCfg(rules.skip ? rules : {
+    skip: SKIP_DEFAULTS
+  });
+  const setSk = p => set({
+    skip: {
+      ...sk,
+      ...p
+    }
+  });
   const onCount = {
     chaos: [tw.chaos.on, tw.mystery.on, tw.rarity.on].filter(Boolean).length,
-    teams: [tw.trades.on].filter(Boolean).length
+    teams: [tw.trades.on].filter(Boolean).length,
+    skips: [sk.on, sk.endgame.on, sk.on && sk.debt.on && !sk.nmd].filter(Boolean).length
   };
+  const per = teams ? 'team' : 'manager';
   return React.createElement("div", {
     className: "app"
   }, React.createElement(TopBar, {
@@ -12727,7 +13278,7 @@ function SetupRules({
     className: "display"
   }, "House rules"), React.createElement("p", {
     className: "hint"
-  }, defaultsMode ? 'New games start with these. You can still change them when setting up a game.' : 'Changes apply to this new draft. A game in progress keeps its rules.', " Optional extras are off until you switch them on.")), React.createElement("div", {
+  }, defaultsMode ? 'New games start with these. You can still change them when setting up a game.' : 'Changes apply to this new draft. A game in progress keeps its rules.', " Optional extras are off until you switch them on; Skip rules are on by default to stop endless dodging.")), React.createElement("div", {
     className: "tabs",
     role: "tablist",
     "aria-label": "Rule sections"
@@ -12872,7 +13423,252 @@ function SetupRules({
     style: {
       margin: 0
     }
-  }, "Tapping \u201CI\u2019m out\u201D drops you out of the current item only: you can\u2019t bid on it again, and you\u2019re back in for the next item. A bid you already made still stands. As soon as nobody but the leader can still bid, the item sells straight away; if nobody can bid at all, it goes unsold. Bots drop out when the price passes what they\u2019ll pay."))), tab === 'chaos' && React.createElement("div", {
+  }, "Tapping \u201CI\u2019m out\u201D drops you out of the current item only: you can\u2019t bid on it again, and you\u2019re back in for the next item. A bid you already made still stands. As soon as nobody but the leader can still bid, the item sells straight away; if nobody can bid at all, it goes unsold. Bots drop out when the price passes what they\u2019ll pay."))), tab === 'skips' && React.createElement("div", {
+    className: "stack",
+    role: "tabpanel"
+  }, React.createElement("div", {
+    className: "card stack-sm",
+    style: {
+      background: 'var(--stage)'
+    }
+  }, React.createElement("b", {
+    className: "small"
+  }, "How skips work"), React.createElement("p", {
+    className: "hint",
+    style: {
+      margin: 0
+    }
+  }, "Each item is handed to one ", per, " in turn", rules.order === 'nominate' ? ' (in Nomination, whoever nominated it)' : '', ". If it ends with no bids, that\u2019s their skip; if anyone buys it, no skip is used. Out of skips? They\u2019re on the hook: they can\u2019t tap \u201CI\u2019m out\u201D, anyone can still outbid them, and if nobody bids they take it for the minimum bid (", money(rules.minBid), "). A pick is only forced if they can legally take and afford the item. Items nobody could buy are skipped automatically and never count.")), React.createElement(RuleSection, {
+    id: "rs-skip",
+    emoji: "\uD83D\uDD01",
+    title: "Skip limits",
+    open: true,
+    on: sk.on,
+    onToggle: v => setSk({
+      on: v
+    }),
+    summary: sk.on ? (sk.max < 0 ? 'Unlimited' : sk.max + ' per ' + per) + (sk.nmd ? ' · No More Dodging' : sk.debt.on ? ' · Skip Debt' : ' · then ' + {
+      must: 'must take next',
+      final: 'final chance',
+      escalate: 'escalating',
+      none: 'no forced picks'
+    }[sk.runOut]) : 'Off'
+  }, React.createElement("div", {
+    className: "field"
+  }, React.createElement("span", {
+    className: "label"
+  }, "Skips per ", per, ", for the whole draft"), React.createElement(Seg, {
+    label: "Skips per manager",
+    value: sk.max,
+    options: SKIP_MAXES.map(v => [v, v < 0 ? 'Unlimited' : String(v)]),
+    onChange: v => setSk({
+      max: v
+    })
+  }), React.createElement("p", {
+    className: "hint"
+  }, teams ? 'In team games the team shares one pool of skips (the team bids as one).' : 'Shown on every manager’s card during the draft.')), React.createElement(Toggle, {
+    on: !!sk.nmd,
+    onChange: v => setSk({
+      nmd: v
+    }),
+    title: "\uD83D\uDEAB No More Dodging",
+    sub: "Strict mode: once your skips are gone, you must take every item handed to you for the rest of the draft. It overrides Skip Debt and the setting below."
+  }), !sk.nmd && !sk.debt.on && React.createElement("div", {
+    className: "field"
+  }, React.createElement("span", {
+    className: "label"
+  }, "When a manager runs out of skips"), React.createElement(Seg, {
+    label: "When skips run out",
+    value: sk.runOut,
+    options: [['must', 'Must take next'], ['final', 'Final chance'], ['escalate', 'Escalating'], ['none', 'No forced picks']],
+    onChange: v => setSk({
+      runOut: v
+    })
+  }), React.createElement("p", {
+    className: "hint"
+  }, {
+    must: 'They must take the next item handed to them (if nobody outbids them).',
+    final: 'One final extra skip, then they must take the next item.',
+    escalate: 'Two last-ditch skips, but they must take an item in between; after the second, every item handed to them is forced.',
+    none: 'Nothing is forced. Their unbid items go to the back of the queue once instead of disappearing (then become free picks).'
+  }[sk.runOut])), !sk.nmd && sk.debt.on && React.createElement("p", {
+    className: "hint"
+  }, "Skip Debt is on, so it decides what happens when skips run out."), React.createElement(Toggle, {
+    on: !!sk.warn,
+    onChange: v => setSk({
+      warn: v
+    }),
+    title: "Skip warnings",
+    sub: "Warn when a manager is down to their last skip and when they have none left."
+  })), React.createElement(RuleSection, {
+    id: "rs-endgame",
+    emoji: "\u23F3",
+    title: "Endgame Anti-Dodging",
+    on: sk.endgame.on,
+    onToggle: v => setSk({
+      endgame: {
+        ...sk.endgame,
+        on: v
+      }
+    }),
+    summary: sk.endgame.on ? 'Last ' + sk.endgame.at + ' items · ' + sk.endgame.allow + ' skip' + (sk.endgame.allow === 1 ? '' : 's') + (sk.endgame.style === 'pressure' ? ' · progressive' : '') : 'Off'
+  }, React.createElement("div", {
+    className: "field"
+  }, React.createElement("span", {
+    className: "label"
+  }, "Start enforcing when"), React.createElement(Seg, {
+    label: "Endgame threshold",
+    value: sk.endgame.at,
+    options: [[5, 'Last 5'], [3, 'Last 3'], [2, 'Last 2']],
+    onChange: v => setSk({
+      endgame: {
+        ...sk.endgame,
+        at: v
+      }
+    })
+  })), React.createElement("div", {
+    className: "field"
+  }, React.createElement("span", {
+    className: "label"
+  }, "Skips allowed in the endgame"), React.createElement(Seg, {
+    label: "Endgame skips",
+    value: sk.endgame.allow,
+    options: [[0, '0'], [1, '1'], [2, '2']],
+    onChange: v => setSk({
+      endgame: {
+        ...sk.endgame,
+        allow: v
+      }
+    })
+  }), React.createElement("p", {
+    className: "hint"
+  }, "Per ", per, ". An endgame skip also needs a normal skip left", sk.on ? '' : ' (skip limits are off, so only this allowance counts)', ".")), React.createElement("div", {
+    className: "field"
+  }, React.createElement("span", {
+    className: "label"
+  }, "Enforcement"), React.createElement(Seg, {
+    label: "Endgame style",
+    value: sk.endgame.style,
+    options: [['must', 'Must take next item'], ['pressure', 'Progressive pressure']],
+    onChange: v => setSk({
+      endgame: {
+        ...sk.endgame,
+        style: v
+      }
+    })
+  }), React.createElement("p", {
+    className: "hint"
+  }, sk.endgame.style === 'pressure' ? 'Warnings start 3 items before the endgame; once it starts, anyone with no endgame skips left must take their item.' : 'Once the endgame starts, anyone with no endgame skips left must take their item.', " Never forces an item someone can\u2019t legally take or afford."))), React.createElement("div", {
+    className: "field"
+  }, React.createElement("span", {
+    className: "label"
+  }, "Forced pick style"), rules.order === 'nominate' ? React.createElement("p", {
+    className: "hint"
+  }, "Nomination is on, so the ", per, " on the hook nominates the item themselves (only items they can take are offered). The style below doesn\u2019t apply.") : React.createElement(React.Fragment, null, React.createElement(Seg, {
+    label: "Forced pick style",
+    value: sk.style,
+    options: [['next', 'Next item'], ['choose3', 'Choose from 3'], ['auctioneer', 'Auctioneer’s choice'], ['random', 'Random']],
+    onChange: v => setSk({
+      style: v
+    })
+  }), React.createElement("p", {
+    className: "hint"
+  }, {
+    next: 'They’re on the hook for the next item handed to them.',
+    choose3: 'They choose one of 3 random items they can take (fewer if fewer are left). If the clock runs out, one is picked for them.',
+    auctioneer: 'The game chooses the item using the rule below.',
+    random: 'A random item they can take.'
+  }[sk.style], " It still goes to auction: anyone can outbid them."), sk.style === 'choose3' && React.createElement("div", {
+    className: "field"
+  }, React.createElement("span", {
+    className: "label"
+  }, "Time to choose"), React.createElement(Seg, {
+    label: "Choose time",
+    value: sk.pickSecs,
+    options: [[15, '15s'], [20, '20s'], [30, '30s'], [60, '60s']],
+    onChange: v => setSk({
+      pickSecs: v
+    })
+  }), React.createElement("p", {
+    className: "hint"
+  }, "Also the fallback if that player disconnects.")), sk.style === 'auctioneer' && React.createElement("div", {
+    className: "field"
+  }, React.createElement("span", {
+    className: "label"
+  }, "Auctioneer picks"), React.createElement(Seg, {
+    label: "Auctioneer preference",
+    value: sk.pref,
+    options: [['rating', 'Highest rated'], ['random', 'Random']],
+    onChange: v => setSk({
+      pref: v
+    })
+  }), React.createElement("p", {
+    className: "hint"
+  }, "Highest rated only works on the 3 football topics (estimated ratings). Other topics have no reliable ratings, so it picks at random. There\u2019s no \u201Cbest value\u201D option because no topic has real value data.")))), React.createElement(RuleSection, {
+    id: "rs-debt",
+    emoji: "\uD83D\uDCB3",
+    title: "Skip Debt",
+    on: sk.debt.on && !sk.nmd,
+    onToggle: v => setSk({
+      debt: {
+        ...sk.debt,
+        on: v
+      },
+      ...(v ? {
+        nmd: false
+      } : {})
+    }),
+    summary: sk.debt.on && !sk.nmd ? {
+      each: 'Each forced pick repays 1',
+      two: '2 forced picks repay 1',
+      end: 'Never repaid'
+    }[sk.debt.clear] : 'Off'
+  }, React.createElement("p", {
+    className: "hint"
+  }, "Out of skips, you can keep skipping, but each extra skip is 1 debt point. While you owe debt, you must take the next item handed to you. Debt never touches your money or bids."), React.createElement("div", {
+    className: "field"
+  }, React.createElement("span", {
+    className: "label"
+  }, "Debt is repaid"), React.createElement(Seg, {
+    label: "Debt recovery",
+    value: sk.debt.clear,
+    options: [['each', 'Each forced pick'], ['two', 'Every 2 forced picks'], ['end', 'Never']],
+    onChange: v => setSk({
+      debt: {
+        ...sk.debt,
+        clear: v
+      }
+    })
+  }), React.createElement("p", {
+    className: "hint"
+  }, {
+    each: 'Each item you’re forced to take repays 1 point. At 0 you can skip again.',
+    two: 'Every 2 forced items repay 1 point.',
+    end: 'Once in debt, every item handed to you is forced for the rest of the draft.'
+  }[sk.debt.clear]))), React.createElement("div", {
+    className: "card stack-sm",
+    style: {
+      background: 'var(--stage)'
+    }
+  }, React.createElement("b", {
+    className: "small"
+  }, "Which rule wins"), React.createElement("ol", {
+    className: "hint",
+    style: {
+      margin: 0,
+      paddingLeft: 18
+    }
+  }, React.createElement("li", null, "Endgame Anti-Dodging (in the last items)"), React.createElement("li", null, "No More Dodging"), React.createElement("li", null, "Skip Debt"), React.createElement("li", null, "When a manager runs out of skips")), React.createElement("p", {
+    className: "hint",
+    style: {
+      margin: 0
+    }
+  }, "Every forced pick uses up an item, and nothing is forced when nobody can legally take it, so a draft always finishes.")), React.createElement("button", {
+    className: "btn btn-sm",
+    onClick: () => set({
+      skip: JSON.parse(JSON.stringify(SKIP_DEFAULTS))
+    })
+  }, "Reset Skip Rules to defaults")), tab === 'chaos' && React.createElement("div", {
     className: "stack",
     role: "tabpanel"
   }, React.createElement("p", {
@@ -13112,7 +13908,7 @@ function SetupRules({
     onClick: () => setAskReset(true)
   }, "Reset rules to defaults"), askReset && React.createElement(Confirm, {
     title: "Reset rules?",
-    body: "Budget and bidding go back to the standard rules, and every optional twist is switched off.",
+    body: "Budget and bidding go back to the standard rules, skip rules go back to their defaults, and every optional twist is switched off.",
     yes: "Reset",
     onYes: () => {
       onReset();
@@ -13200,7 +13996,12 @@ function ManagerButton({
     title: "Chaos Cards left"
   }, "\uD83C\uDCCF", d.cards[m.id].length) : null), React.createElement("span", {
     className: "st"
-  }, status, " \xB7 ", filled, "/", d.rules.slots.length), onOut && React.createElement("button", {
+  }, status, " \xB7 ", filled, "/", d.rules.slots.length), (() => {
+    const ch = skipChip(d, m);
+    return ch ? React.createElement("span", {
+      className: 'skipchip' + (ch.tone ? ' ' + ch.tone : '')
+    }, ch.text) : null;
+  })(), onOut && React.createElement("button", {
     className: "edit outbtn",
     "aria-label": m.name + ' is out on this item',
     title: "Out on this item",
@@ -13771,14 +14572,47 @@ function Auction({
   }
   function skip() {
     if (busy.current || flashing) return;
-    const back = d.rules.noBids === 'back' && !d.passed.includes(d.queue[0]);
+    const out = unsoldOutcome(d);
+    const back = (out.kind === 'bounce' || d.rules.noBids === 'back') && !d.passed.includes(d.queue[0]);
     setThinking(null);
-    audio.say(callLine('noBids'), 1, d.id + ':skip:' + d.reveal);
-    onFlash({
-      kind: 'skip',
-      item: visibleItem(d, item.id).name,
-      back
-    });
+    if (out.kind === 'forced') {
+      const real = d.items[d.queue[0]];
+      const m = out.m;
+      buzz([60, 40, 60]);
+      audio.play('buzzer');
+      audio.say(callLine('forced', {
+        who: m.name,
+        amt: money(d.rules.minBid)
+      }), 2, d.id + ':forced:' + d.reveal);
+      onFlash({
+        kind: 'forced',
+        name: m.name,
+        emoji: m.emoji,
+        color: m.color,
+        price: d.rules.minBid,
+        item: real.name,
+        mystery: !!real.mystery
+      });
+    } else {
+      const c = skipCfg(d);
+      let note = null;
+      if (out.kind === 'charge') {
+        const v = skipVerdict(d, out.m.id);
+        const left = out.cost === 'normal' ? v.left - 1 : null;
+        note = out.m.emoji + ' ' + out.m.name + ' used ' + (out.cost === 'debt' ? 'a skip on credit (+1 skip debt)' : out.cost === 'final' ? 'their final chance' : out.cost === 'escalate' ? 'a last-ditch skip' : 'a skip') + (left != null && c.max >= 0 ? ' · ' + left + ' left' : '');
+        if (c.warn && left === 1) note += ' · ⚠️ last skip!';
+        if (c.warn && left === 0) note += ' · no skips left: next one’s forced';
+        audio.say(callLine('skipUsed', {
+          who: out.m.name
+        }), 1, d.id + ':skip:' + d.reveal);
+      } else audio.say(callLine('noBids'), 1, d.id + ':skip:' + d.reveal);
+      onFlash({
+        kind: 'skip',
+        item: visibleItem(d, item.id).name,
+        back,
+        note
+      });
+    }
     setDraft(p => skipItem(p));
   }
   useEffect(() => {
@@ -13820,7 +14654,7 @@ function Auction({
         }
       }
     }
-    const plan = cardPlan || nextBotAction(d) || botForcedBid(d);
+    const plan = cardPlan || nextBotAction(d) || botForcedBid(d) || botSkipSave(d);
     const passers = cardPlan ? [] : botPassers(d);
     const tOut = passers.length ? setTimeout(() => {
       const cur = live.current;
@@ -13884,6 +14718,27 @@ function Auction({
     }
     seenLog.current = logLen;
   }, [logLen]);
+  const hookKey = (() => {
+    const p = presenter(d);
+    return p && p.forced ? d.id + ':' + d.reveal + ':' + p.m.id : null;
+  })();
+  const announced = useRef(null);
+  useEffect(() => {
+    if (!hookKey || flashing || announced.current === hookKey) return;
+    announced.current = hookKey;
+    const m = forcedPresenter(d);
+    audio.say(callLine('dodge', {
+      who: m.name
+    }), 2, 'dodge:' + hookKey);
+    if ((!online || nv.isHost) && !nv.tv && !(net && net.passive)) onFlash({
+      kind: 'dodge',
+      name: m.name,
+      emoji: m.emoji,
+      color: m.color,
+      price: d.rules.minBid,
+      endgame: (presenter(d) || {}).why === 'endgame'
+    });
+  }, [hookKey, flashing]);
   useEffect(() => {
     if (!nv.runsBots || flashing || d.bid || !item) return;
     const advisers = botAdvisers(d);
@@ -14036,7 +14891,18 @@ function Auction({
     style: {
       width: Math.max(0, left) / timer * 100 + '%'
     }
-  })), paused && React.createElement("div", {
+  })), (() => {
+    const pl = presenterLine(d);
+    const soon = endgameSoon(d);
+    return pl || soon || endgameNow(d) ? React.createElement("div", {
+      className: 'skipline' + (pl && pl.forced ? ' hook' : ''),
+      role: "status"
+    }, pl && React.createElement("span", null, pl.text), soon && React.createElement("span", {
+      className: "small"
+    }, "\u26A0\uFE0F Skips lock in ", d.queue.length - skipCfg(d).endgame.at, " item", d.queue.length - skipCfg(d).endgame.at === 1 ? '' : 's', ": the last ", skipCfg(d).endgame.at, " must be taken."), !soon && endgameNow(d) && !(pl && pl.forced) && React.createElement("span", {
+      className: "small"
+    }, "\u23F3 Endgame: skips are restricted for the last ", skipCfg(d).endgame.at, " items.")) : null;
+  })(), paused && React.createElement("div", {
     className: "pausecover"
   }, React.createElement("div", {
     className: "stack",
@@ -14103,7 +14969,9 @@ function Auction({
     }
   }, you && isOut(d, you.id) ? 'Out ✋' : you && isFull(you) ? 'Team full' : you && !canBid(d, you, youAmt) ? 'Can’t bid' : (d.bid && d.bid.leaderId === you.id ? 'Raise to ' : 'Bid ') + money(youAmt)), you && owesBid(d, you) && !hold && React.createElement("p", {
     className: "hint duo-note"
-  }, "Require every manager to bid is on: bid once before you can drop out."), you && isOut(d, you.id) && React.createElement("p", {
+  }, "Require every manager to bid is on: bid once before you can drop out."), you && skipWithdrawProblem(d, you.id) && !hold && React.createElement("p", {
+    className: "hint duo-note"
+  }, "\uD83D\uDD12 You\u2019re out of skips: you can\u2019t drop out of this one. Anyone can still outbid you; if nobody bids, it\u2019s yours for ", money(d.rules.minBid), "."), you && isOut(d, you.id) && React.createElement("p", {
     className: "hint duo-note"
   }, "You can\u2019t bid again on this item", d.bid && d.bid.leaderId === you.id ? ', but your bid still stands' : '', ". You\u2019re back in on the next one.")) : null : React.createElement("div", {
     className: "actions"
@@ -14115,7 +14983,10 @@ function Auction({
     className: "btn",
     onClick: skip,
     disabled: hold || flashing || !!d.bid || owe.length > 0
-  }, "No bids"), React.createElement("button", {
+  }, (() => {
+    const o = unsoldOutcome(d);
+    return o.kind === 'forced' ? 'No bids → ' + o.m.name : 'No bids';
+  })()), React.createElement("button", {
     className: "btn btn-gold sold",
     onClick: sold,
     disabled: hold || flashing || !d.bid || owe.length > 0
@@ -14219,7 +15090,21 @@ function Nominate({
     style: {
       margin: 0
     }
-  }, isBotTurn ? paused ? 'Paused' : '💭 Choosing what goes up next…' : canPick ? 'Pick the next item to auction.' : 'Waiting for ' + cur.m.name + ' to pick…')), Object.entries(talk.bubbles).map(([id, bb]) => React.createElement("p", {
+  }, isBotTurn ? paused ? 'Paused' : '💭 Choosing what goes up next…' : canPick ? 'Pick the next item to auction.' : 'Waiting for ' + cur.m.name + ' to pick…'), skipRulesOn(d) && (() => {
+    const v = skipVerdict(d, cur.m.id);
+    return v.forced ? React.createElement("p", {
+      className: "small",
+      style: {
+        margin: '6px 0 0',
+        fontWeight: 800
+      }
+    }, "\uD83D\uDD12 No more dodging: ", cur.m.name, " is out of skips, so only items they can take are listed. If nobody bids, they take it for ", money(d.rules.minBid), ".") : v.cost ? React.createElement("p", {
+      className: "small",
+      style: {
+        margin: '6px 0 0'
+      }
+    }, "\uD83C\uDFAF If nobody bids on what ", cur.m.name, " nominates, it uses one of their skips.") : null;
+  })()), Object.entries(talk.bubbles).map(([id, bb]) => React.createElement("p", {
     key: bb.id,
     className: "bubble inline"
   }, bb.text)), canPick && React.createElement(TopicSearch, {
@@ -14269,6 +15154,120 @@ function Nominate({
     onYes: () => act('nominate', pick),
     onClose: () => setPick(null)
   }), teams && React.createElement(TeamsSheet, {
+    d: d,
+    onClose: () => setTeams(false)
+  }));
+}
+function ForcedPick({
+  d,
+  setDraft,
+  goHome
+}) {
+  const o = d.sk && d.sk.offer;
+  const m = o && d.managers.find(x => x.id === o.mid);
+  const solo = d.mode === 'solo';
+  const nv = netView(d, useNet());
+  const act = useAct(d, setDraft);
+  const [teams, setTeams] = useState(false);
+  const secs = skipCfg(d).pickSecs || 20;
+  const [left, setLeft] = useState(secs);
+  const isBotTurn = !!(m && (solo || nv.online) && (isBot(m) || isBotTeam(m)));
+  const canPick = !!m && !isBotTurn && nv.controls(m.id);
+  const key = o ? o.reveal + ':' + o.mid : '';
+  useEffect(() => {
+    setLeft(secs);
+  }, [key]);
+  useEffect(() => {
+    if (!o) return undefined;
+    const t = setInterval(() => setLeft(l => l > 0 ? l - 1 : 0), ms(1000));
+    return () => clearInterval(t);
+  }, [key]);
+  useEffect(() => {
+    if (o && nv.isHost && left <= 0) setDraft(p => p.phase === 'forcepick' && p.sk.offer && p.sk.offer.reveal === o.reveal ? autoChooseForced(p) : p);
+  }, [left, key, nv.isHost]);
+  useEffect(() => {
+    if (!o || !isBotTurn || !nv.runsBots) return undefined;
+    const id = botForcedChoice(d);
+    if (!id) return undefined;
+    const t = setTimeout(() => setDraft(p => p.phase === 'forcepick' && p.sk.offer && p.sk.offer.reveal === o.reveal ? chooseForced(p, id) : p), ms(1500));
+    return () => clearTimeout(t);
+  }, [key, isBotTurn, nv.runsBots]);
+  if (!o || !m) return null;
+  return React.createElement("div", {
+    className: "app"
+  }, React.createElement("div", {
+    className: "topbar dense wraptitle"
+  }, React.createElement("button", {
+    className: "iconbtn",
+    onClick: goHome,
+    "aria-label": "Home"
+  }, "\u2302"), React.createElement(MuteButton, null), React.createElement(TvButton, null), React.createElement("div", {
+    className: "title"
+  }, "Forced pick \xB7 ", d.processed + 1, " of ", d.processed + d.queue.length), React.createElement("span", {
+    className: "grow"
+  }), React.createElement("button", {
+    className: "pillbtn",
+    onClick: () => setTeams(true)
+  }, "Teams")), React.createElement("div", {
+    className: "picker",
+    style: mStyle(m)
+  }, React.createElement("p", {
+    className: "eyebrow"
+  }, "No more dodging"), React.createElement("h2", {
+    className: "display",
+    style: {
+      fontSize: 40
+    }
+  }, m.emoji, " ", m.name), React.createElement("p", {
+    className: "small",
+    style: {
+      margin: 0
+    }
+  }, o.why === 'endgame' ? 'Endgame: no skips left.' : 'Out of skips.', " ", isBotTurn ? '💭 Choosing…' : canPick ? 'Choose the item you’ll be on the hook for.' : 'Waiting for ' + m.name + ' to choose…')), React.createElement("p", {
+    className: "hint",
+    style: {
+      textAlign: 'center',
+      margin: 0
+    }
+  }, "It goes up for auction as normal: anyone can outbid ", m.name, ". If nobody bids, ", m.name, " takes it for ", money(d.rules.minBid), ". ", React.createElement("b", {
+    className: "num"
+  }, left, "s"), " left, then one is picked automatically."), React.createElement("div", {
+    className: "pickgrid"
+  }, o.ids.map(id => {
+    const it = visibleItem(d, id);
+    const r = rarityOf(d, id);
+    return React.createElement("button", {
+      key: id,
+      className: "pickbtn",
+      disabled: !canPick,
+      onClick: () => act('forcePick', id)
+    }, it.hidden ? React.createElement("span", {
+      className: "thumb",
+      style: {
+        background: '#2c2659',
+        color: '#c9a6ff',
+        fontSize: 24
+      }
+    }, "?") : React.createElement(Thumb, {
+      item: it,
+      topic: d.topic
+    }), React.createElement("span", {
+      className: "grow",
+      style: {
+        minWidth: 0
+      }
+    }, React.createElement("b", {
+      style: {
+        display: 'block'
+      }
+    }, it.name, " ", it.pos && React.createElement("span", {
+      className: "pos"
+    }, it.pos), " ", React.createElement(RarityTag, {
+      r: r
+    })), React.createElement("span", {
+      className: "small muted"
+    }, it.desc)));
+  })), teams && React.createElement(TeamsSheet, {
     d: d,
     onClose: () => setTeams(false)
   }));
@@ -15825,7 +16824,7 @@ function Flash({
   onDone
 }) {
   useEffect(() => {
-    const t = setTimeout(onDone, ms(f.kind === 'skip' ? 1100 : f.mystery || f.rarity === 'legendary' ? 2600 : 1800));
+    const t = setTimeout(onDone, ms(f.kind === 'skip' ? f.note ? 1700 : 1100 : f.kind === 'dodge' ? 2200 : f.mystery || f.rarity === 'legendary' ? 2600 : 1800));
     return () => clearTimeout(t);
   }, [f]);
   return React.createElement("div", {
@@ -15885,7 +16884,51 @@ function Flash({
     }
   }, "No bids"), React.createElement("div", {
     className: "it"
-  }, f.item, " ", f.back ? 'goes to the back of the queue' : 'is skipped')), f.kind === 'free' && React.createElement("div", {
+  }, f.item, " ", f.back ? 'goes to the back of the queue' : 'is skipped'), f.note && React.createElement("div", {
+    className: "it",
+    style: {
+      fontSize: 16,
+      color: 'var(--gold)'
+    }
+  }, f.note)), f.kind === 'dodge' && React.createElement("div", {
+    className: "inner dodge"
+  }, React.createElement("div", {
+    className: "big",
+    style: {
+      color: 'var(--danger)',
+      fontSize: 60
+    }
+  }, "NO MORE DODGING!"), React.createElement("div", {
+    className: "to",
+    style: {
+      color: f.color
+    }
+  }, f.emoji, " ", f.name), React.createElement("div", {
+    className: "it"
+  }, f.endgame ? 'Endgame: no skips left.' : 'Out of skips.', " If nobody bids, this one\u2019s yours for ", money(f.price), ".")), f.kind === 'forced' && React.createElement("div", {
+    className: "inner"
+  }, React.createElement("div", {
+    className: "big",
+    style: {
+      color: 'var(--gold)',
+      fontSize: 60
+    }
+  }, "YOU HAVE TO PICK!"), React.createElement("div", {
+    className: "to",
+    style: {
+      color: f.color
+    }
+  }, f.emoji, " ", f.name), React.createElement("div", {
+    className: "price num"
+  }, money(f.price)), f.mystery && React.createElement("div", {
+    className: "it",
+    style: {
+      color: '#c9a6ff',
+      fontWeight: 800
+    }
+  }, "\u2753 The mystery item was\u2026"), React.createElement("div", {
+    className: "it"
+  }, "takes ", f.item)), f.kind === 'free' && React.createElement("div", {
     className: "inner"
   }, React.createElement("div", {
     className: "big",
@@ -15910,10 +16953,11 @@ const DEFAULT_RULES = {
   timer: 0,
   mustFill: true,
   noBids: 'skip',
-  mustBid: false
+  mustBid: false,
+  skip: JSON.parse(JSON.stringify(SKIP_DEFAULTS))
 };
 const RULE_DEFAULTS = () => ({
-  ...DEFAULT_RULES,
+  ...JSON.parse(JSON.stringify(DEFAULT_RULES)),
   ...JSON.parse(JSON.stringify(TWIST_DEFAULTS)),
   finale: {
     ...FINALE_DEFAULTS
@@ -17593,6 +18637,10 @@ function App() {
         d: draft,
         setDraft: setDraft,
         goHome: () => go('home')
+      });else if (draft.phase === 'forcepick') view = React.createElement(ForcedPick, {
+        d: draft,
+        setDraft: setDraft,
+        goHome: () => go('home')
       });else if (draft.phase === 'trade') view = React.createElement(TradeWindow, {
         d: draft,
         setDraft: setDraft,
@@ -17926,6 +18974,23 @@ if (window.__DN_TEST__) window.__DN = {
     ownerInfo,
     migrateSettings,
     rulesLines
+  },
+  skips: {
+    SKIP_DEFAULTS,
+    skipCfg,
+    skipRulesOn,
+    presenter,
+    skipVerdict,
+    eligibleFor,
+    endgameNow,
+    endgameSoon,
+    chooseForced,
+    autoChooseForced,
+    presenterLine,
+    botSkipSave,
+    botForcedChoice,
+    unsoldOutcome,
+    skipChip
   },
   topicsLib: {
     POPULARITY,
@@ -19998,6 +21063,7 @@ const NET_ACTIONS = {
   withdraw: (d, [mid], who) => owns(who, mid) ? withdraw(d, mid) : d,
   card: (d, [by, card, params], who) => d.phase === 'auction' && owns(who, by) && CARD_INFO[card] ? playCard(d, by, card, params || {}) : d,
   veto: (d, [yes, pid], who) => d.pending && d.pending.id === pid && owns(who, d.pending.target) ? answerCard(d, !!yes) : d,
+  forcePick: (d, [id], who) => d.phase === 'forcepick' && d.sk && d.sk.offer && owns(who, d.sk.offer.mid) ? chooseForced(d, id) : d,
   nominate: (d, [id], who) => {
     const c = d.phase === 'nominate' && currentNominator(d);
     return c && owns(who, c.m.id) ? nominate(d, id) : d;
@@ -21154,6 +22220,10 @@ function RoomGame({
     d: d,
     setDraft: setDraft,
     goHome: goHome
+  });else if (d.phase === 'forcepick') view = React.createElement(ForcedPick, {
+    d: d,
+    setDraft: setDraft,
+    goHome: goHome
   });else if (d.phase === 'trade') view = React.createElement(TradeWindow, {
     d: d,
     setDraft: setDraft,
@@ -21597,6 +22667,10 @@ function TvGame({
     flashing: !!flash,
     onFlash: noop
   });else if (d.phase === 'nominate') view = React.createElement(Nominate, {
+    d: d,
+    setDraft: noop,
+    goHome: noop
+  });else if (d.phase === 'forcepick') view = React.createElement(ForcedPick, {
     d: d,
     setDraft: noop,
     goHome: noop

@@ -245,6 +245,7 @@ function RoomGame({ room, d, setHd, onLeave, onPlayAgain, onFinished, past, sett
   if (d.phase === 'auction') view = <Auction d={d} setDraft={setDraft} goHome={goHome} flashing={!!flash} onFlash={onFlash} />;
   else if (d.phase === 'freepick') view = <FreePick d={d} setDraft={setDraft} goHome={goHome} flashing={!!flash} onFlash={onFlash} />;
   else if (d.phase === 'nominate') view = <Nominate d={d} setDraft={setDraft} goHome={goHome} />;
+  else if (d.phase === 'forcepick') view = <ForcedPick d={d} setDraft={setDraft} goHome={goHome} />;
   else if (d.phase === 'trade') view = <TradeWindow d={d} setDraft={setDraft} goHome={goHome} />;
   else view = <Results d={d} past={past} showShame={settings.showShame} live onChange={setDraft} onBack={goHome} onUndo={null} onFinish={goHome} onPlayAgain={isHost ? onPlayAgain : null} />;
   const seated = who.teams.size > 0;

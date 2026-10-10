@@ -85,7 +85,8 @@ module.exports = async function topicTests({ ok, boot, btn, click, sleep }) {
   ok(JSON.stringify(names(P)) === JSON.stringify(travel), '12. unpinning puts topics back in their curated place');
   // Keep one favourite + one pin for the reload test.
   await click(P.w, star(P, travel[0])); await click(P.w, pin(P, low));
-  await sleep(100);
+  // Wait for the settings save (it's debounced, so it can lag under load).
+  for (let t = 0; t < 100; t++) { const v = P.w.localStorage.getItem('dn_settings_v1') || ''; if (v.includes('"' + ts.find((x) => x.name === low).id + '"')) break; await sleep(30); }
   const saved = P.w.localStorage.getItem('dn_settings_v1');
   P.w.close();
   const R = await boot({ idb: false, compress: true, storage: { dn_settings_v1: saved, dn_topics_v1: JSON.stringify(ts), dn_starters_seen_v1: JSON.stringify(ts.map((t) => t.id)) } });

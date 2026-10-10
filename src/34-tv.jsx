@@ -65,6 +65,7 @@ function TvGame({ d, net, flash, setFlash, past, settings }) {
   if (d.phase === 'auction') view = <Auction d={d} setDraft={noop} goHome={noop} flashing={!!flash} onFlash={noop} />;
   else if (d.phase === 'freepick') view = <FreePick d={d} setDraft={noop} goHome={noop} flashing={!!flash} onFlash={noop} />;
   else if (d.phase === 'nominate') view = <Nominate d={d} setDraft={noop} goHome={noop} />;
+  else if (d.phase === 'forcepick') view = <ForcedPick d={d} setDraft={noop} goHome={noop} />;
   else if (d.phase === 'trade') view = <TradeWindow d={d} setDraft={noop} goHome={noop} />;
   else view = <Results d={d} past={past} showShame={settings.showShame} onChange={noop} onBack={noop} />;
   return <NetCtx.Provider value={net}><div className="tvmode">{view}{flash && <Flash f={flash} onDone={() => setFlash(null)} />}</div></NetCtx.Provider>;

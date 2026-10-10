@@ -154,14 +154,17 @@ function withdrawProblem(d, id) {
   if (!m || d.phase !== 'auction' || !currentItem(d)) return 'There’s no item up right now.';
   if (isOut(d, id)) return 'Already out on this item.';
   if (owesBid(d, m)) return 'Require every manager to bid is on: bid at least once on this item before dropping out.';
-  return null;
+  return skipWithdrawProblem(d, id);
 }
 function withdraw(d, id) { return withdrawProblem(d, id) ? d : { ...d, out: { reveal: d.reveal, ids: [...outIds(d), id] } }; }
 // 'sell' | 'skip' | null — whether the item should end right now.
 function auctionEnd(d) {
   if (d.phase !== 'auction' || d.pending || !currentItem(d)) return null;
   if (d.bid) return d.managers.some((m) => m.id !== d.bid.leaderId && canBid(d, m, nextAmount(d))) ? null : 'sell';
-  return d.managers.some((m) => canBid(d, m, d.rules.minBid)) ? null : 'skip';
+  const can = d.managers.filter((m) => canBid(d, m, d.rules.minBid));
+  // Skip rules: if only the manager on the hook could still bid, it goes to them now.
+  const f = forcedPresenter(d);
+  return !can.length || (f && can.length === 1 && can[0].id === f.id) ? 'skip' : null;
 }
 
 // Can this manager bid `amount` on the current item?
@@ -185,7 +188,7 @@ function bidBlocker(d, m) {
 const canTake = (d, m, id) => !isFull(m) && assignSlot(m, d.items[id], d.rules.slots) >= 0;
 
 // Everything an undo has to put back.
-const SNAP_KEYS = ['managers', 'queue', 'leftover', 'passed', 'processed', 'fp', 'phase', 'autoSkipped', 'cards', 'frozen', 'revealed', 'cardLog', 'nom', 'nominated', 'pending', 'trade'];
+const SNAP_KEYS = ['managers', 'queue', 'leftover', 'passed', 'processed', 'fp', 'phase', 'autoSkipped', 'cards', 'frozen', 'revealed', 'cardLog', 'nom', 'nominated', 'pending', 'trade', 'sk'];
 function snap(d) { const o = {}; SNAP_KEYS.forEach((k) => { if (d[k] !== undefined) o[k] = d[k]; }); return JSON.stringify(o); }
 function withHistory(d, label) {
   return { ...d, ...JSON.parse(snap(d)), history: [...d.history, { s: snap(d), label }].slice(-80) };
@@ -228,6 +231,8 @@ function advance(n) {
   else if (isDraftOver(n)) finishDraft(n);
   else { if (n.phase !== 'freepick') n.fp = { round: 0, pos: 0 }; n.phase = 'freepick'; }
   n.reveal = (n.reveal || 0) + 1;
+  // Skip rules: hand the new item to the next manager on the clock.
+  if (n.phase === 'auction') assignPresenter(n, n.rules.order === 'nominate' && n.nom ? n.nom.by : null);
   return n;
 }
 
@@ -295,11 +300,26 @@ function sell(d) {
   n.queue = n.queue.slice(1); n.processed++; n.nominated = null;
   return advance(n);
 }
+// The item ends with no bids. Skip rules decide what that means (see 28-skips.js):
+// the manager on the clock uses a skip, or (out of skips) takes it at the minimum bid.
 function skipItem(d) {
   const id = d.queue[0]; if (!id) return d;
-  const n = withHistory(d, 'Undo skip');
+  const out = d.phase === 'auction' ? unsoldOutcome(d) : { kind: 'plain' };
+  const n = withHistory(d, out.kind === 'forced' ? 'Undo forced pick' : 'Undo skip');
+  if (out.kind === 'forced') {
+    const m = n.managers.find((x) => x.id === out.m.id);
+    const slot = assignSlot(m, n.items[id], n.rules.slots);
+    m.team[slot] = { itemId: id, price: n.rules.minBid, forced: true };
+    m.budget -= n.rules.minBid;
+    if (n.items[id].mystery) n.revealed = [...(n.revealed || []), id];
+    repayForced(n, m.id, id);
+    n.queue = n.queue.slice(1); n.processed++; n.nominated = null;
+    return advance(n);
+  }
+  if (out.kind === 'charge') chargeSkip(n, out.m.id, out.cost, out.end);
   n.queue = n.queue.slice(1); n.nominated = null;
-  if (n.rules.noBids === 'back' && !n.passed.includes(id)) { n.queue.push(id); n.passed.push(id); }
+  const back = out.kind === 'bounce' || n.rules.noBids === 'back';
+  if (back && !n.passed.includes(id)) { n.queue.push(id); n.passed.push(id); }
   else { n.leftover.push(id); n.processed++; }
   return advance(n);
 }
@@ -323,7 +343,10 @@ function undo(d) {
   if (!d.history.length) return d;
   const h = d.history[d.history.length - 1];
   const s = JSON.parse(h.s);
-  return { ...d, ...s, history: d.history.slice(0, -1), bid: null, bids: [], reveal: (d.reveal || 0) + 1, votes: {}, votesRevealed: false, finale: null };
+  const reveal = (d.reveal || 0) + 1;
+  // The restored item keeps the same manager on the clock (skip counts come back with it).
+  if (s.sk && s.sk.cur) s.sk = { ...s.sk, cur: { ...s.sk.cur, reveal } };
+  return { ...d, ...s, history: d.history.slice(0, -1), bid: null, bids: [], reveal, votes: {}, votesRevealed: false, finale: null };
 }
 const undoLabel = (d) => (d.bid ? 'Undo bid' : d.history.length ? d.history[d.history.length - 1].label : 'Undo');
 
@@ -519,7 +542,7 @@ function TeamsSheet({ d, onClose }) {
    ============================================================ */
 function Home({ draft, past, onNew, onSolo, onOnline, onResume, onTopics, onPast, onAbandon, onSettings, onPlayers, showInstall, onDismissInstall }) {
   const [ask, setAsk] = useState(null);
-  const status = draft && (draft.phase === 'auction' ? 'Item ' + (draft.processed + 1) + ' of ' + (draft.processed + draft.queue.length) : draft.phase === 'nominate' ? 'Nominating' : draft.phase === 'trade' ? 'Trade window' : draft.phase === 'freepick' ? 'Free picks' : 'Results & voting');
+  const status = draft && (draft.phase === 'auction' ? 'Item ' + (draft.processed + 1) + ' of ' + (draft.processed + draft.queue.length) : draft.phase === 'nominate' ? 'Nominating' : draft.phase === 'forcepick' ? 'Forced pick' : draft.phase === 'trade' ? 'Trade window' : draft.phase === 'freepick' ? 'Free picks' : 'Results & voting');
   return (
     <div className="app">
       <div className="hero">
@@ -1154,6 +1177,7 @@ function rulesLines(rules, opts) {
   L.push(['✋', rules.mustBid ? 'Require every manager to bid: ON — everyone must bid once on each item before dropping out' : 'Anyone can drop out of an item without bidding']);
   L.push(['🧭', rules.order === 'nominate' ? 'Nomination: teams take turns picking what goes up' : rules.order === 'saved' ? 'Items come up in topic order' : 'Items come up in random order']);
   L.push(['↩️', rules.noBids === 'back' ? 'Unbid items go to the back of the queue' : 'Unbid items are skipped (leftovers become free picks)']);
+  skipRulesLines(rules).forEach((x) => L.push(x));
   if (rules.mustFill) L.push(['🧮', 'You must keep enough money to fill your team']);
   L.push(['🃏', tw.chaos.on ? 'Chaos Cards: ' + tw.chaos.count + ' per ' + per + ' — ' + CARD_TYPES.filter((c) => tw.chaos[c]).map((c) => CARD_INFO[c].name).join(', ') : 'Chaos Cards: off']);
   L.push(['❓', tw.mystery.on ? 'Mystery items: 1 in ' + tw.mystery.every : 'Mystery items: off']);
@@ -1166,7 +1190,7 @@ function RulesSummary({ rules, opts }) {
   return <ul className="rulelist">{rulesLines(rules, opts).map(([e, t]) => <li key={t}><span aria-hidden="true">{e}</span> {t}</li>)}</ul>;
 }
 
-const RULE_TABS = [['general', 'General'], ['auction', 'Auction & bidding'], ['chaos', 'Chaos & surprises'], ['teams', 'Teams & trading'], ['winner', 'Winner'], ['review', 'Review']];
+const RULE_TABS = [['general', 'General'], ['auction', 'Auction & bidding'], ['skips', 'Skip rules'], ['chaos', 'Chaos & surprises'], ['teams', 'Teams & trading'], ['winner', 'Winner'], ['review', 'Review']];
 function SetupRules({ topic, managers, rules, setRules, onBack, onStart, startLabel = 'Start the draft', title = '3 · Rules', teamSummary, onEditTeams, onReset, defaultsMode, clockNote }) {
   const [slotTxt, setSlotTxt] = useState(rules.slots.join(', '));
   const [askReset, setAskReset] = useState(false);
@@ -1191,11 +1215,14 @@ function SetupRules({ topic, managers, rules, setRules, onBack, onStart, startLa
   const fin = { ...FINALE_DEFAULTS, ...(rules.finale || {}) };
   const setF = (p) => set({ finale: { ...fin, ...p } });
   const foot = defaultsMode || isFootball(topic);
-  const onCount = { chaos: [tw.chaos.on, tw.mystery.on, tw.rarity.on].filter(Boolean).length, teams: [tw.trades.on].filter(Boolean).length };
+  const sk = skipCfg(rules.skip ? rules : { skip: SKIP_DEFAULTS });
+  const setSk = (p) => set({ skip: { ...sk, ...p } });
+  const onCount = { chaos: [tw.chaos.on, tw.mystery.on, tw.rarity.on].filter(Boolean).length, teams: [tw.trades.on].filter(Boolean).length, skips: [sk.on, sk.endgame.on, sk.on && sk.debt.on && !sk.nmd].filter(Boolean).length };
+  const per = teams ? 'team' : 'manager';
   return (
     <div className="app">
       <TopBar onBack={onBack} title={title} />
-      <div><p className="eyebrow">{defaultsMode ? 'Your defaults for new games' : topic.emoji + ' ' + topic.name}</p><h2 className="display">House rules</h2><p className="hint">{defaultsMode ? 'New games start with these. You can still change them when setting up a game.' : 'Changes apply to this new draft. A game in progress keeps its rules.'} Optional extras are off until you switch them on.</p></div>
+      <div><p className="eyebrow">{defaultsMode ? 'Your defaults for new games' : topic.emoji + ' ' + topic.name}</p><h2 className="display">House rules</h2><p className="hint">{defaultsMode ? 'New games start with these. You can still change them when setting up a game.' : 'Changes apply to this new draft. A game in progress keeps its rules.'} Optional extras are off until you switch them on; Skip rules are on by default to stop endless dodging.</p></div>
       <div className="tabs" role="tablist" aria-label="Rule sections">
         {RULE_TABS.map(([k, label]) => <button key={k} role="tab" aria-selected={tab === k} className={'ttab' + (tab === k ? ' on' : '')} onClick={() => setTab(k)}>{label}{onCount[k] ? <span className="tabcount">{onCount[k]} on</span> : null}</button>)}
       </div>
@@ -1224,6 +1251,51 @@ function SetupRules({ topic, managers, rules, setRules, onBack, onStart, startLa
           <b className="small">How “I’m out” works</b>
           <p className="hint" style={{ margin: 0 }}>Tapping “I’m out” drops you out of the current item only: you can’t bid on it again, and you’re back in for the next item. A bid you already made still stands. As soon as nobody but the leader can still bid, the item sells straight away; if nobody can bid at all, it goes unsold. Bots drop out when the price passes what they’ll pay.</p>
         </div>
+      </div>}
+
+      {tab === 'skips' && <div className="stack" role="tabpanel">
+        <div className="card stack-sm" style={{ background: 'var(--stage)' }}>
+          <b className="small">How skips work</b>
+          <p className="hint" style={{ margin: 0 }}>Each item is handed to one {per} in turn{rules.order === 'nominate' ? ' (in Nomination, whoever nominated it)' : ''}. If it ends with no bids, that’s their skip; if anyone buys it, no skip is used. Out of skips? They’re on the hook: they can’t tap “I’m out”, anyone can still outbid them, and if nobody bids they take it for the minimum bid ({money(rules.minBid)}). A pick is only forced if they can legally take and afford the item. Items nobody could buy are skipped automatically and never count.</p>
+        </div>
+        <RuleSection id="rs-skip" emoji="🔁" title="Skip limits" open on={sk.on} onToggle={(v) => setSk({ on: v })} summary={sk.on ? (sk.max < 0 ? 'Unlimited' : sk.max + ' per ' + per) + (sk.nmd ? ' · No More Dodging' : sk.debt.on ? ' · Skip Debt' : ' · then ' + { must: 'must take next', final: 'final chance', escalate: 'escalating', none: 'no forced picks' }[sk.runOut]) : 'Off'}>
+          <div className="field"><span className="label">Skips per {per}, for the whole draft</span>
+            <Seg label="Skips per manager" value={sk.max} options={SKIP_MAXES.map((v) => [v, v < 0 ? 'Unlimited' : String(v)])} onChange={(v) => setSk({ max: v })} />
+            <p className="hint">{teams ? 'In team games the team shares one pool of skips (the team bids as one).' : 'Shown on every manager’s card during the draft.'}</p></div>
+          <Toggle on={!!sk.nmd} onChange={(v) => setSk({ nmd: v })} title="🚫 No More Dodging" sub="Strict mode: once your skips are gone, you must take every item handed to you for the rest of the draft. It overrides Skip Debt and the setting below." />
+          {!sk.nmd && !sk.debt.on && <div className="field"><span className="label">When a manager runs out of skips</span>
+            <Seg label="When skips run out" value={sk.runOut} options={[['must', 'Must take next'], ['final', 'Final chance'], ['escalate', 'Escalating'], ['none', 'No forced picks']]} onChange={(v) => setSk({ runOut: v })} />
+            <p className="hint">{{ must: 'They must take the next item handed to them (if nobody outbids them).', final: 'One final extra skip, then they must take the next item.', escalate: 'Two last-ditch skips, but they must take an item in between; after the second, every item handed to them is forced.', none: 'Nothing is forced. Their unbid items go to the back of the queue once instead of disappearing (then become free picks).' }[sk.runOut]}</p></div>}
+          {!sk.nmd && sk.debt.on && <p className="hint">Skip Debt is on, so it decides what happens when skips run out.</p>}
+          <Toggle on={!!sk.warn} onChange={(v) => setSk({ warn: v })} title="Skip warnings" sub="Warn when a manager is down to their last skip and when they have none left." />
+        </RuleSection>
+        <RuleSection id="rs-endgame" emoji="⏳" title="Endgame Anti-Dodging" on={sk.endgame.on} onToggle={(v) => setSk({ endgame: { ...sk.endgame, on: v } })} summary={sk.endgame.on ? 'Last ' + sk.endgame.at + ' items · ' + sk.endgame.allow + ' skip' + (sk.endgame.allow === 1 ? '' : 's') + (sk.endgame.style === 'pressure' ? ' · progressive' : '') : 'Off'}>
+          <div className="field"><span className="label">Start enforcing when</span><Seg label="Endgame threshold" value={sk.endgame.at} options={[[5, 'Last 5'], [3, 'Last 3'], [2, 'Last 2']]} onChange={(v) => setSk({ endgame: { ...sk.endgame, at: v } })} /></div>
+          <div className="field"><span className="label">Skips allowed in the endgame</span><Seg label="Endgame skips" value={sk.endgame.allow} options={[[0, '0'], [1, '1'], [2, '2']]} onChange={(v) => setSk({ endgame: { ...sk.endgame, allow: v } })} />
+            <p className="hint">Per {per}. An endgame skip also needs a normal skip left{sk.on ? '' : ' (skip limits are off, so only this allowance counts)'}.</p></div>
+          <div className="field"><span className="label">Enforcement</span><Seg label="Endgame style" value={sk.endgame.style} options={[['must', 'Must take next item'], ['pressure', 'Progressive pressure']]} onChange={(v) => setSk({ endgame: { ...sk.endgame, style: v } })} />
+            <p className="hint">{sk.endgame.style === 'pressure' ? 'Warnings start 3 items before the endgame; once it starts, anyone with no endgame skips left must take their item.' : 'Once the endgame starts, anyone with no endgame skips left must take their item.'} Never forces an item someone can’t legally take or afford.</p></div>
+        </RuleSection>
+        <div className="field"><span className="label">Forced pick style</span>
+          {rules.order === 'nominate' ? <p className="hint">Nomination is on, so the {per} on the hook nominates the item themselves (only items they can take are offered). The style below doesn’t apply.</p> : <>
+            <Seg label="Forced pick style" value={sk.style} options={[['next', 'Next item'], ['choose3', 'Choose from 3'], ['auctioneer', 'Auctioneer’s choice'], ['random', 'Random']]} onChange={(v) => setSk({ style: v })} />
+            <p className="hint">{{ next: 'They’re on the hook for the next item handed to them.', choose3: 'They choose one of 3 random items they can take (fewer if fewer are left). If the clock runs out, one is picked for them.', auctioneer: 'The game chooses the item using the rule below.', random: 'A random item they can take.' }[sk.style]} It still goes to auction: anyone can outbid them.</p>
+            {sk.style === 'choose3' && <div className="field"><span className="label">Time to choose</span><Seg label="Choose time" value={sk.pickSecs} options={[[15, '15s'], [20, '20s'], [30, '30s'], [60, '60s']]} onChange={(v) => setSk({ pickSecs: v })} /><p className="hint">Also the fallback if that player disconnects.</p></div>}
+            {sk.style === 'auctioneer' && <div className="field"><span className="label">Auctioneer picks</span><Seg label="Auctioneer preference" value={sk.pref} options={[['rating', 'Highest rated'], ['random', 'Random']]} onChange={(v) => setSk({ pref: v })} />
+              <p className="hint">Highest rated only works on the 3 football topics (estimated ratings). Other topics have no reliable ratings, so it picks at random. There’s no “best value” option because no topic has real value data.</p></div>}
+          </>}
+        </div>
+        <RuleSection id="rs-debt" emoji="💳" title="Skip Debt" on={sk.debt.on && !sk.nmd} onToggle={(v) => setSk({ debt: { ...sk.debt, on: v }, ...(v ? { nmd: false } : {}) })} summary={sk.debt.on && !sk.nmd ? { each: 'Each forced pick repays 1', two: '2 forced picks repay 1', end: 'Never repaid' }[sk.debt.clear] : 'Off'}>
+          <p className="hint">Out of skips, you can keep skipping, but each extra skip is 1 debt point. While you owe debt, you must take the next item handed to you. Debt never touches your money or bids.</p>
+          <div className="field"><span className="label">Debt is repaid</span><Seg label="Debt recovery" value={sk.debt.clear} options={[['each', 'Each forced pick'], ['two', 'Every 2 forced picks'], ['end', 'Never']]} onChange={(v) => setSk({ debt: { ...sk.debt, clear: v } })} />
+            <p className="hint">{{ each: 'Each item you’re forced to take repays 1 point. At 0 you can skip again.', two: 'Every 2 forced items repay 1 point.', end: 'Once in debt, every item handed to you is forced for the rest of the draft.' }[sk.debt.clear]}</p></div>
+        </RuleSection>
+        <div className="card stack-sm" style={{ background: 'var(--stage)' }}>
+          <b className="small">Which rule wins</b>
+          <ol className="hint" style={{ margin: 0, paddingLeft: 18 }}><li>Endgame Anti-Dodging (in the last items)</li><li>No More Dodging</li><li>Skip Debt</li><li>When a manager runs out of skips</li></ol>
+          <p className="hint" style={{ margin: 0 }}>Every forced pick uses up an item, and nothing is forced when nobody can legally take it, so a draft always finishes.</p>
+        </div>
+        <button className="btn btn-sm" onClick={() => set({ skip: JSON.parse(JSON.stringify(SKIP_DEFAULTS)) })}>Reset Skip Rules to defaults</button>
       </div>}
 
       {tab === 'chaos' && <div className="stack" role="tabpanel">
@@ -1278,7 +1350,7 @@ function SetupRules({ topic, managers, rules, setRules, onBack, onStart, startLa
       {problems.map((p) => <p key={p} className={p.startsWith('Heads up') ? 'hint' : 'warn'}>{p}</p>)}
       <div className="row">{tab !== 'review' && <button className="btn grow" onClick={() => setTab('review')}>Review rules</button>}<button className="btn btn-gold grow" disabled={blocking.length > 0} onClick={() => onStart({ ...rules, slots: defaultsMode ? rules.slots : slots })}>{startLabel}</button></div>
       {onReset && <button className="btn btn-ghost" onClick={() => setAskReset(true)}>Reset rules to defaults</button>}
-      {askReset && <Confirm title="Reset rules?" body="Budget and bidding go back to the standard rules, and every optional twist is switched off." yes="Reset" onYes={() => { onReset(); if (!defaultsMode) setSlotTxt(topic.slots.join(', ')); }} onClose={() => setAskReset(false)} />}
+      {askReset && <Confirm title="Reset rules?" body="Budget and bidding go back to the standard rules, skip rules go back to their defaults, and every optional twist is switched off." yes="Reset" onYes={() => { onReset(); if (!defaultsMode) setSlotTxt(topic.slots.join(', ')); }} onClose={() => setAskReset(false)} />}
     </div>
   );
 }
@@ -1314,6 +1386,7 @@ function ManagerButton({ d, m, onBid, onCustom, onOut, disabledAll, readOnly, bu
       {m.members && <span className="mem">{m.members.map((p) => p.name).join(' · ')}</span>}
       <span className="money num">{money(m.budget)}{d.cards && d.cards[m.id] && d.cards[m.id].length ? <span className="cardchip" title="Chaos Cards left">🃏{d.cards[m.id].length}</span> : null}</span>
       <span className="st">{status} · {filled}/{d.rules.slots.length}</span>
+      {(() => { const ch = skipChip(d, m); return ch ? <span className={'skipchip' + (ch.tone ? ' ' + ch.tone : '')}>{ch.text}</span> : null; })()}
       {onOut && <button className="edit outbtn" aria-label={m.name + ' is out on this item'} title="Out on this item" onPointerDown={(e) => e.stopPropagation()} onPointerUp={(e) => e.stopPropagation()} onClick={(e) => { e.stopPropagation(); onOut(); }}>✋</button>}
       {customOk && <button className="edit" aria-label={'Custom bid for ' + m.name} onPointerDown={(e) => e.stopPropagation()} onPointerUp={(e) => e.stopPropagation()} onClick={(e) => { e.stopPropagation(); onCustom(); }}>✎</button>}
     </div>
@@ -1602,10 +1675,26 @@ function Auction({ d, setDraft, goHome, flashing, onFlash }) {
   }
   function skip() {
     if (busy.current || flashing) return;
-    const back = d.rules.noBids === 'back' && !d.passed.includes(d.queue[0]);
+    const out = unsoldOutcome(d);
+    const back = (out.kind === 'bounce' || d.rules.noBids === 'back') && !d.passed.includes(d.queue[0]);
     setThinking(null);
-    audio.say(callLine('noBids'), 1, d.id + ':skip:' + d.reveal);
-    onFlash({ kind: 'skip', item: visibleItem(d, item.id).name, back });
+    if (out.kind === 'forced') {
+      const real = d.items[d.queue[0]]; const m = out.m;
+      buzz([60, 40, 60]); audio.play('buzzer');
+      audio.say(callLine('forced', { who: m.name, amt: money(d.rules.minBid) }), 2, d.id + ':forced:' + d.reveal);
+      onFlash({ kind: 'forced', name: m.name, emoji: m.emoji, color: m.color, price: d.rules.minBid, item: real.name, mystery: !!real.mystery });
+    } else {
+      const c = skipCfg(d);
+      let note = null;
+      if (out.kind === 'charge') {
+        const v = skipVerdict(d, out.m.id); const left = out.cost === 'normal' ? v.left - 1 : null;
+        note = out.m.emoji + ' ' + out.m.name + ' used ' + (out.cost === 'debt' ? 'a skip on credit (+1 skip debt)' : out.cost === 'final' ? 'their final chance' : out.cost === 'escalate' ? 'a last-ditch skip' : 'a skip') + (left != null && c.max >= 0 ? ' · ' + left + ' left' : '');
+        if (c.warn && left === 1) note += ' · ⚠️ last skip!';
+        if (c.warn && left === 0) note += ' · no skips left: next one’s forced';
+        audio.say(callLine('skipUsed', { who: out.m.name }), 1, d.id + ':skip:' + d.reveal);
+      } else audio.say(callLine('noBids'), 1, d.id + ':skip:' + d.reveal);
+      onFlash({ kind: 'skip', item: visibleItem(d, item.id).name, back, note });
+    }
     setDraft((p) => skipItem(p));
   }
 
@@ -1644,7 +1733,7 @@ function Auction({ d, setDraft, goHome, flashing, onFlash }) {
         if (c) { cardPlan = c; break; }
       }
     }
-    const plan = cardPlan || nextBotAction(d) || botForcedBid(d);
+    const plan = cardPlan || nextBotAction(d) || botForcedBid(d) || botSkipSave(d);
     // Bots that pass at this price drop out, so the item can end as soon as nobody else wants it.
     const passers = cardPlan ? [] : botPassers(d);
     const tOut = passers.length ? setTimeout(() => {
@@ -1693,6 +1782,17 @@ function Auction({ d, setDraft, goHome, flashing, onFlash }) {
     }
     seenLog.current = logLen;
   }, [logLen]);
+
+  // Skip rules: announce a forced pick when the item comes up ("No more dodging!").
+  const hookKey = (() => { const p = presenter(d); return p && p.forced ? d.id + ':' + d.reveal + ':' + p.m.id : null; })();
+  const announced = useRef(null);
+  useEffect(() => {
+    if (!hookKey || flashing || announced.current === hookKey) return;
+    announced.current = hookKey;
+    const m = forcedPresenter(d);
+    audio.say(callLine('dodge', { who: m.name }), 2, 'dodge:' + hookKey);
+    if ((!online || nv.isHost) && !nv.tv && !(net && net.passive)) onFlash({ kind: 'dodge', name: m.name, emoji: m.emoji, color: m.color, price: d.rules.minBid, endgame: (presenter(d) || {}).why === 'endgame' });
+  }, [hookKey, flashing]);
 
   // Bots on your team give advice when a new item comes up.
   useEffect(() => {
@@ -1772,6 +1872,12 @@ function Auction({ d, setDraft, goHome, flashing, onFlash }) {
           <div className="going" aria-live="polite">{d.pending ? '🛑 Waiting for a Veto answer…' : owe.length && timer > 0 && left <= 0 ? '⏳ Waiting for ' + owe.map((m) => m.name).join(', ') + ' to bid' : going || (thinker ? '💭 ' + thinker.name + ' is thinking…' : you && isOut(d, you.id) ? '✋ You’re out on this item' : frozenTeam ? '🧊 ' + frozenTeam.name + ' is frozen for this item' : outNames.length ? '✋ Out: ' + outNames.join(', ') : ' ')}</div>
           {timer > 0 && <span className="timer" style={{ width: (Math.max(0, left) / timer) * 100 + '%' }} />}
         </div>
+        {(() => { const pl = presenterLine(d); const soon = endgameSoon(d); return pl || soon || endgameNow(d) ? (
+          <div className={'skipline' + (pl && pl.forced ? ' hook' : '')} role="status">
+            {pl && <span>{pl.text}</span>}
+            {soon && <span className="small">⚠️ Skips lock in {d.queue.length - skipCfg(d).endgame.at} item{d.queue.length - skipCfg(d).endgame.at === 1 ? '' : 's'}: the last {skipCfg(d).endgame.at} must be taken.</span>}
+            {!soon && endgameNow(d) && !(pl && pl.forced) && <span className="small">⏳ Endgame: skips are restricted for the last {skipCfg(d).endgame.at} items.</span>}
+          </div>) : null; })()}
         {paused && (
           <div className="pausecover">
             <div className="stack" style={{ alignItems: 'center' }}>
@@ -1800,12 +1906,13 @@ function Auction({ d, setDraft, goHome, flashing, onFlash }) {
             {you && isOut(d, you.id) ? 'Out ✋' : you && isFull(you) ? 'Team full' : you && !canBid(d, you, youAmt) ? 'Can’t bid' : (d.bid && d.bid.leaderId === you.id ? 'Raise to ' : 'Bid ') + money(youAmt)}
           </button>
           {you && owesBid(d, you) && !hold && <p className="hint duo-note">Require every manager to bid is on: bid once before you can drop out.</p>}
+          {you && skipWithdrawProblem(d, you.id) && !hold && <p className="hint duo-note">🔒 You’re out of skips: you can’t drop out of this one. Anyone can still outbid you; if nobody bids, it’s yours for {money(d.rules.minBid)}.</p>}
           {you && isOut(d, you.id) && <p className="hint duo-note">You can’t bid again on this item{d.bid && d.bid.leaderId === you.id ? ', but your bid still stands' : ''}. You’re back in on the next one.</p>}
         </div>
       ) : null) : (
         <div className="actions">
           <button className="btn" onClick={() => setDraft((p) => undo(p))} disabled={hold || flashing || (!d.bid && !d.history.length)}>{undoLabel(d)}</button>
-          <button className="btn" onClick={skip} disabled={hold || flashing || !!d.bid || owe.length > 0}>No bids</button>
+          <button className="btn" onClick={skip} disabled={hold || flashing || !!d.bid || owe.length > 0}>{(() => { const o = unsoldOutcome(d); return o.kind === 'forced' ? 'No bids → ' + o.m.name : 'No bids'; })()}</button>
           <button className="btn btn-gold sold" onClick={sold} disabled={hold || flashing || !d.bid || owe.length > 0}>Sold!</button>
         </div>
       )}
@@ -1863,6 +1970,8 @@ function Nominate({ d, setDraft, goHome }) {
         <p className="eyebrow">Nominating</p>
         <h2 className="display" style={{ fontSize: 40 }}>{cur.m.emoji} {cur.m.name}</h2>
         <p className="small" style={{ margin: 0 }}>{isBotTurn ? (paused ? 'Paused' : '💭 Choosing what goes up next…') : canPick ? 'Pick the next item to auction.' : 'Waiting for ' + cur.m.name + ' to pick…'}</p>
+        {skipRulesOn(d) && (() => { const v = skipVerdict(d, cur.m.id); return v.forced ? <p className="small" style={{ margin: '6px 0 0', fontWeight: 800 }}>🔒 No more dodging: {cur.m.name} is out of skips, so only items they can take are listed. If nobody bids, they take it for {money(d.rules.minBid)}.</p>
+          : v.cost ? <p className="small" style={{ margin: '6px 0 0' }}>🎯 If nobody bids on what {cur.m.name} nominates, it uses one of their skips.</p> : null; })()}
       </div>
       {Object.entries(talk.bubbles).map(([id, bb]) => <p key={bb.id} className="bubble inline">{bb.text}</p>)}
       {canPick && <TopicSearch q={q} setQ={setQ} />}
@@ -1879,6 +1988,60 @@ function Nominate({ d, setDraft, goHome }) {
         <Confirm title="Nominate this?" body={visibleItem(d, pick).name + ' goes up for auction next.'} yes="Nominate"
           onYes={() => act('nominate', pick)} onClose={() => setPick(null)} />
       )}
+      {teams && <TeamsSheet d={d} onClose={() => setTeams(false)} />}
+    </div>
+  );
+}
+
+/* ============================================================
+   FORCED PICK — Choose From 3 (skip rules)
+   ============================================================ */
+function ForcedPick({ d, setDraft, goHome }) {
+  const o = d.sk && d.sk.offer;
+  const m = o && d.managers.find((x) => x.id === o.mid);
+  const solo = d.mode === 'solo';
+  const nv = netView(d, useNet()); const act = useAct(d, setDraft);
+  const [teams, setTeams] = useState(false);
+  const secs = skipCfg(d).pickSecs || 20;
+  const [left, setLeft] = useState(secs);
+  const isBotTurn = !!(m && (solo || nv.online) && (isBot(m) || isBotTeam(m)));
+  const canPick = !!m && !isBotTurn && nv.controls(m.id);
+  const key = o ? o.reveal + ':' + o.mid : '';
+  useEffect(() => { setLeft(secs); }, [key]);
+  useEffect(() => { if (!o) return undefined; const t = setInterval(() => setLeft((l) => (l > 0 ? l - 1 : 0)), ms(1000)); return () => clearInterval(t); }, [key]);
+  // The host's device enforces the countdown: an away or slow player can't hold the game up.
+  useEffect(() => { if (o && nv.isHost && left <= 0) setDraft((p) => (p.phase === 'forcepick' && p.sk.offer && p.sk.offer.reveal === o.reveal ? autoChooseForced(p) : p)); }, [left, key, nv.isHost]);
+  useEffect(() => {
+    if (!o || !isBotTurn || !nv.runsBots) return undefined;
+    const id = botForcedChoice(d); if (!id) return undefined;
+    const t = setTimeout(() => setDraft((p) => (p.phase === 'forcepick' && p.sk.offer && p.sk.offer.reveal === o.reveal ? chooseForced(p, id) : p)), ms(1500));
+    return () => clearTimeout(t);
+  }, [key, isBotTurn, nv.runsBots]);
+  if (!o || !m) return null;
+  return (
+    <div className="app">
+      <div className="topbar dense wraptitle">
+        <button className="iconbtn" onClick={goHome} aria-label="Home">⌂</button>
+        <MuteButton />
+        <TvButton />
+        <div className="title">Forced pick · {d.processed + 1} of {d.processed + d.queue.length}</div>
+        <span className="grow" />
+        <button className="pillbtn" onClick={() => setTeams(true)}>Teams</button>
+      </div>
+      <div className="picker" style={mStyle(m)}>
+        <p className="eyebrow">No more dodging</p>
+        <h2 className="display" style={{ fontSize: 40 }}>{m.emoji} {m.name}</h2>
+        <p className="small" style={{ margin: 0 }}>{o.why === 'endgame' ? 'Endgame: no skips left.' : 'Out of skips.'} {isBotTurn ? '💭 Choosing…' : canPick ? 'Choose the item you’ll be on the hook for.' : 'Waiting for ' + m.name + ' to choose…'}</p>
+      </div>
+      <p className="hint" style={{ textAlign: 'center', margin: 0 }}>It goes up for auction as normal: anyone can outbid {m.name}. If nobody bids, {m.name} takes it for {money(d.rules.minBid)}. <b className="num">{left}s</b> left, then one is picked automatically.</p>
+      <div className="pickgrid">
+        {o.ids.map((id) => { const it = visibleItem(d, id); const r = rarityOf(d, id); return (
+          <button key={id} className="pickbtn" disabled={!canPick} onClick={() => act('forcePick', id)}>
+            {it.hidden ? <span className="thumb" style={{ background: '#2c2659', color: '#c9a6ff', fontSize: 24 }}>?</span> : <Thumb item={it} topic={d.topic} />}
+            <span className="grow" style={{ minWidth: 0 }}><b style={{ display: 'block' }}>{it.name} {it.pos && <span className="pos">{it.pos}</span>} <RarityTag r={r} /></b><span className="small muted">{it.desc}</span></span>
+          </button>
+        ); })}
+      </div>
       {teams && <TeamsSheet d={d} onClose={() => setTeams(false)} />}
     </div>
   );
@@ -2513,7 +2676,7 @@ function PastList({ past, onBack, onOpen, onDelete }) {
    FLASH (sold / skipped / free pick banner)
    ============================================================ */
 function Flash({ f, onDone }) {
-  useEffect(() => { const t = setTimeout(onDone, ms(f.kind === 'skip' ? 1100 : f.mystery || f.rarity === 'legendary' ? 2600 : 1800)); return () => clearTimeout(t); }, [f]);
+  useEffect(() => { const t = setTimeout(onDone, ms(f.kind === 'skip' ? (f.note ? 1700 : 1100) : f.kind === 'dodge' ? 2200 : f.mystery || f.rarity === 'legendary' ? 2600 : 1800)); return () => clearTimeout(t); }, [f]);
   return (
     <div className="flash" onClick={onDone} style={{ '--fc': f.color || 'var(--muted)' }}>
       {f.kind === 'sold' && <div className={'inner' + (f.rarity === 'legendary' ? ' legendary' : '') + (f.big ? ' bigsale' : '')}>
@@ -2531,6 +2694,19 @@ function Flash({ f, onDone }) {
       {f.kind === 'skip' && <div className="inner">
         <div className="big" style={{ color: 'var(--muted)', fontSize: 72 }}>No bids</div>
         <div className="it">{f.item} {f.back ? 'goes to the back of the queue' : 'is skipped'}</div>
+        {f.note && <div className="it" style={{ fontSize: 16, color: 'var(--gold)' }}>{f.note}</div>}
+      </div>}
+      {f.kind === 'dodge' && <div className="inner dodge">
+        <div className="big" style={{ color: 'var(--danger)', fontSize: 60 }}>NO MORE DODGING!</div>
+        <div className="to" style={{ color: f.color }}>{f.emoji} {f.name}</div>
+        <div className="it">{f.endgame ? 'Endgame: no skips left.' : 'Out of skips.'} If nobody bids, this one’s yours for {money(f.price)}.</div>
+      </div>}
+      {f.kind === 'forced' && <div className="inner">
+        <div className="big" style={{ color: 'var(--gold)', fontSize: 60 }}>YOU HAVE TO PICK!</div>
+        <div className="to" style={{ color: f.color }}>{f.emoji} {f.name}</div>
+        <div className="price num">{money(f.price)}</div>
+        {f.mystery && <div className="it" style={{ color: '#c9a6ff', fontWeight: 800 }}>❓ The mystery item was…</div>}
+        <div className="it">takes {f.item}</div>
       </div>}
       {f.kind === 'free' && <div className="inner">
         <div className="big" style={{ color: 'var(--ok)', fontSize: 80 }}>Free pick</div>
@@ -2544,9 +2720,9 @@ function Flash({ f, onDone }) {
 /* ============================================================
    APP
    ============================================================ */
-const DEFAULT_RULES = { budget: 20, minBid: 1, inc: 1, order: 'random', timer: 0, mustFill: true, noBids: 'skip', mustBid: false };
+const DEFAULT_RULES = { budget: 20, minBid: 1, inc: 1, order: 'random', timer: 0, mustFill: true, noBids: 'skip', mustBid: false, skip: JSON.parse(JSON.stringify(SKIP_DEFAULTS)) };
 // What new players get: the classic rules plus every twist at its default.
-const RULE_DEFAULTS = () => ({ ...DEFAULT_RULES, ...JSON.parse(JSON.stringify(TWIST_DEFAULTS)), finale: { ...FINALE_DEFAULTS } });
+const RULE_DEFAULTS = () => ({ ...JSON.parse(JSON.stringify(DEFAULT_RULES)), ...JSON.parse(JSON.stringify(TWIST_DEFAULTS)), finale: { ...FINALE_DEFAULTS } });
 const defaultManagers = () => ['Ash', 'Bilal', 'Cam', 'Dev'].map((name, i) => ({ id: uid(), name, color: COLORS[i], emoji: EMOJIS[i] }));
 const stripDraft = (d) => ({ ...d, history: [] });
 
@@ -3111,6 +3287,7 @@ function App() {
       if (draft.phase === 'auction') view = <Auction d={draft} setDraft={setDraft} goHome={() => go('home')} flashing={!!flash} onFlash={setFlash} />;
       else if (draft.phase === 'freepick') view = <FreePick d={draft} setDraft={setDraft} goHome={() => go('home')} flashing={!!flash} onFlash={setFlash} />;
       else if (draft.phase === 'nominate') view = <Nominate d={draft} setDraft={setDraft} goHome={() => go('home')} />;
+      else if (draft.phase === 'forcepick') view = <ForcedPick d={draft} setDraft={setDraft} goHome={() => go('home')} />;
       else if (draft.phase === 'trade') view = <TradeWindow d={draft} setDraft={setDraft} goHome={() => go('home')} />;
       else view = <Results d={draft} past={past} showShame={settings.showShame} live onChange={setDraft} onBack={() => go('home')} onUndo={draft.mode === 'solo' ? null : () => setDraft((p) => undo(p))} onFinish={() => { setDraft(null); go('home'); }} onPlayAgain={playAgain} />;
       view = <NetCtx.Provider value={localNet}><div className={localTv ? 'tvmode' : ''}><TvSwitch on={!localTv} onThisScreen={() => setLocalTv(true)}>{view}</TvSwitch>{localTv && <TvExit onExit={() => setLocalTv(false)} />}</div></NetCtx.Provider>;
@@ -3183,7 +3360,7 @@ class Boundary extends React.Component {
   }
 }
 
-if (window.__DN_TEST__) window.__DN = { finale: { buildBracket, advanceBracket, nextMatchup, matchVoters, canVoteFor, decideMatchup, simulateMatch, playerRating, teamRating, matchupVoteBot, finaleMode, isFootball, startFinale, castMatchVote, botMatchVotes, playMatchup, resolveMatchup, getMatchup, needsVote, needsMatch, votingDone, finaleStandings, finaleRecord, championStory, goldenBoot, matchVoteProblem, roundName, FINALE_DEFAULTS, validRating, matchScript, revealedEvents, matchFrame, lineupOf, expectedGoals, strength2, squad }, audio, AUDIO_DEFAULTS, share: { encodeTopic, decodeShared, packTopic, unpackTopic, topicCode, shareLink, MAX_LINK }, stats: { careerStats, computeAwards, computeShame, hallOfShame, humanPlayers }, bots: { makeBots, nextBotAction, botDecision, botFreePickChoice, botVote, teamScore, voteChoices, itemFame, seeded, BOT_LEVELS, BOT_TYPES, botCardPlay, botVeto, botNominate, botTradeDecision, botTradeOffer }, twists: { twistRules, TWIST_DEFAULTS, playCard, answerCard, cardProblem, doubleProblem, nominate, currentNominator, nominationPool, botActors, botAdvisers, participants, visibleItem, isHidden, rarityOf, frozenNow, proposeTrade, acceptTrade, rejectTrade, cancelTrade, closeTrades, tradeProblem, openTrades, hasCard }, auction: { withdraw, isOut, auctionEnd, owesBid, withdrawProblem, outIds, owing, botPassers, botForcedBid, runAction, ownerInfo, migrateSettings, rulesLines }, topicsLib: { POPULARITY, popScore, byPopularity, folderOrder, favouritesOrder, prefsOf, isBuiltIn, folderOf, folderList, matchTopic, toggleIn }, DEFAULT_SOLO, isFlex, canBid, createDraft, placeBid, sell, skipItem, undo, freePick, currentPicker, canTake, nextAmount, isDraftOver, draftStats, winsBoard, tally, starterTopics, migrateTopics, validateBackup, makeBackup, wikiTitleFor, PHOTO_TOPICS, store, wiki, DEFAULT_RULES, COLORS, emptyCount, assignSlot, maxBid };
+if (window.__DN_TEST__) window.__DN = { finale: { buildBracket, advanceBracket, nextMatchup, matchVoters, canVoteFor, decideMatchup, simulateMatch, playerRating, teamRating, matchupVoteBot, finaleMode, isFootball, startFinale, castMatchVote, botMatchVotes, playMatchup, resolveMatchup, getMatchup, needsVote, needsMatch, votingDone, finaleStandings, finaleRecord, championStory, goldenBoot, matchVoteProblem, roundName, FINALE_DEFAULTS, validRating, matchScript, revealedEvents, matchFrame, lineupOf, expectedGoals, strength2, squad }, audio, AUDIO_DEFAULTS, share: { encodeTopic, decodeShared, packTopic, unpackTopic, topicCode, shareLink, MAX_LINK }, stats: { careerStats, computeAwards, computeShame, hallOfShame, humanPlayers }, bots: { makeBots, nextBotAction, botDecision, botFreePickChoice, botVote, teamScore, voteChoices, itemFame, seeded, BOT_LEVELS, BOT_TYPES, botCardPlay, botVeto, botNominate, botTradeDecision, botTradeOffer }, twists: { twistRules, TWIST_DEFAULTS, playCard, answerCard, cardProblem, doubleProblem, nominate, currentNominator, nominationPool, botActors, botAdvisers, participants, visibleItem, isHidden, rarityOf, frozenNow, proposeTrade, acceptTrade, rejectTrade, cancelTrade, closeTrades, tradeProblem, openTrades, hasCard }, auction: { withdraw, isOut, auctionEnd, owesBid, withdrawProblem, outIds, owing, botPassers, botForcedBid, runAction, ownerInfo, migrateSettings, rulesLines }, skips: { SKIP_DEFAULTS, skipCfg, skipRulesOn, presenter, skipVerdict, eligibleFor, endgameNow, endgameSoon, chooseForced, autoChooseForced, presenterLine, botSkipSave, botForcedChoice, unsoldOutcome, skipChip }, topicsLib: { POPULARITY, popScore, byPopularity, folderOrder, favouritesOrder, prefsOf, isBuiltIn, folderOf, folderList, matchTopic, toggleIn }, DEFAULT_SOLO, isFlex, canBid, createDraft, placeBid, sell, skipItem, undo, freePick, currentPicker, canTake, nextAmount, isDraftOver, draftStats, winsBoard, tally, starterTopics, migrateTopics, validateBackup, makeBackup, wikiTitleFor, PHOTO_TOPICS, store, wiki, DEFAULT_RULES, COLORS, emptyCount, assignSlot, maxBid };
 store.init().finally(() => {
   ReactDOM.createRoot(document.getElementById('root')).render(<Boundary><App /></Boundary>);
 });

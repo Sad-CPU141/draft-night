@@ -230,12 +230,13 @@ function currentNominator(d) {
   return null;
 }
 // Items that can be nominated: still in the pool and buyable by someone.
-const nominationPool = (d) => d.queue.filter((id) => d.managers.some((m) => !isFull(m) && assignSlot(m, d.items[id], d.rules.slots) >= 0));
+const nominationPool = (d) => { const cur = currentNominator(d); return d.queue.filter((id) => d.managers.some((m) => !isFull(m) && assignSlot(m, d.items[id], d.rules.slots) >= 0) && (!cur || nominationAllowed(d, cur.m.id, id))); };
 function nominate(d, itemId) {
   if (d.phase !== 'nominate') return d;
   const cur = currentNominator(d);
-  if (!cur || !d.queue.includes(itemId)) return d;
-  return { ...d, queue: [itemId, ...d.queue.filter((x) => x !== itemId)], nominated: itemId, nom: { idx: (cur.idx + 1) % d.managers.length, by: cur.m.id }, phase: 'auction', reveal: d.reveal + 1 };
+  if (!cur || !d.queue.includes(itemId) || !nominationAllowed(d, cur.m.id, itemId)) return d;
+  const n = { ...d, queue: [itemId, ...d.queue.filter((x) => x !== itemId)], nominated: itemId, nom: { idx: (cur.idx + 1) % d.managers.length, by: cur.m.id }, phase: 'auction', reveal: d.reveal + 1, bid: null, bids: [] };
+  return assignPresenter(n, cur.m.id); // the nominator is on the clock for what they nominated
 }
 
 /* ---------- trades ---------- */

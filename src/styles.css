@@ -541,3 +541,14 @@ html[data-motion="reduce"] *,html[data-motion="reduce"] *::before,html[data-moti
 .tmark:focus-visible{outline:3px solid var(--gold)}
 .tfolder{display:block;margin:4px 0 0 4px}
 .yours{display:inline-block;margin-left:8px;font-family:var(--body);font-size:11px;font-weight:800;letter-spacing:.06em;text-transform:uppercase;padding:2px 7px;border-radius:99px;background:#2fd17c;color:#0f2a1b;vertical-align:middle}
+
+/* Skip rules */
+.skipline{display:flex;flex-direction:column;gap:2px;padding:8px 12px;border-radius:14px;border:2px solid var(--line);background:var(--panel);font-size:14px;font-weight:700;text-align:center}
+.skipline.hook{border-color:var(--danger);background:color-mix(in srgb,var(--danger) 18%,var(--panel));animation:hookpulse 1.6s ease-in-out 2}
+@keyframes hookpulse{50%{box-shadow:0 0 0 4px color-mix(in srgb,var(--danger) 35%,transparent)}}
+[data-motion=reduce] .skipline.hook{animation:none}
+@media (prefers-reduced-motion:reduce){[data-motion=system] .skipline.hook{animation:none}}
+.skipchip{display:inline-block;align-self:flex-start;margin-top:3px;padding:1px 7px;border-radius:999px;font-size:11px;font-weight:800;letter-spacing:.03em;background:rgba(0,0,0,.28);color:inherit}
+.skipchip.warn{background:color-mix(in srgb,var(--gold) 30%,rgba(0,0,0,.3));color:#fff}
+.skipchip.hot{background:var(--danger);color:#fff}
+.flash .inner.dodge .big{line-height:1}

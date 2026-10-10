@@ -136,6 +136,7 @@ const NET_ACTIONS = {
   withdraw: (d, [mid], who) => (owns(who, mid) ? withdraw(d, mid) : d),
   card: (d, [by, card, params], who) => (d.phase === 'auction' && owns(who, by) && CARD_INFO[card] ? playCard(d, by, card, params || {}) : d),
   veto: (d, [yes, pid], who) => (d.pending && d.pending.id === pid && owns(who, d.pending.target) ? answerCard(d, !!yes) : d),
+  forcePick: (d, [id], who) => (d.phase === 'forcepick' && d.sk && d.sk.offer && owns(who, d.sk.offer.mid) ? chooseForced(d, id) : d),
   nominate: (d, [id], who) => { const c = d.phase === 'nominate' && currentNominator(d); return c && owns(who, c.m.id) ? nominate(d, id) : d; },
   freePick: (d, [id], who) => { const c = d.phase === 'freepick' && currentPicker(d); return c && owns(who, c.m.id) && d.leftover.includes(id) && canTake(d, c.m, id) ? freePick(d, id) : d; },
   propose: (d, [t], who) => (d.phase === 'trade' && t && owns(who, t.from) ? proposeTrade(d, t, Date.now()) : d),

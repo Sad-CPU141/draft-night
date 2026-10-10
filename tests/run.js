@@ -49,6 +49,8 @@ async function click(w, el) { if (!el) throw new Error('missing element'); el.di
 async function tap(w, el) { el.dispatchEvent(new w.MouseEvent('pointerdown', { bubbles: true })); el.dispatchEvent(new w.MouseEvent('pointerup', { bubbles: true })); await sleep(30); }
 
 (async () => {
+  // ONLY=skips|topics runs just that section (handy while working on it).
+  if (process.env.ONLY) { await require('./' + process.env.ONLY + '.js')({ ok, boot, btn, click, sleep }); console.log(failures ? '\n' + failures + ' FAILED' : '\nAll tests passed'); process.exit(failures ? 1 : 0); }
   console.log('Game rules');
   {
     const { DN } = await boot();
@@ -984,6 +986,7 @@ async function tap(w, el) { el.dispatchEvent(new w.MouseEvent('pointerdown', { b
   }
 
   await require('./topics.js')({ ok, boot, btn, click, sleep });
+  await require('./skips.js')({ ok, boot, btn, click, sleep });
 
   if (!process.env.SKIP_ONLINE) await require('./online.js')({ ok, boot, btn, click, sleep });
 

@@ -216,6 +216,7 @@ module.exports = async function onlineTests({ ok, boot, btn, click, sleep }) {
       if (s.phase === 'auction' && Math.random() < 0.15 && fbtn(p, 'Bid ')) { await click(p.w, fbtn(p, 'Bid ')); continue; }
       if (s.phase === 'nominate' && /Pick the next item/.test(t)) { const b = [...p.d.querySelectorAll('.pickbtn')].find((x) => !x.disabled); if (b) { await click(p.w, b); if (fbtn(p, 'Nominate')) await click(p.w, [...p.d.querySelectorAll('.modal button')].find((x) => /Nominate/.test(x.textContent))); } continue; }
       if (s.phase === 'freepick') { const b = [...p.d.querySelectorAll('.pickbtn')].find((x) => !x.disabled); if (b) await click(p.w, b); continue; }
+      if (s.phase === 'forcepick') { const b = [...p.d.querySelectorAll('.pickbtn')].find((x) => !x.disabled); if (b) await click(p.w, b); continue; }
       if (s.phase === 'trade') {
         if (!traded && p === A && fbtn(A, 'Bob')) {
           await click(A.w, [...A.d.querySelectorAll('.pickchip')].find((x) => /Bob/.test(x.textContent)));
@@ -236,6 +237,8 @@ module.exports = async function onlineTests({ ok, boot, btn, click, sleep }) {
   }
   const fin = state(code);
   ok(fin.phase === 'done' && fin.votesRevealed, 'the online game runs to the end: auction, free picks, trades and the vote');
+  const skUsed = Object.values((fin.sk && fin.sk.used) || {}); const forcedN = fin.managers.reduce((n, m) => n + m.team.filter((t) => t && t.forced).length, 0);
+  ok(fin.rules.skip && fin.rules.skip.on && fin.sk && skUsed.every((n) => n <= fin.rules.skip.max), 'skip rules ran on the host’s copy online (' + skUsed.reduce((a, b) => a + b, 0) + ' skips used, ' + forcedN + ' forced picks, nobody over the limit)');
   ok(!!fin.trade && fin.trade.proposals.some((t) => t.status === 'accepted' && t.from === aliceId && t.to === bobId), 'Alice offered Bob a trade from her phone and Bob accepted on his');
   const ppl = fin.managers; const votes = fin.votes || {};
   ok(Object.keys(votes).length === ppl.length && Object.entries(votes).every(([pid, t]) => pid !== t), 'everyone voted (the bot at the reveal), nobody for themselves');

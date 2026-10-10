@@ -178,7 +178,7 @@ function botPassers(d) {
   botActors(d).forEach((a) => { (byTeam[a.id] = byTeam[a.id] || []).push(a); });
   return Object.keys(byTeam).filter((id) => {
     const m = d.managers.find((x) => x.id === id);
-    if (!m || isOut(d, id) || (d.bid && d.bid.leaderId === id) || !canBid(d, m, nextAmount(d)) || owesBid(d, m)) return false;
+    if (!m || isOut(d, id) || (d.bid && d.bid.leaderId === id) || !canBid(d, m, nextAmount(d)) || owesBid(d, m) || skipWithdrawProblem(d, id)) return false;
     return byTeam[id].every((a) => !botDecision(d, a, { noMiss: true }));
   });
 }
