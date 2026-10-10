@@ -205,13 +205,16 @@ function MatchSummary({ d, A, B, match }) {
 }
 
 /* ---------- voting on one matchup ---------- */
-function MatchVote({ d, r, i, onChange, onCount }) {
+function MatchVote({ d, r, i, onChange, onCount, nv, act }) {
   const m = getMatchup(d, r, i);
   const A = teamOf(d, m.a), B = teamOf(d, m.b);
-  const solo = d.mode === 'solo';
+  const online = !!(nv && nv.online);
+  const solo = d.mode === 'solo' || online; // one phone per player: you vote for yourself only
   const voters = matchVoters(d, m);
   const humans = voters.filter((p) => !p.bot);
-  const [voter, setVoter] = useState(solo && humans[0] && !hasMatchVote(m, humans[0].id) ? humans[0].id : null);
+  const mine = online ? humans.filter((p) => nv.controlsPart(p.id)) : humans;
+  const firstOpen = mine.find((p) => !hasMatchVote(m, p.id));
+  const [voter, setVoter] = useState(solo && firstOpen ? firstOpen.id : null);
   const [choice, setChoice] = useState(null);
   const [locked, setLocked] = useState(false);
   const nVoted = voters.filter((p) => hasMatchVote(m, p.id)).length;
@@ -220,8 +223,9 @@ function MatchVote({ d, r, i, onChange, onCount }) {
   if (locked) return (
     <div className="card stack-sm" style={{ textAlign: 'center' }}>
       <h2 className="display" style={{ fontSize: 34 }}>Vote locked 🔒</h2>
-      {solo ? <p className="muted" style={{ margin: 0 }}>🤖 The bots have voted too.</p> : <p className="muted" style={{ margin: 0 }}>Pass the phone to the next voter.</p>}
-      <button className="btn btn-gold" onClick={() => { setLocked(false); setVoter(null); setChoice(null); if (solo) onCount(); }}>{solo ? 'Count the votes' : 'Next voter'}</button>
+      {online ? <p className="muted" style={{ margin: 0 }}>Waiting for everyone else to vote…</p> : solo ? <p className="muted" style={{ margin: 0 }}>🤖 The bots have voted too.</p> : <p className="muted" style={{ margin: 0 }}>Pass the phone to the next voter.</p>}
+      {online ? <button className="btn" onClick={() => { setLocked(false); setVoter(null); setChoice(null); }}>OK</button>
+        : <button className="btn btn-gold" onClick={() => { setLocked(false); setVoter(null); setChoice(null); if (solo) onCount(); }}>{solo ? 'Count the votes' : 'Next voter'}</button>}
     </div>
   );
   if (voter) {
@@ -242,7 +246,7 @@ function MatchVote({ d, r, i, onChange, onCount }) {
         })}
         <div className="row">
           {!solo && <button type="button" className="btn btn-ghost grow" onClick={() => { setVoter(null); setChoice(null); }}>Back</button>}
-          <button type="button" className="btn btn-gold grow" disabled={!choice} onClick={() => { buzz(30); onChange(castMatchVote(d, r, i, voter, choice)); setLocked(true); }}>{choice ? 'Lock in ' + teamOf(d, choice).name : 'Pick a team'}</button>
+          <button type="button" className="btn btn-gold grow" disabled={!choice} onClick={() => { buzz(30); if (online) act('matchVote', r, i, voter, choice); else onChange(castMatchVote(d, r, i, voter, choice)); setLocked(true); }}>{choice ? 'Lock in ' + teamOf(d, choice).name : 'Pick a team'}</button>
         </div>
       </div>
     );
@@ -254,14 +258,16 @@ function MatchVote({ d, r, i, onChange, onCount }) {
       <p className="hint">{neutral ? 'Players who aren’t in this matchup vote. ' : 'Everyone is on one of these teams, so everyone votes — never for their own team. '}{m.revoted ? 'This is the revote after a tie.' : 'Votes stay secret until they’re counted.'}</p>
       {m.note && <p className="warn">{m.note}</p>}
       {!humans.length && <p className="hint">Only bots vote on this one. They’ve voted.</p>}
+      {online && !mine.length && humans.length > 0 && <p className="hint">You’re not voting on this one (it’s your team, or you’re watching).</p>}
       {humans.length > 0 && <div className="votegrid">
         {humans.map((p) => { const done = hasMatchVote(m, p.id); return (
-          <button key={p.id} className="votebtn" style={mStyle(p)} disabled={done} onClick={() => setVoter(p.id)}>
+          <button key={p.id} className="votebtn" style={mStyle(p)} disabled={done || (online && !nv.controlsPart(p.id))} onClick={() => setVoter(p.id)}>
             <span style={{ fontSize: 24 }}>{done ? '✅' : p.emoji}</span>{p.name}{p.teamName ? <small>{p.teamName}</small> : null}
           </button>
         ); })}
       </div>}
-      <button className="btn btn-gold" disabled={!allIn && !nVoted} onClick={onCount}>{allIn ? 'Count the votes' : 'Count now (' + nVoted + '/' + voters.length + ')'}</button>
+      {(!nv || nv.isHost) ? <button className="btn btn-gold" disabled={!allIn && !nVoted} onClick={onCount}>{allIn ? 'Count the votes' : 'Count now (' + nVoted + '/' + voters.length + ')'}</button>
+        : <p className="hint" style={{ textAlign: 'center' }}>The host counts the votes{allIn ? ' — everyone’s in.' : '.'}</p>}
     </div>
   );
 }
@@ -269,38 +275,45 @@ function MatchVote({ d, r, i, onChange, onCount }) {
 /* ---------- the finale, matchup by matchup ---------- */
 function Finale({ d, onChange, onClose, onChampion }) {
   const fin = d.finale; const cfg = finCfg(d); const mode = fin.mode;
+  const nv = netView(d, useNet()); const act = useAct(d, onChange);
+  const host = nv.isHost;
   const nx = nextMatchup(fin.bracket);
-  const [stage, setStage] = useState('overview');
-  const [cur, setCur] = useState(null); // { r, i } of the matchup being played
+  // Which moment we're at is part of the saved game, so online every phone (and the TV) follows the host.
+  const ui = fin.ui || { stage: 'overview', cur: null };
+  const stage = ui.stage === 'done' ? 'overview' : ui.stage; const cur = ui.cur;
+  const withUi = (n, patch) => ({ ...n, finale: { ...n.finale, ui: { ...ui, ...patch } } });
   const [matchOver, setMatchOver] = useState(false);
   const [view, setView] = useState(null); // decided matchup to look at
   const R = fin.bracket.rounds.length;
   const modeName = { bracket: 'Head-to-head bracket', sim: 'Match simulator', combined: 'Combined finale' }[mode];
   const begin = () => {
-    const at = { r: nx.r, i: nx.i }; setCur(at); setMatchOver(false);
-    if (needsVote(mode)) { onChange(botMatchVotes(d, at.r, at.i)); setStage('vote'); }
-    else { onChange(playMatchup(d, at.r, at.i)); setStage('match'); }
+    const at = { r: nx.r, i: nx.i }; setMatchOver(false);
+    if (needsVote(mode)) onChange(withUi(botMatchVotes(d, at.r, at.i), { stage: 'vote', cur: at }));
+    else onChange(withUi(playMatchup(d, at.r, at.i), { stage: 'match', cur: at }));
   };
   const finish = () => {
     let n = resolveMatchup(d, cur.r, cur.i);
     const m = getMatchup(n, cur.r, cur.i);
-    if (!m.winner && m.revoted) { n = botMatchVotes(n, cur.r, cur.i); onChange(n); setStage('vote'); return; }
-    onChange(n); setStage('result');
-    if (m.winner) audio.play(n.finale.champion ? 'fanfare' : 'gavel');
+    if (!m.winner && m.revoted) { n = botMatchVotes(n, cur.r, cur.i); onChange(withUi(n, { stage: 'vote' })); return; }
+    onChange(withUi(n, { stage: 'result' }));
   };
-  const counted = () => { if (needsMatch(mode)) { setMatchOver(false); onChange(playMatchup(d, cur.r, cur.i)); setStage('match'); } else finish(); };
+  const counted = () => { if (needsMatch(mode)) { setMatchOver(false); onChange(withUi(playMatchup(d, cur.r, cur.i), { stage: 'match' })); } else finish(); };
+  // Result sounds on every phone when a matchup is decided.
+  const decided = cur && stage === 'result' ? cur.r + ':' + cur.i : '';
+  useEffect(() => { if (decided) audio.play(d.finale.champion ? 'fanfare' : 'gavel'); }, [decided]);
+  const waiting = <p className="hint" style={{ textAlign: 'center' }}>Waiting for the host…</p>;
   const cm = cur && getMatchup(d, cur.r, cur.i);
   const A = cm && cm.a && teamOf(d, cm.a), B = cm && cm.b && teamOf(d, cm.b);
   let body;
-  if (stage === 'vote' && cm && !cm.winner) body = <MatchVote key={cm.id + (cm.revoted ? 'r' : '')} d={d} r={cur.r} i={cur.i} onChange={onChange} onCount={counted} />;
+  if (stage === 'vote' && cm && !cm.winner) body = <MatchVote key={cm.id + (cm.revoted ? 'r' : '')} d={d} r={cur.r} i={cur.i} onChange={onChange} onCount={counted} nv={nv} act={act} />;
   else if (stage === 'match' && cm && cm.match) body = (
     <>
       <p className="eyebrow" style={{ textAlign: 'center' }}>{roundName(R, cur.r)}{cur.r === R - 1 ? ' · the big one' : ''}</p>
       <MatchPlayer key={cm.id} d={d} A={A} B={B} match={cm.match} speed={cfg.speed} commentary={cfg.commentary} label={cm.id} onDone={() => setMatchOver(true)} />
-      {matchOver && <button className="btn btn-gold" onClick={finish}>{mode === 'combined' ? 'Combine with the votes' : 'Continue'}</button>}
+      {matchOver && (host ? <button className="btn btn-gold" onClick={finish}>{mode === 'combined' ? 'Combine with the votes' : 'Continue'}</button> : waiting)}
     </>
   );
-  else if (stage === 'result' && cm && cm.winner) body = <MatchupResult d={d} m={cm} r={cur.r} final={cur.r === R - 1} onNext={() => { if (d.finale.champion) onChampion(); else { setStage('overview'); setCur(null); } }} />;
+  else if (stage === 'result' && cm && cm.winner) body = <MatchupResult d={d} m={cm} r={cur.r} final={cur.r === R - 1} host={host} onNext={() => { if (d.finale.champion) onChampion(); else onChange(withUi(d, { stage: 'overview', cur: null })); }} />;
   else body = (
     <>
       <div className="card stack-sm">
@@ -310,10 +323,10 @@ function Finale({ d, onChange, onClose, onChampion }) {
           <div className="vsrow">
             {[nx.m.a, nx.m.b].map((id, k) => { const t = teamOf(d, id); return <React.Fragment key={id}>{k === 1 && <span className="vs">VS</span>}<div className="vsteam"><Badge m={t} size={52} /><b>{t.name}</b>{isFootball(d.topic) && <span className="small num">Rating {teamRating(d, t).rating}{teamRating(d, t).provisional ? ' (prov.)' : ''}</span>}</div></React.Fragment>; })}
           </div>
-          <button className="btn btn-gold" onClick={begin}>{needsVote(mode) ? (mode === 'combined' ? 'Vote, then kick off' : 'Vote on this matchup') : 'Kick off'}</button>
+          {host ? <button className="btn btn-gold" onClick={begin}>{needsVote(mode) ? (mode === 'combined' ? 'Vote, then kick off' : 'Vote on this matchup') : 'Kick off'}</button> : waiting}
         </> : fin.champion ? <>
           <h2 className="display" style={{ fontSize: 30 }}>We have a champion</h2>
-          <button className="btn btn-gold" onClick={onChampion}>🏆 Reveal the champion</button>
+          {host ? <button className="btn btn-gold" onClick={onChampion}>🏆 Reveal the champion</button> : waiting}
         </> : <>
           <h2 className="display" style={{ fontSize: 28 }}>No matchups to play</h2>
           <p className="hint" style={{ margin: 0 }}>No team has any players, so there’s nobody to crown.</p>
@@ -334,7 +347,7 @@ function Finale({ d, onChange, onClose, onChampion }) {
   );
 }
 
-function MatchupResult({ d, m, r, final, onNext }) {
+function MatchupResult({ d, m, r, final, onNext, host = true }) {
   const W = teamOf(d, m.winner); const L = teamOf(d, m.winner === m.a ? m.b : m.a);
   const A = teamOf(d, m.a), B = teamOf(d, m.b);
   const va = Object.values(m.votes || {}).filter((v) => v === m.a).length, vb = Object.values(m.votes || {}).filter((v) => v === m.b).length;
@@ -367,7 +380,7 @@ function MatchupResult({ d, m, r, final, onNext }) {
       )}
       {m.match && <MatchSummary d={d} A={A} B={B} match={m.match} />}
       <p className="hint">{L.name} {final ? 'finish as runners-up.' : 'are knocked out.'}</p>
-      <button className="btn btn-gold" onClick={onNext}>{d.finale.champion ? '🏆 Reveal the champion' : 'Back to the bracket'}</button>
+      {host ? <button className="btn btn-gold" onClick={onNext}>{d.finale.champion ? '🏆 Reveal the champion' : 'Back to the bracket'}</button> : <p className="hint" style={{ textAlign: 'center' }}>Waiting for the host…</p>}
     </div>
   );
 }

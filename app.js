@@ -1,4 +1,4 @@
-/* Draft Night e2b33c1069 — built from src/ by build.js. Edit src/, not this file. */
+/* Draft Night e1729e2c39 — built from src/ by build.js. Edit src/, not this file. */
 "use strict";
 (function(){
 function _extends() { return _extends = Object.assign ? Object.assign.bind() : function (n) { for (var e = 1; e < arguments.length; e++) { var t = arguments[e]; for (var r in t) ({}).hasOwnProperty.call(t, r) && (n[r] = t[r]); } return n; }, _extends.apply(null, arguments); }
@@ -3776,8 +3776,9 @@ const audio = (() => {
       return null;
     }
   }
+  let quiet = false;
   function say(text, priority, key) {
-    if (cfg.muted || !cfg.voice || !hasSpeech() || !text) return false;
+    if (quiet || cfg.muted || !cfg.voice || !hasSpeech() || !text) return false;
     if (key) {
       if (said.has(key)) return false;
       said.add(key);
@@ -3828,6 +3829,12 @@ const audio = (() => {
     play,
     say,
     hasSpeech,
+    setQuiet(v) {
+      quiet = !!v;
+    },
+    get quiet() {
+      return quiet;
+    },
     voices() {
       try {
         return hasSpeech() ? window.speechSynthesis.getVoices().filter(v => /^en/i.test(v.lang)) : [];
@@ -5532,6 +5539,9 @@ function createDraft(topic, managers, rules, extra) {
       ...(m.human ? {
         human: true
       } : {}),
+      ...(m.uid ? {
+        uid: m.uid
+      } : {}),
       ...(m.members ? {
         members: m.members.map(p => ({
           ...p
@@ -6122,6 +6132,7 @@ function Home({
   past,
   onNew,
   onSolo,
+  onOnline,
   onResume,
   onTopics,
   onPast,
@@ -6132,7 +6143,6 @@ function Home({
   onDismissInstall
 }) {
   const [ask, setAsk] = useState(null);
-  const [soon, setSoon] = useState(false);
   const status = draft && (draft.phase === 'auction' ? 'Item ' + (draft.processed + 1) + ' of ' + (draft.processed + draft.queue.length) : draft.phase === 'nominate' ? 'Nominating' : draft.phase === 'trade' ? 'Trade window' : draft.phase === 'freepick' ? 'Free picks' : 'Results & voting');
   return React.createElement("div", {
     className: "app"
@@ -6205,18 +6215,14 @@ function Home({
     className: "ms"
   }, "Pass the phone")), React.createElement("button", {
     className: "mode online",
-    "aria-disabled": "true",
-    onClick: () => setSoon(true)
+    onClick: onOnline
   }, React.createElement("span", {
     className: "mi"
   }, "\uD83C\uDF10"), React.createElement("span", {
     className: "mt"
   }, "Online"), React.createElement("span", {
     className: "ms"
-  }, "Coming soon"))), soon && React.createElement("p", {
-    className: "hint soon",
-    role: "status"
-  }, "Online rooms, where everyone bids from their own phone, are coming in a later update. For now, play Solo or Local."), React.createElement("div", {
+  }, "Own phones \xB7 TV"))), React.createElement("div", {
     className: "menu"
   }, React.createElement("button", {
     className: "btn",
@@ -8296,7 +8302,7 @@ function ManagerButton({
     className: "badge"
   }, "\u2605 Leading", enabled ? ' · tap +' + money(d.rules.inc) : '') : thinking ? React.createElement("span", {
     className: "badge think"
-  }, "Thinking\u2026") : readOnly ? blocker || (botInfo ? botInfo.short : 'Watching') : blocker || 'Tap: ' + money(amt);
+  }, "Thinking\u2026") : readOnly ? blocker || (m.cover ? '📡 Away · bot covering' : botInfo ? botInfo.short : (m.uid || m.members) && d.mode === 'online' ? '📱 On their phone' : 'Watching') : blocker || 'Tap: ' + money(amt);
   const dim = readOnly ? !!blocker && !isLead : !isLead && !enabled && !customOk;
   const handlers = readOnly ? {} : {
     onPointerDown: down,
@@ -8349,7 +8355,7 @@ function useBotTalk(d) {
   const last = useRef(0);
   const per = useRef({});
   const timers = useRef([]);
-  const enabled = d.mode === 'solo' && !(d.solo && d.solo.talk === false);
+  const enabled = (d.mode === 'solo' || d.mode === 'online') && !(d.solo && d.solo.talk === false);
   useEffect(() => () => timers.current.forEach(clearTimeout), []);
   const say = (who, event, extra, force) => {
     if (!enabled) return;
@@ -8769,7 +8775,7 @@ function VetoSheet({
     className: "summary"
   }, cardPlayText(d, play)), React.createElement("p", {
     className: "hint"
-  }, "You have a Veto card. Use it to block this? ", d.mode !== 'solo' ? 'Pass the phone to ' + them.name + '.' : ''), React.createElement("div", {
+  }, "You have a Veto card. Use it to block this? ", d.mode === 'local' ? 'Pass the phone to ' + them.name + '.' : ''), React.createElement("div", {
     className: "row pin"
   }, React.createElement("button", {
     className: "btn grow",
@@ -8789,20 +8795,40 @@ function Auction({
 }) {
   const item = currentItem(d);
   const solo = d.mode === 'solo';
-  const [paused, setPaused] = useState(false);
-  const [gavel, setGavel] = useState(false);
+  const net = useNet();
+  const nv = netView(d, net);
+  const online = nv.online;
+  const auto = solo || online;
+  const act = useAct(d, setDraft);
+  const [pausedLocal, setPaused] = useState(false);
+  const [gavelLocal, setGavel] = useState(false);
   const [custom, setCustom] = useState(null);
   const [teams, setTeams] = useState(false);
-  const [thinking, setThinking] = useState(null);
+  const [thinkingLocal, setThinking] = useState(null);
+  const paused = nv.isHost ? pausedLocal : !!nv.live.paused;
+  const gavel = nv.isHost ? gavelLocal : !!nv.live.gavel;
+  const thinking = nv.isHost ? thinkingLocal : nv.live.thinking || null;
   const [out, setOut] = useState(false);
   const [cardsOpen, setCardsOpen] = useState(false);
   const cardTried = useRef(new Set());
   const hold = paused || !!d.pending;
   const busy = useRef(false);
-  const timer = solo ? d.solo && d.solo.clock || 8 : d.rules.timer || 0;
-  const [left, setLeft] = useState(timer);
+  const timer = solo ? d.solo && d.solo.clock || 8 : online ? d.online && d.online.clock || ONLINE.clock : d.rules.timer || 0;
+  const [leftLocal, setLeft] = useState(timer);
   const bidKey = bidKeyOf(d);
+  const left = nv.isHost ? leftLocal : nv.live.key === bidKey && typeof nv.live.left === 'number' ? nv.live.left : timer;
   const talk = useBotTalk(d);
+  const bubbles = nv.isHost ? talk.bubbles : nv.live.bubbles || {};
+  useEffect(() => {
+    if (online && nv.isHost && net.publishLive) net.publishLive({
+      left: leftLocal,
+      key: bidKey,
+      paused: pausedLocal,
+      gavel: gavelLocal,
+      thinking: thinkingLocal,
+      bubbles: talk.bubbles
+    });
+  }, [online, nv.isHost, leftLocal, bidKey, pausedLocal, gavelLocal, thinkingLocal, talk.bubbles]);
   const live = useRef({});
   live.current = {
     d,
@@ -8819,7 +8845,7 @@ function Auction({
   }, [d.reveal]);
   const leader = d.bid && d.managers.find(m => m.id === d.bid.leaderId);
   const total = d.processed + d.queue.length;
-  const you = solo ? d.managers.find(m => m.human) : null;
+  const you = solo ? d.managers.find(m => m.human) : online ? d.managers.find(m => nv.controls(m.id)) : null;
   function sold() {
     if (!d.bid || busy.current || flashing) return;
     busy.current = true;
@@ -8865,7 +8891,7 @@ function Auction({
       onFlash(info);
       setDraft(p => sell(p));
       busy.current = false;
-      if (solo) talk.later(ms(1900), () => {
+      if (nv.runsBots) talk.later(ms(1900), () => {
         const fair = d.rules.budget / d.rules.slots.length;
         if (isBot(leader)) talk.say(winnerId, price <= d.rules.minBid + d.rules.inc && itemFame(item) > 0.45 ? 'steal' : 'win');else if (price >= fair * 1.4) {
           const b = d.managers.find(m => isBot(m));
@@ -8889,17 +8915,17 @@ function Auction({
     setDraft(p => skipItem(p));
   }
   useEffect(() => {
-    if (!timer || hold || flashing || gavel) return undefined;
+    if (!nv.isHost || !timer || hold || flashing || gavel) return undefined;
     const t = setInterval(() => setLeft(l => l > 0 ? l - 1 : 0), ms(1000));
     return () => clearInterval(t);
-  }, [bidKey, hold, flashing, gavel, timer]);
+  }, [bidKey, hold, flashing, gavel, timer, nv.isHost]);
   useEffect(() => {
-    if (!timer || hold || flashing || gavel || left > 0) return;
-    if (d.bid) sold();else if (solo) skip();
-  }, [left, hold, flashing, gavel, timer]);
+    if (!nv.isHost || !timer || hold || flashing || gavel || left > 0) return;
+    if (d.bid) sold();else if (auto) skip();
+  }, [left, hold, flashing, gavel, timer, nv.isHost]);
   const cardKey = bidKey + ':' + JSON.stringify(d.cards || {}) + ':' + (d.cardLog || []).length;
   useEffect(() => {
-    if (!solo || hold || flashing || gavel || busy.current || d.phase !== 'auction') {
+    if (!nv.runsBots || hold || flashing || gavel || busy.current || d.phase !== 'auction') {
       setThinking(null);
       return undefined;
     }
@@ -8938,16 +8964,16 @@ function Auction({
       talk.say(speaker, plan.event);
     }, ms(plan.delay));
     return () => clearTimeout(t);
-  }, [cardKey, hold, flashing, gavel, solo]);
+  }, [cardKey, hold, flashing, gavel, nv.runsBots]);
   useEffect(() => {
     if (!d.pending) return undefined;
     const victim = teamOf(d, d.pending.target);
-    const botVictim = d.mode === 'solo' && victim && (isBot(victim) || isBotTeam(victim));
+    const botVictim = nv.runsBots && victim && (isBot(victim) || isBotTeam(victim));
     if (!botVictim) return undefined;
     const id = d.pending.id;
     const t = setTimeout(() => setDraft(p => p.pending && p.pending.id === id ? answerCard(p, botVeto(p, teamOf(p, p.pending.target), p.pending)) : p), ms(1200));
     return () => clearTimeout(t);
-  }, [d.pending && d.pending.id]);
+  }, [d.pending && d.pending.id, nv.runsBots]);
   const logLen = (d.cardLog || []).length;
   const seenLog = useRef(logLen);
   useEffect(() => {
@@ -8969,7 +8995,7 @@ function Auction({
     seenLog.current = logLen;
   }, [logLen]);
   useEffect(() => {
-    if (!solo || flashing || d.bid || !item) return;
+    if (!nv.runsBots || flashing || d.bid || !item) return;
     const advisers = botAdvisers(d);
     if (!advisers.length) return;
     const a = advisers[d.reveal % advisers.length];
@@ -9027,7 +9053,7 @@ function Auction({
     if (left === 1) audio.say(callLine('twice'), 2, d.id + ':twice:' + bidKey);
   }, [left]);
   useEffect(() => {
-    if (!solo || flashing) return;
+    if (!nv.runsBots || flashing) return;
     if (d.processed === 0 && !d.bid) {
       const b = d.managers.filter(isBot);
       if (b.length) talk.say(b[Math.floor(Math.random() * b.length)].id, 'start', null, true);
@@ -9049,9 +9075,10 @@ function Auction({
   const youAmt = you ? nextAmount(d) : 0;
   const youCan = you && !paused && !flashing && !gavel && canBid(d, you, youAmt);
   const going = timer > 0 && d.bid && left <= 2 && left > 0 ? left === 2 ? 'Going once…' : 'Going twice…' : null;
-  const ordered = solo ? [...d.managers].sort((a, b) => (b.human ? 1 : 0) - (a.human ? 1 : 0)) : d.managers;
+  const ordered = auto ? [...d.managers].sort((a, b) => (nv.controls(b.id) ? 1 : 0) - (nv.controls(a.id) ? 1 : 0)) : d.managers;
+  const vetoHere = d.pending && nv.controls(d.pending.target) && !(nv.runsBots && (isBot(teamOf(d, d.pending.target)) || isBotTeam(teamOf(d, d.pending.target)))) && !(solo && (isBot(teamOf(d, d.pending.target)) || isBotTeam(teamOf(d, d.pending.target))));
   return React.createElement("div", {
-    className: 'app auction' + (solo ? ' solo' : '')
+    className: 'app auction' + (auto ? ' solo' : '')
   }, React.createElement("div", {
     className: "topbar"
   }, React.createElement("button", {
@@ -9060,14 +9087,14 @@ function Auction({
     "aria-label": "Home"
   }, "\u2302"), React.createElement("div", {
     className: "title num"
-  }, "Item ", d.processed + 1, " of ", total), React.createElement(MuteButton, null), ruleOn(d, 'chaos') && React.createElement("button", {
+  }, "Item ", d.processed + 1, " of ", total), React.createElement(MuteButton, null), ruleOn(d, 'chaos') && (!online || you) && React.createElement("button", {
     className: "pillbtn",
     onClick: () => setCardsOpen(true),
     "aria-label": "Chaos Cards"
   }, "\uD83C\uDCCF"), React.createElement("button", {
     className: "pillbtn",
     onClick: () => setTeams(true)
-  }, "Teams"), React.createElement("button", {
+  }, "Teams"), nv.isHost && React.createElement("button", {
     className: "iconbtn",
     onClick: () => setPaused(p => !p),
     "aria-label": paused ? 'Resume' : 'Pause'
@@ -9106,7 +9133,7 @@ function Auction({
     style: {
       color: lc || 'var(--muted)'
     }
-  }, leader ? leader.emoji + ' ' + leader.name + ' leads' : timer > 0 && left <= 0 ? "Time's up · no bids" : solo ? 'Opening bid · bid or wait' : 'Opening bid · tap a manager'), React.createElement("div", {
+  }, leader ? leader.emoji + ' ' + leader.name + ' leads' : timer > 0 && left <= 0 ? "Time's up · no bids" : auto ? 'Opening bid · bid or wait' : 'Opening bid · tap a manager'), React.createElement("div", {
     className: "going",
     "aria-live": "polite"
   }, d.pending ? '🛑 Waiting for a Veto answer…' : going || (thinker ? '💭 ' + thinker.name + ' is thinking…' : solo && out ? 'You’re out on this one' : frozenTeam ? '🧊 ' + frozenTeam.name + ' is frozen for this item' : ' ')), timer > 0 && React.createElement("span", {
@@ -9127,26 +9154,31 @@ function Auction({
       fontSize: 56,
       color: 'var(--gold)'
     }
-  }, "Paused"), React.createElement("button", {
+  }, "Paused"), nv.isHost ? React.createElement("button", {
     className: "btn btn-gold",
     style: {
       width: 200
     },
     onClick: () => setPaused(false)
-  }, "Resume")))), React.createElement("div", {
+  }, "Resume") : React.createElement("p", {
+    className: "muted",
+    style: {
+      margin: 0
+    }
+  }, "The host paused the game.")))), React.createElement("div", {
     className: "mgr-grid"
   }, ordered.map(m => React.createElement(ManagerButton, {
     key: m.id,
     d: d,
     m: m,
     disabledAll: hold || flashing || gavel,
-    readOnly: solo && !m.human,
-    bubble: talk.bubbles[m.id],
+    readOnly: auto && !nv.controls(m.id),
+    bubble: bubbles[m.id],
     thinking: thinking === m.id,
     onBid: amt => {
       buzz(12);
       setOut(false);
-      setDraft(p => placeBid(p, m.id, amt));
+      act('bid', m.id, amt);
     },
     onCustom: () => setCustom(m.id)
   }))), React.createElement("p", {
@@ -9154,14 +9186,14 @@ function Auction({
     style: {
       textAlign: 'center'
     }
-  }, solo ? 'Tap Bid to raise +' + money(d.rules.inc) + ' · ✎ on your card for a custom bid · it sells when the clock runs out' : 'Tap to bid +' + money(d.rules.inc) + ' · hold or ✎ for a custom bid'), solo ? React.createElement("div", {
+  }, nv.tv ? 'Bid from your phones · it sells when the clock runs out' : online && !you ? 'You’re watching this game.' : auto ? 'Tap Bid to raise +' + money(d.rules.inc) + ' · ✎ on your card for a custom bid · it sells when the clock runs out' : 'Tap to bid +' + money(d.rules.inc) + ' · hold or ✎ for a custom bid'), auto ? you ? React.createElement("div", {
     className: "actions duo"
   }, React.createElement("button", {
     className: "btn",
     disabled: hold || flashing || out || !(you && canBid(d, you, youAmt)),
     onClick: () => {
       setOut(true);
-      setLeft(l => Math.min(l, 3));
+      if (solo) setLeft(l => Math.min(l, 3));
     }
   }, "I\u2019m out"), React.createElement("button", {
     className: "btn btn-gold sold",
@@ -9169,9 +9201,9 @@ function Auction({
     onClick: () => {
       buzz(12);
       setOut(false);
-      setDraft(p => placeBid(p, you.id, nextAmount(p)));
+      act('bid', you.id, youAmt);
     }
-  }, you && isFull(you) ? 'Team full' : you && !canBid(d, you, youAmt) ? 'Can’t bid' : (d.bid && d.bid.leaderId === you.id ? 'Raise to ' : 'Bid ') + money(youAmt))) : React.createElement("div", {
+  }, you && isFull(you) ? 'Team full' : you && !canBid(d, you, youAmt) ? 'Can’t bid' : (d.bid && d.bid.leaderId === you.id ? 'Raise to ' : 'Bid ') + money(youAmt))) : null : React.createElement("div", {
     className: "actions"
   }, React.createElement("button", {
     className: "btn",
@@ -9194,7 +9226,7 @@ function Auction({
     onSet: n => {
       buzz(12);
       setOut(false);
-      setDraft(p => placeBid(p, custom, n));
+      act('bid', custom, n);
     },
     onClose: () => setCustom(null)
   }), teams && React.createElement(TeamsSheet, {
@@ -9202,19 +9234,17 @@ function Auction({
     onClose: () => setTeams(false)
   }), cardsOpen && React.createElement(CardSheet, {
     d: d,
-    by: solo && you ? you.id : null,
+    by: auto && you ? you.id : null,
     onClose: () => setCardsOpen(false),
-    onPlay: (by, card, params) => setDraft(p => playCard(p, by, card, params)),
+    onPlay: (by, card, params) => act('card', by, card, params),
     onDouble: (by, pay) => {
       buzz(20);
       setOut(false);
-      setDraft(p => placeBid(p, by, pay, {
-        double: true
-      }));
+      act('bid', by, pay, true);
     }
-  }), d.pending && !(d.mode === 'solo' && (isBot(teamOf(d, d.pending.target)) || isBotTeam(teamOf(d, d.pending.target)))) && React.createElement(VetoSheet, {
+  }), vetoHere && React.createElement(VetoSheet, {
     d: d,
-    onAnswer: v => setDraft(p => answerCard(p, v))
+    onAnswer: v => act('veto', v, d.pending.id)
   }));
 }
 function Nominate({
@@ -9228,7 +9258,11 @@ function Nominate({
   const [paused, setPaused] = useState(false);
   const cur = currentNominator(d);
   const solo = d.mode === 'solo';
-  const botTurn = !!(cur && solo && (isBot(cur.m) || isBotTeam(cur.m)));
+  const nv = netView(d, useNet());
+  const act = useAct(d, setDraft);
+  const isBotTurn = !!(cur && (solo || nv.online) && (isBot(cur.m) || isBotTeam(cur.m)));
+  const botTurn = isBotTurn && nv.runsBots;
+  const canPick = !!cur && !isBotTurn && nv.controls(cur.m.id);
   const talk = useBotTalk(d);
   const live = useRef({});
   live.current = {
@@ -9264,7 +9298,7 @@ function Nominate({
   }, "Nomination \xB7 ", d.processed + 1, " of ", d.processed + d.queue.length), React.createElement("button", {
     className: "pillbtn",
     onClick: () => setTeams(true)
-  }, "Teams"), solo && React.createElement("button", {
+  }, "Teams"), (solo || nv.online && nv.isHost) && React.createElement("button", {
     className: "iconbtn",
     onClick: () => setPaused(p => !p),
     "aria-label": paused ? 'Resume' : 'Pause'
@@ -9283,10 +9317,10 @@ function Nominate({
     style: {
       margin: 0
     }
-  }, botTurn ? paused ? 'Paused' : '💭 Choosing what goes up next…' : 'Pick the next item to auction.')), Object.entries(talk.bubbles).map(([id, bb]) => React.createElement("p", {
+  }, isBotTurn ? paused ? 'Paused' : '💭 Choosing what goes up next…' : canPick ? 'Pick the next item to auction.' : 'Waiting for ' + cur.m.name + ' to pick…')), Object.entries(talk.bubbles).map(([id, bb]) => React.createElement("p", {
     key: bb.id,
     className: "bubble inline"
-  }, bb.text)), !botTurn && React.createElement(TopicSearch, {
+  }, bb.text)), canPick && React.createElement(TopicSearch, {
     q: q,
     setQ: setQ
   }), React.createElement("div", {
@@ -9296,7 +9330,7 @@ function Nominate({
     return React.createElement("button", {
       key: it.id,
       className: "pickbtn",
-      disabled: botTurn,
+      disabled: !canPick,
       onClick: () => setPick(it.id)
     }, it.hidden ? React.createElement("span", {
       className: "thumb",
@@ -9330,7 +9364,7 @@ function Nominate({
     title: "Nominate this?",
     body: visibleItem(d, pick).name + ' goes up for auction next.',
     yes: "Nominate",
-    onYes: () => setDraft(p => nominate(p, pick)),
+    onYes: () => act('nominate', pick),
     onClose: () => setPick(null)
   }), teams && React.createElement(TeamsSheet, {
     d: d,
@@ -9349,7 +9383,10 @@ function TradeWindow({
   goHome
 }) {
   const solo = d.mode === 'solo';
-  const you = solo ? d.managers.find(m => m.human) : null;
+  const nv = netView(d, useNet());
+  const act = useAct(d, setDraft);
+  const online = nv.online;
+  const you = solo ? d.managers.find(m => m.human) : online ? d.managers.find(m => nv.controls(m.id)) : null;
   const [now, setNow] = useState(Date.now());
   const [from, setFrom] = useState(you ? you.id : null);
   const [to, setTo] = useState(null);
@@ -9379,11 +9416,11 @@ function TradeWindow({
     return () => clearInterval(t);
   }, []);
   useEffect(() => {
-    if (left <= 0) setDraft(p => closeTrades(p));
-  }, [left <= 0]);
+    if (left <= 0 && nv.isHost) setDraft(p => closeTrades(p));
+  }, [left <= 0, nv.isHost]);
   const offered = useRef(false);
   useEffect(() => {
-    if (!solo || offered.current) return undefined;
+    if (!nv.runsBots || offered.current) return undefined;
     offered.current = true;
     const timers = botActors(d).filter((a, i, arr) => arr.findIndex(x => x.id === a.id) === i).map((a, i) => setTimeout(() => setDraft(p => {
       if (p.phase !== 'trade') return p;
@@ -9393,7 +9430,7 @@ function TradeWindow({
     }), ms(2500 + i * 2200)));
     return () => timers.forEach(clearTimeout);
   }, []);
-  const pendingForBots = d.trade.proposals.filter(t => t.status === 'pending' && solo && (isBot(teamOf(d, t.to)) || isBotTeam(teamOf(d, t.to)))).map(t => t.id).join(',');
+  const pendingForBots = d.trade.proposals.filter(t => t.status === 'pending' && nv.runsBots && (isBot(teamOf(d, t.to)) || isBotTeam(teamOf(d, t.to)))).map(t => t.id).join(',');
   useEffect(() => {
     if (!pendingForBots) return undefined;
     const ids = pendingForBots.split(',');
@@ -9426,12 +9463,11 @@ function TradeWindow({
   };
   const problem = from && to && give && get ? tradeProblem(d, draftTrade, now) : null;
   const propose = () => {
-    const n = proposeTrade(d, draftTrade, now);
-    if (n === d) {
+    if (problem || proposeTrade(d, draftTrade, now) === d) {
       setMsg(problem || 'That trade can’t be offered.');
       return;
     }
-    setDraft(n);
+    act('propose', draftTrade);
     setGive(null);
     setGet(null);
     setAmount(0);
@@ -9440,8 +9476,8 @@ function TradeWindow({
   const mm = Math.floor(left / 60000),
     ss = Math.floor(left % 60000 / 1000);
   const list = [...d.trade.proposals].reverse();
-  const canAnswer = t => t.status === 'pending' && (!solo || you && t.to === you.id);
-  const canCancel = t => t.status === 'pending' && (!solo || you && t.from === you.id);
+  const canAnswer = t => t.status === 'pending' && (online ? nv.controls(t.to) : !solo || you && t.to === you.id);
+  const canCancel = t => t.status === 'pending' && (online ? nv.controls(t.from) : !solo || you && t.from === you.id);
   return React.createElement("div", {
     className: "app"
   }, React.createElement("div", {
@@ -9460,9 +9496,9 @@ function TradeWindow({
     style: {
       textAlign: 'center'
     }
-  }, "1-for-1 trades", d.rules.trades.money ? ', plus optional money' : '', ". The other team must accept. Anything not accepted when the clock hits 0:00 expires."), React.createElement("div", {
+  }, "1-for-1 trades", d.rules.trades.money ? ', plus optional money' : '', ". The other team must accept. Anything not accepted when the clock hits 0:00 expires."), (!online || you) && React.createElement("div", {
     className: "card stack"
-  }, React.createElement("h3", null, "Offer a trade"), !solo && React.createElement("div", {
+  }, React.createElement("h3", null, "Offer a trade"), !solo && !online && React.createElement("div", {
     className: "field"
   }, React.createElement("span", {
     className: "label"
@@ -9584,13 +9620,13 @@ function TradeWindow({
     className: "row"
   }, canAnswer(t) && React.createElement("button", {
     className: "btn btn-sm btn-gold grow",
-    onClick: () => solo ? setDraft(p => acceptTrade(p, t.id)) : setHandoff(t.id)
+    onClick: () => solo || online ? act('accept', t.id) : setHandoff(t.id)
   }, "Accept"), canAnswer(t) && React.createElement("button", {
     className: "btn btn-sm grow",
-    onClick: () => setDraft(p => rejectTrade(p, t.id))
+    onClick: () => act('reject', t.id)
   }, "Reject"), canCancel(t) && React.createElement("button", {
     className: "btn btn-sm btn-ghost grow",
-    onClick: () => setDraft(p => cancelTrade(p, t.id))
+    onClick: () => act('cancel', t.id)
   }, "Cancel offer"))))), React.createElement("details", {
     className: "card"
   }, React.createElement("summary", {
@@ -9607,10 +9643,15 @@ function TradeWindow({
   }, React.createElement("h3", null, m.emoji, " ", m.name, " \xB7 ", money(m.budget)), React.createElement(TeamList, {
     d: d,
     m: m
-  }))))), React.createElement("button", {
+  }))))), nv.isHost ? React.createElement("button", {
     className: "btn",
     onClick: () => setDraft(p => closeTrades(p))
-  }, "Finish trading \xB7 go to voting"), handoff && (() => {
+  }, "Finish trading \xB7 go to voting") : React.createElement("p", {
+    className: "hint",
+    style: {
+      textAlign: 'center'
+    }
+  }, "The host can end trading early."), handoff && (() => {
     const t = d.trade.proposals.find(x => x.id === handoff);
     if (!t) return null;
     const R = teamOf(d, t.to);
@@ -9632,13 +9673,13 @@ function TradeWindow({
     }, React.createElement("button", {
       className: "btn grow",
       onClick: () => {
-        setDraft(p => rejectTrade(p, t.id));
+        act('reject', t.id);
         setHandoff(null);
       }
     }, "Reject"), React.createElement("button", {
       className: "btn btn-gold grow",
       onClick: () => {
-        setDraft(p => acceptTrade(p, t.id));
+        act('accept', t.id);
         setHandoff(null);
       }
     }, "Accept trade")));
@@ -9656,7 +9697,11 @@ function FreePick({
   const talk = useBotTalk(d);
   const cp = currentPicker(d);
   const m = cp && cp.m;
-  const botTurn = !!(m && d.mode === 'solo' && isBot(m));
+  const nv = netView(d, useNet());
+  const act = useAct(d, setDraft);
+  const isBotTurn = !!(m && (d.mode === 'solo' || nv.online) && (isBot(m) || isBotTeam(m)));
+  const botTurn = isBotTurn && nv.runsBots;
+  const canPick = !!m && !isBotTurn && nv.controls(m.id);
   const live = useRef({});
   live.current = {
     d,
@@ -9665,6 +9710,10 @@ function FreePick({
   };
   const pick = id => {
     if (flashing || !m) return;
+    if (nv.online && !nv.isHost) {
+      act('freePick', id);
+      return;
+    }
     onFlash({
       kind: 'free',
       name: m.name,
@@ -9677,7 +9726,7 @@ function FreePick({
   const turnKey = d.reveal + ':' + (m ? m.id : '');
   useEffect(() => {
     if (!botTurn || flashing || paused) return undefined;
-    const choice = botFreePickChoice(d, m);
+    const choice = botFreePickChoice(d, isBot(m) ? m : botActors(d).find(a => a.id === m.id) || m);
     if (!choice) return undefined;
     const t = setTimeout(() => {
       const cur = live.current;
@@ -9702,7 +9751,7 @@ function FreePick({
   }, "Free picks \xB7 round ", cp.round + 1), React.createElement("button", {
     className: "pillbtn",
     onClick: () => setTeams(true)
-  }, "Teams"), d.mode === 'solo' && React.createElement("button", {
+  }, "Teams"), (d.mode === 'solo' || nv.online && nv.isHost) && React.createElement("button", {
     className: "iconbtn",
     onClick: () => setPaused(p => !p),
     "aria-label": paused ? 'Resume' : 'Pause'
@@ -9726,12 +9775,17 @@ function FreePick({
     style: {
       margin: 0
     }
-  }, emptyCount(m), " empty slot", emptyCount(m) === 1 ? '' : 's', " \xB7 ", money(m.budget), " left"), botTurn && React.createElement("p", {
+  }, emptyCount(m), " empty slot", emptyCount(m) === 1 ? '' : 's', " \xB7 ", money(m.budget), " left"), isBotTurn && React.createElement("p", {
     className: "going",
     style: {
       margin: '6px 0 0'
     }
-  }, paused ? 'Paused' : '💭 Picking…')), Object.entries(talk.bubbles).map(([id, bb]) => {
+  }, paused ? 'Paused' : '💭 Picking…'), !isBotTurn && !canPick && React.createElement("p", {
+    className: "going",
+    style: {
+      margin: '6px 0 0'
+    }
+  }, "Waiting for ", m.name, " to pick\u2026")), Object.entries(talk.bubbles).map(([id, bb]) => {
     const who = d.managers.find(x => x.id === id);
     return who ? React.createElement("p", {
       key: bb.id,
@@ -9746,7 +9800,7 @@ function FreePick({
       key: id,
       className: "pickbtn",
       onClick: () => pick(id),
-      disabled: flashing || botTurn
+      disabled: flashing || !canPick
     }, React.createElement(Thumb, {
       item: it,
       topic: d.topic
@@ -9770,7 +9824,7 @@ function FreePick({
         fontSize: 18
       }
     }, "FREE"));
-  })), d.mode !== 'solo' && React.createElement("button", {
+  })), d.mode === 'local' && React.createElement("button", {
     className: "btn",
     onClick: () => setDraft(p => undo(p)),
     disabled: !d.history.length || flashing
@@ -9968,11 +10022,14 @@ function Voting({
   onVote,
   onReveal,
   onClose,
-  onSoloVote
+  onSoloVote,
+  nv,
+  act
 }) {
-  const solo = d.mode === 'solo';
+  const online = !!(nv && nv.online);
+  const solo = d.mode === 'solo' || online;
   const people = participants(d);
-  const you = solo ? people.find(p => p.human) : null;
+  const you = online ? people.find(p => nv.controlsPart(p.id) && !hasVoted(d, p.id)) : solo ? people.find(p => p.human) : null;
   const [voter, setVoter] = useState(solo && you ? you.id : null);
   const [choice, setChoice] = useState(null);
   const [locked, setLocked] = useState(false);
@@ -9986,7 +10043,16 @@ function Voting({
       fontSize: 40,
       textAlign: 'center'
     }
-  }, "Vote locked \uD83D\uDD12"), solo ? React.createElement("p", {
+  }, "Vote locked \uD83D\uDD12"), online ? React.createElement(React.Fragment, null, React.createElement("p", {
+    className: "muted",
+    style: {
+      textAlign: 'center',
+      margin: 0
+    }
+  }, "Waiting for everyone else. The host reveals the winner."), React.createElement("button", {
+    className: "btn",
+    onClick: onClose
+  }, "OK")) : solo ? React.createElement("p", {
     className: "muted",
     style: {
       textAlign: 'center',
@@ -10011,7 +10077,10 @@ function Voting({
     const choices = voteChoices(d, v.teamId);
     const submit = target => {
       buzz(30);
-      if (solo) {
+      if (online) {
+        act('vote', voter, target);
+        setLocked(true);
+      } else if (solo) {
         setLocked(true);
         onSoloVote(target);
       } else {
@@ -10273,6 +10342,10 @@ function Results({
   showShame
 }) {
   const ref = useRef(null);
+  const nv = netView(d, useNet());
+  const act = useAct(d, onChange);
+  const online = nv.online;
+  const [finClosed, setFinClosed] = useState(false);
   const [voting, setVoting] = useState(false);
   const [img, setImg] = useState(null);
   const [imgBusy, setImgBusy] = useState(false);
@@ -10292,6 +10365,17 @@ function Results({
   const revealed = d.votesRevealed && winners.length > 0;
   const noVotes = d.votesRevealed && !winners.length;
   const solo = d.mode === 'solo';
+  const people = participants(d);
+  const humansP = people.filter(p => !p.bot);
+  const humanVotes = humansP.filter(p => hasVoted(d, p.id)).length;
+  const myOpenVote = online && !d.votesRevealed ? people.find(p => nv.controlsPart(p.id) && !hasVoted(d, p.id)) : null;
+  const hostReveal = () => {
+    onChange({
+      ...fillBotVotes(d),
+      votesRevealed: true
+    });
+    doReveal();
+  };
   const doReveal = () => {
     setVoting(false);
     audio.play('drumroll');
@@ -10306,8 +10390,19 @@ function Results({
       });
     }, 1100);
   };
+  const finStage = d.finale ? (d.finale.ui || {}).stage || 'overview' : null;
+  const finaleOpen = !!d.finale && (online ? finStage !== 'done' && !finClosed : showFinale);
+  const revealKey = d.finale ? finStage === 'done' : revealed;
+  const seenReveal = useRef(revealKey);
   useEffect(() => {
-    if (!revealed || showFinale) return;
+    if (revealKey && !seenReveal.current && !nv.isHost) doReveal();
+    seenReveal.current = revealKey;
+  }, [revealKey]);
+  useEffect(() => {
+    setFinClosed(false);
+  }, [finStage]);
+  useEffect(() => {
+    if (!revealed || finaleOpen) return;
     if (finDone) {
       audio.say(callLine('champion', {
         who: winners[0].name
@@ -10319,10 +10414,11 @@ function Results({
     }) : callLine('winner', {
       who: winners[0].name
     }), 3, d.id + ':winner:' + Object.keys(d.votes || {}).length);
-  }, [revealed, showFinale]);
+  }, [revealed, finaleOpen]);
   const openFinale = () => {
     if (!d.finale) onChange(startFinale(d));
     setShowFinale(true);
+    setFinClosed(false);
   };
   const soloVote = target => {
     setTimeout(() => {
@@ -10571,13 +10667,35 @@ function Results({
     className: "exportfoot"
   }, "DRAFT NIGHT \xB7 ", (location.host + location.pathname).replace(/\/(index\.html)?$/, ''))), React.createElement("div", {
     className: "stack"
-  }, !d.votesRevealed && !isFin && React.createElement("button", {
+  }, !online && !d.votesRevealed && !isFin && React.createElement("button", {
     className: "btn btn-gold",
     onClick: () => setVoting(true)
-  }, solo ? 'Vote for the best team' : Object.keys(d.votes || {}).length ? 'Continue the vote' : 'Start the secret vote'), !d.votesRevealed && isFin && React.createElement("button", {
+  }, solo ? 'Vote for the best team' : Object.keys(d.votes || {}).length ? 'Continue the vote' : 'Start the secret vote'), online && !d.votesRevealed && !isFin && React.createElement(React.Fragment, null, myOpenVote ? React.createElement("button", {
+    className: "btn btn-gold",
+    onClick: () => setVoting(true)
+  }, "Vote for the best team") : React.createElement("p", {
+    className: "hint",
+    style: {
+      textAlign: 'center',
+      margin: 0
+    }
+  }, nv.tv ? 'Vote on your phones.' : 'Your vote is in.', " ", humanVotes, " of ", humansP.length, " players have voted."), nv.isHost && React.createElement("button", {
+    className: 'btn' + (myOpenVote ? '' : ' btn-gold'),
+    disabled: !humanVotes,
+    onClick: hostReveal
+  }, humanVotes === humansP.length ? 'Reveal the winner' : 'Reveal now (' + humanVotes + '/' + humansP.length + ')')), !d.votesRevealed && isFin && (!online || nv.isHost) && React.createElement("button", {
     className: "btn btn-gold",
     onClick: openFinale
-  }, d.finale ? '🏆 Continue the finale' : '🏆 Start the finale'), !d.votesRevealed && isFin && !d.finale && React.createElement("p", {
+  }, d.finale ? '🏆 Continue the finale' : '🏆 Start the finale'), !d.votesRevealed && isFin && online && !nv.isHost && (d.finale ? React.createElement("button", {
+    className: "btn btn-gold",
+    onClick: () => setFinClosed(false)
+  }, "\uD83C\uDFC6 Watch the finale") : React.createElement("p", {
+    className: "hint",
+    style: {
+      textAlign: 'center',
+      margin: 0
+    }
+  }, "Waiting for the host to start the finale.")), !d.votesRevealed && isFin && !d.finale && React.createElement("p", {
     className: "hint",
     style: {
       textAlign: 'center',
@@ -10599,27 +10717,29 @@ function Results({
     disabled: imgBusy
   }, imgBusy ? 'Making image…' : 'Save as image'), imgErr && React.createElement("p", {
     className: "warn"
-  }, imgErr), d.votesRevealed && !d.finale && React.createElement("button", {
+  }, imgErr), d.votesRevealed && !d.finale && !online && React.createElement("button", {
     className: "btn btn-ghost",
     onClick: () => onChange({
       ...d,
       votes: {},
       votesRevealed: false
     })
-  }, "Redo the vote"), live && onPlayAgain && !d.votesRevealed && React.createElement("button", {
+  }, "Redo the vote"), live && onPlayAgain && !d.votesRevealed && !online && React.createElement("button", {
     className: "btn btn-ghost",
     onClick: onPlayAgain
   }, "Play again"), live && React.createElement("button", {
     className: "btn btn-ghost",
     onClick: onFinish
-  }, "Finish \xB7 back to home"), React.createElement("p", {
+  }, online ? 'Leave the room' : 'Finish · back to home'), React.createElement("p", {
     className: "hint",
     style: {
       textAlign: 'center'
     }
-  }, live ? 'This draft is saved in Past Drafts.' : 'Saved in Past Drafts.')), voting && React.createElement(Voting, {
+  }, online ? d.votesRevealed ? 'Saved in Past Drafts on this phone.' : 'It’s saved on every phone once the winner is revealed.' : live ? 'This draft is saved in Past Drafts.' : 'Saved in Past Drafts.')), voting && React.createElement(Voting, {
     d: d,
     onSoloVote: soloVote,
+    nv: nv,
+    act: act,
     onVote: (v, t) => {
       if (!hasVoted(d, v)) onChange({
         ...d,
@@ -10637,11 +10757,24 @@ function Results({
       doReveal();
     },
     onClose: () => setVoting(false)
-  }), showFinale && d.finale && React.createElement(Finale, {
+  }), finaleOpen && React.createElement(Finale, {
     d: d,
     onChange: onChange,
-    onClose: () => setShowFinale(false),
+    onClose: () => {
+      setShowFinale(false);
+      setFinClosed(true);
+    },
     onChampion: () => {
+      onChange({
+        ...d,
+        finale: {
+          ...d.finale,
+          ui: {
+            ...(d.finale.ui || {}),
+            stage: 'done'
+          }
+        }
+      });
       setShowFinale(false);
       doReveal();
     }
@@ -11824,6 +11957,16 @@ function App() {
         history.replaceState(null, '', location.pathname + location.search);
       } catch (e) {}
     }
+    const r = (location.hash || '').match(/^#room=([A-Za-z0-9]+)/);
+    if (r) {
+      setScreen({
+        name: 'online-home',
+        code: cleanCode(r[1])
+      });
+      try {
+        history.replaceState(null, '', location.pathname + location.search);
+      } catch (e) {}
+    }
   }, []);
   const [settings, setSettings] = useState(() => store.get(K.settings, {}));
   const audioCfg = {
@@ -11989,8 +12132,87 @@ function App() {
     }, extra));
     go('draft');
   };
+  const profile = {
+    ...defaultProfile(),
+    ...(settings.online || {})
+  };
+  const setProfile = p => setSettings(x => ({
+    ...x,
+    online: p
+  }));
+  const fileOnline = d => setPast(p => {
+    const s = stripDraft(d);
+    const i = p.findIndex(x => x.id === d.id);
+    if (i >= 0) {
+      const a = [...p];
+      a[i] = s;
+      return a;
+    }
+    return [s, ...p];
+  });
   let view;
   switch (screen.name) {
+    case 'online-home':
+      view = React.createElement(OnlineHome, {
+        profile: profile,
+        setProfile: setProfile,
+        last: lastRoom(),
+        initialCode: screen.code,
+        onBack: () => go('home'),
+        onCreate: () => {
+          setProfile({
+            ...profile,
+            name: profile.name.trim()
+          });
+          go('online', {
+            start: {
+              kind: 'create'
+            },
+            k: uid()
+          });
+        },
+        onJoin: code => {
+          setProfile({
+            ...profile,
+            name: profile.name.trim()
+          });
+          go('online', {
+            start: {
+              kind: 'join',
+              code
+            },
+            k: uid()
+          });
+        },
+        onTv: code => go('online', {
+          start: {
+            kind: 'tv',
+            code
+          },
+          k: uid()
+        }),
+        onRejoin: l => go('online', {
+          start: {
+            kind: l.kind === 'tv' ? 'tv' : 'join',
+            code: l.code
+          },
+          k: uid()
+        })
+      });
+      break;
+    case 'online':
+      view = React.createElement(OnlineScreen, {
+        key: screen.k,
+        start: screen.start,
+        profile: profile,
+        topics: topics,
+        rulePrefs: rulePrefs,
+        past: past,
+        settings: settings,
+        onFinished: fileOnline,
+        onExit: () => go('online-home')
+      });
+      break;
     case 'topics':
       view = React.createElement(TopicsList, {
         topics: topics,
@@ -12341,6 +12563,7 @@ function App() {
           setDraft(null);
           go('solo-setup');
         },
+        onOnline: () => go('online-home'),
         onPlayers: () => go('players'),
         onResume: () => go('draft'),
         onTopics: () => go('topics'),
@@ -12965,15 +13188,20 @@ function MatchVote({
   r,
   i,
   onChange,
-  onCount
+  onCount,
+  nv,
+  act
 }) {
   const m = getMatchup(d, r, i);
   const A = teamOf(d, m.a),
     B = teamOf(d, m.b);
-  const solo = d.mode === 'solo';
+  const online = !!(nv && nv.online);
+  const solo = d.mode === 'solo' || online;
   const voters = matchVoters(d, m);
   const humans = voters.filter(p => !p.bot);
-  const [voter, setVoter] = useState(solo && humans[0] && !hasMatchVote(m, humans[0].id) ? humans[0].id : null);
+  const mine = online ? humans.filter(p => nv.controlsPart(p.id)) : humans;
+  const firstOpen = mine.find(p => !hasMatchVote(m, p.id));
+  const [voter, setVoter] = useState(solo && firstOpen ? firstOpen.id : null);
   const [choice, setChoice] = useState(null);
   const [locked, setLocked] = useState(false);
   const nVoted = voters.filter(p => hasMatchVote(m, p.id)).length;
@@ -12989,7 +13217,12 @@ function MatchVote({
     style: {
       fontSize: 34
     }
-  }, "Vote locked \uD83D\uDD12"), solo ? React.createElement("p", {
+  }, "Vote locked \uD83D\uDD12"), online ? React.createElement("p", {
+    className: "muted",
+    style: {
+      margin: 0
+    }
+  }, "Waiting for everyone else to vote\u2026") : solo ? React.createElement("p", {
     className: "muted",
     style: {
       margin: 0
@@ -12999,7 +13232,14 @@ function MatchVote({
     style: {
       margin: 0
     }
-  }, "Pass the phone to the next voter."), React.createElement("button", {
+  }, "Pass the phone to the next voter."), online ? React.createElement("button", {
+    className: "btn",
+    onClick: () => {
+      setLocked(false);
+      setVoter(null);
+      setChoice(null);
+    }
+  }, "OK") : React.createElement("button", {
     className: "btn btn-gold",
     onClick: () => {
       setLocked(false);
@@ -13053,7 +13293,7 @@ function MatchVote({
       disabled: !choice,
       onClick: () => {
         buzz(30);
-        onChange(castMatchVote(d, r, i, voter, choice));
+        if (online) act('matchVote', r, i, voter, choice);else onChange(castMatchVote(d, r, i, voter, choice));
         setLocked(true);
       }
     }, choice ? 'Lock in ' + teamOf(d, choice).name : 'Pick a team')));
@@ -13073,7 +13313,9 @@ function MatchVote({
     className: "warn"
   }, m.note), !humans.length && React.createElement("p", {
     className: "hint"
-  }, "Only bots vote on this one. They\u2019ve voted."), humans.length > 0 && React.createElement("div", {
+  }, "Only bots vote on this one. They\u2019ve voted."), online && !mine.length && humans.length > 0 && React.createElement("p", {
+    className: "hint"
+  }, "You\u2019re not voting on this one (it\u2019s your team, or you\u2019re watching)."), humans.length > 0 && React.createElement("div", {
     className: "votegrid"
   }, humans.map(p => {
     const done = hasMatchVote(m, p.id);
@@ -13081,18 +13323,23 @@ function MatchVote({
       key: p.id,
       className: "votebtn",
       style: mStyle(p),
-      disabled: done,
+      disabled: done || online && !nv.controlsPart(p.id),
       onClick: () => setVoter(p.id)
     }, React.createElement("span", {
       style: {
         fontSize: 24
       }
     }, done ? '✅' : p.emoji), p.name, p.teamName ? React.createElement("small", null, p.teamName) : null);
-  })), React.createElement("button", {
+  })), !nv || nv.isHost ? React.createElement("button", {
     className: "btn btn-gold",
     disabled: !allIn && !nVoted,
     onClick: onCount
-  }, allIn ? 'Count the votes' : 'Count now (' + nVoted + '/' + voters.length + ')'));
+  }, allIn ? 'Count the votes' : 'Count now (' + nVoted + '/' + voters.length + ')') : React.createElement("p", {
+    className: "hint",
+    style: {
+      textAlign: 'center'
+    }
+  }, "The host counts the votes", allIn ? ' — everyone’s in.' : '.'));
 }
 function Finale({
   d,
@@ -13103,9 +13350,26 @@ function Finale({
   const fin = d.finale;
   const cfg = finCfg(d);
   const mode = fin.mode;
+  const nv = netView(d, useNet());
+  const act = useAct(d, onChange);
+  const host = nv.isHost;
   const nx = nextMatchup(fin.bracket);
-  const [stage, setStage] = useState('overview');
-  const [cur, setCur] = useState(null);
+  const ui = fin.ui || {
+    stage: 'overview',
+    cur: null
+  };
+  const stage = ui.stage === 'done' ? 'overview' : ui.stage;
+  const cur = ui.cur;
+  const withUi = (n, patch) => ({
+    ...n,
+    finale: {
+      ...n.finale,
+      ui: {
+        ...ui,
+        ...patch
+      }
+    }
+  });
   const [matchOver, setMatchOver] = useState(false);
   const [view, setView] = useState(null);
   const R = fin.bracket.rounds.length;
@@ -13119,36 +13383,47 @@ function Finale({
       r: nx.r,
       i: nx.i
     };
-    setCur(at);
     setMatchOver(false);
-    if (needsVote(mode)) {
-      onChange(botMatchVotes(d, at.r, at.i));
-      setStage('vote');
-    } else {
-      onChange(playMatchup(d, at.r, at.i));
-      setStage('match');
-    }
+    if (needsVote(mode)) onChange(withUi(botMatchVotes(d, at.r, at.i), {
+      stage: 'vote',
+      cur: at
+    }));else onChange(withUi(playMatchup(d, at.r, at.i), {
+      stage: 'match',
+      cur: at
+    }));
   };
   const finish = () => {
     let n = resolveMatchup(d, cur.r, cur.i);
     const m = getMatchup(n, cur.r, cur.i);
     if (!m.winner && m.revoted) {
       n = botMatchVotes(n, cur.r, cur.i);
-      onChange(n);
-      setStage('vote');
+      onChange(withUi(n, {
+        stage: 'vote'
+      }));
       return;
     }
-    onChange(n);
-    setStage('result');
-    if (m.winner) audio.play(n.finale.champion ? 'fanfare' : 'gavel');
+    onChange(withUi(n, {
+      stage: 'result'
+    }));
   };
   const counted = () => {
     if (needsMatch(mode)) {
       setMatchOver(false);
-      onChange(playMatchup(d, cur.r, cur.i));
-      setStage('match');
+      onChange(withUi(playMatchup(d, cur.r, cur.i), {
+        stage: 'match'
+      }));
     } else finish();
   };
+  const decided = cur && stage === 'result' ? cur.r + ':' + cur.i : '';
+  useEffect(() => {
+    if (decided) audio.play(d.finale.champion ? 'fanfare' : 'gavel');
+  }, [decided]);
+  const waiting = React.createElement("p", {
+    className: "hint",
+    style: {
+      textAlign: 'center'
+    }
+  }, "Waiting for the host\u2026");
   const cm = cur && getMatchup(d, cur.r, cur.i);
   const A = cm && cm.a && teamOf(d, cm.a),
     B = cm && cm.b && teamOf(d, cm.b);
@@ -13159,7 +13434,9 @@ function Finale({
     r: cur.r,
     i: cur.i,
     onChange: onChange,
-    onCount: counted
+    onCount: counted,
+    nv: nv,
+    act: act
   });else if (stage === 'match' && cm && cm.match) body = React.createElement(React.Fragment, null, React.createElement("p", {
     className: "eyebrow",
     style: {
@@ -13175,19 +13452,20 @@ function Finale({
     commentary: cfg.commentary,
     label: cm.id,
     onDone: () => setMatchOver(true)
-  }), matchOver && React.createElement("button", {
+  }), matchOver && (host ? React.createElement("button", {
     className: "btn btn-gold",
     onClick: finish
-  }, mode === 'combined' ? 'Combine with the votes' : 'Continue'));else if (stage === 'result' && cm && cm.winner) body = React.createElement(MatchupResult, {
+  }, mode === 'combined' ? 'Combine with the votes' : 'Continue') : waiting));else if (stage === 'result' && cm && cm.winner) body = React.createElement(MatchupResult, {
     d: d,
     m: cm,
     r: cur.r,
     final: cur.r === R - 1,
+    host: host,
     onNext: () => {
-      if (d.finale.champion) onChampion();else {
-        setStage('overview');
-        setCur(null);
-      }
+      if (d.finale.champion) onChampion();else onChange(withUi(d, {
+        stage: 'overview',
+        cur: null
+      }));
     }
   });else body = React.createElement(React.Fragment, null, React.createElement("div", {
     className: "card stack-sm"
@@ -13214,18 +13492,18 @@ function Finale({
     }), React.createElement("b", null, t.name), isFootball(d.topic) && React.createElement("span", {
       className: "small num"
     }, "Rating ", teamRating(d, t).rating, teamRating(d, t).provisional ? ' (prov.)' : '')));
-  })), React.createElement("button", {
+  })), host ? React.createElement("button", {
     className: "btn btn-gold",
     onClick: begin
-  }, needsVote(mode) ? mode === 'combined' ? 'Vote, then kick off' : 'Vote on this matchup' : 'Kick off')) : fin.champion ? React.createElement(React.Fragment, null, React.createElement("h2", {
+  }, needsVote(mode) ? mode === 'combined' ? 'Vote, then kick off' : 'Vote on this matchup' : 'Kick off') : waiting) : fin.champion ? React.createElement(React.Fragment, null, React.createElement("h2", {
     className: "display",
     style: {
       fontSize: 30
     }
-  }, "We have a champion"), React.createElement("button", {
+  }, "We have a champion"), host ? React.createElement("button", {
     className: "btn btn-gold",
     onClick: onChampion
-  }, "\uD83C\uDFC6 Reveal the champion")) : React.createElement(React.Fragment, null, React.createElement("h2", {
+  }, "\uD83C\uDFC6 Reveal the champion") : waiting) : React.createElement(React.Fragment, null, React.createElement("h2", {
     className: "display",
     style: {
       fontSize: 28
@@ -13265,7 +13543,8 @@ function MatchupResult({
   m,
   r,
   final,
-  onNext
+  onNext,
+  host = true
 }) {
   const W = teamOf(d, m.winner);
   const L = teamOf(d, m.winner === m.a ? m.b : m.a);
@@ -13355,10 +13634,15 @@ function MatchupResult({
     match: m.match
   }), React.createElement("p", {
     className: "hint"
-  }, L.name, " ", final ? 'finish as runners-up.' : 'are knocked out.'), React.createElement("button", {
+  }, L.name, " ", final ? 'finish as runners-up.' : 'are knocked out.'), host ? React.createElement("button", {
     className: "btn btn-gold",
     onClick: onNext
-  }, d.finale.champion ? '🏆 Reveal the champion' : 'Back to the bracket'));
+  }, d.finale.champion ? '🏆 Reveal the champion' : 'Back to the bracket') : React.createElement("p", {
+    className: "hint",
+    style: {
+      textAlign: 'center'
+    }
+  }, "Waiting for the host\u2026"));
 }
 function MatchupSheet({
   d,
@@ -13586,5 +13870,1600 @@ function FinaleResults({
       fontSize: 18
     }
   }, teamRating(d, s.team).rating)))));
+}
+const FB_CONFIG = {
+  apiKey: 'AIzaSyCjw0jMkbljpMKol013HCe_l_h8nzNLtCY',
+  authDomain: 'draft-night-125a6.firebaseapp.com',
+  databaseURL: 'https://draft-night-125a6-default-rtdb.firebaseio.com',
+  projectId: 'draft-night-125a6',
+  storageBucket: 'draft-night-125a6.firebasestorage.app',
+  messagingSenderId: '483436244846',
+  appId: '1:483436244846:web:ef3f78656ffa791ed79b7f'
+};
+const FB_VER = '10.14.1';
+const ROOM_ALPHA = 'ABCDEFGHJKMNPQRSTUVWXYZ23456789';
+const ONLINE = {
+  maxTeams: 8,
+  maxTeamSize: 4,
+  maxPeople: 16,
+  coverAfter: 60000,
+  hostGrace: 8000,
+  clocks: [6, 10, 15, 20],
+  clock: 10
+};
+const LAST_ROOM = 'dn_last_room';
+function loadScript(src) {
+  return new Promise((resolve, reject) => {
+    const s = document.createElement('script');
+    s.src = src;
+    s.async = true;
+    s.onload = resolve;
+    s.onerror = () => reject(new Error('load ' + src));
+    document.head.appendChild(s);
+  });
+}
+let fbReady = null;
+function loadFirebase() {
+  if (window.__DN_FAKE_FB) return Promise.resolve(window.__DN_FAKE_FB);
+  if (fbReady) return fbReady;
+  fbReady = ['app', 'auth', 'database'].reduce((p, n) => p.then(() => window.firebase && n === 'app' ? null : loadScript('vendor/firebase-' + n + '-compat.js?v=' + FB_VER)), Promise.resolve()).then(() => {
+    const fb = window.firebase;
+    if (!fb.apps.length) fb.initializeApp(FB_CONFIG);
+    return fb;
+  });
+  fbReady.catch(() => {
+    fbReady = null;
+  });
+  return fbReady;
+}
+function signIn(fb) {
+  const a = fb.auth();
+  return new Promise((resolve, reject) => {
+    const off = a.onAuthStateChanged(u => {
+      off();
+      if (u) resolve(u.uid);else a.signInAnonymously().then(c => resolve(c.user.uid), reject);
+    }, reject);
+  });
+}
+const roomCode = () => Array.from({
+  length: 5
+}, () => ROOM_ALPHA[Math.floor(Math.random() * ROOM_ALPHA.length)]).join('');
+const cleanCode = s => (s || '').toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, 5);
+const netError = e => {
+  const m = String(e && (e.code || e.message) || e || '');
+  if (/permission|PERMISSION_DENIED/i.test(m)) return 'The online server refused that. If you just set up Firebase, check the security rules were published.';
+  if (/operation-not-allowed|admin-restricted/i.test(m)) return 'Anonymous sign-in isn’t switched on in Firebase (Authentication → Sign-in method → Anonymous).';
+  if (/unauthorized-domain/i.test(m)) return 'This website isn’t on Firebase’s authorised domains list (Authentication → Settings).';
+  if (/network|offline|load /i.test(m)) return 'Couldn’t reach the online server. Check your internet connection and try again.';
+  return 'Something went wrong going online (' + m.slice(0, 80) + ').';
+};
+function saveLastRoom(v) {
+  try {
+    if (v) localStorage.setItem(LAST_ROOM, JSON.stringify(v));else localStorage.removeItem(LAST_ROOM);
+  } catch (e) {}
+}
+function lastRoom() {
+  try {
+    const v = JSON.parse(localStorage.getItem(LAST_ROOM) || 'null');
+    return v && Date.now() - v.at < 12 * 3600e3 ? v : null;
+  } catch (e) {
+    return null;
+  }
+}
+function ownerInfo(d, uid) {
+  const teams = new Set(),
+    parts = new Set();
+  if (!d || !uid) return {
+    teams,
+    parts
+  };
+  d.managers.forEach(m => {
+    if (m.members) m.members.forEach(p => {
+      if (p.uid === uid) {
+        teams.add(m.id);
+        parts.add(p.id);
+      }
+    });else if (m.uid === uid) {
+      teams.add(m.id);
+      parts.add(m.id);
+    }
+  });
+  return {
+    teams,
+    parts
+  };
+}
+function humanSeats(d) {
+  const out = [];
+  d.managers.forEach(m => {
+    if (m.members) m.members.forEach(p => {
+      if (p.uid) out.push({
+        uid: p.uid,
+        teamId: m.id,
+        partId: p.id,
+        name: p.name,
+        covered: !!p.cover
+      });
+    });else if (m.uid) out.push({
+      uid: m.uid,
+      teamId: m.id,
+      partId: m.id,
+      name: m.name,
+      covered: !!m.cover
+    });
+  });
+  return out;
+}
+const COVER_BOT = {
+  type: 'needs',
+  level: 'medium'
+};
+function setCover(d, uid, on) {
+  let changed = false;
+  const fix = x => {
+    if (x.uid !== uid || !!x.cover === on) return x;
+    changed = true;
+    if (on) return {
+      ...x,
+      bot: {
+        ...COVER_BOT
+      },
+      cover: true
+    };
+    const {
+      bot,
+      cover,
+      ...rest
+    } = x;
+    return rest;
+  };
+  const managers = d.managers.map(m => m.members ? {
+    ...m,
+    members: m.members.map(fix)
+  } : fix(m));
+  return changed ? {
+    ...d,
+    managers
+  } : d;
+}
+function claimSeat(d, oldUid, newUid) {
+  const fix = x => x.uid === oldUid ? (() => {
+    const {
+      bot,
+      cover,
+      ...rest
+    } = x;
+    return x.cover ? {
+      ...rest,
+      uid: newUid
+    } : {
+      ...x,
+      uid: newUid
+    };
+  })() : x;
+  return {
+    ...d,
+    managers: d.managers.map(m => m.members ? {
+      ...m,
+      members: m.members.map(fix)
+    } : fix(m))
+  };
+}
+function castVote(d, pid, target) {
+  if (d.votesRevealed || hasVoted(d, pid)) return d;
+  const p = participants(d).find(x => x.id === pid);
+  if (!p) return d;
+  const choices = voteChoices(d, p.teamId).map(m => m.id);
+  if (target == null ? choices.length : !choices.includes(target)) return d;
+  return {
+    ...d,
+    votes: {
+      ...(d.votes || {}),
+      [pid]: target == null ? null : target
+    }
+  };
+}
+function fillBotVotes(d) {
+  const votes = {
+    ...(d.votes || {})
+  };
+  participants(d).filter(p => p.bot && !Object.prototype.hasOwnProperty.call(votes, p.id)).forEach(p => {
+    votes[p.id] = botVote(d, {
+      ...teamOf(d, p.teamId),
+      name: p.name,
+      bot: p.bot,
+      speaker: p.id,
+      teamId: p.teamId
+    });
+  });
+  return {
+    ...d,
+    votes
+  };
+}
+const owns = (who, teamId) => !who || who.teams.has(teamId);
+const ownsPart = (who, pid) => !who || who.parts.has(pid);
+const findTrade = (d, id) => d.trade ? d.trade.proposals.find(t => t.id === id) : null;
+const NET_ACTIONS = {
+  bid: (d, [mid, amt, dbl], who) => d.phase === 'auction' && owns(who, mid) && typeof amt === 'number' ? placeBid(d, mid, amt, dbl ? {
+    double: true
+  } : undefined) : d,
+  card: (d, [by, card, params], who) => d.phase === 'auction' && owns(who, by) && CARD_INFO[card] ? playCard(d, by, card, params || {}) : d,
+  veto: (d, [yes, pid], who) => d.pending && d.pending.id === pid && owns(who, d.pending.target) ? answerCard(d, !!yes) : d,
+  nominate: (d, [id], who) => {
+    const c = d.phase === 'nominate' && currentNominator(d);
+    return c && owns(who, c.m.id) ? nominate(d, id) : d;
+  },
+  freePick: (d, [id], who) => {
+    const c = d.phase === 'freepick' && currentPicker(d);
+    return c && owns(who, c.m.id) && d.leftover.includes(id) && canTake(d, c.m, id) ? freePick(d, id) : d;
+  },
+  propose: (d, [t], who) => d.phase === 'trade' && t && owns(who, t.from) ? proposeTrade(d, t, Date.now()) : d,
+  accept: (d, [id], who) => {
+    const t = findTrade(d, id);
+    return t && t.status === 'pending' && owns(who, t.to) ? acceptTrade(d, id) : d;
+  },
+  reject: (d, [id], who) => {
+    const t = findTrade(d, id);
+    return t && t.status === 'pending' && owns(who, t.to) ? rejectTrade(d, id) : d;
+  },
+  cancel: (d, [id], who) => {
+    const t = findTrade(d, id);
+    return t && t.status === 'pending' && owns(who, t.from) ? cancelTrade(d, id) : d;
+  },
+  vote: (d, [pid, target], who) => d.phase === 'done' && ownsPart(who, pid) ? castVote(d, pid, target) : d,
+  matchVote: (d, [r, i, pid, team], who) => d.finale && d.finale.bracket && ownsPart(who, pid) && d.finale.bracket.rounds[r] && d.finale.bracket.rounds[r][i] ? castMatchVote(d, r, i, pid, team) : d
+};
+function runAction(d, name, args, who) {
+  const fn = NET_ACTIONS[name];
+  if (!fn || !d || !Array.isArray(args)) return d;
+  try {
+    return fn(d, args, who) || d;
+  } catch (e) {
+    return d;
+  }
+}
+function onlineTopic(t) {
+  return {
+    ...t,
+    items: t.items.map(it => {
+      const {
+        photo,
+        imageData,
+        ...rest
+      } = it;
+      return rest;
+    })
+  };
+}
+const NO_SYNC = new Set(['history']);
+class Room {
+  constructor(fb, uid, code) {
+    this.fb = fb;
+    this.db = fb.database();
+    this.uid = uid;
+    this.code = code;
+    this.base = 'rooms/' + code + '/';
+    this.meta = null;
+    this.players = {};
+    this.presence = {};
+    this.lobby = null;
+    this.live = {};
+    this.state = null;
+    this.connected = true;
+    this.kind = 'player';
+    this.subs = new Set();
+    this.offs = [];
+    this.sent = {};
+    this.liveSent = {};
+    this.stateCache = {};
+    this.liveCache = {};
+    this.awaySince = {};
+    this.closed = false;
+    this.onAction = null;
+    this.seen = new Set();
+  }
+  ref(p) {
+    return this.db.ref(this.base + (p || ''));
+  }
+  get amHost() {
+    return !!(this.meta && this.meta.host === this.uid);
+  }
+  emit() {
+    this.subs.forEach(f => {
+      try {
+        f(this);
+      } catch (e) {}
+    });
+  }
+  subscribe(f) {
+    this.subs.add(f);
+    return () => this.subs.delete(f);
+  }
+  listen(path, ev, fn) {
+    const r = typeof path === 'string' ? this.ref(path) : path;
+    r.on(ev, fn);
+    this.offs.push(() => r.off(ev, fn));
+  }
+  static async connect() {
+    const fb = await loadFirebase();
+    const uid = await signIn(fb);
+    return {
+      fb,
+      uid
+    };
+  }
+  static async create(profile) {
+    const {
+      fb,
+      uid
+    } = await Room.connect();
+    const db = fb.database();
+    let code = null;
+    for (let i = 0; i < 6 && !code; i++) {
+      const c = roomCode();
+      const snap = await db.ref('rooms/' + c + '/meta').once('value');
+      if (!snap.exists()) code = c;
+    }
+    if (!code) throw new Error('Couldn’t find a free room code. Try again.');
+    const room = new Room(fb, uid, code);
+    await room.ref('meta').set({
+      host: uid,
+      createdAt: fb.database.ServerValue.TIMESTAMP,
+      status: 'lobby',
+      v: 1
+    });
+    await room.ref('players/' + uid).set({
+      name: profile.name,
+      emoji: profile.emoji,
+      color: profile.color,
+      kind: 'player',
+      team: 0,
+      joinedAt: fb.database.ServerValue.TIMESTAMP
+    });
+    await room.start();
+    return room;
+  }
+  static async join(code, profile, kind) {
+    const {
+      fb,
+      uid
+    } = await Room.connect();
+    const room = new Room(fb, uid, code);
+    const meta = (await room.ref('meta').once('value')).val();
+    if (!meta) throw new Error('No room with code ' + code + '. Check the code with the host.');
+    if (meta.status === 'closed') throw new Error('That room has ended.');
+    const players = (await room.ref('players').once('value')).val() || {};
+    const me = players[uid];
+    room.kind = kind === 'tv' ? 'tv' : 'player';
+    if (!me && room.kind === 'player') {
+      const people = Object.values(players).filter(p => p.kind !== 'tv').length;
+      if (people >= ONLINE.maxPeople) throw new Error('That room is full (' + ONLINE.maxPeople + ' players).');
+    }
+    if (!me || me.kind !== room.kind || profile && (me.name !== profile.name || me.emoji !== profile.emoji)) {
+      await room.ref('players/' + uid).update({
+        ...(me ? {} : {
+          joinedAt: fb.database.ServerValue.TIMESTAMP,
+          team: 0
+        }),
+        kind: room.kind,
+        ...(room.kind === 'tv' ? {
+          name: 'TV',
+          emoji: '📺',
+          color: '#ffffff'
+        } : {
+          name: profile.name,
+          emoji: profile.emoji,
+          color: profile.color
+        })
+      });
+    }
+    await room.start();
+    return room;
+  }
+  async start() {
+    saveLastRoom({
+      code: this.code,
+      at: Date.now(),
+      kind: this.kind
+    });
+    const me = this.ref('presence/' + this.uid);
+    this.listen(this.db.ref('.info/connected'), 'value', s => {
+      this.connected = s.val() !== false;
+      if (s.val() === true) {
+        me.onDisconnect().remove();
+        me.set(true);
+      }
+      this.emit();
+    });
+    const json = s => {
+      try {
+        return JSON.parse(s);
+      } catch (e) {
+        return null;
+      }
+    };
+    this.listen('meta', 'value', s => {
+      this.meta = s.val();
+      if (!this.meta && !this.closed) {
+        this.meta = {
+          status: 'closed'
+        };
+      }
+      this.emit();
+      this.checkHost();
+    });
+    this.listen('players', 'value', s => {
+      this.players = s.val() || {};
+      this.emit();
+      this.checkHost();
+    });
+    this.listen('presence', 'value', s => {
+      this.presence = s.val() || {};
+      this.emit();
+      this.checkHost();
+    });
+    this.listen('lobby', 'value', s => {
+      this.lobby = s.val() ? json(s.val()) : null;
+      this.emit();
+    });
+    this.listen('state', 'value', s => {
+      const v = s.val();
+      if (!v) {
+        this.state = null;
+        this.stateCache = {};
+        this.emit();
+        return;
+      }
+      const d = {};
+      const cache = {};
+      Object.keys(v).forEach(k => {
+        cache[k] = {
+          raw: v[k],
+          val: this.stateCache[k] && this.stateCache[k].raw === v[k] ? this.stateCache[k].val : json(v[k])
+        };
+        d[k] = cache[k].val;
+      });
+      this.stateCache = cache;
+      this.state = d;
+      this.emit();
+    });
+    this.listen('live', 'value', s => {
+      const v = s.val() || {};
+      const o = {};
+      Object.keys(v).forEach(k => {
+        o[k] = this.liveCache[k] && this.liveCache[k].raw === v[k] ? this.liveCache[k].val : json(v[k]);
+        this.liveCache[k] = {
+          raw: v[k],
+          val: o[k]
+        };
+      });
+      this.live = o;
+      this.emit();
+    });
+    this.listen('actions', 'child_added', s => this.handleAction(s.key, s.val()));
+  }
+  handleAction(key, a) {
+    if (!this.amHost || !this.onAction || this.seen.has(key)) return;
+    this.seen.add(key);
+    let body = null;
+    try {
+      body = JSON.parse((a || {}).json);
+    } catch (e) {}
+    const done = () => this.ref('actions/' + key).remove().catch(() => {});
+    if (!body || typeof body.name !== 'string' || !a.by) {
+      done();
+      return;
+    }
+    this.onAction({
+      id: key,
+      by: a.by,
+      name: body.name,
+      args: Array.isArray(body.args) ? body.args : []
+    }, done);
+  }
+  async drainActions() {
+    const v = (await this.ref('actions').once('value')).val() || {};
+    Object.keys(v).forEach(k => this.handleAction(k, v[k]));
+  }
+  online(uid) {
+    return !!this.presence[uid];
+  }
+  people() {
+    return Object.entries(this.players).map(([uid, p]) => ({
+      uid,
+      ...p,
+      online: this.online(uid)
+    })).sort((a, b) => (a.joinedAt || 0) - (b.joinedAt || 0));
+  }
+  checkHost() {
+    if (!this.meta || this.meta.status === 'closed' || this.kind === 'tv' || !this.players[this.uid]) return;
+    const host = this.meta.host;
+    if (host === this.uid || this.online(host)) {
+      clearTimeout(this.hostTimer);
+      this.hostTimer = null;
+      return;
+    }
+    if (this.hostTimer) return;
+    this.hostTimer = setTimeout(() => {
+      this.hostTimer = null;
+      const cur = this.meta && this.meta.host;
+      if (!cur || cur === this.uid || this.online(cur)) return;
+      const next = this.people().find(p => p.online && p.kind !== 'tv');
+      if (!next || next.uid !== this.uid) return;
+      this.ref('meta/host').transaction(h => h === cur ? this.uid : h).then(() => this.emit()).catch(() => {});
+    }, ms(ONLINE.hostGrace));
+  }
+  send(name, args) {
+    if (this.amHost && this.onAction) {
+      this.onAction({
+        id: 'local',
+        by: this.uid,
+        name,
+        args
+      }, () => {});
+      return;
+    }
+    this.ref('actions').push({
+      by: this.uid,
+      json: JSON.stringify({
+        name,
+        args
+      }),
+      at: this.fb.database.ServerValue.TIMESTAMP
+    }).catch(() => {});
+  }
+  publish(d) {
+    if (!this.amHost) return;
+    const out = {};
+    let n = 0;
+    const keys = new Set([...Object.keys(d || {}), ...Object.keys(this.sent)]);
+    keys.forEach(k => {
+      if (NO_SYNC.has(k)) return;
+      const v = d && d[k] !== undefined ? JSON.stringify(d[k]) : null;
+      if (this.sent[k] === v || v === null && this.sent[k] === undefined) return;
+      out[k] = v;
+      n++;
+      if (v === null) delete this.sent[k];else this.sent[k] = v;
+    });
+    if (n) this.ref('state').update(out).catch(() => {});
+  }
+  adoptState() {
+    this.sent = {};
+    Object.keys(this.stateCache).forEach(k => {
+      this.sent[k] = this.stateCache[k].raw;
+    });
+  }
+  publishLive(o) {
+    if (!this.amHost) return;
+    const out = {};
+    let n = 0;
+    Object.keys(o).forEach(k => {
+      const v = o[k] === undefined ? null : JSON.stringify(o[k]);
+      if (this.liveSent[k] !== v) {
+        out[k] = v;
+        this.liveSent[k] = v;
+        n++;
+      }
+    });
+    if (n) this.ref('live').update(out).catch(() => {});
+  }
+  setLobby(l) {
+    if (this.amHost) return this.ref('lobby').set(JSON.stringify(l)).catch(() => {});
+    return null;
+  }
+  setMe(patch) {
+    return this.ref('players/' + this.uid).update(patch).catch(() => {});
+  }
+  setPlayer(uid, patch) {
+    if (this.amHost) return (patch ? this.ref('players/' + uid).update(patch) : this.ref('players/' + uid).remove()).catch(() => {});
+    return null;
+  }
+  setStatus(status) {
+    if (this.amHost) return this.ref('meta/status').set(status).catch(() => {});
+    return null;
+  }
+  async resetGame() {
+    if (!this.amHost) return;
+    this.sent = {};
+    this.liveSent = {};
+    await this.ref('state').remove().catch(() => {});
+    await this.ref('live').remove().catch(() => {});
+    await this.ref('actions').remove().catch(() => {});
+  }
+  leave(forget) {
+    if (this.closed) return;
+    this.closed = true;
+    clearTimeout(this.hostTimer);
+    this.offs.forEach(f => {
+      try {
+        f();
+      } catch (e) {}
+    });
+    this.offs = [];
+    this.ref('presence/' + this.uid).remove().catch(() => {});
+    if (forget) {
+      saveLastRoom(null);
+      if (!this.state) this.ref('players/' + this.uid).remove().catch(() => {});
+    }
+  }
+  async close() {
+    if (!this.amHost) return;
+    await this.ref('meta/status').set('closed').catch(() => {});
+    this.leave(true);
+    setTimeout(() => this.db.ref('rooms/' + this.code).remove().catch(() => {}), 1500);
+  }
+}
+const NetCtx = React.createContext(null);
+const useNet = () => React.useContext(NetCtx);
+function netView(d, net) {
+  const online = !!(d && d.mode === 'online' && net);
+  const isHost = !online || net.role === 'host';
+  const who = online ? net.who : null;
+  return {
+    online,
+    isHost,
+    who,
+    tv: online && net.role === 'tv',
+    live: online ? net.live || {} : {},
+    runsBots: !!d && (d.mode === 'solo' || online) && isHost,
+    controls: teamId => !online ? d.mode === 'solo' ? !!(teamOf(d, teamId) || {}).human : true : !!who && who.teams.has(teamId),
+    controlsPart: pid => !online ? true : !!who && who.parts.has(pid)
+  };
+}
+function useAct(d, setDraft) {
+  const net = useNet();
+  return (name, ...args) => {
+    if (d && d.mode === 'online' && net) {
+      net.send(name, args);
+      return;
+    }
+    setDraft(p => runAction(p, name, args, null));
+  };
+}
+const TEAM_EMOJI = ['🔴', '🔵', '🟢', '🟣'];
+const defaultProfile = () => ({
+  name: '',
+  emoji: EMOJIS[Math.floor(Math.random() * EMOJIS.length)],
+  color: COLORS[Math.floor(Math.random() * COLORS.length)]
+});
+function OnlineHome({
+  profile,
+  setProfile,
+  last,
+  initialCode,
+  onCreate,
+  onJoin,
+  onTv,
+  onRejoin,
+  onBack
+}) {
+  const [code, setCode] = useState(cleanCode(initialCode || ''));
+  const name = (profile.name || '').trim();
+  return React.createElement("div", {
+    className: "app"
+  }, React.createElement(TopBar, {
+    onBack: onBack,
+    title: "Online"
+  }), React.createElement("h2", {
+    className: "display"
+  }, "Play on your own phones"), React.createElement("p", {
+    className: "muted",
+    style: {
+      margin: 0
+    }
+  }, "The host makes a room, friends join with the code, and everyone bids from their own phone. A laptop or TV can show the big screen."), last && React.createElement("div", {
+    className: "card row"
+  }, React.createElement("span", {
+    style: {
+      fontSize: 26
+    }
+  }, "\uD83D\uDD01"), React.createElement("div", {
+    className: "grow"
+  }, React.createElement("b", null, "Rejoin room ", last.code), React.createElement("span", {
+    className: "small muted",
+    style: {
+      display: 'block'
+    }
+  }, "Pick up where you left off.")), React.createElement("button", {
+    className: "btn btn-sm btn-gold",
+    onClick: () => onRejoin(last)
+  }, "Rejoin")), React.createElement("div", {
+    className: "card stack"
+  }, React.createElement("span", {
+    className: "label"
+  }, "You"), React.createElement("div", {
+    className: "row",
+    style: {
+      gap: 10
+    }
+  }, React.createElement("button", {
+    className: "emo",
+    "aria-label": "Change emoji",
+    onClick: () => setProfile({
+      ...profile,
+      emoji: EMOJIS[(EMOJIS.indexOf(profile.emoji) + 1) % EMOJIS.length]
+    })
+  }, profile.emoji), React.createElement("input", {
+    id: "on-name",
+    className: "input grow",
+    maxLength: 16,
+    value: profile.name,
+    placeholder: "Your name",
+    onChange: e => setProfile({
+      ...profile,
+      name: e.target.value
+    })
+  })), React.createElement("div", {
+    className: "chips",
+    role: "group",
+    "aria-label": "Your colour"
+  }, COLORS.slice(0, 8).map(c => React.createElement("button", {
+    key: c,
+    className: 'swatch' + (profile.color === c ? ' on' : ''),
+    style: {
+      background: c
+    },
+    "aria-label": 'Colour ' + c,
+    onClick: () => setProfile({
+      ...profile,
+      color: c
+    })
+  }))), React.createElement("p", {
+    className: "hint",
+    style: {
+      margin: 0
+    }
+  }, "Use the same name each time so your wins add up in Players & stats.")), React.createElement("button", {
+    className: "btn btn-gold",
+    disabled: !name,
+    onClick: onCreate
+  }, "Create a room"), React.createElement("div", {
+    className: "card stack"
+  }, React.createElement("label", {
+    className: "label",
+    htmlFor: "on-code"
+  }, "Join with a code"), React.createElement("div", {
+    className: "row"
+  }, React.createElement("input", {
+    id: "on-code",
+    className: "input grow codeinput",
+    value: code,
+    maxLength: 5,
+    autoCapitalize: "characters",
+    autoCorrect: "off",
+    spellCheck: "false",
+    placeholder: "ABCDE",
+    onChange: e => setCode(cleanCode(e.target.value))
+  }), React.createElement("button", {
+    className: "btn btn-sm btn-gold",
+    disabled: code.length !== 5 || !name,
+    onClick: () => onJoin(code)
+  }, "Join")), React.createElement("button", {
+    className: "btn btn-ghost btn-sm",
+    disabled: code.length !== 5,
+    onClick: () => onTv(code)
+  }, "\uD83D\uDCFA Use this screen as the TV"), !name && React.createElement("p", {
+    className: "hint",
+    style: {
+      margin: 0
+    }
+  }, "Type your name first.")), React.createElement("p", {
+    className: "hint"
+  }, "Anyone with the room code can join, so only share it with your group."));
+}
+function seatsFromLobby(room, cfg) {
+  const people = room.people().filter(p => p.kind !== 'tv' && p.online);
+  const seatId = uid => 'p-' + uid.slice(0, 12);
+  if (!cfg.teamMode) {
+    const used = new Set();
+    const humans = people.map(p => {
+      let color = p.color;
+      if (used.has(color)) color = COLORS.find(c => !used.has(c)) || color;
+      used.add(color);
+      return {
+        id: seatId(p.uid),
+        uid: p.uid,
+        name: (p.name || 'Player').trim(),
+        emoji: p.emoji,
+        color
+      };
+    });
+    const bots = makeBots(cfg.bots, cfg.level, cfg.botSeed, [...used]);
+    return [...humans, ...bots];
+  }
+  const teams = [];
+  const fill = makeBots(cfg.teamCount * ONLINE.maxTeamSize, cfg.level, cfg.botSeed, []);
+  let b = 0;
+  for (let t = 0; t < cfg.teamCount; t++) {
+    const members = people.filter(p => (p.team || 0) % cfg.teamCount === t).slice(0, ONLINE.maxTeamSize).map(p => ({
+      id: seatId(p.uid),
+      uid: p.uid,
+      name: (p.name || 'Player').trim(),
+      emoji: p.emoji
+    }));
+    if (cfg.fillBots) while (members.length < cfg.teamSize) {
+      const x = fill[b++];
+      members.push({
+        id: x.id,
+        name: x.name,
+        emoji: x.emoji,
+        bot: x.bot
+      });
+    }
+    if (members.length) teams.push({
+      id: 'team-' + t,
+      name: cfg.teamNames && cfg.teamNames[t] || TEAM_NAMES[t],
+      color: COLORS[t],
+      emoji: TEAM_EMOJI[t],
+      members
+    });
+  }
+  return teams;
+}
+function lobbyProblems(room, cfg) {
+  const seats = seatsFromLobby(room, cfg);
+  const out = [];
+  if (!cfg.topic) out.push('Pick a topic.');
+  if (seats.length < 2) out.push(cfg.teamMode ? 'You need at least two teams with someone in them.' : 'You need at least two players (add a bot to play against).');
+  if (!cfg.teamMode && seats.length > ONLINE.maxTeams) out.push('Too many players: the most is ' + ONLINE.maxTeams + ' (people + bots). Remove some bots or switch to teams.');
+  if (cfg.teamMode) cfg.teamCount && Array.from({
+    length: cfg.teamCount
+  }, (_, t) => t).forEach(t => {
+    const n = room.people().filter(p => p.kind !== 'tv' && p.online && (p.team || 0) % cfg.teamCount === t).length;
+    if (n > ONLINE.maxTeamSize) out.push((cfg.teamNames[t] || 'A team') + ' has more than ' + ONLINE.maxTeamSize + ' people.');
+  });
+  return out;
+}
+function initialLobby(topic, rules) {
+  return {
+    teamMode: false,
+    teamCount: 2,
+    teamSize: 2,
+    fillBots: true,
+    teamNames: TEAM_NAMES.slice(0, 4),
+    bots: 0,
+    level: 'medium',
+    botSeed: uid(),
+    talk: true,
+    clock: ONLINE.clock,
+    topic: topic ? packTopic(onlineTopic(topic), false) : null,
+    topicName: topic ? topic.name : '',
+    topicEmoji: topic ? topic.emoji : '',
+    rules: topic ? {
+      ...rules,
+      slots: [...topic.slots]
+    } : rules
+  };
+}
+function RoomCode({
+  code,
+  big
+}) {
+  const link = location.origin + location.pathname + '#room=' + code;
+  const [msg, setMsg] = useState('');
+  const share = async () => {
+    try {
+      if (navigator.share) {
+        await navigator.share({
+          title: 'Draft Night',
+          text: 'Join my Draft Night room: ' + code,
+          url: link
+        });
+        return;
+      }
+    } catch (e) {
+      return;
+    }
+    try {
+      await navigator.clipboard.writeText(link);
+      setMsg('Link copied.');
+    } catch (e) {
+      setMsg(link);
+    }
+  };
+  return React.createElement("div", {
+    className: 'roomcode' + (big ? ' big' : '')
+  }, React.createElement("span", {
+    className: "eyebrow"
+  }, "Room code"), React.createElement("b", {
+    className: "num",
+    "aria-label": 'Room code ' + code.split('').join(' ')
+  }, code), big ? React.createElement("span", {
+    className: "small"
+  }, "Open ", location.host, location.pathname.replace(/index\.html$/, ''), " \u2192 Online \u2192 enter the code") : React.createElement("button", {
+    className: "btn btn-sm",
+    onClick: share
+  }, "Share invite link"), msg && React.createElement("span", {
+    className: "small muted",
+    style: {
+      overflowWrap: 'anywhere'
+    }
+  }, msg));
+}
+function PlayerRow({
+  p,
+  me,
+  host,
+  isHost,
+  teamMode,
+  cfg,
+  room
+}) {
+  return React.createElement("div", {
+    className: 'prow-on' + (p.online ? '' : ' away'),
+    style: mStyle({
+      color: p.color || '#888'
+    })
+  }, React.createElement("span", {
+    className: "dot",
+    "aria-label": p.online ? 'online' : 'away'
+  }), React.createElement("span", {
+    className: "grow"
+  }, React.createElement("b", null, p.emoji, " ", p.name), p.uid === host ? React.createElement("small", null, " \xB7 host") : null, p.uid === me ? React.createElement("small", null, " \xB7 you") : null, !p.online ? React.createElement("small", null, " \xB7 away") : null), teamMode && (isHost || p.uid === me) && p.kind !== 'tv' && React.createElement("select", {
+    "aria-label": 'Team for ' + p.name,
+    className: "input mini-select",
+    value: (p.team || 0) % cfg.teamCount,
+    onChange: e => p.uid === me ? room.setMe({
+      team: +e.target.value
+    }) : room.setPlayer(p.uid, {
+      team: +e.target.value
+    })
+  }, Array.from({
+    length: cfg.teamCount
+  }, (_, t) => React.createElement("option", {
+    key: t,
+    value: t
+  }, TEAM_EMOJI[t], " ", cfg.teamNames[t]))), teamMode && !(isHost || p.uid === me) && React.createElement("span", {
+    className: "small"
+  }, TEAM_EMOJI[(p.team || 0) % cfg.teamCount]), isHost && p.uid !== me && React.createElement("button", {
+    className: "mini",
+    "aria-label": 'Remove ' + p.name,
+    onClick: () => room.setPlayer(p.uid, null)
+  }, "\u2715"));
+}
+function Lobby({
+  room,
+  topics,
+  rulePrefs,
+  onLeave: leaveNow,
+  onStart,
+  tv
+}) {
+  const isHost = room.amHost;
+  const [askLeave, setAskLeave] = useState(false);
+  const onLeave = () => isHost ? setAskLeave(true) : leaveNow();
+  const leaveSheet = askLeave && React.createElement(Confirm, {
+    title: "Close the room?",
+    body: "Everyone in the lobby is sent back. You can make a new room any time.",
+    yes: "Close room",
+    danger: true,
+    onYes: leaveNow,
+    onClose: () => setAskLeave(false)
+  });
+  const cfg = room.lobby;
+  const [view, setView] = useState('lobby');
+  const [folder, setFolder] = useState(null);
+  const set = patch => room.setLobby({
+    ...cfg,
+    ...patch
+  });
+  const people = room.people();
+  const players = people.filter(p => p.kind !== 'tv');
+  const tvs = people.filter(p => p.kind === 'tv' && p.online);
+  if (!cfg) return React.createElement("div", {
+    className: "app"
+  }, React.createElement(TopBar, {
+    onBack: onLeave,
+    title: "Lobby"
+  }), React.createElement("p", {
+    className: "muted"
+  }, "Setting up the room\u2026"));
+  const topicObj = cfg.topic ? unpackTopic(cfg.topic).topic : null;
+  if (isHost && view === 'topic') return React.createElement(SetupTopic, {
+    topics: topics,
+    folder: folder,
+    setFolder: setFolder,
+    onBack: () => setView('lobby'),
+    onTopics: () => setView('lobby'),
+    onPick: id => {
+      const t = topics.find(x => x.id === id);
+      set({
+        topic: packTopic(onlineTopic(t), false),
+        topicName: t.name,
+        topicEmoji: t.emoji,
+        rules: {
+          ...cfg.rules,
+          ...twistRules(cfg.rules),
+          slots: [...t.slots]
+        }
+      });
+      setView('lobby');
+    }
+  });
+  if (isHost && view === 'rules' && topicObj) {
+    const seats = seatsFromLobby(room, cfg);
+    return React.createElement(SetupRules, {
+      topic: topicObj,
+      managers: seats.length ? seats : [{
+        id: 'a'
+      }, {
+        id: 'b'
+      }],
+      rules: cfg.rules,
+      setRules: r => set({
+        rules: r
+      }),
+      onBack: () => setView('lobby'),
+      title: "Online \xB7 Rules",
+      startLabel: "Save rules",
+      teamSummary: {
+        teams: cfg.teamMode,
+        text: cfg.teamMode ? cfg.teamCount + ' teams' : 'Individual',
+        detail: 'Change teams and bots in the lobby.'
+      },
+      onStart: r => {
+        set({
+          rules: r
+        });
+        setView('lobby');
+      },
+      onReset: () => set({
+        rules: {
+          ...RULE_DEFAULTS(),
+          slots: [...topicObj.slots]
+        }
+      })
+    });
+  }
+  const problems = isHost ? lobbyProblems(room, cfg) : [];
+  const humansOnline = players.filter(p => p.online).length;
+  const r = cfg.rules || {};
+  const twistsOn = ['chaos', 'mystery', 'rarity', 'trades'].filter(k => r[k] && r[k].on).map(k => ({
+    chaos: 'Chaos Cards',
+    mystery: 'Mystery items',
+    rarity: 'Rarity',
+    trades: 'Trades'
+  })[k]);
+  const fin = r.finale && r.finale.mode || 'vote';
+  if (tv) return React.createElement("div", {
+    className: "app tvlobby"
+  }, React.createElement(RoomCode, {
+    code: room.code,
+    big: true
+  }), React.createElement("div", {
+    className: "card stack-sm"
+  }, React.createElement("h3", null, cfg.topicEmoji, " ", cfg.topicName || 'Topic not picked yet'), React.createElement("p", {
+    className: "small muted",
+    style: {
+      margin: 0
+    }
+  }, humansOnline, " player", humansOnline === 1 ? '' : 's', " in \xB7 waiting for the host to start")), React.createElement("div", {
+    className: "tvplayers"
+  }, players.map(p => React.createElement("span", {
+    key: p.uid,
+    className: 'tvp' + (p.online ? '' : ' away'),
+    style: mStyle({
+      color: p.color || '#888'
+    })
+  }, p.emoji, " ", p.name))));
+  return React.createElement("div", {
+    className: "app"
+  }, React.createElement(TopBar, {
+    onBack: onLeave,
+    backLabel: "\u2715",
+    title: "Lobby",
+    right: React.createElement(MuteButton, null)
+  }), React.createElement(RoomCode, {
+    code: room.code
+  }), React.createElement("div", {
+    className: "card stack-sm"
+  }, React.createElement("div", {
+    className: "row"
+  }, React.createElement("h3", {
+    className: "grow"
+  }, "Players \xB7 ", humansOnline), tvs.length > 0 && React.createElement("span", {
+    className: "small muted"
+  }, "\uD83D\uDCFA TV connected")), players.map(p => React.createElement(PlayerRow, {
+    key: p.uid,
+    p: p,
+    me: room.uid,
+    host: room.meta.host,
+    isHost: isHost,
+    teamMode: cfg.teamMode,
+    cfg: cfg,
+    room: room
+  })), players.some(p => !p.online) && React.createElement("p", {
+    className: "hint",
+    style: {
+      margin: 0
+    }
+  }, "Away players aren\u2019t given a seat when the game starts.")), isHost ? React.createElement(React.Fragment, null, React.createElement("div", {
+    className: "card stack"
+  }, React.createElement("h3", null, "Teams & bots"), React.createElement(Seg, {
+    label: "Play as",
+    value: cfg.teamMode ? 'teams' : 'solo',
+    options: [['solo', 'Everyone for themselves'], ['teams', 'Teams']],
+    onChange: v => set({
+      teamMode: v === 'teams'
+    })
+  }), !cfg.teamMode ? React.createElement("div", {
+    className: "field"
+  }, React.createElement("span", {
+    className: "label"
+  }, "Bots filling empty seats"), React.createElement(Stepper, {
+    id: "on-bots",
+    value: cfg.bots,
+    min: 0,
+    max: Math.max(0, ONLINE.maxTeams - humansOnline),
+    onChange: v => set({
+      bots: v
+    })
+  }), React.createElement("p", {
+    className: "hint"
+  }, "Up to ", ONLINE.maxTeams, " seats in total (", humansOnline, " people + ", cfg.bots, " bot", cfg.bots === 1 ? '' : 's', ").")) : React.createElement(React.Fragment, null, React.createElement("div", {
+    className: "field"
+  }, React.createElement("span", {
+    className: "label"
+  }, "Number of teams"), React.createElement(Seg, {
+    label: "Number of teams",
+    value: cfg.teamCount,
+    options: [[2, '2'], [3, '3'], [4, '4']],
+    onChange: v => set({
+      teamCount: v
+    })
+  })), React.createElement(Toggle, {
+    on: cfg.fillBots,
+    onChange: v => set({
+      fillBots: v
+    }),
+    title: "Bots fill empty team spots",
+    sub: 'Each team is topped up to ' + cfg.teamSize + ' with bots. Bots on a team with people give advice; all-bot teams play for themselves.'
+  }), cfg.fillBots && React.createElement("div", {
+    className: "field"
+  }, React.createElement("span", {
+    className: "label"
+  }, "Team size"), React.createElement(Seg, {
+    label: "Team size",
+    value: cfg.teamSize,
+    options: [[1, '1'], [2, '2'], [3, '3'], [4, '4']],
+    onChange: v => set({
+      teamSize: v
+    })
+  })), React.createElement("p", {
+    className: "hint"
+  }, "Everyone picks their team in the list above. Teams of up to ", ONLINE.maxTeamSize, ".")), (cfg.teamMode ? cfg.fillBots : cfg.bots > 0) && React.createElement("div", {
+    className: "field"
+  }, React.createElement("span", {
+    className: "label"
+  }, "Bot difficulty"), React.createElement(Seg, {
+    label: "Bot difficulty",
+    value: cfg.level,
+    options: Object.keys(BOT_LEVELS).map(k => [k, BOT_LEVELS[k].label]),
+    onChange: v => set({
+      level: v
+    })
+  })), React.createElement(Toggle, {
+    on: cfg.talk,
+    onChange: v => set({
+      talk: v
+    }),
+    title: "Bot trash talk",
+    sub: "Speech bubbles from the bots."
+  })), React.createElement("div", {
+    className: "card stack"
+  }, React.createElement("h3", null, "Game"), React.createElement("button", {
+    className: "tcard",
+    onClick: () => setView('topic')
+  }, React.createElement("span", {
+    className: "em"
+  }, cfg.topicEmoji || '🎲'), React.createElement("span", {
+    className: "meta"
+  }, React.createElement("span", {
+    className: "name"
+  }, cfg.topicName || 'Pick a topic'), React.createElement("span", {
+    className: "sub"
+  }, topicObj ? topicObj.items.length + ' items · ' + topicObj.slots.length + ' slots' : 'Tap to choose')), React.createElement("span", {
+    className: "muted",
+    style: {
+      fontSize: 22
+    }
+  }, "\u203A")), React.createElement("div", {
+    className: "field"
+  }, React.createElement("span", {
+    className: "label"
+  }, "Bid clock"), React.createElement(Seg, {
+    label: "Bid clock",
+    value: cfg.clock,
+    options: ONLINE.clocks.map(c => [c, c + 's']),
+    onChange: v => set({
+      clock: v
+    })
+  }), React.createElement("p", {
+    className: "hint"
+  }, "Restarts on every bid. When it runs out, the item sells (or is skipped if nobody bid).")), React.createElement("button", {
+    className: "btn",
+    disabled: !topicObj,
+    onClick: () => setView('rules')
+  }, "Rules: ", money(r.budget || 20), " budget", twistsOn.length ? ' · ' + twistsOn.join(', ') : '', " \xB7 winner by ", fin === 'vote' ? 'vote' : fin)), problems.map(p => React.createElement("p", {
+    key: p,
+    className: "warn"
+  }, p)), React.createElement("button", {
+    className: "btn btn-gold",
+    disabled: problems.length > 0,
+    onClick: onStart
+  }, "Start the draft"), React.createElement("p", {
+    className: "hint",
+    style: {
+      textAlign: 'center'
+    }
+  }, "A bot covers anyone who drops out for ", ONLINE.coverAfter / 1000, "s, and hands their seat back when they return."), leaveSheet) : React.createElement(React.Fragment, null, React.createElement("div", {
+    className: "card stack-sm"
+  }, React.createElement("h3", null, cfg.topicEmoji, " ", cfg.topicName || 'The host is picking a topic'), React.createElement("p", {
+    className: "small muted",
+    style: {
+      margin: 0
+    }
+  }, money(r.budget || 20), " budget \xB7 ", (r.slots || []).length, " slots \xB7 ", cfg.clock, "s bid clock", twistsOn.length ? ' · ' + twistsOn.join(', ') : '', " \xB7 winner by ", fin === 'vote' ? 'vote' : fin), React.createElement("p", {
+    className: "small muted",
+    style: {
+      margin: 0
+    }
+  }, cfg.teamMode ? cfg.teamCount + ' teams' + (cfg.fillBots ? ', bots fill empty spots' : '') : 'Everyone for themselves' + (cfg.bots ? ' + ' + cfg.bots + ' bot' + (cfg.bots === 1 ? '' : 's') : ''))), React.createElement("p", {
+    className: "muted",
+    style: {
+      textAlign: 'center'
+    }
+  }, "Waiting for the host to start\u2026")));
+}
+function RoomGame({
+  room,
+  d,
+  setHd,
+  onLeave,
+  onPlayAgain,
+  onFinished,
+  past,
+  settings
+}) {
+  const isHost = room.amHost;
+  const tv = room.kind === 'tv';
+  const [flash, setFlash] = useState(null);
+  const [askLeave, setAskLeave] = useState(false);
+  const who = useMemo(() => ownerInfo(d, room.uid), [d && d.managers, room.uid]);
+  const net = {
+    role: isHost ? 'host' : tv ? 'tv' : 'player',
+    who,
+    live: room.live,
+    send: (n, a) => room.send(n, a),
+    publishLive: o => room.publishLive(o)
+  };
+  const onFlash = info => {
+    setFlash(info);
+    if (isHost) room.publishLive({
+      flash: {
+        id: uid(),
+        info
+      }
+    });
+  };
+  const lastFlash = useRef(room.live && room.live.flash ? room.live.flash.id : null);
+  const fl = room.live && room.live.flash;
+  useEffect(() => {
+    if (isHost || !fl || fl.id === lastFlash.current) return;
+    lastFlash.current = fl.id;
+    if (fl.info.kind === 'card') return;
+    setFlash(fl.info);
+    if (fl.info.kind === 'sold') {
+      audio.play(fl.info.big ? 'big' : 'gavel');
+      if (fl.info.rarity === 'legendary' || fl.info.big) setTimeout(() => audio.play('cheer'), 600);
+    }
+  }, [fl && fl.id, isHost]);
+  useEffect(() => {
+    if (d && d.phase === 'done' && d.votesRevealed && (!d.finale || (d.finale.ui || {}).stage === 'done' || !d.finale.champion)) onFinished(d);
+  }, [d && d.votesRevealed, d && d.finale && (d.finale.ui || {}).stage]);
+  if (!d) return React.createElement("div", {
+    className: "app"
+  }, React.createElement("p", {
+    className: "muted"
+  }, "Loading the game\u2026"));
+  const setDraft = isHost ? setHd : () => {};
+  const goHome = () => setAskLeave(true);
+  let view;
+  if (d.phase === 'auction') view = React.createElement(Auction, {
+    d: d,
+    setDraft: setDraft,
+    goHome: goHome,
+    flashing: !!flash,
+    onFlash: onFlash
+  });else if (d.phase === 'freepick') view = React.createElement(FreePick, {
+    d: d,
+    setDraft: setDraft,
+    goHome: goHome,
+    flashing: !!flash,
+    onFlash: onFlash
+  });else if (d.phase === 'nominate') view = React.createElement(Nominate, {
+    d: d,
+    setDraft: setDraft,
+    goHome: goHome
+  });else if (d.phase === 'trade') view = React.createElement(TradeWindow, {
+    d: d,
+    setDraft: setDraft,
+    goHome: goHome
+  });else view = React.createElement(Results, {
+    d: d,
+    past: past,
+    showShame: settings.showShame,
+    live: true,
+    onChange: setDraft,
+    onBack: goHome,
+    onUndo: null,
+    onFinish: goHome,
+    onPlayAgain: isHost ? onPlayAgain : null
+  });
+  const seated = who.teams.size > 0;
+  const awaySeats = !seated && !tv ? humanSeats(d).filter(s => !room.online(s.uid)) : [];
+  return React.createElement(NetCtx.Provider, {
+    value: net
+  }, React.createElement("div", {
+    className: tv ? 'tvmode' : ''
+  }, !room.connected && React.createElement("div", {
+    className: "netbar",
+    role: "status"
+  }, "Reconnecting\u2026 your seat is kept."), !seated && !tv && awaySeats.length > 0 && React.createElement("div", {
+    className: "netbar seat",
+    role: "region",
+    "aria-label": "Take a seat"
+  }, React.createElement("span", null, "You\u2019re watching. Take back a seat:"), awaySeats.map(s => React.createElement("button", {
+    key: s.uid,
+    className: "btn btn-sm",
+    onClick: () => room.send('claimSeat', [s.uid])
+  }, s.name))), view, flash && React.createElement(Flash, {
+    f: flash,
+    onDone: () => setFlash(null)
+  }), askLeave && React.createElement(Confirm, {
+    title: "Leave the room?",
+    body: isHost ? 'Another player takes over as host and the game carries on. You can rejoin from Online.' : 'The game carries on. A bot covers your seat after a minute; you can rejoin from Online.',
+    yes: "Leave",
+    onYes: onLeave,
+    onClose: () => setAskLeave(false)
+  })));
+}
+function OnlineScreen({
+  start,
+  profile,
+  topics,
+  rulePrefs,
+  past,
+  settings,
+  onExit,
+  onFinished
+}) {
+  const [room, setRoom] = useState(null);
+  const [err, setErr] = useState('');
+  const [, tick] = useState(0);
+  const [hd, setHd] = useState(null);
+  const hdRef = useRef(null);
+  hdRef.current = hd;
+  const joined = useRef(false);
+  useEffect(() => {
+    let alive = true;
+    let r = null;
+    const p = start.kind === 'create' ? Room.create(profile) : Room.join(start.code, profile, start.kind === 'tv' ? 'tv' : 'player');
+    p.then(x => {
+      if (!alive) {
+        x.leave(false);
+        return;
+      }
+      r = x;
+      if (window.__DN_TEST__) window.__DN_ROOM = x;
+      x.subscribe(() => tick(n => n + 1));
+      setRoom(x);
+    }).catch(e => {
+      if (alive) setErr(e && e.message && !/^[a-z/-]+$/.test(e.message) && !/firebase|network|permission/i.test(e.message) ? e.message : netError(e));
+    });
+    return () => {
+      alive = false;
+      if (r) r.leave(false);
+    };
+  }, []);
+  const amHost = !!(room && room.amHost);
+  const status = room && room.meta ? room.meta.status : null;
+  useEffect(() => {
+    audio.setQuiet(!!room && !amHost && room.kind !== 'tv');
+    return () => audio.setQuiet(false);
+  }, [room, amHost]);
+  useEffect(() => {
+    if (!room || !amHost) return;
+    if (!room.lobby && status === 'lobby') {
+      const t = topics.find(x => x.items.length && x.slots.length);
+      room.setLobby(initialLobby(t, {
+        ...rulePrefs(),
+        slots: t ? [...t.slots] : []
+      }));
+    }
+    if (status === 'game' && !hdRef.current && room.state) {
+      room.adoptState();
+      setHd({
+        ...room.state,
+        history: []
+      });
+    }
+    room.drainActions().catch(() => {});
+  }, [room, amHost, status, !!(room && room.state)]);
+  useEffect(() => {
+    if (room && amHost && hd) room.publish(hd);
+  }, [hd, amHost]);
+  useEffect(() => {
+    if (!room) return undefined;
+    room.onAction = ({
+      by,
+      name,
+      args
+    }, done) => {
+      done();
+      if (!room.amHost) return;
+      setHd(p => {
+        if (!p) return p;
+        if (name === 'claimSeat') {
+          const [old] = args;
+          return typeof old === 'string' && !room.online(old) && ownerInfo(p, by).teams.size === 0 && humanSeats(p).some(s => s.uid === old) ? claimSeat(p, old, by) : p;
+        }
+        if ((name === 'bid' || name === 'card') && room.liveSent.paused === 'true') return p;
+        const n = runAction(p, name, args, ownerInfo(p, by));
+        if (name === 'freePick' && n !== p) {
+          const cp = currentPicker(p);
+          const it = p.items[args[0]];
+          setTimeout(() => {
+            const info = {
+              kind: 'free',
+              name: cp.m.name,
+              emoji: cp.m.emoji,
+              color: cp.m.color,
+              item: it.name
+            };
+            room.publishLive({
+              flash: {
+                id: uid(),
+                info
+              }
+            });
+          }, 0);
+        }
+        return n;
+      });
+    };
+    return () => {
+      room.onAction = null;
+    };
+  }, [room]);
+  useEffect(() => {
+    if (!room || !amHost || !hd) return undefined;
+    const t = setInterval(() => {
+      const now = Date.now();
+      setHd(p => {
+        if (!p) return p;
+        let n = p;
+        humanSeats(p).forEach(s => {
+          if (room.online(s.uid)) {
+            delete room.awaySince[s.uid];
+            if (s.covered) n = setCover(n, s.uid, false);
+          } else {
+            room.awaySince[s.uid] = room.awaySince[s.uid] || now;
+            if (!s.covered && now - room.awaySince[s.uid] >= ms(ONLINE.coverAfter)) n = setCover(n, s.uid, true);
+          }
+        });
+        return n;
+      });
+    }, ms(2000));
+    return () => clearInterval(t);
+  }, [room, amHost, !!hd]);
+  useEffect(() => {
+    if (room && room.players[room.uid]) joined.current = true;
+  });
+  const leave = forget => {
+    if (room) room.leave(forget);
+    onExit();
+  };
+  if (err) return React.createElement("div", {
+    className: "app"
+  }, React.createElement(TopBar, {
+    onBack: onExit,
+    title: "Online"
+  }), React.createElement("div", {
+    className: "card stack"
+  }, React.createElement("b", null, "Couldn\u2019t open the room"), React.createElement("p", {
+    className: "small",
+    style: {
+      margin: 0
+    }
+  }, err), React.createElement("button", {
+    className: "btn",
+    onClick: onExit
+  }, "Back")));
+  if (!room || !room.meta) return React.createElement("div", {
+    className: "app"
+  }, React.createElement(TopBar, {
+    onBack: onExit,
+    title: "Online"
+  }), React.createElement("p", {
+    className: "muted",
+    style: {
+      textAlign: 'center'
+    }
+  }, "Connecting\u2026"));
+  if (status === 'closed') return React.createElement("div", {
+    className: "app"
+  }, React.createElement(TopBar, {
+    onBack: () => leave(true),
+    title: "Online"
+  }), React.createElement("div", {
+    className: "card stack"
+  }, React.createElement("b", null, "This room has ended"), React.createElement("button", {
+    className: "btn",
+    onClick: () => leave(true)
+  }, "Back")));
+  if (joined.current && !room.players[room.uid]) return React.createElement("div", {
+    className: "app"
+  }, React.createElement(TopBar, {
+    onBack: () => leave(true),
+    title: "Online"
+  }), React.createElement("div", {
+    className: "card stack"
+  }, React.createElement("b", null, "You were removed from the room"), React.createElement("button", {
+    className: "btn",
+    onClick: () => leave(true)
+  }, "Back")));
+  if (status === 'lobby') return React.createElement(Lobby, {
+    room: room,
+    topics: topics,
+    rulePrefs: rulePrefs,
+    tv: room.kind === 'tv',
+    onLeave: () => amHost ? room.close().then(onExit) : leave(true),
+    onStart: () => {
+      const cfg = room.lobby;
+      const t = unpackTopic(cfg.topic).topic;
+      const managers = seatsFromLobby(room, cfg);
+      const rules = {
+        ...RULE_DEFAULTS(),
+        ...cfg.rules,
+        slots: [...t.slots]
+      };
+      const d = createDraft(t, managers, rules, {
+        mode: 'online',
+        online: {
+          clock: cfg.clock,
+          code: room.code
+        },
+        solo: {
+          talk: cfg.talk,
+          level: cfg.level
+        }
+      });
+      room.sent = {};
+      setHd(d);
+      room.publish(d);
+      room.setStatus('game');
+    }
+  });
+  const d = amHost ? hd : room.state;
+  return React.createElement(RoomGame, {
+    room: room,
+    d: d,
+    setHd: setHd,
+    past: past,
+    settings: settings,
+    onFinished: onFinished,
+    onLeave: () => leave(false),
+    onPlayAgain: async () => {
+      await room.resetGame();
+      setHd(null);
+      room.setStatus('lobby');
+      room.setLobby({
+        ...room.lobby,
+        botSeed: uid()
+      });
+    }
+  });
 }
 })();

@@ -114,8 +114,9 @@ const audio = (() => {
     } catch (e) { return null; }
   }
   // priority: 3 = SOLD / winner / legendary (cuts in), 2 = countdown, 1 = colour commentary (skipped if busy)
+  let quiet = false;
   function say(text, priority, key) {
-    if (cfg.muted || !cfg.voice || !hasSpeech() || !text) return false;
+    if (quiet || cfg.muted || !cfg.voice || !hasSpeech() || !text) return false;
     if (key) { if (said.has(key)) return false; said.add(key); if (said.size > 400) said.clear(); }
     try {
       const synth = window.speechSynthesis;
@@ -141,6 +142,8 @@ const audio = (() => {
       else if (cfg.music) { if (ctx) startMusic(); } else stopMusic();
     },
     play, say, hasSpeech,
+    // Online: players' phones stay quiet so the room doesn't hear ten auctioneers at once.
+    setQuiet(v) { quiet = !!v; }, get quiet() { return quiet; },
     voices() { try { return hasSpeech() ? window.speechSynthesis.getVoices().filter((v) => /^en/i.test(v.lang)) : []; } catch (e) { return []; } },
     test() { ensureCtx(); play('gavel'); say('SOLD to the highest bidder! What a night!', 3); },
     resetSaid() { said.clear(); },

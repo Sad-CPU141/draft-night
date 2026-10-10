@@ -1,4 +1,4 @@
-/* Draft Night e2b33c1069 — built from src/styles.css */
+/* Draft Night e1729e2c39 — built from src/styles.css */
 /* Layout: one phone-width column, a stage-lit backdrop, the auction screen as a full-height console with a sticky gavel bar. */
 :root{
   --ink:#0f0c21; --stage:#19153a; --panel:#221d47; --panel2:#2c2659; --line:#3d3672;
@@ -455,3 +455,32 @@ input[type=range]{width:100%;accent-color:var(--gold);min-height:32px}
 .cbar .v,.key.v{background:#7d6bff}
 .key{display:inline-block;width:10px;height:10px;border-radius:3px;vertical-align:middle}
 @media (prefers-reduced-motion:reduce){.mbanner.pop{animation:none}.sb-progress i{transition:none}}
+
+/* ---------- Step 8: online rooms and TV ---------- */
+.swatch{width:34px;height:34px;border-radius:50%;border:3px solid transparent;flex:none}
+.swatch.on{border-color:var(--text);box-shadow:0 0 0 2px var(--ink) inset}
+.codeinput{font-family:var(--display);font-size:28px;letter-spacing:.3em;text-transform:uppercase;text-align:center}
+.roomcode{display:flex;flex-direction:column;align-items:center;gap:6px;padding:14px;border-radius:20px;background:var(--panel);border:2px dashed var(--gold)}
+.roomcode b{font-family:var(--display);font-weight:400;font-size:56px;letter-spacing:.18em;color:var(--gold);line-height:1}
+.roomcode.big b{font-size:clamp(72px,14vw,160px)}
+.roomcode.big .small{font-size:18px;text-align:center}
+.prow-on{display:flex;align-items:center;gap:10px;padding:8px 10px;border-radius:12px;background:var(--panel2);border-left:5px solid var(--c)}
+.prow-on .dot{width:10px;height:10px;border-radius:50%;background:var(--ok);flex:none}
+.prow-on.away{opacity:.6}
+.prow-on.away .dot{background:var(--dim)}
+.prow-on small{color:var(--muted);font-weight:600}
+.mini-select{width:auto;min-height:36px;padding:4px 8px;font-size:14px}
+.netbar{position:sticky;top:0;z-index:30;background:var(--danger);color:#fff;text-align:center;font-weight:700;padding:8px 12px;font-size:14px}
+.netbar.seat{background:var(--panel2);display:flex;flex-wrap:wrap;gap:8px;align-items:center;justify-content:center}
+.tvlobby{max-width:1100px}
+.tvplayers{display:flex;flex-wrap:wrap;gap:12px;justify-content:center}
+.tvp{font-family:var(--cond);font-weight:800;font-size:26px;padding:8px 16px;border-radius:14px;background:var(--panel);border-left:6px solid var(--c)}
+.tvp.away{opacity:.5}
+.tvmode .app{max-width:1200px}
+.tvmode .auction .mgr-grid{grid-template-columns:repeat(auto-fill,minmax(220px,1fr))}
+.tvmode .itemcard .nm{font-size:clamp(40px,5vw,72px)}
+.tvmode .itemcard .ph{width:180px;height:180px}
+.tvmode .bidbox .amount{font-size:clamp(80px,10vw,140px)}
+.tvmode .timernum{font-size:48px}
+.tvmode .actions{display:none}
+@media (min-width:900px){.tvmode .auction .paused{display:grid;grid-template-columns:1.2fr 1fr;gap:20px;align-items:center}}

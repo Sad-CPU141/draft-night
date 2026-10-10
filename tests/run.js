@@ -10,7 +10,7 @@ let failures = 0;
 const ok = (cond, msg) => { if (cond) console.log('  ✓ ' + msg); else { failures++; console.log('  ✗ ' + msg); } };
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
-async function boot({ idb = true, fetchImpl, storage, speed, url, fakeAudio, compress, h2c } = {}) {
+async function boot({ idb = true, fetchImpl, storage, speed, url, fakeAudio, compress, h2c, fb } = {}) {
   const dom = new JSDOM(fs.readFileSync(path.join(root, 'index.html'), 'utf8').replace(/<script[^>]*src="[^"]*"[^>]*><\/script>/g, '').replace(/<link[^>]*>/g, ''), {
     url: url || 'https://sad-cpu141.github.io/draft-night/', runScripts: 'outside-only', pretendToBeVisual: true,
   });
@@ -19,6 +19,7 @@ async function boot({ idb = true, fetchImpl, storage, speed, url, fakeAudio, com
   w.addEventListener('error', (e) => console.log('    PAGE ERROR:', e.error && (e.error.stack || e.error.message)));
   const origErr = w.console.error; w.console.error = (...a) => { console.log('    CONSOLE.ERROR:', String(a[0]).slice(0, 600)); };
   if (speed) w.__DN_TEST_SPEED = speed;
+  if (fb) w.__DN_FAKE_FB = fb;
   if (fakeAudio) {
     // A pretend speech engine that records what the auctioneer says.
     w.__spoken = []; w.__cancels = 0;
@@ -252,7 +253,7 @@ async function tap(w, el) { el.dispatchEvent(new w.MouseEvent('pointerdown', { b
     ok(!neg, 'no bot or player ever goes below $0');
     const avg = (o) => o.paid / Math.max(1, o.n);
     ok(avg(per.spender) > avg(per.bargain) * 1.3, 'Big Spender pays more per item than Bargain Hunter ($' + avg(per.spender).toFixed(2) + ' vs $' + avg(per.bargain).toFixed(2) + ')');
-    ok(per.spender.fame / per.spender.n > per.bargain.fame / per.bargain.n, 'Big Spender buys more famous items than Bargain Hunter');
+    ok(per.spender.fame / per.spender.n > per.bargain.fame / per.bargain.n, 'Big Spender buys more famous items than Bargain Hunter (' + (per.spender.fame / per.spender.n).toFixed(3) + ' vs ' + (per.bargain.fame / per.bargain.n).toFixed(3) + ')');
     const fb = sim.flexBids; const rate = (t) => fb[t].flex / Math.max(1, fb[t].all);
     ok(rate('needs') < rate('chaos') * 0.6 && rate('needs') < rate('spender') * 0.6, 'Position Strategist rarely bids on filled positions while it still has gaps ('  + Math.round(100 * rate('needs')) + '% vs Chaos ' + Math.round(100 * rate('chaos')) + '%, Spender ' + Math.round(100 * rate('spender')) + '%)');
     // Difficulty: hard and easy bots of the same personality at the same table.
@@ -426,7 +427,8 @@ async function tap(w, el) { el.dispatchEvent(new w.MouseEvent('pointerdown', { b
   {
     const { w, d, DN } = await boot({ speed: 0.02 });
     await click(w, btn(d, 'Online'));
-    ok(/coming in a later update/i.test(d.body.textContent) && !!btn(d, 'Solo'), 'Online shows Coming Soon and stays on the home screen');
+    ok(/Create a room/.test(d.body.textContent), 'Online opens the online room screen');
+    await click(w, d.querySelector('.topbar .iconbtn'));
     await click(w, btn(d, 'Solo'));
     const startOver = [...d.querySelectorAll('.modal button')].find((x) => /New draft/.test(x.textContent));
     if (startOver) await click(w, startOver);
@@ -467,7 +469,7 @@ async function tap(w, el) { el.dispatchEvent(new w.MouseEvent('pointerdown', { b
     const choices = [...d.querySelectorAll('.modal .votebtn')];
     ok(choices.length >= 1 && !choices.some((c) => /You\b/.test(c.textContent.split('·')[0])), 'you can’t vote for your own team');
     await click(w, choices[0]);
-    await click(w, btn(d, 'Lock in'));
+    btn(d, 'Lock in').dispatchEvent(new w.MouseEvent('click', { bubbles: true })); await sleep(5);
     ok(/bots are voting/i.test(d.body.textContent), 'after you lock in, the bots vote');
     await sleep(200);
     const cur = DN.store.get('dn_current_v1') || {};
@@ -838,6 +840,8 @@ async function tap(w, el) { el.dispatchEvent(new w.MouseEvent('pointerdown', { b
     const okVotes = s4.finale.bracket.rounds.flat().every((m) => Object.entries(m.votes || {}).every(([pid, t]) => pid !== t));
     ok(/Champions!/.test(b4.d.body.textContent) && okVotes, 'solo bracket: bots vote, nobody votes for their own team, a champion is crowned');
   }
+
+  if (!process.env.SKIP_ONLINE) await require('./online.js')({ ok, boot, btn, click, sleep });
 
   console.log('Persistence after refresh');
   {

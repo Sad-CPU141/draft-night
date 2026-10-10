@@ -219,7 +219,7 @@ function createDraft(topic, managers, rules, extra) {
     id: uid(), createdAt: Date.now(),
     topic: { id: topic.id, name: topic.name, emoji: topic.emoji, layout: topic.layout, art: artOf(topic), kitShape: topic.kitShape || '', kitLabel: topic.kitLabel || '', photos: !!topic.photos },
     rules: { ...rules },
-    managers: managers.map((m) => ({ id: m.id, name: m.name.trim(), color: m.color, emoji: m.emoji, budget: rules.budget, team: rules.slots.map(() => null), ...(m.bot ? { bot: { ...m.bot } } : {}), ...(m.human ? { human: true } : {}), ...(m.members ? { members: m.members.map((p) => ({ ...p })) } : {}) })),
+    managers: managers.map((m) => ({ id: m.id, name: m.name.trim(), color: m.color, emoji: m.emoji, budget: rules.budget, team: rules.slots.map(() => null), ...(m.bot ? { bot: { ...m.bot } } : {}), ...(m.human ? { human: true } : {}), ...(m.uid ? { uid: m.uid } : {}), ...(m.members ? { members: m.members.map((p) => ({ ...p })) } : {}) })),
     teamMode: managers.some((m) => m.members),
     items, queue: rules.order === 'random' ? shuffle(ids) : ids, leftover: [], passed: [], processed: 0,
     cards: dealCards(managers.map((m) => m.id), rules, seed), frozen: {}, revealed: [], cardLog: [], pending: null,
@@ -484,9 +484,8 @@ function TeamsSheet({ d, onClose }) {
 /* ============================================================
    HOME
    ============================================================ */
-function Home({ draft, past, onNew, onSolo, onResume, onTopics, onPast, onAbandon, onSettings, onPlayers, showInstall, onDismissInstall }) {
+function Home({ draft, past, onNew, onSolo, onOnline, onResume, onTopics, onPast, onAbandon, onSettings, onPlayers, showInstall, onDismissInstall }) {
   const [ask, setAsk] = useState(null);
-  const [soon, setSoon] = useState(false);
   const status = draft && (draft.phase === 'auction' ? 'Item ' + (draft.processed + 1) + ' of ' + (draft.processed + draft.queue.length) : draft.phase === 'nominate' ? 'Nominating' : draft.phase === 'trade' ? 'Trade window' : draft.phase === 'freepick' ? 'Free picks' : 'Results & voting');
   return (
     <div className="app">
@@ -511,11 +510,10 @@ function Home({ draft, past, onNew, onSolo, onResume, onTopics, onPast, onAbando
         <button className="mode local" onClick={() => (draft ? setAsk('new') : onNew())}>
           <span className="mi">📱</span><span className="mt">Local</span><span className="ms">Pass the phone</span>
         </button>
-        <button className="mode online" aria-disabled="true" onClick={() => setSoon(true)}>
-          <span className="mi">🌐</span><span className="mt">Online</span><span className="ms">Coming soon</span>
+        <button className="mode online" onClick={onOnline}>
+          <span className="mi">🌐</span><span className="mt">Online</span><span className="ms">Own phones · TV</span>
         </button>
       </div>
-      {soon && <p className="hint soon" role="status">Online rooms, where everyone bids from their own phone, are coming in a later update. For now, play Solo or Local.</p>}
       <div className="menu">
         <button className="btn" onClick={onTopics}>Topics</button>
         <button className="btn" onClick={onPast}>Past drafts{past.length ? ' (' + past.length + ')' : ''}</button>
@@ -1172,7 +1170,7 @@ function ManagerButton({ d, m, onBid, onCustom, disabledAll, readOnly, bubble, t
   const botInfo = isBot(m) ? BOT_TYPES[m.bot.type] : null;
   const status = isLead ? <span className="badge">★ Leading{enabled ? ' · tap +' + money(d.rules.inc) : ''}</span>
     : thinking ? <span className="badge think">Thinking…</span>
-    : readOnly ? (blocker || (botInfo ? botInfo.short : 'Watching'))
+    : readOnly ? (blocker || (m.cover ? '📡 Away · bot covering' : botInfo ? botInfo.short : (m.uid || m.members) && d.mode === 'online' ? '📱 On their phone' : 'Watching'))
     : (blocker || 'Tap: ' + money(amt));
   const dim = readOnly ? !!blocker && !isLead : (!isLead && !enabled && !customOk);
   const handlers = readOnly ? {} : { onPointerDown: down, onPointerUp: up, onPointerLeave: cancel, onPointerCancel: cancel,
@@ -1195,7 +1193,7 @@ function ManagerButton({ d, m, onBid, onCustom, disabledAll, readOnly, bubble, t
 function useBotTalk(d) {
   const [bubbles, setBubbles] = useState({});
   const last = useRef(0); const per = useRef({}); const timers = useRef([]);
-  const enabled = d.mode === 'solo' && !(d.solo && d.solo.talk === false);
+  const enabled = (d.mode === 'solo' || d.mode === 'online') && !(d.solo && d.solo.talk === false);
   useEffect(() => () => timers.current.forEach(clearTimeout), []);
   // who: a bot manager id, or a bot "actor" ({ id: team id, name, bot, speaker }) from a bot team.
   const say = (who, event, extra, force) => {
@@ -1395,7 +1393,7 @@ function VetoSheet({ d, onAnswer }) {
       <p className="eyebrow">🛑 Veto?</p>
       <h2 className="display" style={{ fontSize: 30, color: them.color }}>{them.emoji} {them.name}</h2>
       <p className="summary">{cardPlayText(d, play)}</p>
-      <p className="hint">You have a Veto card. Use it to block this? {d.mode !== 'solo' ? 'Pass the phone to ' + them.name + '.' : ''}</p>
+      <p className="hint">You have a Veto card. Use it to block this? {d.mode === 'local' ? 'Pass the phone to ' + them.name + '.' : ''}</p>
       <div className="row pin">
         <button className="btn grow" onClick={() => onAnswer(false)}>Let it happen</button>
         <button className="btn btn-gold grow" onClick={() => onAnswer(true)}>Use Veto</button>
@@ -1409,21 +1407,32 @@ const bidKeyOf = (d) => d.reveal + ':' + (d.bid ? d.bid.amount + d.bid.leaderId 
 function Auction({ d, setDraft, goHome, flashing, onFlash }) {
   const item = currentItem(d);
   const solo = d.mode === 'solo';
-  const [paused, setPaused] = useState(false);
-  const [gavel, setGavel] = useState(false);
+  const net = useNet(); const nv = netView(d, net); const online = nv.online; const auto = solo || online;
+  const act = useAct(d, setDraft);
+  const [pausedLocal, setPaused] = useState(false);
+  const [gavelLocal, setGavel] = useState(false);
   const [custom, setCustom] = useState(null);
   const [teams, setTeams] = useState(false);
-  const [thinking, setThinking] = useState(null);
+  const [thinkingLocal, setThinking] = useState(null);
+  // Online, the host's phone runs the clock; everyone else shows what it publishes.
+  const paused = nv.isHost ? pausedLocal : !!nv.live.paused;
+  const gavel = nv.isHost ? gavelLocal : !!nv.live.gavel;
+  const thinking = nv.isHost ? thinkingLocal : nv.live.thinking || null;
   const [out, setOut] = useState(false); // solo: you tapped "I'm out" for this item
   const [cardsOpen, setCardsOpen] = useState(false);
   const cardTried = useRef(new Set()); // each bot considers a card at most once per item
   const hold = paused || !!d.pending;   // a card waiting for a Veto answer pauses the item
   const busy = useRef(false);
   // Solo games always run a closing clock so items sell on their own.
-  const timer = solo ? ((d.solo && d.solo.clock) || 8) : (d.rules.timer || 0);
-  const [left, setLeft] = useState(timer);
+  const timer = solo ? ((d.solo && d.solo.clock) || 8) : online ? ((d.online && d.online.clock) || ONLINE.clock) : (d.rules.timer || 0);
+  const [leftLocal, setLeft] = useState(timer);
   const bidKey = bidKeyOf(d);
+  const left = nv.isHost ? leftLocal : (nv.live.key === bidKey && typeof nv.live.left === 'number' ? nv.live.left : timer);
   const talk = useBotTalk(d);
+  const bubbles = nv.isHost ? talk.bubbles : (nv.live.bubbles || {});
+  useEffect(() => {
+    if (online && nv.isHost && net.publishLive) net.publishLive({ left: leftLocal, key: bidKey, paused: pausedLocal, gavel: gavelLocal, thinking: thinkingLocal, bubbles: talk.bubbles });
+  }, [online, nv.isHost, leftLocal, bidKey, pausedLocal, gavelLocal, thinkingLocal, talk.bubbles]);
   // Refs let delayed bot actions check the *current* game before acting.
   const live = useRef({}); live.current = { d, paused: hold, flashing, gavel, left };
   useEffect(() => { setLeft(timer); }, [bidKey, timer]);
@@ -1431,7 +1440,7 @@ function Auction({ d, setDraft, goHome, flashing, onFlash }) {
 
   const leader = d.bid && d.managers.find((m) => m.id === d.bid.leaderId);
   const total = d.processed + d.queue.length;
-  const you = solo ? d.managers.find((m) => m.human) : null;
+  const you = solo ? d.managers.find((m) => m.human) : online ? d.managers.find((m) => nv.controls(m.id)) : null;
 
   function sold() {
     if (!d.bid || busy.current || flashing) return;
@@ -1453,7 +1462,7 @@ function Auction({ d, setDraft, goHome, flashing, onFlash }) {
     audio.say(line, 3, d.id + ':sold:' + d.reveal);
     setTimeout(() => {
       setGavel(false); onFlash(info); setDraft((p) => sell(p)); busy.current = false;
-      if (solo) talk.later(ms(1900), () => {
+      if (nv.runsBots) talk.later(ms(1900), () => {
         const fair = d.rules.budget / d.rules.slots.length;
         if (isBot(leader)) talk.say(winnerId, price <= d.rules.minBid + d.rules.inc && itemFame(item) > 0.45 ? 'steal' : 'win');
         else if (price >= fair * 1.4) { const b = d.managers.find((m) => isBot(m)); if (b) talk.say(b.id, 'rival'); }
@@ -1474,19 +1483,19 @@ function Auction({ d, setDraft, goHome, flashing, onFlash }) {
   // Closing clock: a steady ticker that restarts on every bid, so a bid landing on the
   // same instant as a tick can never stall it.
   useEffect(() => {
-    if (!timer || hold || flashing || gavel) return undefined;
+    if (!nv.isHost || !timer || hold || flashing || gavel) return undefined;
     const t = setInterval(() => setLeft((l) => (l > 0 ? l - 1 : 0)), ms(1000));
     return () => clearInterval(t);
-  }, [bidKey, hold, flashing, gavel, timer]);
+  }, [bidKey, hold, flashing, gavel, timer, nv.isHost]);
   useEffect(() => {
-    if (!timer || hold || flashing || gavel || left > 0) return;
-    if (d.bid) sold(); else if (solo) skip();
-  }, [left, hold, flashing, gavel, timer]);
+    if (!nv.isHost || !timer || hold || flashing || gavel || left > 0) return;
+    if (d.bid) sold(); else if (auto) skip();
+  }, [left, hold, flashing, gavel, timer, nv.isHost]);
 
   // Solo: one bot at a time considers the current price, then bids after a short, human-ish delay.
   const cardKey = bidKey + ':' + JSON.stringify(d.cards || {}) + ':' + ((d.cardLog || []).length);
   useEffect(() => {
-    if (!solo || hold || flashing || gavel || busy.current || d.phase !== 'auction') { setThinking(null); return undefined; }
+    if (!nv.runsBots || hold || flashing || gavel || busy.current || d.phase !== 'auction') { setThinking(null); return undefined; }
     // Before the first bid, a bot may play a card (once per item); otherwise the quickest bidder acts.
     let cardPlan = null;
     if (cardWindow(d)) {
@@ -1515,18 +1524,18 @@ function Auction({ d, setDraft, goHome, flashing, onFlash }) {
       talk.say(speaker, plan.event);
     }, ms(plan.delay));
     return () => clearTimeout(t);
-  }, [cardKey, hold, flashing, gavel, solo]);
+  }, [cardKey, hold, flashing, gavel, nv.runsBots]);
 
   // A card aimed at a bot team that holds a Veto: the bot answers on its own.
   useEffect(() => {
     if (!d.pending) return undefined;
     const victim = teamOf(d, d.pending.target);
-    const botVictim = d.mode === 'solo' && victim && (isBot(victim) || isBotTeam(victim));
+    const botVictim = nv.runsBots && victim && (isBot(victim) || isBotTeam(victim));
     if (!botVictim) return undefined;
     const id = d.pending.id;
     const t = setTimeout(() => setDraft((p) => (p.pending && p.pending.id === id ? answerCard(p, botVeto(p, teamOf(p, p.pending.target), p.pending)) : p)), ms(1200));
     return () => clearTimeout(t);
-  }, [d.pending && d.pending.id]);
+  }, [d.pending && d.pending.id, nv.runsBots]);
 
   // Announce card results.
   const logLen = (d.cardLog || []).length;
@@ -1543,7 +1552,7 @@ function Auction({ d, setDraft, goHome, flashing, onFlash }) {
 
   // Bots on your team give advice when a new item comes up.
   useEffect(() => {
-    if (!solo || flashing || d.bid || !item) return;
+    if (!nv.runsBots || flashing || d.bid || !item) return;
     const advisers = botAdvisers(d); if (!advisers.length) return;
     const a = advisers[d.reveal % advisers.length];
     const vis = visibleItem(d, item.id);
@@ -1579,7 +1588,7 @@ function Auction({ d, setDraft, goHome, flashing, onFlash }) {
 
   // Solo: a little pre-game talk, and the strategist grumbles about items it can't use.
   useEffect(() => {
-    if (!solo || flashing) return;
+    if (!nv.runsBots || flashing) return;
     if (d.processed === 0 && !d.bid) { const b = d.managers.filter(isBot); if (b.length) talk.say(b[Math.floor(Math.random() * b.length)].id, 'start', null, true); return; }
     const planner = d.managers.find((m) => isBot(m) && m.bot.type === 'needs' && !isFull(m) && item && assignSlot(m, item, d.rules.slots) < 0);
     if (planner) { const k = planner.team.findIndex((x) => !x); talk.say(planner.id, 'need', { slot: d.rules.slots[k] }); }
@@ -1593,16 +1602,17 @@ function Auction({ d, setDraft, goHome, flashing, onFlash }) {
   const youAmt = you ? nextAmount(d) : 0;
   const youCan = you && !paused && !flashing && !gavel && canBid(d, you, youAmt);
   const going = timer > 0 && d.bid && left <= 2 && left > 0 ? (left === 2 ? 'Going once…' : 'Going twice…') : null;
-  const ordered = solo ? [...d.managers].sort((a, b) => (b.human ? 1 : 0) - (a.human ? 1 : 0)) : d.managers;
+  const ordered = auto ? [...d.managers].sort((a, b) => (nv.controls(b.id) ? 1 : 0) - (nv.controls(a.id) ? 1 : 0)) : d.managers;
+  const vetoHere = d.pending && nv.controls(d.pending.target) && !(nv.runsBots && (isBot(teamOf(d, d.pending.target)) || isBotTeam(teamOf(d, d.pending.target)))) && !(solo && (isBot(teamOf(d, d.pending.target)) || isBotTeam(teamOf(d, d.pending.target))));
   return (
-    <div className={'app auction' + (solo ? ' solo' : '')}>
+    <div className={'app auction' + (auto ? ' solo' : '')}>
       <div className="topbar">
         <button className="iconbtn" onClick={goHome} aria-label="Home">⌂</button>
         <div className="title num">Item {d.processed + 1} of {total}</div>
         <MuteButton />
-        {ruleOn(d, 'chaos') && <button className="pillbtn" onClick={() => setCardsOpen(true)} aria-label="Chaos Cards">🃏</button>}
+        {ruleOn(d, 'chaos') && (!online || you) && <button className="pillbtn" onClick={() => setCardsOpen(true)} aria-label="Chaos Cards">🃏</button>}
         <button className="pillbtn" onClick={() => setTeams(true)}>Teams</button>
-        <button className="iconbtn" onClick={() => setPaused((p) => !p)} aria-label={paused ? 'Resume' : 'Pause'}>{paused ? '▶' : 'Ⅱ'}</button>
+        {nv.isHost && <button className="iconbtn" onClick={() => setPaused((p) => !p)} aria-label={paused ? 'Resume' : 'Pause'}>{paused ? '▶' : 'Ⅱ'}</button>}
       </div>
       <div className="progress"><div className="bar"><i style={{ width: (d.processed / Math.max(1, total)) * 100 + '%' }} /></div><span className="small muted num">{d.queue.length - 1} left</span></div>
 
@@ -1611,7 +1621,7 @@ function Auction({ d, setDraft, goHome, flashing, onFlash }) {
         <div className={'bidbox' + (leader ? ' lead' : '')} style={lc ? { '--lc': lc } : null}>
           {timer > 0 && <span className={'timernum num' + (left <= 3 ? ' hot' : '')}>{Math.max(0, left)}</span>}
           <div key={bidKey} className={'amount num' + (leader ? ' pop' : '')}>{money(d.bid ? d.bid.amount : d.rules.minBid)}</div>
-          <div className="leader" style={{ color: lc || 'var(--muted)' }}>{leader ? leader.emoji + ' ' + leader.name + ' leads' : timer > 0 && left <= 0 ? "Time's up · no bids" : solo ? 'Opening bid · bid or wait' : 'Opening bid · tap a manager'}</div>
+          <div className="leader" style={{ color: lc || 'var(--muted)' }}>{leader ? leader.emoji + ' ' + leader.name + ' leads' : timer > 0 && left <= 0 ? "Time's up · no bids" : auto ? 'Opening bid · bid or wait' : 'Opening bid · tap a manager'}</div>
           <div className="going" aria-live="polite">{d.pending ? '🛑 Waiting for a Veto answer…' : going || (thinker ? '💭 ' + thinker.name + ' is thinking…' : solo && out ? 'You’re out on this one' : frozenTeam ? '🧊 ' + frozenTeam.name + ' is frozen for this item' : ' ')}</div>
           {timer > 0 && <span className="timer" style={{ width: (Math.max(0, left) / timer) * 100 + '%' }} />}
         </div>
@@ -1619,7 +1629,7 @@ function Auction({ d, setDraft, goHome, flashing, onFlash }) {
           <div className="pausecover">
             <div className="stack" style={{ alignItems: 'center' }}>
               <h2 className="display" style={{ fontSize: 56, color: 'var(--gold)' }}>Paused</h2>
-              <button className="btn btn-gold" style={{ width: 200 }} onClick={() => setPaused(false)}>Resume</button>
+              {nv.isHost ? <button className="btn btn-gold" style={{ width: 200 }} onClick={() => setPaused(false)}>Resume</button> : <p className="muted" style={{ margin: 0 }}>The host paused the game.</p>}
             </div>
           </div>
         )}
@@ -1627,22 +1637,22 @@ function Auction({ d, setDraft, goHome, flashing, onFlash }) {
 
       <div className="mgr-grid">
         {ordered.map((m) => (
-          <ManagerButton key={m.id} d={d} m={m} disabledAll={hold || flashing || gavel} readOnly={solo && !m.human}
-            bubble={talk.bubbles[m.id]} thinking={thinking === m.id}
-            onBid={(amt) => { buzz(12); setOut(false); setDraft((p) => placeBid(p, m.id, amt)); }}
+          <ManagerButton key={m.id} d={d} m={m} disabledAll={hold || flashing || gavel} readOnly={auto && !nv.controls(m.id)}
+            bubble={bubbles[m.id]} thinking={thinking === m.id}
+            onBid={(amt) => { buzz(12); setOut(false); act('bid', m.id, amt); }}
             onCustom={() => setCustom(m.id)} />
         ))}
       </div>
-      <p className="hint" style={{ textAlign: 'center' }}>{solo ? 'Tap Bid to raise +' + money(d.rules.inc) + ' · ✎ on your card for a custom bid · it sells when the clock runs out' : 'Tap to bid +' + money(d.rules.inc) + ' · hold or ✎ for a custom bid'}</p>
+      <p className="hint" style={{ textAlign: 'center' }}>{nv.tv ? 'Bid from your phones · it sells when the clock runs out' : online && !you ? 'You’re watching this game.' : auto ? 'Tap Bid to raise +' + money(d.rules.inc) + ' · ✎ on your card for a custom bid · it sells when the clock runs out' : 'Tap to bid +' + money(d.rules.inc) + ' · hold or ✎ for a custom bid'}</p>
 
-      {solo ? (
+      {auto ? (you ? (
         <div className="actions duo">
-          <button className="btn" disabled={hold || flashing || out || !(you && canBid(d, you, youAmt))} onClick={() => { setOut(true); setLeft((l) => Math.min(l, 3)); }}>I’m out</button>
-          <button className="btn btn-gold sold" disabled={!youCan} onClick={() => { buzz(12); setOut(false); setDraft((p) => placeBid(p, you.id, nextAmount(p))); }}>
+          <button className="btn" disabled={hold || flashing || out || !(you && canBid(d, you, youAmt))} onClick={() => { setOut(true); if (solo) setLeft((l) => Math.min(l, 3)); }}>I’m out</button>
+          <button className="btn btn-gold sold" disabled={!youCan} onClick={() => { buzz(12); setOut(false); act('bid', you.id, youAmt); }}>
             {you && isFull(you) ? 'Team full' : you && !canBid(d, you, youAmt) ? 'Can’t bid' : (d.bid && d.bid.leaderId === you.id ? 'Raise to ' : 'Bid ') + money(youAmt)}
           </button>
         </div>
-      ) : (
+      ) : null) : (
         <div className="actions">
           <button className="btn" onClick={() => setDraft((p) => undo(p))} disabled={hold || flashing || (!d.bid && !d.history.length)}>{undoLabel(d)}</button>
           <button className="btn" onClick={skip} disabled={hold || flashing || !!d.bid}>No bids</button>
@@ -1650,12 +1660,12 @@ function Auction({ d, setDraft, goHome, flashing, onFlash }) {
         </div>
       )}
       {gavel && <div className="gavel" aria-hidden="true">🔨</div>}
-      {custom && <CustomBid d={d} m={d.managers.find((x) => x.id === custom)} onSet={(n) => { buzz(12); setOut(false); setDraft((p) => placeBid(p, custom, n)); }} onClose={() => setCustom(null)} />}
+      {custom && <CustomBid d={d} m={d.managers.find((x) => x.id === custom)} onSet={(n) => { buzz(12); setOut(false); act('bid', custom, n); }} onClose={() => setCustom(null)} />}
       {teams && <TeamsSheet d={d} onClose={() => setTeams(false)} />}
-      {cardsOpen && <CardSheet d={d} by={solo && you ? you.id : null} onClose={() => setCardsOpen(false)}
-        onPlay={(by, card, params) => setDraft((p) => playCard(p, by, card, params))}
-        onDouble={(by, pay) => { buzz(20); setOut(false); setDraft((p) => placeBid(p, by, pay, { double: true })); }} />}
-      {d.pending && !(d.mode === 'solo' && (isBot(teamOf(d, d.pending.target)) || isBotTeam(teamOf(d, d.pending.target)))) && <VetoSheet d={d} onAnswer={(v) => setDraft((p) => answerCard(p, v))} />}
+      {cardsOpen && <CardSheet d={d} by={auto && you ? you.id : null} onClose={() => setCardsOpen(false)}
+        onPlay={(by, card, params) => act('card', by, card, params)}
+        onDouble={(by, pay) => { buzz(20); setOut(false); act('bid', by, pay, true); }} />}
+      {vetoHere && <VetoSheet d={d} onAnswer={(v) => act('veto', v, d.pending.id)} />}
     </div>
   );
 }
@@ -1670,7 +1680,10 @@ function Nominate({ d, setDraft, goHome }) {
   const [paused, setPaused] = useState(false);
   const cur = currentNominator(d);
   const solo = d.mode === 'solo';
-  const botTurn = !!(cur && solo && (isBot(cur.m) || isBotTeam(cur.m)));
+  const nv = netView(d, useNet()); const act = useAct(d, setDraft);
+  const isBotTurn = !!(cur && (solo || nv.online) && (isBot(cur.m) || isBotTeam(cur.m)));
+  const botTurn = isBotTurn && nv.runsBots;
+  const canPick = !!cur && !isBotTurn && nv.controls(cur.m.id);
   const talk = useBotTalk(d);
   const live = useRef({}); live.current = { d, paused };
   useEffect(() => {
@@ -1692,18 +1705,18 @@ function Nominate({ d, setDraft, goHome }) {
         <MuteButton />
         <div className="title">Nomination · {d.processed + 1} of {d.processed + d.queue.length}</div>
         <button className="pillbtn" onClick={() => setTeams(true)}>Teams</button>
-        {solo && <button className="iconbtn" onClick={() => setPaused((p) => !p)} aria-label={paused ? 'Resume' : 'Pause'}>{paused ? '▶' : 'Ⅱ'}</button>}
+        {(solo || (nv.online && nv.isHost)) && <button className="iconbtn" onClick={() => setPaused((p) => !p)} aria-label={paused ? 'Resume' : 'Pause'}>{paused ? '▶' : 'Ⅱ'}</button>}
       </div>
       <div className="picker" style={mStyle(cur.m)}>
         <p className="eyebrow">Nominating</p>
         <h2 className="display" style={{ fontSize: 40 }}>{cur.m.emoji} {cur.m.name}</h2>
-        <p className="small" style={{ margin: 0 }}>{botTurn ? (paused ? 'Paused' : '💭 Choosing what goes up next…') : 'Pick the next item to auction.'}</p>
+        <p className="small" style={{ margin: 0 }}>{isBotTurn ? (paused ? 'Paused' : '💭 Choosing what goes up next…') : canPick ? 'Pick the next item to auction.' : 'Waiting for ' + cur.m.name + ' to pick…'}</p>
       </div>
       {Object.entries(talk.bubbles).map(([id, bb]) => <p key={bb.id} className="bubble inline">{bb.text}</p>)}
-      {!botTurn && <TopicSearch q={q} setQ={setQ} />}
+      {canPick && <TopicSearch q={q} setQ={setQ} />}
       <div className="pickgrid">
         {shown.map((it) => { const r = rarityOf(d, it.id); return (
-          <button key={it.id} className="pickbtn" disabled={botTurn} onClick={() => setPick(it.id)}>
+          <button key={it.id} className="pickbtn" disabled={!canPick} onClick={() => setPick(it.id)}>
             {it.hidden ? <span className="thumb" style={{ background: '#2c2659', color: '#c9a6ff', fontSize: 24 }}>?</span> : <Thumb item={it} topic={d.topic} />}
             <span className="grow" style={{ minWidth: 0 }}><b style={{ display: 'block' }}>{it.name} {it.pos && <span className="pos">{it.pos}</span>} <RarityTag r={r} /></b><span className="small muted">{it.desc}</span></span>
           </button>
@@ -1712,7 +1725,7 @@ function Nominate({ d, setDraft, goHome }) {
       </div>
       {pick && (
         <Confirm title="Nominate this?" body={visibleItem(d, pick).name + ' goes up for auction next.'} yes="Nominate"
-          onYes={() => setDraft((p) => nominate(p, pick))} onClose={() => setPick(null)} />
+          onYes={() => act('nominate', pick)} onClose={() => setPick(null)} />
       )}
       {teams && <TeamsSheet d={d} onClose={() => setTeams(false)} />}
     </div>
@@ -1729,7 +1742,8 @@ function tradeText(d, t) {
 }
 function TradeWindow({ d, setDraft, goHome }) {
   const solo = d.mode === 'solo';
-  const you = solo ? d.managers.find((m) => m.human) : null;
+  const nv = netView(d, useNet()); const act = useAct(d, setDraft); const online = nv.online;
+  const you = solo ? d.managers.find((m) => m.human) : online ? d.managers.find((m) => nv.controls(m.id)) : null;
   const [now, setNow] = useState(Date.now());
   const [from, setFrom] = useState(you ? you.id : null);
   const [to, setTo] = useState(null);
@@ -1744,11 +1758,11 @@ function TradeWindow({ d, setDraft, goHome }) {
   useEffect(() => { if (nOffers) { audio.play('bid'); audio.say(callLine('tradeOffer'), 1, d.id + ':offer:' + nOffers); } }, [nOffers]);
   useEffect(() => { if (nDone) { audio.play('trade'); audio.say(callLine('tradeDone'), 2, d.id + ':deal:' + nDone); } }, [nDone]);
   useEffect(() => { const t = setInterval(() => setNow(Date.now()), ms(1000)); return () => clearInterval(t); }, []);
-  useEffect(() => { if (left <= 0) setDraft((p) => closeTrades(p)); }, [left <= 0]);
+  useEffect(() => { if (left <= 0 && nv.isHost) setDraft((p) => closeTrades(p)); }, [left <= 0, nv.isHost]);
   // Solo: bot teams make at most one offer each when the window opens…
   const offered = useRef(false);
   useEffect(() => {
-    if (!solo || offered.current) return undefined;
+    if (!nv.runsBots || offered.current) return undefined;
     offered.current = true;
     const timers = botActors(d).filter((a, i, arr) => arr.findIndex((x) => x.id === a.id) === i).map((a, i) => setTimeout(() => setDraft((p) => {
       if (p.phase !== 'trade') return p;
@@ -1758,7 +1772,7 @@ function TradeWindow({ d, setDraft, goHome }) {
     return () => timers.forEach(clearTimeout);
   }, []);
   // …and answer offers made to them after a short think.
-  const pendingForBots = d.trade.proposals.filter((t) => t.status === 'pending' && solo && (isBot(teamOf(d, t.to)) || isBotTeam(teamOf(d, t.to)))).map((t) => t.id).join(',');
+  const pendingForBots = d.trade.proposals.filter((t) => t.status === 'pending' && nv.runsBots && (isBot(teamOf(d, t.to)) || isBotTeam(teamOf(d, t.to)))).map((t) => t.id).join(',');
   useEffect(() => {
     if (!pendingForBots) return undefined;
     const ids = pendingForBots.split(',');
@@ -1779,11 +1793,11 @@ function TradeWindow({ d, setDraft, goHome }) {
   const A = from && teamOf(d, from), B = to && teamOf(d, to);
   const draftTrade = { from, to, give, get, money: d.rules.trades.money && amount > 0 && payer ? { payer, amount } : null };
   const problem = from && to && give && get ? tradeProblem(d, draftTrade, now) : null;
-  const propose = () => { const n = proposeTrade(d, draftTrade, now); if (n === d) { setMsg(problem || 'That trade can’t be offered.'); return; } setDraft(n); setGive(null); setGet(null); setAmount(0); setMsg('Offer sent to ' + B.name + '.'); };
+  const propose = () => { if (problem || proposeTrade(d, draftTrade, now) === d) { setMsg(problem || 'That trade can’t be offered.'); return; } act('propose', draftTrade); setGive(null); setGet(null); setAmount(0); setMsg('Offer sent to ' + B.name + '.'); };
   const mm = Math.floor(left / 60000), ss = Math.floor((left % 60000) / 1000);
   const list = [...d.trade.proposals].reverse();
-  const canAnswer = (t) => t.status === 'pending' && (!solo || (you && t.to === you.id));
-  const canCancel = (t) => t.status === 'pending' && (!solo || (you && t.from === you.id));
+  const canAnswer = (t) => t.status === 'pending' && (online ? nv.controls(t.to) : (!solo || (you && t.to === you.id)));
+  const canCancel = (t) => t.status === 'pending' && (online ? nv.controls(t.from) : (!solo || (you && t.from === you.id)));
   return (
     <div className="app">
       <div className="topbar">
@@ -1793,9 +1807,9 @@ function TradeWindow({ d, setDraft, goHome }) {
         <span className={'tclock num' + (left < 30000 ? ' hot' : '')} aria-live="polite">{mm}:{String(ss).padStart(2, '0')}</span>
       </div>
       <p className="hint" style={{ textAlign: 'center' }}>1-for-1 trades{d.rules.trades.money ? ', plus optional money' : ''}. The other team must accept. Anything not accepted when the clock hits 0:00 expires.</p>
-      <div className="card stack">
+      {(!online || you) && <div className="card stack">
         <h3>Offer a trade</h3>
-        {!solo && <div className="field"><span className="label">Your team</span><div className="chips">{d.managers.map((m) => <button key={m.id} className={'pickchip' + (from === m.id ? ' on' : '')} style={mStyle(m)} onClick={() => { setFrom(m.id); setGive(null); if (to === m.id) setTo(null); }}>{m.emoji} {m.name}</button>)}</div></div>}
+        {!solo && !online && <div className="field"><span className="label">Your team</span><div className="chips">{d.managers.map((m) => <button key={m.id} className={'pickchip' + (from === m.id ? ' on' : '')} style={mStyle(m)} onClick={() => { setFrom(m.id); setGive(null); if (to === m.id) setTo(null); }}>{m.emoji} {m.name}</button>)}</div></div>}
         {A && <div className="field"><span className="label">Trade with</span><div className="chips">{d.managers.filter((m) => m.id !== from).map((m) => <button key={m.id} className={'pickchip' + (to === m.id ? ' on' : '')} style={mStyle(m)} onClick={() => { setTo(m.id); setGet(null); }}>{m.emoji} {m.name}</button>)}</div></div>}
         {A && B && (
           <div className="tradecols">
@@ -1813,7 +1827,7 @@ function TradeWindow({ d, setDraft, goHome }) {
         {problem && <p className="warn">{problem}</p>}
         {msg && <p className="hint" style={{ color: 'var(--ok)' }}>{msg}</p>}
         <button className="btn btn-gold" disabled={!(give && get) || !!problem} onClick={propose}>Offer trade</button>
-      </div>
+      </div>}
       <div className="stack-sm">
         <h3>Offers</h3>
         {!list.length && <p className="hint">No offers yet.</p>}
@@ -1824,24 +1838,24 @@ function TradeWindow({ d, setDraft, goHome }) {
             {t.note && <span className="small muted">“{t.note}”</span>}
             {(canAnswer(t) || canCancel(t)) && (
               <div className="row">
-                {canAnswer(t) && <button className="btn btn-sm btn-gold grow" onClick={() => (solo ? setDraft((p) => acceptTrade(p, t.id)) : setHandoff(t.id))}>Accept</button>}
-                {canAnswer(t) && <button className="btn btn-sm grow" onClick={() => setDraft((p) => rejectTrade(p, t.id))}>Reject</button>}
-                {canCancel(t) && <button className="btn btn-sm btn-ghost grow" onClick={() => setDraft((p) => cancelTrade(p, t.id))}>Cancel offer</button>}
+                {canAnswer(t) && <button className="btn btn-sm btn-gold grow" onClick={() => (solo || online ? act('accept', t.id) : setHandoff(t.id))}>Accept</button>}
+                {canAnswer(t) && <button className="btn btn-sm grow" onClick={() => act('reject', t.id)}>Reject</button>}
+                {canCancel(t) && <button className="btn btn-sm btn-ghost grow" onClick={() => act('cancel', t.id)}>Cancel offer</button>}
               </div>
             )}
           </div>
         ))}
       </div>
       <details className="card"><summary className="label">Rosters</summary><div className="stack" style={{ marginTop: 10 }}>{d.managers.map((m) => <div key={m.id} className="tteam" style={mStyle(m)}><h3>{m.emoji} {m.name} · {money(m.budget)}</h3><TeamList d={d} m={m} /></div>)}</div></details>
-      <button className="btn" onClick={() => setDraft((p) => closeTrades(p))}>Finish trading · go to voting</button>
+      {nv.isHost ? <button className="btn" onClick={() => setDraft((p) => closeTrades(p))}>Finish trading · go to voting</button> : <p className="hint" style={{ textAlign: 'center' }}>The host can end trading early.</p>}
       {handoff && (() => { const t = d.trade.proposals.find((x) => x.id === handoff); if (!t) return null; const R = teamOf(d, t.to); return (
         <Sheet center onClose={() => setHandoff(null)}>
           <p className="eyebrow">Pass the phone to</p>
           <h2 className="display" style={{ fontSize: 34, color: R.color }}>{R.emoji} {R.name}</h2>
           <p className="summary">{tradeText(d, t)}</p>
           <div className="row pin">
-            <button className="btn grow" onClick={() => { setDraft((p) => rejectTrade(p, t.id)); setHandoff(null); }}>Reject</button>
-            <button className="btn btn-gold grow" onClick={() => { setDraft((p) => acceptTrade(p, t.id)); setHandoff(null); }}>Accept trade</button>
+            <button className="btn grow" onClick={() => { act('reject', t.id); setHandoff(null); }}>Reject</button>
+            <button className="btn btn-gold grow" onClick={() => { act('accept', t.id); setHandoff(null); }}>Accept trade</button>
           </div>
         </Sheet>
       ); })()}
@@ -1858,10 +1872,14 @@ function FreePick({ d, setDraft, goHome, flashing, onFlash }) {
   const talk = useBotTalk(d);
   const cp = currentPicker(d);
   const m = cp && cp.m;
-  const botTurn = !!(m && d.mode === 'solo' && isBot(m));
+  const nv = netView(d, useNet()); const act = useAct(d, setDraft);
+  const isBotTurn = !!(m && (d.mode === 'solo' || nv.online) && (isBot(m) || isBotTeam(m)));
+  const botTurn = isBotTurn && nv.runsBots;
+  const canPick = !!m && !isBotTurn && nv.controls(m.id);
   const live = useRef({}); live.current = { d, flashing, paused };
   const pick = (id) => {
     if (flashing || !m) return;
+    if (nv.online && !nv.isHost) { act('freePick', id); return; }
     onFlash({ kind: 'free', name: m.name, emoji: m.emoji, color: m.color, item: d.items[id].name });
     setDraft((p) => freePick(p, id));
   };
@@ -1869,7 +1887,7 @@ function FreePick({ d, setDraft, goHome, flashing, onFlash }) {
   const turnKey = d.reveal + ':' + (m ? m.id : '');
   useEffect(() => {
     if (!botTurn || flashing || paused) return undefined;
-    const choice = botFreePickChoice(d, m);
+    const choice = botFreePickChoice(d, isBot(m) ? m : (botActors(d).find((a) => a.id === m.id) || m));
     if (!choice) return undefined;
     const t = setTimeout(() => {
       const cur = live.current;
@@ -1888,26 +1906,27 @@ function FreePick({ d, setDraft, goHome, flashing, onFlash }) {
         <MuteButton />
         <div className="title">Free picks · round {cp.round + 1}</div>
         <button className="pillbtn" onClick={() => setTeams(true)}>Teams</button>
-        {d.mode === 'solo' && <button className="iconbtn" onClick={() => setPaused((p) => !p)} aria-label={paused ? 'Resume' : 'Pause'}>{paused ? '▶' : 'Ⅱ'}</button>}
+        {(d.mode === 'solo' || (nv.online && nv.isHost)) && <button className="iconbtn" onClick={() => setPaused((p) => !p)} aria-label={paused ? 'Resume' : 'Pause'}>{paused ? '▶' : 'Ⅱ'}</button>}
       </div>
       <p className="hint" style={{ textAlign: 'center' }}>The auction is over and some teams still have empty slots. Leftovers are free, picked in snake order.</p>
       <div className="picker" style={mStyle(m)}>
         <p className="eyebrow">On the clock</p>
         <h2 className="display" style={{ fontSize: 48 }}>{m.emoji} {m.name}</h2>
         <p className="small" style={{ margin: 0 }}>{emptyCount(m)} empty slot{emptyCount(m) === 1 ? '' : 's'} · {money(m.budget)} left</p>
-        {botTurn && <p className="going" style={{ margin: '6px 0 0' }}>{paused ? 'Paused' : '💭 Picking…'}</p>}
+        {isBotTurn && <p className="going" style={{ margin: '6px 0 0' }}>{paused ? 'Paused' : '💭 Picking…'}</p>}
+        {!isBotTurn && !canPick && <p className="going" style={{ margin: '6px 0 0' }}>Waiting for {m.name} to pick…</p>}
       </div>
       {Object.entries(talk.bubbles).map(([id, bb]) => { const who = d.managers.find((x) => x.id === id); return who ? <p key={bb.id} className="bubble inline" style={mStyle(who)}><b>{who.emoji} {who.name}:</b> {bb.text}</p> : null; })}
       <div className="pickgrid">
         {avail.map((id) => { const it = d.items[id]; return (
-          <button key={id} className="pickbtn" onClick={() => pick(id)} disabled={flashing || botTurn}>
+          <button key={id} className="pickbtn" onClick={() => pick(id)} disabled={flashing || !canPick}>
             <Thumb item={it} topic={d.topic} />
             <span className="grow" style={{ minWidth: 0 }}><b style={{ display: 'block' }}>{it.name} {it.pos && <span className="pos">{it.pos}</span>}</b><span className="small muted">{it.desc}</span></span>
             <span style={{ fontFamily: 'var(--display)', color: 'var(--ok)', fontSize: 18 }}>FREE</span>
           </button>
         ); })}
       </div>
-      {d.mode !== 'solo' && <button className="btn" onClick={() => setDraft((p) => undo(p))} disabled={!d.history.length || flashing}>{undoLabel(d)}</button>}
+      {d.mode === 'local' && <button className="btn" onClick={() => setDraft((p) => undo(p))} disabled={!d.history.length || flashing}>{undoLabel(d)}</button>}
       {teams && <TeamsSheet d={d} onClose={() => setTeams(false)} />}
     </div>
   );
@@ -1982,10 +2001,11 @@ function Confetti({ colors }) {
 const hasVoted = (d, id) => Object.prototype.hasOwnProperty.call(d.votes || {}, id);
 
 // Secret vote. Local: pass the phone, everyone votes. Solo: you vote, then the bots vote.
-function Voting({ d, onVote, onReveal, onClose, onSoloVote }) {
-  const solo = d.mode === 'solo';
+function Voting({ d, onVote, onReveal, onClose, onSoloVote, nv, act }) {
+  const online = !!(nv && nv.online);
+  const solo = d.mode === 'solo' || online;
   const people = participants(d);
-  const you = solo ? people.find((p) => p.human) : null;
+  const you = online ? people.find((p) => nv.controlsPart(p.id) && !hasVoted(d, p.id)) : solo ? people.find((p) => p.human) : null;
   const [voter, setVoter] = useState(solo && you ? you.id : null);
   const [choice, setChoice] = useState(null);
   const [locked, setLocked] = useState(false);
@@ -1993,7 +2013,10 @@ function Voting({ d, onVote, onReveal, onClose, onSoloVote }) {
   if (locked) return (
     <Sheet center onClose={() => {}}>
       <h2 className="display" style={{ fontSize: 40, textAlign: 'center' }}>Vote locked 🔒</h2>
-      {solo ? <p className="muted" style={{ textAlign: 'center', margin: 0 }}>🤖 The bots are voting…</p>
+      {online ? <>
+          <p className="muted" style={{ textAlign: 'center', margin: 0 }}>Waiting for everyone else. The host reveals the winner.</p>
+          <button className="btn" onClick={onClose}>OK</button>
+        </> : solo ? <p className="muted" style={{ textAlign: 'center', margin: 0 }}>🤖 The bots are voting…</p>
         : <>
           <p className="muted" style={{ textAlign: 'center', margin: 0 }}>Pass the phone to the next manager.</p>
           <button className="btn btn-gold" onClick={() => { setLocked(false); setVoter(null); setChoice(null); }}>Next voter</button>
@@ -2005,7 +2028,7 @@ function Voting({ d, onVote, onReveal, onClose, onSoloVote }) {
     const choices = voteChoices(d, v.teamId);
     const submit = (target) => {
       buzz(30);
-      if (solo) { setLocked(true); onSoloVote(target); } else { onVote(voter, target); setLocked(true); }
+      if (online) { act('vote', voter, target); setLocked(true); } else if (solo) { setLocked(true); onSoloVote(target); } else { onVote(voter, target); setLocked(true); }
     };
     return (
       <Sheet center onClose={() => { if (solo) onClose(); else { setVoter(null); setChoice(null); } }}>
@@ -2108,6 +2131,8 @@ function ExportCard({ d, kind, showShame }) {
 
 function Results({ d, past, onChange, onBack, onUndo, onFinish, onPlayAgain, live, showShame }) {
   const ref = useRef(null);
+  const nv = netView(d, useNet()); const act = useAct(d, onChange); const online = nv.online;
+  const [finClosed, setFinClosed] = useState(false);
   const [voting, setVoting] = useState(false);
   const [img, setImg] = useState(null);
   const [imgBusy, setImgBusy] = useState(false);
@@ -2124,16 +2149,27 @@ function Results({ d, past, onChange, onBack, onUndo, onFinish, onPlayAgain, liv
   const revealed = d.votesRevealed && winners.length > 0;
   const noVotes = d.votesRevealed && !winners.length;
   const solo = d.mode === 'solo';
+  const people = participants(d); const humansP = people.filter((p) => !p.bot);
+  const humanVotes = humansP.filter((p) => hasVoted(d, p.id)).length;
+  const myOpenVote = online && !d.votesRevealed ? people.find((p) => nv.controlsPart(p.id) && !hasVoted(d, p.id)) : null;
+  const hostReveal = () => { onChange({ ...fillBotVotes(d), votesRevealed: true }); doReveal(); };
   const doReveal = () => {
     setVoting(false); audio.play('drumroll');
     setTimeout(() => { setParty((x) => x + 1); buzz([60, 40, 60, 40, 200]); audio.play('fanfare'); setTimeout(() => audio.play('cheer'), 400); window.scrollTo({ top: 0, behavior: 'smooth' }); }, 1100);
   };
+  const finStage = d.finale ? (d.finale.ui || {}).stage || 'overview' : null;
+  const finaleOpen = !!d.finale && (online ? finStage !== 'done' && !finClosed : showFinale);
+  // Other phones get the confetti and fanfare when the host reveals the winner.
+  const revealKey = d.finale ? finStage === 'done' : revealed;
+  const seenReveal = useRef(revealKey);
+  useEffect(() => { if (revealKey && !seenReveal.current && !nv.isHost) doReveal(); seenReveal.current = revealKey; }, [revealKey]);
+  useEffect(() => { setFinClosed(false); }, [finStage]);
   useEffect(() => {
-    if (!revealed || showFinale) return;
+    if (!revealed || finaleOpen) return;
     if (finDone) { audio.say(callLine('champion', { who: winners[0].name }), 3, d.id + ':champion'); return; }
     audio.say(winners.length > 1 ? callLine('tie', { who: winners.map((w) => w.name).join(' and ') }) : callLine('winner', { who: winners[0].name }), 3, d.id + ':winner:' + Object.keys(d.votes || {}).length);
-  }, [revealed, showFinale]);
-  const openFinale = () => { if (!d.finale) onChange(startFinale(d)); setShowFinale(true); };
+  }, [revealed, finaleOpen]);
+  const openFinale = () => { if (!d.finale) onChange(startFinale(d)); setShowFinale(true); setFinClosed(false); };
   // Solo: your vote, then every bot votes for the team it rates highest (never its own), all revealed together.
   const soloVote = (target) => {
     setTimeout(() => {
@@ -2239,24 +2275,29 @@ function Results({ d, past, onChange, onBack, onUndo, onFinish, onPlayAgain, liv
       </div>
 
       <div className="stack">
-        {!d.votesRevealed && !isFin && <button className="btn btn-gold" onClick={() => setVoting(true)}>{solo ? 'Vote for the best team' : Object.keys(d.votes || {}).length ? 'Continue the vote' : 'Start the secret vote'}</button>}
-        {!d.votesRevealed && isFin && <button className="btn btn-gold" onClick={openFinale}>{d.finale ? '🏆 Continue the finale' : '🏆 Start the finale'}</button>}
+        {!online && !d.votesRevealed && !isFin && <button className="btn btn-gold" onClick={() => setVoting(true)}>{solo ? 'Vote for the best team' : Object.keys(d.votes || {}).length ? 'Continue the vote' : 'Start the secret vote'}</button>}
+        {online && !d.votesRevealed && !isFin && <>
+          {myOpenVote ? <button className="btn btn-gold" onClick={() => setVoting(true)}>Vote for the best team</button> : <p className="hint" style={{ textAlign: 'center', margin: 0 }}>{nv.tv ? 'Vote on your phones.' : 'Your vote is in.'} {humanVotes} of {humansP.length} players have voted.</p>}
+          {nv.isHost && <button className={'btn' + (myOpenVote ? '' : ' btn-gold')} disabled={!humanVotes} onClick={hostReveal}>{humanVotes === humansP.length ? 'Reveal the winner' : 'Reveal now (' + humanVotes + '/' + humansP.length + ')'}</button>}
+        </>}
+        {!d.votesRevealed && isFin && (!online || nv.isHost) && <button className="btn btn-gold" onClick={openFinale}>{d.finale ? '🏆 Continue the finale' : '🏆 Start the finale'}</button>}
+        {!d.votesRevealed && isFin && online && !nv.isHost && (d.finale ? <button className="btn btn-gold" onClick={() => setFinClosed(false)}>🏆 Watch the finale</button> : <p className="hint" style={{ textAlign: 'center', margin: 0 }}>Waiting for the host to start the finale.</p>)}
         {!d.votesRevealed && isFin && !d.finale && <p className="hint" style={{ textAlign: 'center', margin: 0 }}>{{ bracket: 'Head-to-head bracket: teams meet 1v1 and the players not involved vote.', sim: 'Match simulator: every matchup is a simulated football match.', combined: 'Combined finale: each matchup is a match plus a vote (' + finCfg(d).weight + '/' + (100 - finCfg(d).weight) + ').' }[fmode]}{(d.rules.finale && d.rules.finale.mode !== fmode) ? ' (Matches need a football topic, so this topic uses the vote bracket.)' : ''}</p>}
         {isFootball(d.topic) && <button className="btn" onClick={() => setFriendly(true)}>⚽ Friendly match{finDone ? ' / rematch' : ''}</button>}
         {live && onPlayAgain && d.votesRevealed && <button className="btn btn-gold" onClick={onPlayAgain}>Play again</button>}
         <button className="btn" onClick={() => setPickFormat(true)} disabled={imgBusy}>{imgBusy ? 'Making image…' : 'Save as image'}</button>
         {imgErr && <p className="warn">{imgErr}</p>}
-        {d.votesRevealed && !d.finale && <button className="btn btn-ghost" onClick={() => onChange({ ...d, votes: {}, votesRevealed: false })}>Redo the vote</button>}
-        {live && onPlayAgain && !d.votesRevealed && <button className="btn btn-ghost" onClick={onPlayAgain}>Play again</button>}
-        {live && <button className="btn btn-ghost" onClick={onFinish}>Finish · back to home</button>}
-        <p className="hint" style={{ textAlign: 'center' }}>{live ? 'This draft is saved in Past Drafts.' : 'Saved in Past Drafts.'}</p>
+        {d.votesRevealed && !d.finale && !online && <button className="btn btn-ghost" onClick={() => onChange({ ...d, votes: {}, votesRevealed: false })}>Redo the vote</button>}
+        {live && onPlayAgain && !d.votesRevealed && !online && <button className="btn btn-ghost" onClick={onPlayAgain}>Play again</button>}
+        {live && <button className="btn btn-ghost" onClick={onFinish}>{online ? 'Leave the room' : 'Finish · back to home'}</button>}
+        <p className="hint" style={{ textAlign: 'center' }}>{online ? (d.votesRevealed ? 'Saved in Past Drafts on this phone.' : 'It’s saved on every phone once the winner is revealed.') : live ? 'This draft is saved in Past Drafts.' : 'Saved in Past Drafts.'}</p>
       </div>
 
-      {voting && <Voting d={d} onSoloVote={soloVote}
+      {voting && <Voting d={d} onSoloVote={soloVote} nv={nv} act={act}
         onVote={(v, t) => { if (!hasVoted(d, v)) onChange({ ...d, votes: { ...(d.votes || {}), [v]: t } }); }}
         onReveal={() => { onChange({ ...d, votesRevealed: true }); doReveal(); }}
         onClose={() => setVoting(false)} />}
-      {showFinale && d.finale && <Finale d={d} onChange={onChange} onClose={() => setShowFinale(false)} onChampion={() => { setShowFinale(false); doReveal(); }} />}
+      {finaleOpen && <Finale d={d} onChange={onChange} onClose={() => { setShowFinale(false); setFinClosed(true); }} onChampion={() => { onChange({ ...d, finale: { ...d.finale, ui: { ...(d.finale.ui || {}), stage: 'done' } } }); setShowFinale(false); doReveal(); }} />}
       {friendly && <FriendlySheet d={d} onClose={() => setFriendly(false)} />}
       {viewMatch && d.finale && <MatchupSheet d={d} at={viewMatch} onClose={() => setViewMatch(null)} />}
       {party > 0 && revealed && <Confetti key={party} colors={[...winners.map((w) => w.color), '#ffc83d', '#ffffff']} />}
@@ -2711,10 +2752,12 @@ function App() {
   const [toast, setToast] = useState(null);
   const [folder, setFolder] = useState(null);
   const [importing, setImporting] = useState(null); // null, '' (blank) or a shared code from a link
-  // Opening a share link (#topic=…) shows the import preview, then tidies the address bar.
+  // Opening a share link (#topic=…) shows the import preview; a room link (#room=…) opens Online with the code.
   useEffect(() => {
     const m = (location.hash || '').match(/^#topic=(.+)$/);
     if (m) { setImporting(decodeURIComponent(m[1])); try { history.replaceState(null, '', location.pathname + location.search); } catch (e) {} }
+    const r = (location.hash || '').match(/^#room=([A-Za-z0-9]+)/);
+    if (r) { setScreen({ name: 'online-home', code: cleanCode(r[1]) }); try { history.replaceState(null, '', location.pathname + location.search); } catch (e) {} }
   }, []);
   const [settings, setSettings] = useState(() => store.get(K.settings, {}));
   const audioCfg = { ...AUDIO_DEFAULTS, ...(settings.audio || {}) };
@@ -2768,8 +2811,23 @@ function App() {
     go('draft');
   };
 
+  const profile = { ...defaultProfile(), ...(settings.online || {}) };
+  const setProfile = (p) => setSettings((x) => ({ ...x, online: p }));
+  // Every phone files a finished online game in its own Past Drafts.
+  const fileOnline = (d) => setPast((p) => { const s = stripDraft(d); const i = p.findIndex((x) => x.id === d.id); if (i >= 0) { const a = [...p]; a[i] = s; return a; } return [s, ...p]; });
+
   let view;
   switch (screen.name) {
+    case 'online-home':
+      view = <OnlineHome profile={profile} setProfile={setProfile} last={lastRoom()} initialCode={screen.code} onBack={() => go('home')}
+        onCreate={() => { setProfile({ ...profile, name: profile.name.trim() }); go('online', { start: { kind: 'create' }, k: uid() }); }}
+        onJoin={(code) => { setProfile({ ...profile, name: profile.name.trim() }); go('online', { start: { kind: 'join', code }, k: uid() }); }}
+        onTv={(code) => go('online', { start: { kind: 'tv', code }, k: uid() })}
+        onRejoin={(l) => go('online', { start: { kind: l.kind === 'tv' ? 'tv' : 'join', code: l.code }, k: uid() })} />;
+      break;
+    case 'online':
+      view = <OnlineScreen key={screen.k} start={screen.start} profile={profile} topics={topics} rulePrefs={rulePrefs} past={past} settings={settings} onFinished={fileOnline} onExit={() => go('online-home')} />;
+      break;
     case 'topics':
       view = <TopicsList topics={topics} folder={folder} setFolder={setFolder} onImport={() => setImporting('')} onBack={() => go(screen.from || 'home')} onOpen={(id) => go('topic', { id, from: screen.from })}
         onCreate={(f) => { const t = { id: uid(), name: 'New topic', emoji: '🎲', slots: ['Pick 1', 'Pick 2', 'Pick 3'], layout: 'list', art: 'emoji', folder: f || 'My Topics', items: [] }; setTopics((ts) => [...ts, t]); go('topic', { id: t.id, from: screen.from }); }}
@@ -2864,6 +2922,7 @@ function App() {
         showInstall={!app.standalone && !settings.installDismissed && (app.canPrompt || isIOS())} onDismissInstall={() => setSettings((x) => ({ ...x, installDismissed: true }))}
         onNew={() => { setDraft(null); setRules({ ...rulePrefs(), slots: [] }); go('setup-managers'); }}
         onSolo={() => { setDraft(null); go('solo-setup'); }}
+        onOnline={() => go('online-home')}
         onPlayers={() => go('players')}
         onResume={() => go('draft')} onTopics={() => go('topics')} onPast={() => go('past')} onAbandon={() => setDraft(null)} />;
   }
