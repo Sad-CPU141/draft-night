@@ -9,6 +9,14 @@ One phone, one auctioneer, everyone shouting bids. Build the best team for the m
 - **Solo:** you against 1–7 bots (3 by default) on Easy, Medium or Hard. Each bot has a personality that really changes how it bids — Big Spender, Bargain Hunter, Position Strategist or Chaos — plus a funny name and optional trash talk. Items sell when the bid clock runs out; bots vote at the end and never for themselves.
 - **Local:** one phone, one auctioneer, everyone shouting bids (pass the phone to vote).
 - **Online:** coming in a later update.
+- **Teams:** 2v2, 3v3, 4v4 or up to 4 teams of 1–4 players, in Local or Solo. Each team shares one budget, one roster and its Chaos Cards; everyone votes, never for their own team.
+
+## Twists (all switchable in House rules)
+- **Chaos Cards** (2 per team by default): Steal, Swap, Freeze, Double Bid, Veto. Exact rules are at the top of `src/28-twists.js`.
+- **Mystery items** (1 in 8 by default): auctioned face down, fit any open slot, revealed when sold.
+- **Rarity** (70% Common / 25% Rare / 5% Legendary by default): looks only, fixed for the whole draft.
+- **Nomination mode**: teams take turns choosing the next item.
+- **Trade window** (3 minutes by default): 1-for-1 trades with optional money; the other team must accept.
 
 ## Features
 - 48 starter topics in 7 folders (Sports, Food & Drink, Entertainment, Travel & Places, Animals, Style & Rides, Just for Fun), plus your own topics.
@@ -34,6 +42,7 @@ npm test         # rules, photo lookups, full click-through, backup, persistence
 ```
 
 - Edit files in `src/`, then run the build. Don't edit `app.js` directly.
+- `src/28-twists.js` holds the rules for cards, mystery items, rarity, teams, nomination and trades, as plain functions.
 - `src/27-bots.js` is the bot brain: pure functions that read the draft and return a bid, a delay or a vote.
 - `src/25-wiki-titles.js` holds the exact Wikipedia page names and which topics show photos.
 - `sw.js` is versioned on every build, so phones pick up new versions automatically.

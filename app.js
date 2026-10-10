@@ -1,4 +1,4 @@
-/* Draft Night 01db533eb2 — built from src/ by build.js. Edit src/, not this file. */
+/* Draft Night 0686618f2e — built from src/ by build.js. Edit src/, not this file. */
 "use strict";
 (function(){
 function _extends() { return _extends = Object.assign ? Object.assign.bind() : function (n) { for (var e = 1; e < arguments.length; e++) { var t = arguments[e]; for (var r in t) ({}).hasOwnProperty.call(t, r) && (n[r] = t[r]); } return n; }, _extends.apply(null, arguments); }
@@ -2626,7 +2626,7 @@ const slotKey = (d, item) => {
 };
 function scarcityOf(d, item) {
   const key = slotKey(d, item);
-  const pool = [...d.queue, ...d.leftover].map(id => d.items[id]);
+  const pool = [...d.queue, ...d.leftover].map(id => visibleItem(d, id));
   const supply = pool.filter(it => slotKey(d, it) === key || key === '*').length;
   const demand = d.managers.reduce((n, m) => n + d.rules.slots.filter((s, k) => !m.team[k] && (key === '*' || norm(s) === key || isFlex(s))).length, 0);
   return clamp(demand / Math.max(1, supply), 0.5, 2);
@@ -2653,7 +2653,7 @@ function botValue(d, bot, item, rng) {
   } else v *= Math.pow(sc, L.scarcity * 0.5);
   if (type === 'chaos' && unit('crush', bot.name, item.name) < 0.12) v *= 1.9;
   if (L.scarcity > 0.3) {
-    const options = d.queue.slice(1).filter(id => assignSlot(bot, d.items[id], slots) >= 0).length;
+    const options = d.queue.slice(1).filter(id => assignSlot(bot, visibleItem(d, id), slots) >= 0).length;
     if (options < emptyCount(bot) * 1.5) v *= 1 + 0.25 * L.scarcity;
   }
   return v * (1 + (rng() - 0.5) * 2 * L.noise);
@@ -2680,8 +2680,8 @@ function botLimit(d, bot, item, rng) {
   };
 }
 function botDecision(d, bot) {
-  const item = currentItem(d);
-  if (!item || !isBot(bot) || isFull(bot)) return null;
+  const item = d.queue.length ? visibleItem(d, d.queue[0]) : null;
+  if (!item || !isBot(bot) || isFull(bot) || d.phase !== 'auction' || d.pending) return null;
   if (d.bid && d.bid.leaderId === bot.id) return null;
   const price = nextAmount(d);
   if (!canBid(d, bot, price)) return null;
@@ -2693,7 +2693,19 @@ function botDecision(d, bot) {
     limit,
     value
   } = botLimit(d, bot, item, rng);
-  if (price > limit) return null;
+  if (price > limit) {
+    const pay = Math.ceil(price / 2);
+    const keen = type === 'spender' ? itemFame(item) > 0.55 : type === 'needs' ? scarcityOf(d, item) > 1.2 : type === 'chaos' ? rng() < 0.3 : value > price * 0.75;
+    if (keen && pay <= limit && !doubleProblem(d, bot.id, pay)) return {
+      botId: bot.id,
+      speaker: bot.speaker || bot.id,
+      amount: pay,
+      double: true,
+      delay: clamp(Math.round(900 + rng() * 900), 650, 2300),
+      event: 'jump'
+    };
+    return null;
+  }
   const rivals = d.managers.filter(m => m.id !== bot.id && !isFull(m) && assignSlot(m, item, d.rules.slots) >= 0);
   const rivalMax = rivals.reduce((mx, m) => Math.max(mx, maxBid(m, d.rules)), 0);
   if (type === 'bargain') {
@@ -2717,13 +2729,14 @@ function botDecision(d, bot) {
   delay = clamp(delay, 650, 2300);
   return {
     botId: bot.id,
+    speaker: bot.speaker || bot.id,
     amount,
     delay: Math.round(delay),
     event: amount > price ? 'jump' : 'bid'
   };
 }
 function nextBotAction(d) {
-  return d.managers.filter(isBot).map(b => botDecision(d, b)).filter(Boolean).sort((a, b) => a.delay - b.delay || (a.botId < b.botId ? -1 : 1))[0] || null;
+  return botActors(d).map(b => botDecision(d, b)).filter(Boolean).sort((a, b) => a.delay - b.delay || (a.botId < b.botId ? -1 : 1))[0] || null;
 }
 function botFreePickChoice(d, bot) {
   const L = botLevel(bot);
@@ -2732,7 +2745,7 @@ function botFreePickChoice(d, bot) {
   const rng = seeded(d.seed || d.id, 'free', d.fp.round, d.fp.pos, bot.id);
   return opts.map(id => ({
     id,
-    s: botValue(d, bot, d.items[id], () => 0.5) * (1 + (rng() - 0.5) * 2 * L.freeNoise)
+    s: botValue(d, bot, visibleItem(d, id), () => 0.5) * (1 + (rng() - 0.5) * 2 * L.freeNoise)
   })).sort((a, b) => b.s - a.s)[0].id;
 }
 function teamScore(d, m, judge) {
@@ -2754,14 +2767,14 @@ function teamScore(d, m, judge) {
   const completeness = filled / slots.length;
   return quality * (0.55 + 0.45 * completeness) + 0.15 * Math.max(0, vfm) + exact * fair * 0.1;
 }
-function voteChoices(d, voterId) {
-  return d.managers.filter(m => m.id !== voterId && m.team.some(Boolean));
+function voteChoices(d, voterTeamId) {
+  return d.managers.filter(m => m.id !== voterTeamId && m.team.some(Boolean));
 }
 function botVote(d, bot) {
-  const choices = voteChoices(d, bot.id);
+  const choices = voteChoices(d, bot.teamId || bot.id);
   if (!choices.length) return null;
   const L = botLevel(bot);
-  const rng = seeded(d.seed || d.id, 'vote', bot.id);
+  const rng = seeded(d.seed || d.id, 'vote', bot.speaker || bot.id);
   return choices.map(m => ({
     id: m.id,
     s: teamScore(d, m, bot) * (1 + (rng() - 0.5) * 2 * L.noise * 0.6)
@@ -2821,7 +2834,20 @@ function botLine(bot, event, extra) {
   talkMemory.set(bot.id, [...recent, line].slice(-6));
   return line.replace('{slot}', extra && extra.slot || 'player');
 }
+TALK.spender.card = ['Rules are for people with less money.', 'Activating my secret weapon.'];
+TALK.bargain.card = ['A little trick I picked up at a yard sale.', 'Free value? Don’t mind if I do.'];
+TALK.needs.card = ['Exactly as planned.', 'This card fills a hole.'];
+TALK.chaos.card = ['Let’s spice things up!', 'I pressed a button. Something happened.'];
+['spender', 'bargain', 'needs', 'chaos'].forEach(k => {
+  TALK[k].advise = ['I’d go up to {slot} for this one.', 'Worth {slot}, tops.', 'Let’s grab this. Max {slot}.'];
+  TALK[k].pass = ['Let this one go.', 'Not for us. Save the money.'];
+  TALK[k].nominate = ['Let’s see who wants this one.', 'Up next: my pick.'];
+});
 const TALK_CHANCE = {
+  card: 0.9,
+  advise: 0.6,
+  pass: 0.4,
+  nominate: 0.4,
   start: 1,
   bid: 0.22,
   jump: 0.75,
@@ -2832,6 +2858,714 @@ const TALK_CHANCE = {
   rival: 0.45,
   need: 0.35
 };
+function botCardPlay(d, bot) {
+  if (!cardWindow(d) || !d.cards || !(d.cards[bot.id] || []).length) return null;
+  const L = botLevel(bot);
+  const type = bot.bot.type;
+  const rng = seeded(d.seed, d.reveal, 'card', bot.speaker || bot.id);
+  if (rng() < (type === 'chaos' ? 0.45 : 0.72)) return null;
+  const item = visibleItem(d, d.queue[0]);
+  const fair = d.rules.budget / d.rules.slots.length;
+  const rivals = d.managers.filter(m => m.id !== bot.id);
+  const opts = [];
+  if (hasCard(d, bot.id, 'freeze') && assignSlot(bot, item, d.rules.slots) >= 0) {
+    const v = botValue(d, bot, item, rng);
+    const threat = rivals.filter(m => !isFull(m) && assignSlot(m, item, d.rules.slots) >= 0).sort((a, b) => maxBid(b, d.rules) - maxBid(a, d.rules))[0];
+    const want = type === 'spender' ? itemFame(item) > 0.6 : type === 'needs' ? scarcityOf(d, item) > 1.1 : type === 'bargain' ? v > fair * 0.9 : rng() < 0.5;
+    if (threat && want && v > fair * (type === 'chaos' ? 0.5 : 0.9) && !cardProblem(d, bot.id, 'freeze', {
+      target: threat.id
+    })) opts.push({
+      card: 'freeze',
+      params: {
+        target: threat.id
+      },
+      gain: v * 0.6
+    });
+  }
+  if (hasCard(d, bot.id, 'steal')) {
+    rivals.forEach(m => m.team.forEach(t => {
+      if (!t) return;
+      const it = d.items[t.itemId];
+      if (cardProblem(d, bot.id, 'steal', {
+        target: m.id,
+        item: t.itemId
+      })) return;
+      const v = botValue(d, bot, it, rng);
+      const cost = stealPrice(d, t);
+      const edge = type === 'bargain' ? 0.65 : type === 'spender' ? 1.1 : 0.85;
+      if (v - cost * edge > fair * 0.3) opts.push({
+        card: 'steal',
+        params: {
+          target: m.id,
+          item: t.itemId
+        },
+        gain: v - cost
+      });
+    }));
+  }
+  if (hasCard(d, bot.id, 'swap')) {
+    bot.team.forEach(mine => {
+      if (!mine) return;
+      rivals.forEach(m => m.team.forEach(t => {
+        if (!t || cardProblem(d, bot.id, 'swap', {
+          target: m.id,
+          item: t.itemId,
+          mine: mine.itemId
+        })) return;
+        const gain = botValue(d, bot, d.items[t.itemId], () => 0.5) - botValue(d, bot, d.items[mine.itemId], () => 0.5);
+        if (gain > fair * 0.35) opts.push({
+          card: 'swap',
+          params: {
+            target: m.id,
+            item: t.itemId,
+            mine: mine.itemId
+          },
+          gain
+        });
+      }));
+    });
+  }
+  if (!opts.length) return null;
+  const pick = L.noise > 0.3 ? opts[Math.floor(rng() * opts.length)] : opts.sort((a, b) => b.gain - a.gain)[0];
+  return {
+    ...pick,
+    botId: bot.id,
+    speaker: bot.speaker || bot.id,
+    delay: clamp(Math.round(800 + rng() * 900), 650, 2200)
+  };
+}
+function botVeto(d, team, play) {
+  if (!hasCard(d, team.id, 'veto')) return false;
+  const actor = isBotTeam(team) ? {
+    ...team,
+    name: team.members[0].name,
+    bot: team.members[0].bot,
+    speaker: team.members[0].id
+  } : team;
+  if (!actor.bot) return false;
+  const rng = seeded(d.seed, 'veto', play.id);
+  const fair = d.rules.budget / d.rules.slots.length;
+  if (actor.bot.type === 'chaos') return rng() < 0.6;
+  if (play.card === 'freeze') {
+    const item = visibleItem(d, d.queue[0]);
+    return !!item && botValue(d, actor, item, rng) > fair * 0.9;
+  }
+  const lost = play.card === 'steal' ? d.items[play.item] : d.items[play.item];
+  const loss = botValue(d, actor, lost, () => 0.5) - (play.card === 'swap' ? botValue(d, actor, d.items[play.mine], () => 0.5) : 0);
+  return loss > fair * (botLevel(actor).noise > 0.3 ? 0.2 : 0.45);
+}
+function botNominate(d, bot) {
+  const pool = nominationPool(d);
+  if (!pool.length) return null;
+  const L = botLevel(bot);
+  const type = bot.bot.type;
+  const rng = seeded(d.seed, 'nom', d.reveal, bot.speaker || bot.id);
+  const score = id => {
+    const it = visibleItem(d, id);
+    const fame = itemFame(it);
+    const mine = assignSlot(bot, it, d.rules.slots) >= 0 ? botValue(d, bot, it, () => 0.5) : 0;
+    let s;
+    if (type === 'needs') s = mine * (assignSlot(bot, it, d.rules.slots) >= 0 && !isFlex(d.rules.slots[assignSlot(bot, it, d.rules.slots)]) ? 1.5 : 0.4);else if (type === 'spender') s = mine + fame * 8;else if (type === 'bargain') s = mine > 0 ? mine * (1.4 - fame) : fame * 3;else s = rng() * 10 + mine * 0.3;
+    return s * (1 + (rng() - 0.5) * 2 * L.noise);
+  };
+  return pool.map(id => ({
+    id,
+    s: score(id)
+  })).sort((a, b) => b.s - a.s)[0].id;
+}
+function tradeGain(d, bot, t) {
+  const me = bot.id;
+  const fair = d.rules.budget / d.rules.slots.length;
+  const giveId = t.from === me ? t.give : t.get;
+  const getId = t.from === me ? t.get : t.give;
+  const val = id => {
+    const r = rarityOf(d, id);
+    return botValue(d, {
+      ...bot,
+      team: bot.team.map(x => x && x.itemId === giveId ? null : x)
+    }, d.items[id], () => 0.5) * (r === 'legendary' ? 1.12 : r === 'rare' ? 1.04 : 1);
+  };
+  let gain = val(getId) - val(giveId);
+  if (t.money && t.money.amount) gain += (t.money.payer === me ? -1 : 1) * t.money.amount * 0.9;
+  return {
+    gain,
+    fair
+  };
+}
+function botTradeDecision(d, bot, t) {
+  if (tradeProblem(d, t)) return {
+    accept: false,
+    reason: 'That trade doesn’t work any more.'
+  };
+  const L = botLevel(bot);
+  const type = bot.bot.type;
+  const rng = seeded(d.seed, 'trade', t.id, bot.speaker || bot.id);
+  const {
+    gain,
+    fair
+  } = tradeGain(d, bot, t);
+  const noisy = gain + (rng() - 0.5) * 2 * L.noise * fair;
+  const need = type === 'bargain' ? fair * 0.3 : type === 'spender' ? -fair * 0.1 : type === 'needs' ? fair * 0.1 : -fair * 0.25;
+  const accept = type === 'chaos' ? noisy > need && rng() < 0.75 : noisy > need;
+  const reason = accept ? gain > fair * 0.4 ? 'Deal! I like this a lot.' : 'Fair enough, deal.' : gain < -fair * 0.4 ? 'No chance. That’s a downgrade for us.' : 'Not quite worth it for us.';
+  return {
+    accept,
+    reason
+  };
+}
+function botTradeOffer(d, bot) {
+  const fair = d.rules.budget / d.rules.slots.length;
+  const rng = seeded(d.seed, 'offer', bot.speaker || bot.id);
+  if (rng() < (botLevel(bot).rivals ? 0.25 : 0.5)) return null;
+  let best = null;
+  bot.team.forEach(mine => {
+    if (!mine) return;
+    d.managers.forEach(m => {
+      if (m.id === bot.id) return;
+      m.team.forEach(t => {
+        if (!t) return;
+        const offer = {
+          from: bot.id,
+          to: m.id,
+          give: mine.itemId,
+          get: t.itemId,
+          money: null
+        };
+        if (tradeProblem(d, offer)) return;
+        const {
+          gain
+        } = tradeGain(d, bot, offer);
+        const theirSide = (itemFame(d.items[mine.itemId]) - itemFame(d.items[t.itemId])) * fair;
+        if (gain > fair * 0.25 && theirSide > -fair * 0.35 && (!best || gain > best.gain)) best = {
+          ...offer,
+          gain
+        };
+      });
+    });
+  });
+  if (!best) return null;
+  const {
+    gain,
+    ...offer
+  } = best;
+  if (d.rules.trades.money && gain > fair * 0.8 && bot.budget >= 1) offer.money = {
+    payer: bot.id,
+    amount: Math.min(bot.budget, Math.max(1, Math.round(gain * 0.25)))
+  };
+  return offer;
+}
+const TWIST_DEFAULTS = {
+  chaos: {
+    on: true,
+    count: 2,
+    steal: true,
+    veto: true,
+    double: true,
+    swap: true,
+    freeze: true
+  },
+  mystery: {
+    on: true,
+    every: 8
+  },
+  rarity: {
+    on: true,
+    rare: 25,
+    legendary: 5
+  },
+  trades: {
+    on: true,
+    minutes: 3,
+    money: true
+  }
+};
+const CARD_INFO = {
+  steal: {
+    name: 'Steal',
+    emoji: '🦹',
+    text: 'Before the first bid: take one item from a rival team. You pay them what they paid + '
+  },
+  swap: {
+    name: 'Swap',
+    emoji: '🔄',
+    text: 'Before the first bid: swap one of your items for one of a rival’s. Both must fit.'
+  },
+  freeze: {
+    name: 'Freeze',
+    emoji: '🧊',
+    text: 'Before the first bid: one rival team can’t bid on this item.'
+  },
+  double: {
+    name: 'Double Bid',
+    emoji: '✖️2',
+    text: 'Your bid counts double. Bid $X, it counts as $2X, and you pay $X if you win.'
+  },
+  veto: {
+    name: 'Veto',
+    emoji: '🛑',
+    text: 'Response only: blocks a Steal, Swap or Freeze aimed at your team.'
+  }
+};
+const CARD_TYPES = ['steal', 'swap', 'freeze', 'double', 'veto'];
+const ruleOn = (d, k) => !!(d && d.rules && d.rules[k] && d.rules[k].on);
+const twistRules = r => ({
+  chaos: {
+    ...TWIST_DEFAULTS.chaos,
+    ...(r && r.chaos || {})
+  },
+  mystery: {
+    ...TWIST_DEFAULTS.mystery,
+    ...(r && r.mystery || {})
+  },
+  rarity: {
+    ...TWIST_DEFAULTS.rarity,
+    ...(r && r.rarity || {})
+  },
+  trades: {
+    ...TWIST_DEFAULTS.trades,
+    ...(r && r.trades || {})
+  }
+});
+const teamOf = (d, id) => d.managers.find(m => m.id === id);
+function participants(d) {
+  if (!d.teamMode) return d.managers.map(m => ({
+    id: m.id,
+    name: m.name,
+    emoji: m.emoji,
+    color: m.color,
+    teamId: m.id,
+    bot: m.bot,
+    human: m.human
+  }));
+  return d.managers.flatMap(t => (t.members || []).map(p => ({
+    ...p,
+    color: t.color,
+    teamId: t.id,
+    teamName: t.name
+  })));
+}
+const isBotTeam = t => !!(t && t.members && t.members.length && t.members.every(p => p.bot));
+function botActors(d) {
+  const out = [];
+  d.managers.forEach(m => {
+    if (m.members) {
+      if (isBotTeam(m)) m.members.forEach(p => out.push({
+        ...m,
+        name: p.name,
+        bot: p.bot,
+        speaker: p.id
+      }));
+    } else if (m.bot) out.push({
+      ...m,
+      speaker: m.id
+    });
+  });
+  return out;
+}
+function botAdvisers(d) {
+  const out = [];
+  d.managers.forEach(m => {
+    if (m.members && !isBotTeam(m)) m.members.filter(p => p.bot).forEach(p => out.push({
+      ...m,
+      name: p.name,
+      bot: p.bot,
+      speaker: p.id
+    }));
+  });
+  return out;
+}
+const isHidden = (d, id) => !!(d.items[id] && d.items[id].mystery && !(d.revealed || []).includes(id));
+function visibleItem(d, id) {
+  const it = d.items[id];
+  if (!it) return null;
+  if (!isHidden(d, id)) return it;
+  return {
+    id,
+    name: 'Mystery item',
+    pos: '',
+    desc: 'Face down until it’s sold',
+    emoji: '❓',
+    mystery: true,
+    hidden: true
+  };
+}
+const rarityOf = (d, id) => isHidden(d, id) ? null : d.rarity && d.rarity[id] || null;
+function assignRarity(ids, rules, seed) {
+  const r = rules.rarity;
+  if (!r || !r.on) return {};
+  const leg = clamp(+r.legendary || 0, 0, 100),
+    rare = clamp(+r.rare || 0, 0, 100 - leg);
+  const out = {};
+  ids.forEach(id => {
+    const u = unit('rarity', seed, id) * 100;
+    out[id] = u < leg ? 'legendary' : u < leg + rare ? 'rare' : 'common';
+  });
+  return out;
+}
+function pickMystery(ids, rules, seed) {
+  const m = rules.mystery;
+  if (!m || !m.on) return [];
+  const every = Math.max(2, Math.round(+m.every || 8));
+  const count = Math.floor(ids.length / every);
+  return [...ids].sort((a, b) => unit('mys', seed, a) - unit('mys', seed, b)).slice(0, count);
+}
+function dealCards(teamIds, rules, seed) {
+  const c = rules.chaos;
+  if (!c || !c.on) return {};
+  const types = CARD_TYPES.filter(t => c[t]);
+  if (!types.length) return {};
+  const n = clamp(Math.round(+c.count || 0), 0, 5);
+  const out = {};
+  teamIds.forEach(id => {
+    const rng = seeded('deal', seed, id);
+    const pool = [];
+    while (pool.length < n) {
+      const r = [...types];
+      for (let i = r.length - 1; i > 0; i--) {
+        const j = Math.floor(rng() * (i + 1));
+        [r[i], r[j]] = [r[j], r[i]];
+      }
+      pool.push(...r);
+    }
+    out[id] = pool.slice(0, n);
+  });
+  return out;
+}
+const hasCard = (d, teamId, card) => !!(d.cards && d.cards[teamId] && d.cards[teamId].includes(card));
+const cardWindow = d => d.phase === 'auction' && !d.bid && !d.pending && !!currentItem(d);
+const stealPrice = (d, t) => Math.max(d.rules.minBid, (t.price || 0) + d.rules.inc);
+const frozenNow = (d, teamId) => !!(d.frozen && d.frozen[teamId] === d.reveal);
+function removeCard(cards, teamId, card) {
+  const a = [...(cards[teamId] || [])];
+  const i = a.indexOf(card);
+  if (i >= 0) a.splice(i, 1);
+  return {
+    ...cards,
+    [teamId]: a
+  };
+}
+function slotOfItem(m, itemId) {
+  return m.team.findIndex(t => t && t.itemId === itemId);
+}
+function cardProblem(d, by, card, p) {
+  p = p || {};
+  if (!ruleOn(d, 'chaos') || !d.rules.chaos[card]) return 'That card isn’t in this game.';
+  if (!hasCard(d, by, card)) return 'You don’t have that card.';
+  const me = teamOf(d, by);
+  if (card === 'veto') return 'Veto can only be used when someone targets your team.';
+  if (card === 'double') return null;
+  if (!cardWindow(d)) return 'Play this before the first bid on an item.';
+  const them = teamOf(d, p.target);
+  if (!them || them.id === by) return 'Pick a rival team.';
+  if (card === 'freeze') {
+    if (d.frozen && Object.values(d.frozen).includes(d.reveal)) return 'Someone is already frozen for this item.';
+    if (isFull(them)) return 'That team is full already.';
+    return null;
+  }
+  if (card === 'steal') {
+    const k = slotOfItem(them, p.item);
+    if (k < 0) return 'That team doesn’t own that item.';
+    if (assignSlot(me, d.items[p.item], d.rules.slots) < 0) return 'You have no open slot for that item.';
+    const price = stealPrice(d, them.team[k]);
+    if (price > maxBid(me, d.rules)) return 'You need ' + money(price) + ' and can’t afford it.';
+    return null;
+  }
+  if (card === 'swap') {
+    const a = slotOfItem(me, p.mine),
+      b = slotOfItem(them, p.item);
+    if (a < 0 || b < 0) return 'Pick one of your items and one of theirs.';
+    if (!swapFits(d, me, them, p.mine, p.item)) return 'Those two items don’t fit each other’s rosters.';
+    return null;
+  }
+  return 'Unknown card.';
+}
+function swapFits(d, A, B, itemA, itemB) {
+  const a = {
+    ...A,
+    team: A.team.map(t => t && t.itemId === itemA ? null : t)
+  };
+  const b = {
+    ...B,
+    team: B.team.map(t => t && t.itemId === itemB ? null : t)
+  };
+  return assignSlot(a, d.items[itemB], d.rules.slots) >= 0 && assignSlot(b, d.items[itemA], d.rules.slots) >= 0;
+}
+function playCard(d, by, card, p) {
+  if (cardProblem(d, by, card, p)) return d;
+  const n = withHistory(d, 'Undo card');
+  n.cards = removeCard(n.cards, by, card);
+  const play = {
+    id: uid(),
+    by,
+    card,
+    target: p.target,
+    item: p.item || null,
+    mine: p.mine || null,
+    reveal: d.reveal
+  };
+  if (hasCard(n, p.target, 'veto')) {
+    n.pending = play;
+    return n;
+  }
+  return applyCard(n, play);
+}
+function applyCard(n, play) {
+  const me = n.managers.find(m => m.id === play.by),
+    them = n.managers.find(m => m.id === play.target);
+  let ok = !!(me && them),
+    detail = '';
+  if (ok && play.card === 'freeze') {
+    n.frozen = {
+      ...(n.frozen || {}),
+      [them.id]: play.reveal
+    };
+    detail = them.name + ' can’t bid on this item';
+  }
+  if (ok && play.card === 'steal') {
+    const k = slotOfItem(them, play.item);
+    const slot = k >= 0 ? assignSlot(me, n.items[play.item], n.rules.slots) : -1;
+    const price = k >= 0 ? stealPrice(n, them.team[k]) : 0;
+    ok = k >= 0 && slot >= 0 && price <= maxBid(me, n.rules);
+    if (ok) {
+      them.team = them.team.map((t, i) => i === k ? null : t);
+      them.budget += price;
+      me.team = me.team.map((t, i) => i === slot ? {
+        itemId: play.item,
+        price,
+        stolen: true
+      } : t);
+      me.budget -= price;
+      detail = me.name + ' stole ' + n.items[play.item].name + ' for ' + money(price);
+    }
+  }
+  if (ok && play.card === 'swap') {
+    ok = slotOfItem(me, play.mine) >= 0 && slotOfItem(them, play.item) >= 0 && swapFits(n, me, them, play.mine, play.item);
+    if (ok) {
+      const ta = me.team[slotOfItem(me, play.mine)],
+        tb = them.team[slotOfItem(them, play.item)];
+      me.team = me.team.map(t => t && t.itemId === play.mine ? null : t);
+      them.team = them.team.map(t => t && t.itemId === play.item ? null : t);
+      const sMe = assignSlot(me, n.items[play.item], n.rules.slots),
+        sThem = assignSlot(them, n.items[play.mine], n.rules.slots);
+      me.team = me.team.map((t, i) => i === sMe ? {
+        ...tb
+      } : t);
+      them.team = them.team.map((t, i) => i === sThem ? {
+        ...ta
+      } : t);
+      detail = me.name + ' swapped ' + n.items[play.mine].name + ' for ' + n.items[play.item].name;
+    }
+  }
+  n.pending = null;
+  n.cardLog = [...(n.cardLog || []), {
+    ...play,
+    result: ok ? 'done' : 'fizzled',
+    detail: ok ? detail : 'It no longer worked, so nothing happened.'
+  }];
+  return ok && play.card !== 'freeze' ? recheckCurrent(n) : n;
+}
+function answerCard(d, useVeto) {
+  if (!d.pending) return d;
+  const play = d.pending;
+  if (useVeto && hasCard(d, play.target, 'veto')) {
+    const n = {
+      ...d,
+      cards: removeCard(d.cards, play.target, 'veto'),
+      pending: null
+    };
+    n.cardLog = [...(n.cardLog || []), {
+      ...play,
+      result: 'vetoed',
+      detail: teamOf(d, play.target).name + ' vetoed it'
+    }];
+    return n;
+  }
+  return applyCard({
+    ...d,
+    managers: d.managers.map(m => ({
+      ...m,
+      team: [...m.team]
+    }))
+  }, play);
+}
+function recheckCurrent(n) {
+  const id = n.queue[0];
+  if (!id) return n;
+  const someoneCan = n.managers.some(m => !isFull(m) && assignSlot(m, n.items[id], n.rules.slots) >= 0 && maxBid(m, n.rules) >= n.rules.minBid);
+  return someoneCan ? n : advance(n);
+}
+function doubleProblem(d, by, pay) {
+  if (!ruleOn(d, 'chaos') || !d.rules.chaos.double) return 'Double Bid isn’t in this game.';
+  if (!hasCard(d, by, 'double')) return 'You don’t have a Double Bid card.';
+  const m = teamOf(d, by);
+  if (!m || d.phase !== 'auction' || d.pending) return 'You can’t bid right now.';
+  if (d.bid && d.bid.leaderId === by) return 'You’re already leading.';
+  if (!canBid(d, m, pay)) return 'You can’t pay ' + money(pay) + '.';
+  if (pay * 2 < nextAmount(d)) return 'Bid at least ' + money(Math.ceil(nextAmount(d) / 2)) + ' so it counts as ' + money(nextAmount(d)) + '.';
+  return null;
+}
+function currentNominator(d) {
+  const n = d.managers.length;
+  const start = d.nom && d.nom.idx || 0;
+  for (let k = 0; k < n; k++) {
+    const m = d.managers[(start + k) % n];
+    if (!isFull(m)) return {
+      m,
+      idx: (start + k) % n
+    };
+  }
+  return null;
+}
+const nominationPool = d => d.queue.filter(id => d.managers.some(m => !isFull(m) && assignSlot(m, d.items[id], d.rules.slots) >= 0));
+function nominate(d, itemId) {
+  if (d.phase !== 'nominate') return d;
+  const cur = currentNominator(d);
+  if (!cur || !d.queue.includes(itemId)) return d;
+  return {
+    ...d,
+    queue: [itemId, ...d.queue.filter(x => x !== itemId)],
+    nominated: itemId,
+    nom: {
+      idx: (cur.idx + 1) % d.managers.length,
+      by: cur.m.id
+    },
+    phase: 'auction',
+    reveal: d.reveal + 1
+  };
+}
+function openTrades(n, now) {
+  n.phase = 'trade';
+  n.trade = {
+    endsAt: (now || Date.now()) + Math.max(0.5, +n.rules.trades.minutes || 3) * 60000,
+    proposals: [],
+    done: false
+  };
+  return n;
+}
+const tradeOpen = (d, now) => d.phase === 'trade' && d.trade && (now || Date.now()) < d.trade.endsAt;
+function tradeProblem(d, t, now) {
+  if (!tradeOpen(d, now)) return 'The trade window is closed.';
+  const A = teamOf(d, t.from),
+    B = teamOf(d, t.to);
+  if (!A || !B || A.id === B.id) return 'Pick another team to trade with.';
+  if (slotOfItem(A, t.give) < 0) return A.name + ' no longer owns ' + (d.items[t.give] || {}).name + '.';
+  if (slotOfItem(B, t.get) < 0) return B.name + ' no longer owns ' + (d.items[t.get] || {}).name + '.';
+  if (!swapFits(d, A, B, t.give, t.get)) return 'Those items don’t fit each other’s rosters.';
+  const m = t.money;
+  if (m && m.amount) {
+    if (!d.rules.trades.money) return 'Money isn’t allowed in trades this game.';
+    if (!(m.amount > 0) || Math.round(m.amount) !== m.amount) return 'Money must be a whole dollar amount.';
+    const payer = teamOf(d, m.payer);
+    if (!payer || payer.id !== A.id && payer.id !== B.id) return 'Only one of the two teams can pay.';
+    if (payer.budget < m.amount) return payer.name + ' only has ' + money(payer.budget) + '.';
+  }
+  return null;
+}
+function proposeTrade(d, t, now) {
+  const p = {
+    id: uid(),
+    from: t.from,
+    to: t.to,
+    give: t.give,
+    get: t.get,
+    money: t.money && t.money.amount ? {
+      payer: t.money.payer,
+      amount: t.money.amount
+    } : null,
+    status: 'pending',
+    at: now || Date.now()
+  };
+  if (tradeProblem(d, p, now)) return d;
+  if (d.trade.proposals.some(x => x.status === 'pending' && x.from === p.from && x.to === p.to && x.give === p.give && x.get === p.get)) return d;
+  return {
+    ...d,
+    trade: {
+      ...d.trade,
+      proposals: [...d.trade.proposals, p]
+    }
+  };
+}
+const setTradeStatus = (d, id, status, note) => ({
+  ...d,
+  trade: {
+    ...d.trade,
+    proposals: d.trade.proposals.map(x => x.id === id ? {
+      ...x,
+      status,
+      note: note || x.note
+    } : x)
+  }
+});
+function acceptTrade(d, id, now) {
+  const t = d.trade && d.trade.proposals.find(x => x.id === id);
+  if (!t || t.status !== 'pending') return d;
+  const problem = tradeProblem(d, t, now);
+  if (problem) return setTradeStatus(d, id, tradeOpen(d, now) ? 'invalid' : 'expired', problem);
+  const n = {
+    ...d,
+    managers: d.managers.map(m => ({
+      ...m,
+      team: [...m.team]
+    }))
+  };
+  const A = teamOf(n, t.from),
+    B = teamOf(n, t.to);
+  const ta = A.team[slotOfItem(A, t.give)],
+    tb = B.team[slotOfItem(B, t.get)];
+  A.team = A.team.map(x => x && x.itemId === t.give ? null : x);
+  B.team = B.team.map(x => x && x.itemId === t.get ? null : x);
+  const sa = assignSlot(A, n.items[t.get], n.rules.slots);
+  A.team = A.team.map((x, i) => i === sa ? {
+    ...tb,
+    traded: true
+  } : x);
+  const sb = assignSlot(B, n.items[t.give], n.rules.slots);
+  B.team = B.team.map((x, i) => i === sb ? {
+    ...ta,
+    traded: true
+  } : x);
+  if (t.money && t.money.amount) {
+    const payer = t.money.payer === A.id ? A : B;
+    const payee = payer === A ? B : A;
+    payer.budget -= t.money.amount;
+    payee.budget += t.money.amount;
+  }
+  n.trade = {
+    ...n.trade,
+    proposals: n.trade.proposals.map(x => x.id === id ? {
+      ...x,
+      status: 'accepted'
+    } : x.status === 'pending' && [x.give, x.get].some(it => it === t.give || it === t.get) ? {
+      ...x,
+      status: 'invalid',
+      note: 'One of these items was traded away.'
+    } : x)
+  };
+  return n;
+}
+const rejectTrade = (d, id) => {
+  const t = d.trade && d.trade.proposals.find(x => x.id === id);
+  return t && t.status === 'pending' ? setTradeStatus(d, id, 'rejected') : d;
+};
+const cancelTrade = (d, id) => {
+  const t = d.trade && d.trade.proposals.find(x => x.id === id);
+  return t && t.status === 'pending' ? setTradeStatus(d, id, 'cancelled') : d;
+};
+function closeTrades(d) {
+  if (d.phase !== 'trade') return d;
+  return {
+    ...d,
+    phase: 'done',
+    trade: {
+      ...d.trade,
+      done: true,
+      proposals: d.trade.proposals.map(x => x.status === 'pending' ? {
+        ...x,
+        status: 'expired'
+      } : x)
+    }
+  };
+}
 const KITS = {
   'brazil': ['#FFDC02', '#1B7A3E'],
   'italy': ['#1F4FA8', '#ffffff'],
@@ -3108,6 +3842,13 @@ const emptyCount = m => m.team.filter(x => !x).length;
 const isFull = m => emptyCount(m) === 0;
 const spent = (d, m) => d.rules.budget - m.budget;
 function assignSlot(m, item, slots) {
+  if (item.mystery) {
+    const p = norm(item.pos);
+    const exact = p ? slots.findIndex((s, k) => norm(s) === p && !m.team[k]) : -1;
+    if (exact >= 0) return exact;
+    const flex = slots.findIndex((s, k) => isFlex(s) && !m.team[k]);
+    return flex >= 0 ? flex : m.team.findIndex(x => !x);
+  }
   const pos = norm(item.pos);
   const posInTemplate = pos && slots.some(s => norm(s) === pos);
   if (posInTemplate) {
@@ -3127,44 +3868,32 @@ const currentItem = d => d.queue.length ? d.items[d.queue[0]] : null;
 const nextAmount = d => d.bid ? d.bid.amount + d.rules.inc : d.rules.minBid;
 function canBid(d, m, amount) {
   const item = currentItem(d);
-  if (!item || isFull(m)) return false;
+  if (!item || isFull(m) || d.pending || d.phase !== 'auction' || frozenNow(d, m.id)) return false;
   if (assignSlot(m, item, d.rules.slots) < 0) return false;
   return amount >= d.rules.minBid && amount <= maxBid(m, d.rules);
 }
 function bidBlocker(d, m) {
   const item = currentItem(d);
   if (isFull(m)) return 'Team full';
+  if (frozenNow(d, m.id)) return 'Frozen 🧊';
   if (item && assignSlot(m, item, d.rules.slots) < 0) return 'No ' + (item.pos || 'open') + ' slot';
   if (maxBid(m, d.rules) < d.rules.minBid) return 'Out of money';
   if (maxBid(m, d.rules) < nextAmount(d)) return 'Max ' + money(maxBid(m, d.rules));
   return null;
 }
 const canTake = (d, m, id) => !isFull(m) && assignSlot(m, d.items[id], d.rules.slots) >= 0;
+const SNAP_KEYS = ['managers', 'queue', 'leftover', 'passed', 'processed', 'fp', 'phase', 'autoSkipped', 'cards', 'frozen', 'revealed', 'cardLog', 'nom', 'nominated', 'pending', 'trade'];
 function snap(d) {
-  return JSON.stringify({
-    managers: d.managers,
-    queue: d.queue,
-    leftover: d.leftover,
-    passed: d.passed,
-    processed: d.processed,
-    fp: d.fp,
-    phase: d.phase,
-    autoSkipped: d.autoSkipped || 0
+  const o = {};
+  SNAP_KEYS.forEach(k => {
+    if (d[k] !== undefined) o[k] = d[k];
   });
+  return JSON.stringify(o);
 }
 function withHistory(d, label) {
   return {
     ...d,
-    managers: d.managers.map(m => ({
-      ...m,
-      team: [...m.team]
-    })),
-    queue: [...d.queue],
-    leftover: [...d.leftover],
-    passed: [...d.passed],
-    fp: {
-      ...d.fp
-    },
+    ...JSON.parse(snap(d)),
     history: [...d.history, {
       s: snap(d),
       label
@@ -3208,7 +3937,12 @@ function advance(n) {
     n.processed++;
     n.autoSkipped = (n.autoSkipped || 0) + 1;
   }
-  if (n.queue.length) n.phase = 'auction';else if (isDraftOver(n)) n.phase = 'done';else {
+  if (n.queue.length) {
+    if (n.rules.order === 'nominate' && n.nominated !== n.queue[0]) {
+      n.phase = 'nominate';
+      n.nominated = null;
+    } else n.phase = 'auction';
+  } else if (isDraftOver(n)) finishDraft(n);else {
     if (n.phase !== 'freepick') n.fp = {
       round: 0,
       pos: 0
@@ -3218,14 +3952,23 @@ function advance(n) {
   n.reveal = (n.reveal || 0) + 1;
   return n;
 }
+function finishDraft(n) {
+  if (ruleOn(n, 'trades') && !(n.trade && n.trade.done)) openTrades(n);else n.phase = 'done';
+  return n;
+}
 function createDraft(topic, managers, rules, extra) {
+  const seed = extra && extra.seed || uid();
+  const ids = topic.items.map(it => it.id);
+  const mystery = new Set(pickMystery(ids, rules, seed));
   const items = {};
   topic.items.forEach(it => {
-    items[it.id] = {
+    items[it.id] = mystery.has(it.id) ? {
+      ...it,
+      mystery: true
+    } : {
       ...it
     };
   });
-  const ids = topic.items.map(it => it.id);
   const d = {
     id: uid(),
     createdAt: Date.now(),
@@ -3256,13 +3999,30 @@ function createDraft(topic, managers, rules, extra) {
       } : {}),
       ...(m.human ? {
         human: true
+      } : {}),
+      ...(m.members ? {
+        members: m.members.map(p => ({
+          ...p
+        }))
       } : {})
     })),
+    teamMode: managers.some(m => m.members),
     items,
     queue: rules.order === 'random' ? shuffle(ids) : ids,
     leftover: [],
     passed: [],
     processed: 0,
+    cards: dealCards(managers.map(m => m.id), rules, seed),
+    frozen: {},
+    revealed: [],
+    cardLog: [],
+    pending: null,
+    rarity: assignRarity(ids, rules, seed),
+    nom: {
+      idx: 0
+    },
+    nominated: null,
+    trade: null,
     bid: null,
     bids: [],
     history: [],
@@ -3275,13 +4035,27 @@ function createDraft(topic, managers, rules, extra) {
     votes: {},
     votesRevealed: false,
     mode: 'local',
-    seed: uid(),
-    ...(extra || {})
+    ...(extra || {}),
+    seed
   };
   return advance(d);
 }
-function placeBid(d, managerId, amount) {
+function placeBid(d, managerId, amount, opts) {
   const m = d.managers.find(x => x.id === managerId);
+  if (opts && opts.double) {
+    if (doubleProblem(d, managerId, amount)) return d;
+    return {
+      ...d,
+      cards: removeCard(d.cards, managerId, 'double'),
+      bids: [...d.bids, d.bid],
+      bid: {
+        amount: amount * 2,
+        pay: amount,
+        leaderId: managerId,
+        double: true
+      }
+    };
+  }
   if (!m || !canBid(d, m, amount)) return d;
   if (d.bid && amount <= d.bid.amount) return d;
   return {
@@ -3289,6 +4063,7 @@ function placeBid(d, managerId, amount) {
     bids: [...d.bids, d.bid],
     bid: {
       amount,
+      pay: amount,
       leaderId: managerId
     }
   };
@@ -3297,10 +4072,15 @@ function undoBid(d) {
   if (!d.bid) return d;
   const bids = [...d.bids];
   const prev = bids.pop();
+  const cards = d.bid.double ? {
+    ...d.cards,
+    [d.bid.leaderId]: [...(d.cards[d.bid.leaderId] || []), 'double']
+  } : d.cards;
   return {
     ...d,
     bids,
-    bid: prev || null
+    bid: prev || null,
+    cards
   };
 }
 function sell(d) {
@@ -3310,14 +4090,20 @@ function sell(d) {
   const n = withHistory(d, 'Undo sale');
   const m = n.managers.find(x => x.id === b.leaderId);
   const slot = assignSlot(m, n.items[id], n.rules.slots);
-  if (slot < 0) return d;
+  const price = b.pay != null ? b.pay : b.amount;
+  if (slot < 0 || price > m.budget) return d;
   m.team[slot] = {
     itemId: id,
-    price: b.amount
+    price,
+    ...(b.double ? {
+      doubled: true
+    } : {})
   };
-  m.budget -= b.amount;
+  m.budget -= price;
+  if (n.items[id].mystery) n.revealed = [...(n.revealed || []), id];
   n.queue = n.queue.slice(1);
   n.processed++;
+  n.nominated = null;
   return advance(n);
 }
 function skipItem(d) {
@@ -3325,6 +4111,7 @@ function skipItem(d) {
   if (!id) return d;
   const n = withHistory(d, 'Undo skip');
   n.queue = n.queue.slice(1);
+  n.nominated = null;
   if (n.rules.noBids === 'back' && !n.passed.includes(id)) {
     n.queue.push(id);
     n.passed.push(id);
@@ -3346,12 +4133,13 @@ function freePick(d, itemId) {
     price: 0,
     free: true
   };
+  if (n.items[itemId].mystery) n.revealed = [...(n.revealed || []), itemId];
   n.leftover = n.leftover.filter(x => x !== itemId);
   n.fp = {
     round: cp.round,
     pos: cp.pos + 1
   };
-  if (isDraftOver(n)) n.phase = 'done';
+  if (isDraftOver(n)) finishDraft(n);
   n.reveal++;
   return n;
 }
@@ -3687,9 +4475,18 @@ function TeamList({
       radius: 7
     }), it ? React.createElement("span", {
       className: "n"
-    }, it.name, t.free && React.createElement("span", {
+    }, it.name, (() => {
+      const r = rarityOf(d, t.itemId);
+      return r && r !== 'common' ? React.createElement("span", {
+        className: 'rmark ' + r
+      }, r === 'legendary' ? '★' : '◆') : null;
+    })(), t.free && React.createElement("span", {
       className: "muted small"
-    }, " \xB7 free")) : React.createElement("span", {
+    }, " \xB7 free"), t.stolen && React.createElement("span", {
+      className: "muted small"
+    }, " \xB7 stolen"), t.traded && React.createElement("span", {
+      className: "muted small"
+    }, " \xB7 traded")) : React.createElement("span", {
       className: "n empty"
     }, "Empty"), t && React.createElement("span", {
       className: "p num"
@@ -3726,7 +4523,21 @@ function TeamsSheet({
     }
   }, React.createElement("h3", {
     className: "grow"
-  }, m.emoji, " ", m.name), React.createElement("span", {
+  }, m.emoji, " ", m.name, m.members ? React.createElement("span", {
+    className: "small muted",
+    style: {
+      display: 'block',
+      fontFamily: 'var(--body)',
+      fontWeight: 600
+    }
+  }, m.members.map(p => p.name).join(' · ')) : null, d.cards && (d.cards[m.id] || []).length ? React.createElement("span", {
+    className: "small muted",
+    style: {
+      display: 'block',
+      fontFamily: 'var(--body)',
+      fontWeight: 600
+    }
+  }, "\uD83C\uDCCF ", d.cards[m.id].map(c => CARD_INFO[c].name).join(', ')) : null), React.createElement("span", {
     className: "num",
     style: {
       fontFamily: 'var(--display)',
@@ -3753,7 +4564,7 @@ function Home({
 }) {
   const [ask, setAsk] = useState(null);
   const [soon, setSoon] = useState(false);
-  const status = draft && (draft.phase === 'auction' ? 'Item ' + (draft.processed + 1) + ' of ' + (draft.processed + draft.queue.length) : draft.phase === 'freepick' ? 'Free picks' : 'Results & voting');
+  const status = draft && (draft.phase === 'auction' ? 'Item ' + (draft.processed + 1) + ' of ' + (draft.processed + draft.queue.length) : draft.phase === 'nominate' ? 'Nominating' : draft.phase === 'trade' ? 'Trade window' : draft.phase === 'freepick' ? 'Free picks' : 'Results & voting');
   return React.createElement("div", {
     className: "app"
   }, React.createElement("div", {
@@ -4654,8 +5465,61 @@ const DEFAULT_SOLO = {
   talk: true,
   clock: 8,
   topicId: 't-pl',
-  seed: 'start'
+  seed: 'start',
+  teams: {
+    on: false,
+    count: 2,
+    size: 2,
+    name: 'Team You'
+  }
 };
+const DEFAULT_TEAMS = {
+  on: false,
+  count: 2,
+  size: 2,
+  teams: []
+};
+function soloTeams(cfg) {
+  const T = {
+    ...DEFAULT_SOLO.teams,
+    ...(cfg.teams || {})
+  };
+  const total = T.count * T.size - 1;
+  const bots = makeBots(total, cfg.level, cfg.seed, [COLORS[1]]);
+  const rng = seeded('teamnames', cfg.seed);
+  const names = shuffle(TEAM_NAMES.map(n => [n, rng()]).sort((a, b) => a[1] - b[1]).map(x => x[0]));
+  const teams = [];
+  const toMember = b => ({
+    id: b.id,
+    name: b.name,
+    emoji: b.emoji,
+    bot: b.bot
+  });
+  teams.push({
+    id: 'team-you',
+    name: (T.name || 'Team You').trim() || 'Team You',
+    color: COLORS[1],
+    emoji: '😎',
+    human: true,
+    members: [{
+      id: 'you',
+      name: cfg.name.trim() || 'You',
+      emoji: '😎',
+      human: true
+    }, ...bots.slice(0, T.size - 1).map(toMember)]
+  });
+  for (let i = 1; i < T.count; i++) {
+    const ms = bots.slice(T.size - 1 + (i - 1) * T.size, T.size - 1 + i * T.size);
+    teams.push({
+      id: 'team-' + i + '-' + ms[0].id,
+      name: names[i % names.length],
+      color: ms[0].color,
+      emoji: ms[0].emoji,
+      members: ms.map(toMember)
+    });
+  }
+  return teams;
+}
 function SoloSetup({
   cfg,
   setCfg,
@@ -4666,7 +5530,19 @@ function SoloSetup({
   onRules,
   onStart
 }) {
+  const T = {
+    ...DEFAULT_SOLO.teams,
+    ...(cfg.teams || {})
+  };
+  const setT = p => setCfg({
+    ...cfg,
+    teams: {
+      ...T,
+      ...p
+    }
+  });
   const bots = makeBots(cfg.bots, cfg.level, cfg.seed, [COLORS[1]]);
+  const teams = T.on ? soloTeams(cfg) : null;
   const valid = topic && topic.items.length && topic.slots.length && cfg.name.trim();
   const level = BOT_LEVELS[cfg.level];
   return React.createElement("div", {
@@ -4695,6 +5571,57 @@ function SoloSetup({
     }),
     placeholder: "You"
   })), React.createElement("div", {
+    className: "field"
+  }, React.createElement("span", {
+    className: "label"
+  }, "Play style"), React.createElement(Seg, {
+    label: "Play style",
+    value: T.on ? 'teams' : 'solo',
+    options: [['solo', 'Every bot for itself'], ['teams', 'Teams']],
+    onChange: v => setT({
+      on: v === 'teams'
+    })
+  })), T.on ? React.createElement(React.Fragment, null, React.createElement("div", {
+    className: "row"
+  }, React.createElement("div", {
+    className: "field grow"
+  }, React.createElement("label", {
+    htmlFor: "solo-tcount"
+  }, "Teams"), React.createElement(Stepper, {
+    id: "solo-tcount",
+    value: T.count,
+    min: 2,
+    max: 4,
+    onChange: v => setT({
+      count: v
+    })
+  })), React.createElement("div", {
+    className: "field grow"
+  }, React.createElement("label", {
+    htmlFor: "solo-tsize"
+  }, "Players each"), React.createElement(Stepper, {
+    id: "solo-tsize",
+    value: T.size,
+    min: 1,
+    max: 4,
+    onChange: v => setT({
+      size: v
+    })
+  }))), React.createElement("div", {
+    className: "field"
+  }, React.createElement("label", {
+    htmlFor: "solo-tname"
+  }, "Your team name"), React.createElement("input", {
+    id: "solo-tname",
+    className: "input",
+    maxLength: 20,
+    value: T.name,
+    onChange: e => setT({
+      name: e.target.value
+    })
+  })), React.createElement("p", {
+    className: "hint"
+  }, T.count === 2 ? T.size + 'v' + T.size : T.count + ' teams of ' + T.size, ". Bots on your team advise you; you make the bids. Other teams are all bots and bid together.")) : React.createElement("div", {
     className: "field"
   }, React.createElement("label", {
     htmlFor: "solo-bots"
@@ -4753,7 +5680,15 @@ function SoloSetup({
       ...cfg,
       seed: uid()
     })
-  }, "Shuffle bots")), React.createElement("div", {
+  }, "Shuffle bots")), teams ? React.createElement("div", {
+    className: "stack-sm"
+  }, teams.map(t => React.createElement("div", {
+    key: t.id,
+    className: "teamprev",
+    style: mStyle(t)
+  }, React.createElement("b", null, t.emoji, " ", t.name), React.createElement("span", {
+    className: "small"
+  }, t.members.map(p => p.name + (p.bot ? ' (' + BOT_TYPES[p.bot.type].short + ')' : '')).join(' · '))))) : React.createElement("div", {
     className: "stack-sm"
   }, bots.map(b => React.createElement("div", {
     key: b.id,
@@ -4809,17 +5744,213 @@ function SoloSetup({
     style: {
       textAlign: 'center'
     }
-  }, cfg.bots, " ", cfg.bots === 1 ? 'bot' : 'bots', " \xB7 ", level.label, " \xB7 ", cfg.clock, "s clock \xB7 trash talk ", cfg.talk ? 'on' : 'off'), React.createElement("button", {
+  }, T.on ? T.count === 2 ? T.size + 'v' + T.size : T.count + ' teams of ' + T.size : cfg.bots + ' ' + (cfg.bots === 1 ? 'bot' : 'bots'), " \xB7 ", level.label, " \xB7 ", cfg.clock, "s clock \xB7 trash talk ", cfg.talk ? 'on' : 'off'), React.createElement("button", {
     className: "btn btn-gold",
     disabled: !valid,
-    onClick: () => onStart(bots)
+    onClick: () => onStart(teams || bots)
   }, "Start solo draft"));
 }
+const TEAM_NAMES = ['The Overpayers', 'Budget Bandits', 'Chaos FC', 'Spreadsheet United', 'Bargain Bin Rovers', 'Team Mayhem', 'Deadline Dealers', 'The Free Agents'];
+function shapeTeams(teams, count, size) {
+  const out = [];
+  for (let i = 0; i < count; i++) {
+    const t = teams[i] || {
+      id: uid(),
+      name: 'Team ' + (i + 1),
+      color: COLORS[i % COLORS.length],
+      emoji: EMOJIS[i % EMOJIS.length],
+      members: []
+    };
+    const members = [];
+    for (let j = 0; j < size; j++) members.push((t.members || [])[j] || {
+      id: uid(),
+      name: ''
+    });
+    out.push({
+      ...t,
+      members
+    });
+  }
+  return out;
+}
+function TeamsEditor({
+  cfg,
+  setCfg
+}) {
+  const teams = shapeTeams(cfg.teams || [], cfg.count, cfg.size);
+  const setTeams = ts => setCfg({
+    ...cfg,
+    teams: ts
+  });
+  const upd = (i, patch) => setTeams(teams.map((t, k) => k === i ? {
+    ...t,
+    ...patch
+  } : t));
+  const updMember = (i, j, name) => upd(i, {
+    members: teams[i].members.map((p, k) => k === j ? {
+      ...p,
+      name
+    } : p)
+  });
+  const autoAssign = () => {
+    const names = shuffle(teams.flatMap(t => t.members.map(p => p.name.trim())).filter(Boolean));
+    let k = 0;
+    setTeams(teams.map(t => ({
+      ...t,
+      members: t.members.map(p => ({
+        ...p,
+        name: names[k++] || ''
+      }))
+    })));
+  };
+  return React.createElement("div", {
+    className: "stack"
+  }, React.createElement("div", {
+    className: "card stack"
+  }, React.createElement("div", {
+    className: "row"
+  }, React.createElement("div", {
+    className: "field grow"
+  }, React.createElement("label", {
+    htmlFor: "tm-count"
+  }, "Teams"), React.createElement(Stepper, {
+    id: "tm-count",
+    value: cfg.count,
+    min: 2,
+    max: 4,
+    onChange: v => setCfg({
+      ...cfg,
+      count: v,
+      teams: shapeTeams(teams, v, cfg.size)
+    })
+  })), React.createElement("div", {
+    className: "field grow"
+  }, React.createElement("label", {
+    htmlFor: "tm-size"
+  }, "Players each"), React.createElement(Stepper, {
+    id: "tm-size",
+    value: cfg.size,
+    min: 1,
+    max: 4,
+    onChange: v => setCfg({
+      ...cfg,
+      size: v,
+      teams: shapeTeams(teams, cfg.count, v)
+    })
+  }))), React.createElement("p", {
+    className: "hint"
+  }, cfg.count === 2 ? cfg.size + 'v' + cfg.size : cfg.count + ' teams of ' + cfg.size, " \xB7 each team shares one budget, one roster and its Chaos Cards. Everyone votes, but never for their own team."), React.createElement("button", {
+    className: "btn btn-sm",
+    style: {
+      alignSelf: 'flex-start'
+    },
+    onClick: autoAssign
+  }, "Shuffle players into teams")), teams.map((t, i) => React.createElement("div", {
+    key: t.id,
+    className: "teamedit",
+    style: mStyle(t)
+  }, React.createElement("div", {
+    className: "row"
+  }, React.createElement("button", {
+    className: "emo",
+    onClick: () => upd(i, {
+      emoji: EMOJIS[(EMOJIS.indexOf(t.emoji) + 1) % EMOJIS.length]
+    }),
+    "aria-label": "Change team emoji"
+  }, t.emoji), React.createElement("button", {
+    className: "swatch",
+    onClick: () => upd(i, {
+      color: COLORS[(COLORS.indexOf(t.color) + 1) % COLORS.length]
+    }),
+    "aria-label": "Change team colour"
+  }), React.createElement("input", {
+    id: 'tm-name-' + t.id,
+    className: "input grow",
+    value: t.name,
+    maxLength: 20,
+    placeholder: 'Team ' + (i + 1),
+    onChange: e => upd(i, {
+      name: e.target.value
+    })
+  })), React.createElement("div", {
+    className: "stack-sm",
+    style: {
+      marginTop: 8
+    }
+  }, t.members.map((p, j) => React.createElement("input", {
+    key: p.id,
+    id: 'tm-p-' + p.id,
+    className: "input",
+    value: p.name,
+    maxLength: 16,
+    placeholder: 'Player ' + (j + 1),
+    onChange: e => updMember(i, j, e.target.value)
+  }))))));
+}
+const localTeamsToManagers = cfg => shapeTeams(cfg.teams || [], cfg.count, cfg.size).map(t => ({
+  id: t.id,
+  name: t.name.trim(),
+  color: t.color,
+  emoji: t.emoji,
+  members: t.members.map(p => ({
+    id: p.id,
+    name: p.name.trim(),
+    emoji: '🙂'
+  }))
+}));
+const teamsValid = cfg => {
+  const ts = shapeTeams(cfg.teams || [], cfg.count, cfg.size);
+  return ts.every(t => t.name.trim() && t.members.every(p => p.name.trim()));
+};
 function SetupManagers({
   managers,
   setManagers,
   onBack,
-  onNext
+  onNext,
+  teamCfg,
+  setTeamCfg
+}) {
+  if (teamCfg && teamCfg.on) return React.createElement("div", {
+    className: "app"
+  }, React.createElement(TopBar, {
+    onBack: onBack,
+    title: "1 \xB7 Teams"
+  }), React.createElement("div", null, React.createElement("h2", {
+    className: "display"
+  }, "Who's bidding?")), React.createElement(Seg, {
+    label: "Play style",
+    value: "teams",
+    options: [['solo', 'Individual'], ['teams', 'Teams']],
+    onChange: v => setTeamCfg({
+      ...teamCfg,
+      on: v === 'teams'
+    })
+  }), React.createElement(TeamsEditor, {
+    cfg: teamCfg,
+    setCfg: setTeamCfg
+  }), !teamsValid(teamCfg) && React.createElement("p", {
+    className: "hint"
+  }, "Every team and player needs a name."), React.createElement("button", {
+    className: "btn btn-gold",
+    disabled: !teamsValid(teamCfg),
+    onClick: onNext
+  }, "Next: pick a topic"));
+  return React.createElement(SetupManagersSolo, {
+    managers: managers,
+    setManagers: setManagers,
+    onBack: onBack,
+    onNext: onNext,
+    teamCfg: teamCfg,
+    setTeamCfg: setTeamCfg
+  });
+}
+function SetupManagersSolo({
+  managers,
+  setManagers,
+  onBack,
+  onNext,
+  teamCfg,
+  setTeamCfg
 }) {
   const upd = (i, patch) => setManagers(managers.map((m, k) => k === i ? {
     ...m,
@@ -4863,7 +5994,15 @@ function SetupManagers({
     className: "display"
   }, "Who's bidding?"), React.createElement("p", {
     className: "hint"
-  }, "2 to 8 managers. Tap the colour or emoji to change it.")), React.createElement("div", {
+  }, "2 to 8 managers. Tap the colour or emoji to change it.")), setTeamCfg && React.createElement(Seg, {
+    label: "Play style",
+    value: "solo",
+    options: [['solo', 'Individual'], ['teams', 'Teams']],
+    onChange: v => setTeamCfg({
+      ...(teamCfg || DEFAULT_TEAMS),
+      on: v === 'teams'
+    })
+  }), React.createElement("div", {
     className: "stack-sm"
   }, managers.map((m, i) => React.createElement("div", {
     className: "mrow",
@@ -5041,6 +6180,72 @@ function SetupTopic({
     onClick: onTopics
   }, "Manage topics"));
 }
+function RuleSection({
+  id,
+  title,
+  emoji,
+  on,
+  onToggle,
+  summary,
+  children,
+  open: startOpen
+}) {
+  const [open, setOpen] = useState(!!startOpen);
+  return React.createElement("section", {
+    className: 'rsec' + (on === false ? ' off' : '')
+  }, React.createElement("div", {
+    className: "rhead2"
+  }, React.createElement("button", {
+    type: "button",
+    className: "rtitle",
+    "aria-expanded": open,
+    "aria-controls": id,
+    onClick: () => setOpen(o => !o)
+  }, React.createElement("span", {
+    className: "re"
+  }, emoji), React.createElement("span", {
+    className: "grow",
+    style: {
+      minWidth: 0
+    }
+  }, React.createElement("b", null, title), React.createElement("span", {
+    className: "small muted",
+    style: {
+      display: 'block'
+    }
+  }, summary)), React.createElement("span", {
+    className: "chev"
+  }, open ? '▾' : '▸')), onToggle && React.createElement("button", {
+    type: "button",
+    className: "mini-sw",
+    role: "switch",
+    "aria-checked": !!on,
+    "aria-label": title + (on ? ' on' : ' off'),
+    onClick: () => onToggle(!on)
+  }, React.createElement("span", null))), open && React.createElement("div", {
+    id: id,
+    className: "rbody stack"
+  }, children));
+}
+function PctField({
+  id,
+  label,
+  value,
+  onChange,
+  max
+}) {
+  return React.createElement("div", {
+    className: "field grow"
+  }, React.createElement("label", {
+    htmlFor: id
+  }, label), React.createElement(Stepper, {
+    id: id,
+    value: value,
+    min: 0,
+    max: max,
+    onChange: onChange
+  }));
+}
 function SetupRules({
   topic,
   managers,
@@ -5049,21 +6254,38 @@ function SetupRules({
   onBack,
   onStart,
   startLabel = 'Start the draft',
-  title = '3 · Rules'
+  title = '3 · Rules',
+  teamSummary,
+  onEditTeams,
+  onReset
 }) {
   const [slotTxt, setSlotTxt] = useState(rules.slots.join(', '));
+  const [askReset, setAskReset] = useState(false);
   const slots = parseSlots(slotTxt);
+  const tw = twistRules(rules);
   const set = p => setRules({
     ...rules,
     ...p
+  });
+  const setTw = (k, p) => setRules({
+    ...rules,
+    [k]: {
+      ...tw[k],
+      ...p
+    }
   });
   const needed = rules.minBid * slots.length;
   const problems = [];
   if (!slots.length) problems.push('Add at least one slot.');
   if (rules.budget < needed) problems.push('A budget of ' + money(rules.budget) + " can't fill " + slots.length + ' slots at ' + money(rules.minBid) + ' each. Raise it to at least ' + money(needed) + '.');
+  if (tw.chaos.on && !CARD_TYPES.some(c => tw.chaos[c])) problems.push('Chaos Cards are on but every card type is switched off. Turn one on, or switch Chaos Cards off.');
+  if (tw.rarity.on && tw.rarity.rare + tw.rarity.legendary > 100) problems.push('Rare + Legendary can’t be more than 100%.');
   if (topic.items.length < slots.length * managers.length) problems.push('Heads up: ' + topic.items.length + ' items for ' + slots.length * managers.length + ' slots. Some teams will finish short.');
+  if (tw.mystery.on && topic.items.length < tw.mystery.every) problems.push('Heads up: this topic has fewer than ' + tw.mystery.every + ' items, so there won’t be any mystery items.');
   const blocking = problems.filter(p => !p.startsWith('Heads up'));
   const posMissing = [...new Set(topic.items.map(i => i.pos).filter(p => p && !slots.some(s => norm(s) === norm(p))))];
+  const common = 100 - tw.rarity.rare - tw.rarity.legendary;
+  const mysteryCount = tw.mystery.on ? Math.floor(topic.items.length / Math.max(2, tw.mystery.every)) : 0;
   return React.createElement("div", {
     className: "app"
   }, React.createElement(TopBar, {
@@ -5073,13 +6295,19 @@ function SetupRules({
     className: "eyebrow"
   }, topic.emoji, " ", topic.name), React.createElement("h2", {
     className: "display"
-  }, "House rules")), React.createElement("div", {
-    className: "card stack"
+  }, "House rules"), React.createElement("p", {
+    className: "hint"
+  }, "Changes apply to new drafts only. A game in progress keeps its rules.")), React.createElement(RuleSection, {
+    id: "rs-basic",
+    emoji: "\uD83D\uDCB5",
+    title: "Money & slots",
+    summary: money(rules.budget) + ' budget · min ' + money(rules.minBid) + ' · +' + money(rules.inc) + ' · ' + slots.length + ' slots',
+    open: true
   }, React.createElement("div", {
     className: "field"
   }, React.createElement("label", {
     htmlFor: "r-budget"
-  }, "Starting budget"), React.createElement(Stepper, {
+  }, "Starting budget", teamSummary && teamSummary.teams ? ' (per team)' : ''), React.createElement(Stepper, {
     id: "r-budget",
     prefix: "$",
     value: rules.budget,
@@ -5116,9 +6344,7 @@ function SetupRules({
     onChange: v => set({
       inc: v
     })
-  }))), React.createElement("div", {
-    className: "card stack"
-  }, React.createElement("div", {
+  })), React.createElement("div", {
     className: "field"
   }, React.createElement("label", {
     htmlFor: "r-slots"
@@ -5139,17 +6365,6 @@ function SetupRules({
     className: "field"
   }, React.createElement("span", {
     className: "label"
-  }, "Item order"), React.createElement(Seg, {
-    label: "Item order",
-    value: rules.order,
-    options: [['random', 'Shuffle'], ['saved', 'Saved order']],
-    onChange: v => set({
-      order: v
-    })
-  })), React.createElement("div", {
-    className: "field"
-  }, React.createElement("span", {
-    className: "label"
   }, "Bid timer"), React.createElement(Seg, {
     label: "Bid timer",
     value: rules.timer,
@@ -5159,7 +6374,7 @@ function SetupRules({
     })
   }), rules.timer > 0 && React.createElement("p", {
     className: "hint"
-  }, "Resets on every bid. When it runs out with a leader, the item sells automatically.")), React.createElement(Toggle, {
+  }, "Resets on every bid. When it runs out with a leader, the item sells automatically. (Solo always uses its own bid clock.)")), React.createElement(Toggle, {
     on: rules.mustFill,
     onChange: v => set({
       mustFill: v
@@ -5177,9 +6392,145 @@ function SetupRules({
     onChange: v => set({
       noBids: v
     })
+  }))), React.createElement(RuleSection, {
+    id: "rs-flow",
+    emoji: "\uD83E\uDDED",
+    title: "Draft flow",
+    summary: (rules.order === 'nominate' ? 'Nomination' : rules.order === 'saved' ? 'Topic order' : 'Random order') + ' · trades ' + (tw.trades.on ? tw.trades.minutes + ' min' + (tw.trades.money ? ' + money' : '') : 'off')
+  }, React.createElement("div", {
+    className: "field"
+  }, React.createElement("span", {
+    className: "label"
+  }, "Draft order"), React.createElement(Seg, {
+    label: "Draft order",
+    value: rules.order,
+    options: [['random', 'Random'], ['nominate', 'Nomination'], ['saved', 'Topic order']],
+    onChange: v => set({
+      order: v
+    })
   }), React.createElement("p", {
     className: "hint"
-  }, rules.noBids === 'back' ? 'An unsold item comes round once more, then goes to the leftovers.' : 'Unsold items go to the leftovers for free picks at the end.'))), problems.map(p => React.createElement("p", {
+  }, rules.order === 'nominate' ? 'Teams take turns choosing which item goes up next.' : rules.order === 'saved' ? 'Items come up in the order saved in the topic.' : 'Items come up in a random order.')), React.createElement(Toggle, {
+    on: tw.trades.on,
+    onChange: v => setTw('trades', {
+      on: v
+    }),
+    title: "Trade window after the draft",
+    sub: "1-for-1 trades. Both teams must accept."
+  }), tw.trades.on && React.createElement(React.Fragment, null, React.createElement("div", {
+    className: "field"
+  }, React.createElement("span", {
+    className: "label"
+  }, "Trade window"), React.createElement(Seg, {
+    label: "Trade window length",
+    value: tw.trades.minutes,
+    options: [[1, '1 min'], [3, '3 min'], [5, '5 min'], [10, '10 min']],
+    onChange: v => setTw('trades', {
+      minutes: v
+    })
+  })), React.createElement(Toggle, {
+    on: tw.trades.money,
+    onChange: v => setTw('trades', {
+      money: v
+    }),
+    title: "Money in trades",
+    sub: "A team can add cash to sweeten a 1-for-1 trade."
+  }))), React.createElement(RuleSection, {
+    id: "rs-chaos",
+    emoji: "\uD83C\uDCCF",
+    title: "Chaos Cards",
+    on: tw.chaos.on,
+    onToggle: v => setTw('chaos', {
+      on: v
+    }),
+    summary: tw.chaos.on ? tw.chaos.count + ' per ' + (teamSummary && teamSummary.teams ? 'team' : 'manager') + ' · ' + CARD_TYPES.filter(c => tw.chaos[c]).map(c => CARD_INFO[c].name).join(', ') : 'Off'
+  }, React.createElement("div", {
+    className: "field"
+  }, React.createElement("label", {
+    htmlFor: "r-cards"
+  }, "Cards per ", teamSummary && teamSummary.teams ? 'team' : 'manager'), React.createElement(Stepper, {
+    id: "r-cards",
+    value: tw.chaos.count,
+    min: 1,
+    max: 5,
+    onChange: v => setTw('chaos', {
+      count: v
+    })
+  }), teamSummary && teamSummary.teams ? React.createElement("p", {
+    className: "hint"
+  }, "In team games, cards belong to the team, not each player.") : null), CARD_TYPES.map(c => React.createElement(Toggle, {
+    key: c,
+    on: tw.chaos[c],
+    onChange: v => setTw('chaos', {
+      [c]: v
+    }),
+    title: CARD_INFO[c].emoji + ' ' + CARD_INFO[c].name,
+    sub: CARD_INFO[c].text + (c === 'steal' ? money(rules.inc) + '.' : '')
+  }))), React.createElement(RuleSection, {
+    id: "rs-mys",
+    emoji: "\u2753",
+    title: "Mystery items",
+    on: tw.mystery.on,
+    onToggle: v => setTw('mystery', {
+      on: v
+    }),
+    summary: tw.mystery.on ? '1 in ' + tw.mystery.every + ' · ' + mysteryCount + ' in this topic' : 'Off'
+  }, React.createElement("div", {
+    className: "field"
+  }, React.createElement("span", {
+    className: "label"
+  }, "How often"), React.createElement(Seg, {
+    label: "Mystery frequency",
+    value: tw.mystery.every,
+    options: [[5, '1 in 5'], [8, '1 in 8'], [12, '1 in 12']],
+    onChange: v => setTw('mystery', {
+      every: v
+    })
+  })), React.createElement("p", {
+    className: "hint"
+  }, "Mystery items are auctioned face down and fit any open slot. You find out what you bought after it sells.")), React.createElement(RuleSection, {
+    id: "rs-rar",
+    emoji: "\u2728",
+    title: "Rarity",
+    on: tw.rarity.on,
+    onToggle: v => setTw('rarity', {
+      on: v
+    }),
+    summary: tw.rarity.on ? common + '% Common · ' + tw.rarity.rare + '% Rare · ' + tw.rarity.legendary + '% Legendary' : 'Off'
+  }, React.createElement("div", {
+    className: "row"
+  }, React.createElement(PctField, {
+    id: "r-rare",
+    label: "Rare %",
+    value: tw.rarity.rare,
+    max: 100 - tw.rarity.legendary,
+    onChange: v => setTw('rarity', {
+      rare: v
+    })
+  }), React.createElement(PctField, {
+    id: "r-leg",
+    label: "Legendary %",
+    value: tw.rarity.legendary,
+    max: 100 - tw.rarity.rare,
+    onChange: v => setTw('rarity', {
+      legendary: v
+    })
+  })), React.createElement("p", {
+    className: "hint"
+  }, "Common is the rest (", common, "%). Rarity is just for show: it doesn\u2019t change prices.")), teamSummary && React.createElement(RuleSection, {
+    id: "rs-team",
+    emoji: "\uD83D\uDC65",
+    title: "Team play",
+    summary: teamSummary.text
+  }, React.createElement("p", {
+    className: "hint"
+  }, teamSummary.detail), onEditTeams && React.createElement("button", {
+    className: "btn btn-sm",
+    style: {
+      alignSelf: 'flex-start'
+    },
+    onClick: onEditTeams
+  }, "Edit players & teams")), problems.map(p => React.createElement("p", {
     key: p,
     className: p.startsWith('Heads up') ? 'hint' : 'warn'
   }, p)), React.createElement("button", {
@@ -5189,7 +6540,19 @@ function SetupRules({
       ...rules,
       slots
     })
-  }, startLabel));
+  }, startLabel), onReset && React.createElement("button", {
+    className: "btn btn-ghost",
+    onClick: () => setAskReset(true)
+  }, "Reset rules to defaults"), askReset && React.createElement(Confirm, {
+    title: "Reset rules?",
+    body: "Budget, bids and every twist go back to their defaults. Slots come from the topic.",
+    yes: "Reset",
+    onYes: () => {
+      onReset();
+      setSlotTxt(topic.slots.join(', '));
+    },
+    onClose: () => setAskReset(false)
+  }));
 }
 function ManagerButton({
   d,
@@ -5260,9 +6623,14 @@ function ManagerButton({
     role: "status"
   }, bubble.text), React.createElement("span", {
     className: "who"
-  }, m.emoji, " ", m.name), React.createElement("span", {
+  }, m.emoji, " ", m.name), m.members && React.createElement("span", {
+    className: "mem"
+  }, m.members.map(p => p.name).join(' · ')), React.createElement("span", {
     className: "money num"
-  }, money(m.budget)), React.createElement("span", {
+  }, money(m.budget), d.cards && d.cards[m.id] && d.cards[m.id].length ? React.createElement("span", {
+    className: "cardchip",
+    title: "Chaos Cards left"
+  }, "\uD83C\uDCCF", d.cards[m.id].length) : null), React.createElement("span", {
     className: "st"
   }, status, " \xB7 ", filled, "/", d.rules.slots.length), customOk && React.createElement("button", {
     className: "edit",
@@ -5282,15 +6650,20 @@ function useBotTalk(d) {
   const timers = useRef([]);
   const enabled = d.mode === 'solo' && !(d.solo && d.solo.talk === false);
   useEffect(() => () => timers.current.forEach(clearTimeout), []);
-  const say = (botId, event, extra, force) => {
+  const say = (who, event, extra, force) => {
     if (!enabled) return;
-    const bot = d.managers.find(m => m.id === botId);
-    if (!isBot(bot)) return;
+    const bot = typeof who === 'object' ? who : d.managers.find(m => m.id === who) || botActors(d).find(a => a.speaker === who);
+    if (!bot || !isBot(bot)) return;
+    const botId = bot.id;
     const now = Date.now();
     if (!force && (now - last.current < ms(3000) || now - (per.current[botId] || 0) < ms(7000))) return;
     if (!force && Math.random() > (TALK_CHANCE[event] != null ? TALK_CHANCE[event] : 0.3)) return;
-    const text = botLine(bot, event, extra);
-    if (!text) return;
+    const line = botLine({
+      ...bot,
+      id: bot.speaker || bot.id
+    }, event, extra);
+    if (!line) return;
+    const text = d.teamMode ? bot.name + ': ' + line : line;
     last.current = now;
     per.current[botId] = now;
     const id = now + '-' + Math.random();
@@ -5394,19 +6767,50 @@ function WikiCredit({
     rel: "noopener noreferrer"
   }, "Photo: Wikipedia \u2197");
 }
+function RarityTag({
+  r
+}) {
+  return r && r !== 'common' ? React.createElement("span", {
+    className: 'rtag ' + r
+  }, r === 'legendary' ? '★ Legendary' : '◆ Rare') : null;
+}
 function ItemCard({
-  item,
+  item: real,
   d
 }) {
-  const pos = norm(item.pos);
-  const inTemplate = pos && d.rules.slots.some(s => norm(s) === pos);
-  const hasFlex = d.rules.slots.some(isFlex);
-  return React.createElement("div", {
+  const item = visibleItem(d, real.id);
+  const rar = rarityOf(d, real.id);
+  if (item.hidden) return React.createElement("div", {
     className: "flip"
   }, React.createElement("div", {
     className: "flip-inner"
   }, React.createElement("div", {
-    className: "face itemcard"
+    className: "face itemcard mysterycard"
+  }, React.createElement("div", {
+    className: "ph mys",
+    "aria-hidden": "true"
+  }, "?"), React.createElement("div", {
+    className: "info"
+  }, React.createElement("span", null, React.createElement("span", {
+    className: "pos"
+  }, "MYSTERY")), React.createElement("div", {
+    className: "nm"
+  }, "Mystery item"), React.createElement("div", {
+    className: "ds"
+  }, "Face down. You find out what it is after it sells."), React.createElement("div", {
+    className: "fits"
+  }, "Fits any open slot"))), React.createElement("div", {
+    className: "face back"
+  }, React.createElement("span", null, "?"))));
+  const pos = norm(item.pos);
+  const inTemplate = pos && d.rules.slots.some(s => norm(s) === pos);
+  const hasFlex = d.rules.slots.some(isFlex);
+  return React.createElement("div", {
+    className: 'flip' + (rar ? ' r-' + rar : '')
+  }, React.createElement("div", {
+    className: "flip-inner"
+  }, React.createElement("div", {
+    className: 'face itemcard' + (rar ? ' r-' + rar : '')
   }, React.createElement("div", {
     className: "ph"
   }, React.createElement(ItemArt, {
@@ -5416,9 +6820,17 @@ function ItemCard({
     radius: 16
   })), React.createElement("div", {
     className: "info"
-  }, item.pos && React.createElement("span", null, React.createElement("span", {
+  }, React.createElement("span", {
+    className: "row",
+    style: {
+      gap: 6,
+      flexWrap: 'wrap'
+    }
+  }, item.pos && React.createElement("span", {
     className: "pos"
-  }, item.pos)), React.createElement("div", {
+  }, item.pos), React.createElement(RarityTag, {
+    r: rar
+  })), React.createElement("div", {
     className: "nm"
   }, item.name), item.desc && React.createElement("div", {
     className: "ds"
@@ -5430,6 +6842,239 @@ function ItemCard({
   }))), React.createElement("div", {
     className: "face back"
   }, React.createElement("span", null, "?"))));
+}
+function CardSheet({
+  d,
+  by: fixedBy,
+  onPlay,
+  onDouble,
+  onClose
+}) {
+  const [by, setBy] = useState(fixedBy || null);
+  const [card, setCard] = useState(null);
+  const [target, setTarget] = useState(null);
+  const [mine, setMine] = useState(null);
+  const [item, setItem] = useState(null);
+  const minPay = Math.max(d.rules.minBid, Math.ceil(nextAmount(d) / 2));
+  const [pay, setPay] = useState(minPay);
+  const team = by && teamOf(d, by);
+  const rivals = d.managers.filter(m => m.id !== by);
+  const reset = () => {
+    setCard(null);
+    setTarget(null);
+    setMine(null);
+    setItem(null);
+  };
+  const itemsOf = m => m.team.filter(Boolean);
+  const title = t => React.createElement("h2", {
+    className: "display",
+    style: {
+      fontSize: 30
+    }
+  }, t);
+  if (!by) return React.createElement(Sheet, {
+    center: true,
+    onClose: onClose
+  }, title('Who’s playing a card?'), React.createElement("div", {
+    className: "stack-sm"
+  }, d.managers.map(m => React.createElement("button", {
+    key: m.id,
+    className: "votebtn",
+    style: {
+      ...mStyle(m),
+      flexDirection: 'row',
+      justifyContent: 'space-between'
+    },
+    disabled: !(d.cards[m.id] || []).length,
+    onClick: () => setBy(m.id)
+  }, React.createElement("span", null, m.emoji, " ", m.name), React.createElement("span", null, "\uD83C\uDCCF ", (d.cards[m.id] || []).length)))), React.createElement("button", {
+    className: "btn btn-ghost",
+    onClick: onClose
+  }, "Close"));
+  const params = {
+    target,
+    item,
+    mine
+  };
+  const problem = card === 'double' ? doubleProblem(d, by, pay) : card ? cardProblem(d, by, card, params) : null;
+  const ready = card && !problem && (card === 'double' || card === 'freeze' ? card === 'double' || target : card === 'steal' ? target && item : target && item && mine);
+  let summary = '';
+  if (card === 'double') summary = 'Bid ' + money(pay) + '. It counts as ' + money(pay * 2) + '. You pay ' + money(pay) + ' if you win.';
+  if (card === 'freeze' && target) summary = teamOf(d, target).name + ' can’t bid on this item.';
+  if (card === 'steal' && item) {
+    const owner = teamOf(d, target);
+    const t = owner.team.find(x => x && x.itemId === item);
+    summary = 'Take ' + d.items[item].name + ' from ' + owner.name + '. You pay them ' + money(stealPrice(d, t)) + '.';
+  }
+  if (card === 'swap' && item && mine) summary = 'Give ' + d.items[mine].name + ', get ' + d.items[item].name + ' from ' + teamOf(d, target).name + '.';
+  return React.createElement(Sheet, {
+    center: true,
+    onClose: onClose
+  }, React.createElement("p", {
+    className: "eyebrow"
+  }, team.emoji, " ", team.name, " \xB7 Chaos Cards"), !card ? React.createElement(React.Fragment, null, title('Play a card'), !cardWindow(d) && React.createElement("p", {
+    className: "hint"
+  }, "Steal, Swap and Freeze can only be played before the first bid on an item."), React.createElement("div", {
+    className: "stack-sm"
+  }, (d.cards[by] || []).map((c, i) => {
+    const info = CARD_INFO[c];
+    const why = c === 'veto' ? 'Kept for defence. It’s used when someone targets you.' : c === 'double' ? doubleProblem(d, by, Math.max(minPay, d.rules.minBid)) : !cardWindow(d) ? 'Only before the first bid.' : null;
+    return React.createElement("button", {
+      key: c + i,
+      className: "cardbtn",
+      disabled: c === 'veto' || c !== 'double' && !cardWindow(d),
+      onClick: () => {
+        setCard(c);
+        setPay(minPay);
+      }
+    }, React.createElement("span", {
+      className: "ce"
+    }, info.emoji), React.createElement("span", {
+      className: "grow",
+      style: {
+        minWidth: 0
+      }
+    }, React.createElement("b", null, info.name), React.createElement("span", {
+      className: "small",
+      style: {
+        display: 'block',
+        opacity: 0.85
+      }
+    }, info.text, c === 'steal' ? money(d.rules.inc) + '.' : ''), why && React.createElement("span", {
+      className: "small muted",
+      style: {
+        display: 'block'
+      }
+    }, why)));
+  }), !(d.cards[by] || []).length && React.createElement("p", {
+    className: "hint"
+  }, "No cards left.")), React.createElement("button", {
+    className: "btn btn-ghost",
+    onClick: fixedBy ? onClose : () => setBy(null)
+  }, fixedBy ? 'Close' : 'Back')) : React.createElement(React.Fragment, null, title(CARD_INFO[card].emoji + ' ' + CARD_INFO[card].name), card === 'double' && React.createElement("div", {
+    className: "field"
+  }, React.createElement("label", {
+    htmlFor: "dbl-pay"
+  }, "You pay"), React.createElement(Stepper, {
+    id: "dbl-pay",
+    prefix: "$",
+    value: pay,
+    min: minPay,
+    max: Math.max(minPay, maxBid(team, d.rules)),
+    onChange: setPay
+  })), (card === 'freeze' || card === 'steal' || card === 'swap') && React.createElement("div", {
+    className: "field"
+  }, React.createElement("span", {
+    className: "label"
+  }, "Rival team"), React.createElement("div", {
+    className: "chips"
+  }, rivals.map(m => React.createElement("button", {
+    key: m.id,
+    className: 'pickchip' + (target === m.id ? ' on' : ''),
+    style: mStyle(m),
+    onClick: () => {
+      setTarget(m.id);
+      setItem(null);
+    }
+  }, m.emoji, " ", m.name)))), card === 'swap' && React.createElement("div", {
+    className: "field"
+  }, React.createElement("span", {
+    className: "label"
+  }, "Your item to give"), React.createElement("div", {
+    className: "stack-sm"
+  }, itemsOf(team).map(t => React.createElement("button", {
+    key: t.itemId,
+    className: 'pickbtn' + (mine === t.itemId ? ' on' : ''),
+    onClick: () => setMine(t.itemId)
+  }, React.createElement(Thumb, {
+    item: d.items[t.itemId],
+    topic: d.topic
+  }), React.createElement("span", {
+    className: "grow"
+  }, d.items[t.itemId].name))), !itemsOf(team).length && React.createElement("p", {
+    className: "hint"
+  }, "You don\u2019t own anything yet."))), (card === 'steal' || card === 'swap') && target && React.createElement("div", {
+    className: "field"
+  }, React.createElement("span", {
+    className: "label"
+  }, card === 'steal' ? 'Item to steal' : 'Item to get'), React.createElement("div", {
+    className: "stack-sm"
+  }, itemsOf(teamOf(d, target)).map(t => React.createElement("button", {
+    key: t.itemId,
+    className: 'pickbtn' + (item === t.itemId ? ' on' : ''),
+    onClick: () => setItem(t.itemId)
+  }, React.createElement(Thumb, {
+    item: d.items[t.itemId],
+    topic: d.topic
+  }), React.createElement("span", {
+    className: "grow"
+  }, d.items[t.itemId].name), card === 'steal' && React.createElement("span", {
+    className: "num",
+    style: {
+      fontFamily: 'var(--display)',
+      color: 'var(--gold)'
+    }
+  }, money(stealPrice(d, t))))), !itemsOf(teamOf(d, target)).length && React.createElement("p", {
+    className: "hint"
+  }, "They don\u2019t own anything yet."))), summary && React.createElement("p", {
+    className: "summary"
+  }, summary), problem && (card === 'double' || target) && React.createElement("p", {
+    className: "warn"
+  }, problem), React.createElement("div", {
+    className: "row pin"
+  }, React.createElement("button", {
+    className: "btn btn-ghost grow",
+    onClick: reset
+  }, "Back"), React.createElement("button", {
+    className: "btn btn-gold grow",
+    disabled: !ready,
+    onClick: () => {
+      if (card === 'double') onDouble(by, pay);else onPlay(by, card, params);
+      onClose();
+    }
+  }, "Play ", CARD_INFO[card].name))));
+}
+function cardPlayText(d, play) {
+  const by = teamOf(d, play.by),
+    them = teamOf(d, play.target);
+  if (play.card === 'freeze') return by.name + ' wants to FREEZE ' + them.name + ' for this item.';
+  if (play.card === 'steal') {
+    const t = them.team.find(x => x && x.itemId === play.item);
+    return by.name + ' wants to STEAL ' + d.items[play.item].name + ' from ' + them.name + (t ? ' for ' + money(stealPrice(d, t)) : '') + '.';
+  }
+  if (play.card === 'swap') return by.name + ' wants to SWAP ' + d.items[play.mine].name + ' for ' + them.name + '’s ' + d.items[play.item].name + '.';
+  return '';
+}
+function VetoSheet({
+  d,
+  onAnswer
+}) {
+  const play = d.pending;
+  const them = teamOf(d, play.target);
+  return React.createElement(Sheet, {
+    center: true,
+    onClose: () => {}
+  }, React.createElement("p", {
+    className: "eyebrow"
+  }, "\uD83D\uDED1 Veto?"), React.createElement("h2", {
+    className: "display",
+    style: {
+      fontSize: 30,
+      color: them.color
+    }
+  }, them.emoji, " ", them.name), React.createElement("p", {
+    className: "summary"
+  }, cardPlayText(d, play)), React.createElement("p", {
+    className: "hint"
+  }, "You have a Veto card. Use it to block this? ", d.mode !== 'solo' ? 'Pass the phone to ' + them.name + '.' : ''), React.createElement("div", {
+    className: "row pin"
+  }, React.createElement("button", {
+    className: "btn grow",
+    onClick: () => onAnswer(false)
+  }, "Let it happen"), React.createElement("button", {
+    className: "btn btn-gold grow",
+    onClick: () => onAnswer(true)
+  }, "Use Veto")));
 }
 const bidKeyOf = d => d.reveal + ':' + (d.bid ? d.bid.amount + d.bid.leaderId : 'none');
 function Auction({
@@ -5447,6 +7092,9 @@ function Auction({
   const [teams, setTeams] = useState(false);
   const [thinking, setThinking] = useState(null);
   const [out, setOut] = useState(false);
+  const [cardsOpen, setCardsOpen] = useState(false);
+  const cardTried = useRef(new Set());
+  const hold = paused || !!d.pending;
   const busy = useRef(false);
   const timer = solo ? d.solo && d.solo.clock || 8 : d.rules.timer || 0;
   const [left, setLeft] = useState(timer);
@@ -5455,7 +7103,7 @@ function Auction({
   const live = useRef({});
   live.current = {
     d,
-    paused,
+    paused: hold,
     flashing,
     gavel,
     left
@@ -5475,13 +7123,17 @@ function Auction({
     const price = d.bid.amount;
     const winnerId = d.bid.leaderId;
     const bidders = [...new Set(d.bids.filter(Boolean).map(b => b.leaderId))].filter(id => id !== winnerId);
+    const real = d.items[d.queue[0]];
     const info = {
       kind: 'sold',
       name: leader.name,
       emoji: leader.emoji,
       color: leader.color,
       price,
-      item: item.name
+      item: real.name,
+      mystery: !!real.mystery,
+      rarity: (d.rarity || {})[real.id] || null,
+      doubled: !!d.bid.double
     };
     buzz([40, 30, 160]);
     setGavel(true);
@@ -5508,41 +7160,100 @@ function Auction({
     setThinking(null);
     onFlash({
       kind: 'skip',
-      item: item.name,
+      item: visibleItem(d, item.id).name,
       back
     });
     setDraft(p => skipItem(p));
   }
   useEffect(() => {
-    if (!timer || paused || flashing || gavel) return undefined;
+    if (!timer || hold || flashing || gavel) return undefined;
     const t = setInterval(() => setLeft(l => l > 0 ? l - 1 : 0), ms(1000));
     return () => clearInterval(t);
-  }, [bidKey, paused, flashing, gavel, timer]);
+  }, [bidKey, hold, flashing, gavel, timer]);
   useEffect(() => {
-    if (!timer || paused || flashing || gavel || left > 0) return;
+    if (!timer || hold || flashing || gavel || left > 0) return;
     if (d.bid) sold();else if (solo) skip();
-  }, [left, paused, flashing, gavel, timer]);
+  }, [left, hold, flashing, gavel, timer]);
+  const cardKey = bidKey + ':' + JSON.stringify(d.cards || {}) + ':' + (d.cardLog || []).length;
   useEffect(() => {
-    if (!solo || paused || flashing || gavel || busy.current || d.phase !== 'auction') {
+    if (!solo || hold || flashing || gavel || busy.current || d.phase !== 'auction') {
       setThinking(null);
       return undefined;
     }
-    const plan = nextBotAction(d);
+    let cardPlan = null;
+    if (cardWindow(d)) {
+      for (const a of botActors(d)) {
+        const k = d.reveal + ':' + a.speaker;
+        if (cardTried.current.has(k)) continue;
+        cardTried.current.add(k);
+        const c = botCardPlay(d, a);
+        if (c) {
+          cardPlan = c;
+          break;
+        }
+      }
+    }
+    const plan = cardPlan || nextBotAction(d);
     if (!plan) {
       setThinking(null);
       return undefined;
     }
     setThinking(plan.botId);
-    const key = bidKey;
     const t = setTimeout(() => {
       const cur = live.current;
-      if (bidKeyOf(cur.d) !== key || cur.paused || cur.flashing || cur.gavel || busy.current || cur.left <= 0 || cur.d.phase !== 'auction') return;
+      if (cur.paused || cur.flashing || cur.gavel || busy.current || cur.left <= 0 || cur.d.phase !== 'auction') return;
       setThinking(null);
-      setDraft(p => bidKeyOf(p) === key && p.phase === 'auction' ? placeBid(p, plan.botId, plan.amount) : p);
-      talk.say(plan.botId, plan.event);
+      const speaker = botActors(d).find(a => a.speaker === plan.speaker) || plan.botId;
+      if (plan.card) {
+        setDraft(p => p.reveal === d.reveal && !p.bid ? playCard(p, plan.botId, plan.card, plan.params) : p);
+        talk.say(speaker, 'card', null, true);
+        return;
+      }
+      setDraft(p => bidKeyOf(p) === bidKey && p.phase === 'auction' ? placeBid(p, plan.botId, plan.amount, plan.double ? {
+        double: true
+      } : undefined) : p);
+      talk.say(speaker, plan.event);
     }, ms(plan.delay));
     return () => clearTimeout(t);
-  }, [bidKey, paused, flashing, gavel, solo]);
+  }, [cardKey, hold, flashing, gavel, solo]);
+  useEffect(() => {
+    if (!d.pending) return undefined;
+    const victim = teamOf(d, d.pending.target);
+    const botVictim = d.mode === 'solo' && victim && (isBot(victim) || isBotTeam(victim));
+    if (!botVictim) return undefined;
+    const id = d.pending.id;
+    const t = setTimeout(() => setDraft(p => p.pending && p.pending.id === id ? answerCard(p, botVeto(p, teamOf(p, p.pending.target), p.pending)) : p), ms(1200));
+    return () => clearTimeout(t);
+  }, [d.pending && d.pending.id]);
+  const logLen = (d.cardLog || []).length;
+  const seenLog = useRef(logLen);
+  useEffect(() => {
+    if (logLen > seenLog.current) {
+      const e = d.cardLog[logLen - 1];
+      onFlash({
+        kind: 'card',
+        card: e.card,
+        result: e.result,
+        text: e.detail,
+        by: teamOf(d, e.by)
+      });
+    }
+    seenLog.current = logLen;
+  }, [logLen]);
+  useEffect(() => {
+    if (!solo || flashing || d.bid || !item) return;
+    const advisers = botAdvisers(d);
+    if (!advisers.length) return;
+    const a = advisers[d.reveal % advisers.length];
+    const vis = visibleItem(d, item.id);
+    if (assignSlot(a, vis, d.rules.slots) < 0) return;
+    const {
+      limit
+    } = botLimit(d, a, vis, seeded(d.seed, 'adv', d.reveal));
+    if (limit >= d.rules.minBid) talk.say(a, 'advise', {
+      slot: money(limit)
+    });else talk.say(a, 'pass');
+  }, [d.reveal, flashing]);
   useEffect(() => {
     if (!solo || flashing) return;
     if (d.processed === 0 && !d.bid) {
@@ -5562,6 +7273,7 @@ function Auction({
   const lc = leader ? leader.color : null;
   const showCard = !flashing;
   const thinker = thinking && d.managers.find(m => m.id === thinking);
+  const frozenTeam = d.managers.find(m => frozenNow(d, m.id));
   const youAmt = you ? nextAmount(d) : 0;
   const youCan = you && !paused && !flashing && !gavel && canBid(d, you, youAmt);
   const going = timer > 0 && d.bid && left <= 2 && left > 0 ? left === 2 ? 'Going once…' : 'Going twice…' : null;
@@ -5576,7 +7288,11 @@ function Auction({
     "aria-label": "Home"
   }, "\u2302"), React.createElement("div", {
     className: "title num"
-  }, "Item ", d.processed + 1, " of ", total), React.createElement("button", {
+  }, "Item ", d.processed + 1, " of ", total), ruleOn(d, 'chaos') && React.createElement("button", {
+    className: "pillbtn",
+    onClick: () => setCardsOpen(true),
+    "aria-label": "Chaos Cards"
+  }, "\uD83C\uDCCF"), React.createElement("button", {
     className: "pillbtn",
     onClick: () => setTeams(true)
   }, "Teams"), React.createElement("button", {
@@ -5621,7 +7337,7 @@ function Auction({
   }, leader ? leader.emoji + ' ' + leader.name + ' leads' : timer > 0 && left <= 0 ? "Time's up · no bids" : solo ? 'Opening bid · bid or wait' : 'Opening bid · tap a manager'), React.createElement("div", {
     className: "going",
     "aria-live": "polite"
-  }, going || (thinker ? '💭 ' + thinker.name + ' is thinking…' : solo && out ? 'You’re out on this one' : ' ')), timer > 0 && React.createElement("span", {
+  }, d.pending ? '🛑 Waiting for a Veto answer…' : going || (thinker ? '💭 ' + thinker.name + ' is thinking…' : solo && out ? 'You’re out on this one' : frozenTeam ? '🧊 ' + frozenTeam.name + ' is frozen for this item' : ' ')), timer > 0 && React.createElement("span", {
     className: "timer",
     style: {
       width: Math.max(0, left) / timer * 100 + '%'
@@ -5651,7 +7367,7 @@ function Auction({
     key: m.id,
     d: d,
     m: m,
-    disabledAll: paused || flashing || gavel,
+    disabledAll: hold || flashing || gavel,
     readOnly: solo && !m.human,
     bubble: talk.bubbles[m.id],
     thinking: thinking === m.id,
@@ -5670,7 +7386,7 @@ function Auction({
     className: "actions duo"
   }, React.createElement("button", {
     className: "btn",
-    disabled: paused || flashing || out || !(you && canBid(d, you, youAmt)),
+    disabled: hold || flashing || out || !(you && canBid(d, you, youAmt)),
     onClick: () => {
       setOut(true);
       setLeft(l => Math.min(l, 3));
@@ -5688,15 +7404,15 @@ function Auction({
   }, React.createElement("button", {
     className: "btn",
     onClick: () => setDraft(p => undo(p)),
-    disabled: paused || flashing || !d.bid && !d.history.length
+    disabled: hold || flashing || !d.bid && !d.history.length
   }, undoLabel(d)), React.createElement("button", {
     className: "btn",
     onClick: skip,
-    disabled: paused || flashing || !!d.bid
+    disabled: hold || flashing || !!d.bid
   }, "No bids"), React.createElement("button", {
     className: "btn btn-gold sold",
     onClick: sold,
-    disabled: paused || flashing || !d.bid
+    disabled: hold || flashing || !d.bid
   }, "Sold!")), gavel && React.createElement("div", {
     className: "gavel",
     "aria-hidden": "true"
@@ -5712,7 +7428,435 @@ function Auction({
   }), teams && React.createElement(TeamsSheet, {
     d: d,
     onClose: () => setTeams(false)
+  }), cardsOpen && React.createElement(CardSheet, {
+    d: d,
+    by: solo && you ? you.id : null,
+    onClose: () => setCardsOpen(false),
+    onPlay: (by, card, params) => setDraft(p => playCard(p, by, card, params)),
+    onDouble: (by, pay) => {
+      buzz(20);
+      setOut(false);
+      setDraft(p => placeBid(p, by, pay, {
+        double: true
+      }));
+    }
+  }), d.pending && !(d.mode === 'solo' && (isBot(teamOf(d, d.pending.target)) || isBotTeam(teamOf(d, d.pending.target)))) && React.createElement(VetoSheet, {
+    d: d,
+    onAnswer: v => setDraft(p => answerCard(p, v))
   }));
+}
+function Nominate({
+  d,
+  setDraft,
+  goHome
+}) {
+  const [q, setQ] = useState('');
+  const [pick, setPick] = useState(null);
+  const [teams, setTeams] = useState(false);
+  const [paused, setPaused] = useState(false);
+  const cur = currentNominator(d);
+  const solo = d.mode === 'solo';
+  const botTurn = !!(cur && solo && (isBot(cur.m) || isBotTeam(cur.m)));
+  const talk = useBotTalk(d);
+  const live = useRef({});
+  live.current = {
+    d,
+    paused
+  };
+  useEffect(() => {
+    if (!botTurn || paused) return undefined;
+    const actor = botActors(d).find(a => a.id === cur.m.id);
+    const id = actor && botNominate(d, actor);
+    if (!id) return undefined;
+    const reveal = d.reveal;
+    const t = setTimeout(() => {
+      if (live.current.paused || live.current.d.reveal !== reveal) return;
+      setDraft(p => p.reveal === reveal ? nominate(p, id) : p);
+      talk.say(actor, 'nominate');
+    }, ms(1300));
+    return () => clearTimeout(t);
+  }, [d.reveal, botTurn, paused]);
+  if (!cur) return null;
+  const pool = nominationPool(d).map(id => visibleItem(d, id));
+  const shown = pool.filter(it => !q.trim() || (it.name + ' ' + (it.pos || '') + ' ' + (it.desc || '')).toLowerCase().includes(q.trim().toLowerCase()));
+  return React.createElement("div", {
+    className: "app"
+  }, React.createElement("div", {
+    className: "topbar"
+  }, React.createElement("button", {
+    className: "iconbtn",
+    onClick: goHome,
+    "aria-label": "Home"
+  }, "\u2302"), React.createElement("div", {
+    className: "title"
+  }, "Nomination \xB7 ", d.processed + 1, " of ", d.processed + d.queue.length), React.createElement("button", {
+    className: "pillbtn",
+    onClick: () => setTeams(true)
+  }, "Teams"), solo && React.createElement("button", {
+    className: "iconbtn",
+    onClick: () => setPaused(p => !p),
+    "aria-label": paused ? 'Resume' : 'Pause'
+  }, paused ? '▶' : 'Ⅱ')), React.createElement("div", {
+    className: "picker",
+    style: mStyle(cur.m)
+  }, React.createElement("p", {
+    className: "eyebrow"
+  }, "Nominating"), React.createElement("h2", {
+    className: "display",
+    style: {
+      fontSize: 40
+    }
+  }, cur.m.emoji, " ", cur.m.name), React.createElement("p", {
+    className: "small",
+    style: {
+      margin: 0
+    }
+  }, botTurn ? paused ? 'Paused' : '💭 Choosing what goes up next…' : 'Pick the next item to auction.')), Object.entries(talk.bubbles).map(([id, bb]) => React.createElement("p", {
+    key: bb.id,
+    className: "bubble inline"
+  }, bb.text)), !botTurn && React.createElement(TopicSearch, {
+    q: q,
+    setQ: setQ
+  }), React.createElement("div", {
+    className: "pickgrid"
+  }, shown.map(it => {
+    const r = rarityOf(d, it.id);
+    return React.createElement("button", {
+      key: it.id,
+      className: "pickbtn",
+      disabled: botTurn,
+      onClick: () => setPick(it.id)
+    }, it.hidden ? React.createElement("span", {
+      className: "thumb",
+      style: {
+        background: '#2c2659',
+        color: '#c9a6ff',
+        fontSize: 24
+      }
+    }, "?") : React.createElement(Thumb, {
+      item: it,
+      topic: d.topic
+    }), React.createElement("span", {
+      className: "grow",
+      style: {
+        minWidth: 0
+      }
+    }, React.createElement("b", {
+      style: {
+        display: 'block'
+      }
+    }, it.name, " ", it.pos && React.createElement("span", {
+      className: "pos"
+    }, it.pos), " ", React.createElement(RarityTag, {
+      r: r
+    })), React.createElement("span", {
+      className: "small muted"
+    }, it.desc)));
+  }), !shown.length && React.createElement("p", {
+    className: "muted"
+  }, "Nothing matches \u201C", q, "\u201D.")), pick && React.createElement(Confirm, {
+    title: "Nominate this?",
+    body: visibleItem(d, pick).name + ' goes up for auction next.',
+    yes: "Nominate",
+    onYes: () => setDraft(p => nominate(p, pick)),
+    onClose: () => setPick(null)
+  }), teams && React.createElement(TeamsSheet, {
+    d: d,
+    onClose: () => setTeams(false)
+  }));
+}
+function tradeText(d, t) {
+  const A = teamOf(d, t.from),
+    B = teamOf(d, t.to);
+  const m = t.money && t.money.amount ? ' + ' + money(t.money.amount) + ' from ' + teamOf(d, t.money.payer).name : '';
+  return A.name + ' gives ' + d.items[t.give].name + ' ↔ ' + B.name + ' gives ' + d.items[t.get].name + m;
+}
+function TradeWindow({
+  d,
+  setDraft,
+  goHome
+}) {
+  const solo = d.mode === 'solo';
+  const you = solo ? d.managers.find(m => m.human) : null;
+  const [now, setNow] = useState(Date.now());
+  const [from, setFrom] = useState(you ? you.id : null);
+  const [to, setTo] = useState(null);
+  const [give, setGive] = useState(null);
+  const [get, setGet] = useState(null);
+  const [payer, setPayer] = useState(null);
+  const [amount, setAmount] = useState(0);
+  const [handoff, setHandoff] = useState(null);
+  const [msg, setMsg] = useState('');
+  const left = Math.max(0, d.trade.endsAt - now);
+  useEffect(() => {
+    const t = setInterval(() => setNow(Date.now()), ms(1000));
+    return () => clearInterval(t);
+  }, []);
+  useEffect(() => {
+    if (left <= 0) setDraft(p => closeTrades(p));
+  }, [left <= 0]);
+  const offered = useRef(false);
+  useEffect(() => {
+    if (!solo || offered.current) return undefined;
+    offered.current = true;
+    const timers = botActors(d).filter((a, i, arr) => arr.findIndex(x => x.id === a.id) === i).map((a, i) => setTimeout(() => setDraft(p => {
+      if (p.phase !== 'trade') return p;
+      const actor = botActors(p).find(x => x.speaker === a.speaker);
+      const offer = actor && botTradeOffer(p, actor);
+      return offer ? proposeTrade(p, offer) : p;
+    }), ms(2500 + i * 2200)));
+    return () => timers.forEach(clearTimeout);
+  }, []);
+  const pendingForBots = d.trade.proposals.filter(t => t.status === 'pending' && solo && (isBot(teamOf(d, t.to)) || isBotTeam(teamOf(d, t.to)))).map(t => t.id).join(',');
+  useEffect(() => {
+    if (!pendingForBots) return undefined;
+    const ids = pendingForBots.split(',');
+    const t = setTimeout(() => setDraft(p => {
+      let n = p;
+      ids.forEach(id => {
+        const tr = n.trade.proposals.find(x => x.id === id);
+        if (!tr || tr.status !== 'pending') return;
+        const actor = botActors(n).find(a => a.id === tr.to);
+        if (!actor) return;
+        const ans = botTradeDecision(n, actor, tr);
+        n = ans.accept ? acceptTrade(n, id) : setTradeStatus(rejectTrade(n, id), id, 'rejected', ans.reason);
+        if (ans.accept) n = setTradeStatus(n, id, n.trade.proposals.find(x => x.id === id).status, ans.reason);
+      });
+      return n;
+    }), ms(1600));
+    return () => clearTimeout(t);
+  }, [pendingForBots]);
+  const A = from && teamOf(d, from),
+    B = to && teamOf(d, to);
+  const draftTrade = {
+    from,
+    to,
+    give,
+    get,
+    money: d.rules.trades.money && amount > 0 && payer ? {
+      payer,
+      amount
+    } : null
+  };
+  const problem = from && to && give && get ? tradeProblem(d, draftTrade, now) : null;
+  const propose = () => {
+    const n = proposeTrade(d, draftTrade, now);
+    if (n === d) {
+      setMsg(problem || 'That trade can’t be offered.');
+      return;
+    }
+    setDraft(n);
+    setGive(null);
+    setGet(null);
+    setAmount(0);
+    setMsg('Offer sent to ' + B.name + '.');
+  };
+  const mm = Math.floor(left / 60000),
+    ss = Math.floor(left % 60000 / 1000);
+  const list = [...d.trade.proposals].reverse();
+  const canAnswer = t => t.status === 'pending' && (!solo || you && t.to === you.id);
+  const canCancel = t => t.status === 'pending' && (!solo || you && t.from === you.id);
+  return React.createElement("div", {
+    className: "app"
+  }, React.createElement("div", {
+    className: "topbar"
+  }, React.createElement("button", {
+    className: "iconbtn",
+    onClick: goHome,
+    "aria-label": "Home"
+  }, "\u2302"), React.createElement("div", {
+    className: "title"
+  }, "Trade window"), React.createElement("span", {
+    className: 'tclock num' + (left < 30000 ? ' hot' : ''),
+    "aria-live": "polite"
+  }, mm, ":", String(ss).padStart(2, '0'))), React.createElement("p", {
+    className: "hint",
+    style: {
+      textAlign: 'center'
+    }
+  }, "1-for-1 trades", d.rules.trades.money ? ', plus optional money' : '', ". The other team must accept. Anything not accepted when the clock hits 0:00 expires."), React.createElement("div", {
+    className: "card stack"
+  }, React.createElement("h3", null, "Offer a trade"), !solo && React.createElement("div", {
+    className: "field"
+  }, React.createElement("span", {
+    className: "label"
+  }, "Your team"), React.createElement("div", {
+    className: "chips"
+  }, d.managers.map(m => React.createElement("button", {
+    key: m.id,
+    className: 'pickchip' + (from === m.id ? ' on' : ''),
+    style: mStyle(m),
+    onClick: () => {
+      setFrom(m.id);
+      setGive(null);
+      if (to === m.id) setTo(null);
+    }
+  }, m.emoji, " ", m.name)))), A && React.createElement("div", {
+    className: "field"
+  }, React.createElement("span", {
+    className: "label"
+  }, "Trade with"), React.createElement("div", {
+    className: "chips"
+  }, d.managers.filter(m => m.id !== from).map(m => React.createElement("button", {
+    key: m.id,
+    className: 'pickchip' + (to === m.id ? ' on' : ''),
+    style: mStyle(m),
+    onClick: () => {
+      setTo(m.id);
+      setGet(null);
+    }
+  }, m.emoji, " ", m.name)))), A && B && React.createElement("div", {
+    className: "tradecols"
+  }, React.createElement("div", {
+    className: "field"
+  }, React.createElement("span", {
+    className: "label"
+  }, "You give"), React.createElement("div", {
+    className: "stack-sm"
+  }, A.team.filter(Boolean).map(t => React.createElement("button", {
+    key: t.itemId,
+    className: 'pickbtn small' + (give === t.itemId ? ' on' : ''),
+    onClick: () => setGive(t.itemId)
+  }, React.createElement(Thumb, {
+    item: d.items[t.itemId],
+    topic: d.topic,
+    size: 34
+  }), React.createElement("span", {
+    className: "grow"
+  }, d.items[t.itemId].name))))), React.createElement("div", {
+    className: "field"
+  }, React.createElement("span", {
+    className: "label"
+  }, "You get"), React.createElement("div", {
+    className: "stack-sm"
+  }, B.team.filter(Boolean).map(t => React.createElement("button", {
+    key: t.itemId,
+    className: 'pickbtn small' + (get === t.itemId ? ' on' : ''),
+    onClick: () => setGet(t.itemId)
+  }, React.createElement(Thumb, {
+    item: d.items[t.itemId],
+    topic: d.topic,
+    size: 34
+  }), React.createElement("span", {
+    className: "grow"
+  }, d.items[t.itemId].name)))))), A && B && d.rules.trades.money && React.createElement("div", {
+    className: "field"
+  }, React.createElement("span", {
+    className: "label"
+  }, "Add money (optional)"), React.createElement(Seg, {
+    label: "Who pays",
+    value: payer || 'none',
+    options: [['none', 'No money'], [A.id, A.name + ' pays'], [B.id, B.name + ' pays']],
+    onChange: v => {
+      setPayer(v === 'none' ? null : v);
+      if (v === 'none') setAmount(0);else setAmount(Math.min(Math.max(1, amount), teamOf(d, v).budget));
+    }
+  }), payer && React.createElement(Stepper, {
+    id: "trade-money",
+    prefix: "$",
+    value: amount,
+    min: 1,
+    max: Math.max(1, teamOf(d, payer).budget),
+    onChange: setAmount
+  })), give && get && React.createElement("p", {
+    className: "summary"
+  }, tradeText(d, {
+    ...draftTrade,
+    money: draftTrade.money
+  })), problem && React.createElement("p", {
+    className: "warn"
+  }, problem), msg && React.createElement("p", {
+    className: "hint",
+    style: {
+      color: 'var(--ok)'
+    }
+  }, msg), React.createElement("button", {
+    className: "btn btn-gold",
+    disabled: !(give && get) || !!problem,
+    onClick: propose
+  }, "Offer trade")), React.createElement("div", {
+    className: "stack-sm"
+  }, React.createElement("h3", null, "Offers"), !list.length && React.createElement("p", {
+    className: "hint"
+  }, "No offers yet."), list.map(t => React.createElement("div", {
+    key: t.id,
+    className: 'trow ' + t.status
+  }, React.createElement("span", {
+    className: "tstat"
+  }, {
+    pending: '⏳ Waiting',
+    accepted: '✅ Done',
+    rejected: '❌ Rejected',
+    cancelled: '↩️ Cancelled',
+    expired: '⌛ Expired',
+    invalid: '⚠️ No longer valid'
+  }[t.status]), React.createElement("span", {
+    className: "small"
+  }, tradeText(d, t)), t.note && React.createElement("span", {
+    className: "small muted"
+  }, "\u201C", t.note, "\u201D"), (canAnswer(t) || canCancel(t)) && React.createElement("div", {
+    className: "row"
+  }, canAnswer(t) && React.createElement("button", {
+    className: "btn btn-sm btn-gold grow",
+    onClick: () => solo ? setDraft(p => acceptTrade(p, t.id)) : setHandoff(t.id)
+  }, "Accept"), canAnswer(t) && React.createElement("button", {
+    className: "btn btn-sm grow",
+    onClick: () => setDraft(p => rejectTrade(p, t.id))
+  }, "Reject"), canCancel(t) && React.createElement("button", {
+    className: "btn btn-sm btn-ghost grow",
+    onClick: () => setDraft(p => cancelTrade(p, t.id))
+  }, "Cancel offer"))))), React.createElement("details", {
+    className: "card"
+  }, React.createElement("summary", {
+    className: "label"
+  }, "Rosters"), React.createElement("div", {
+    className: "stack",
+    style: {
+      marginTop: 10
+    }
+  }, d.managers.map(m => React.createElement("div", {
+    key: m.id,
+    className: "tteam",
+    style: mStyle(m)
+  }, React.createElement("h3", null, m.emoji, " ", m.name, " \xB7 ", money(m.budget)), React.createElement(TeamList, {
+    d: d,
+    m: m
+  }))))), React.createElement("button", {
+    className: "btn",
+    onClick: () => setDraft(p => closeTrades(p))
+  }, "Finish trading \xB7 go to voting"), handoff && (() => {
+    const t = d.trade.proposals.find(x => x.id === handoff);
+    if (!t) return null;
+    const R = teamOf(d, t.to);
+    return React.createElement(Sheet, {
+      center: true,
+      onClose: () => setHandoff(null)
+    }, React.createElement("p", {
+      className: "eyebrow"
+    }, "Pass the phone to"), React.createElement("h2", {
+      className: "display",
+      style: {
+        fontSize: 34,
+        color: R.color
+      }
+    }, R.emoji, " ", R.name), React.createElement("p", {
+      className: "summary"
+    }, tradeText(d, t)), React.createElement("div", {
+      className: "row pin"
+    }, React.createElement("button", {
+      className: "btn grow",
+      onClick: () => {
+        setDraft(p => rejectTrade(p, t.id));
+        setHandoff(null);
+      }
+    }, "Reject"), React.createElement("button", {
+      className: "btn btn-gold grow",
+      onClick: () => {
+        setDraft(p => acceptTrade(p, t.id));
+        setHandoff(null);
+      }
+    }, "Accept trade")));
+  })());
 }
 function FreePick({
   d,
@@ -5958,7 +8102,9 @@ function TeamCard({
     }
   }, win ? '👑' : m.emoji), React.createElement("span", {
     className: "nm"
-  }, m.name), React.createElement("span", {
+  }, m.name, m.members ? React.createElement("small", {
+    className: "memline"
+  }, m.members.map(p => p.name).join(' · ')) : null), React.createElement("span", {
     className: "mo"
   }, "spent", React.createElement("b", {
     className: "num"
@@ -6036,7 +8182,8 @@ function Voting({
   onSoloVote
 }) {
   const solo = d.mode === 'solo';
-  const you = solo ? d.managers.find(m => m.human) : null;
+  const people = participants(d);
+  const you = solo ? people.find(p => p.human) : null;
   const [voter, setVoter] = useState(solo && you ? you.id : null);
   const [choice, setChoice] = useState(null);
   const [locked, setLocked] = useState(false);
@@ -6071,8 +8218,8 @@ function Voting({
     }
   }, "Next voter")));
   if (voter) {
-    const v = d.managers.find(m => m.id === voter);
-    const choices = voteChoices(d, voter);
+    const v = people.find(p => p.id === voter);
+    const choices = voteChoices(d, v.teamId);
     const submit = target => {
       buzz(30);
       if (solo) {
@@ -6099,7 +8246,12 @@ function Voting({
         fontSize: 32,
         color: v.color
       }
-    }, v.emoji, " ", v.name, ", pick the best team"), choices.length ? React.createElement("p", {
+    }, v.emoji, " ", v.name, ", pick the best team"), v.teamName && React.createElement("p", {
+      className: "eyebrow",
+      style: {
+        color: v.color
+      }
+    }, "Playing for ", v.teamName), choices.length ? React.createElement("p", {
       className: "hint"
     }, "You can't vote for your own team.") : React.createElement("p", {
       className: "hint"
@@ -6152,7 +8304,7 @@ function Voting({
     onClose: onClose
   }, React.createElement("p", {
     className: "eyebrow"
-  }, "Secret vote \xB7 ", voted, " of ", d.managers.length, " in"), React.createElement("h2", {
+  }, "Secret vote \xB7 ", voted, " of ", people.length, " in"), React.createElement("h2", {
     className: "display",
     style: {
       fontSize: 34
@@ -6161,7 +8313,7 @@ function Voting({
     className: "hint"
   }, "Each manager taps their own name, then votes in private. Votes stay hidden until the reveal."), React.createElement("div", {
     className: "votegrid"
-  }, d.managers.map(m => {
+  }, people.map(m => {
     const done = hasVoted(d, m.id);
     return React.createElement("button", {
       key: m.id,
@@ -6173,7 +8325,13 @@ function Voting({
       style: {
         fontSize: 24
       }
-    }, done ? '✅' : m.emoji), m.name);
+    }, done ? '✅' : m.emoji), m.name, m.teamName ? React.createElement("small", {
+      style: {
+        fontFamily: 'var(--body)',
+        fontWeight: 600,
+        opacity: 0.8
+      }
+    }, m.teamName) : null);
   })), React.createElement("div", {
     className: "row pin"
   }, React.createElement("button", {
@@ -6188,7 +8346,7 @@ function Voting({
     className: "btn btn-gold grow",
     disabled: !voted,
     onClick: onReveal
-  }, voted === d.managers.length ? 'Reveal winner' : 'Reveal (' + voted + '/' + d.managers.length + ')')));
+  }, voted === people.length ? 'Reveal winner' : 'Reveal (' + voted + '/' + people.length + ')')));
 }
 function Results({
   d,
@@ -6228,10 +8386,18 @@ function Results({
       const votes = {
         ...(d.votes || {})
       };
-      const you = d.managers.find(m => m.human);
+      const people = participants(d);
+      const you = people.find(p => p.human);
       if (you && !hasVoted(d, you.id)) votes[you.id] = target;
-      d.managers.filter(isBot).forEach(b => {
-        if (!Object.prototype.hasOwnProperty.call(votes, b.id)) votes[b.id] = botVote(d, b);
+      people.filter(p => p.bot).forEach(p => {
+        if (Object.prototype.hasOwnProperty.call(votes, p.id)) return;
+        votes[p.id] = botVote(d, {
+          ...teamOf(d, p.teamId),
+          name: p.name,
+          bot: p.bot,
+          speaker: p.id,
+          teamId: p.teamId
+        });
       });
       onChange({
         ...d,
@@ -6399,14 +8565,30 @@ function Results({
     style: {
       textAlign: 'center'
     }
-  }, d.managers.map(m => {
+  }, participants(d).map(m => {
     const t = d.votes && d.votes[m.id];
     const to = t && d.managers.find(x => x.id === t);
     return m.name + ' → ' + (to ? to.name : 'no vote');
   }).join(' · ')), revealed && React.createElement(Leaderboard, {
     rows: winsBoard([...(past || []).filter(p => p.id !== d.id), d]),
     highlight: winners.map(w => w.name.trim().toLowerCase())
-  }), React.createElement("p", {
+  }), d.trade && d.trade.proposals.some(t => t.status === 'accepted') && React.createElement("div", {
+    className: "board"
+  }, React.createElement("h3", null, "\uD83E\uDD1D Trades"), d.trade.proposals.filter(t => t.status === 'accepted').map(t => React.createElement("p", {
+    key: t.id,
+    className: "small",
+    style: {
+      margin: 0
+    }
+  }, tradeText(d, t)))), (d.cardLog || []).length > 0 && React.createElement("div", {
+    className: "board"
+  }, React.createElement("h3", null, "\uD83C\uDCCF Chaos Cards"), d.cardLog.map(e => React.createElement("p", {
+    key: e.id,
+    className: "small",
+    style: {
+      margin: 0
+    }
+  }, CARD_INFO[e.card].emoji, " ", e.result === 'vetoed' ? teamOf(d, e.by).name + '’s ' + CARD_INFO[e.card].name + ' was vetoed' : e.result === 'fizzled' ? teamOf(d, e.by).name + '’s ' + CARD_INFO[e.card].name + ' fizzled' : e.detail))), React.createElement("p", {
     className: "exportfoot"
   }, "DRAFT NIGHT \xB7 ", (location.host + location.pathname).replace(/\/(index\.html)?$/, ''))), React.createElement("div", {
     className: "stack"
@@ -6563,7 +8745,7 @@ function Flash({
   onDone
 }) {
   useEffect(() => {
-    const t = setTimeout(onDone, ms(f.kind === 'skip' ? 1100 : 1800));
+    const t = setTimeout(onDone, ms(f.kind === 'skip' ? 1100 : f.mystery || f.rarity === 'legendary' ? 2600 : 1800));
     return () => clearTimeout(t);
   }, [f]);
   return React.createElement("div", {
@@ -6573,7 +8755,7 @@ function Flash({
       '--fc': f.color || 'var(--muted)'
     }
   }, f.kind === 'sold' && React.createElement("div", {
-    className: "inner"
+    className: 'inner' + (f.rarity === 'legendary' ? ' legendary' : '')
   }, React.createElement("div", {
     className: "big",
     style: {
@@ -6586,9 +8768,34 @@ function Flash({
     }
   }, "to ", f.emoji, " ", f.name), React.createElement("div", {
     className: "price num"
-  }, money(f.price)), React.createElement("div", {
+  }, money(f.price), f.doubled ? React.createElement("small", {
+    className: "dbl"
+  }, " (Double Bid)") : null), f.mystery && React.createElement("div", {
+    className: "it",
+    style: {
+      color: '#c9a6ff',
+      fontWeight: 800
+    }
+  }, "\u2753 The mystery item was\u2026"), React.createElement("div", {
     className: "it"
-  }, f.item)), f.kind === 'skip' && React.createElement("div", {
+  }, f.item, " ", f.rarity && f.rarity !== 'common' ? React.createElement(RarityTag, {
+    r: f.rarity
+  }) : null)), f.kind === 'card' && React.createElement("div", {
+    className: "inner"
+  }, React.createElement("div", {
+    className: "big",
+    style: {
+      fontSize: 64,
+      color: f.result === 'done' ? 'var(--gold)' : 'var(--danger)'
+    }
+  }, CARD_INFO[f.card].emoji, " ", f.result === 'vetoed' ? 'Vetoed!' : f.result === 'fizzled' ? 'Fizzled' : CARD_INFO[f.card].name + '!'), f.by && React.createElement("div", {
+    className: "to",
+    style: {
+      color: f.by.color
+    }
+  }, f.by.emoji, " ", f.by.name), React.createElement("div", {
+    className: "it"
+  }, f.text)), f.kind === 'skip' && React.createElement("div", {
     className: "inner"
   }, React.createElement("div", {
     className: "big",
@@ -6624,6 +8831,10 @@ const DEFAULT_RULES = {
   mustFill: true,
   noBids: 'skip'
 };
+const RULE_DEFAULTS = () => ({
+  ...DEFAULT_RULES,
+  ...JSON.parse(JSON.stringify(TWIST_DEFAULTS))
+});
 const defaultManagers = () => ['Ash', 'Bilal', 'Cam', 'Dev'].map((name, i) => ({
   id: uid(),
   name,
@@ -6963,9 +9174,61 @@ function App() {
     return copy.id;
   };
   const soloTopic = () => topics.find(t => t.id === soloCfg.topicId && t.items.length) || topics.find(t => t.items.length && t.slots.length) || null;
+  const rulePrefs = () => {
+    const p = {
+      ...RULE_DEFAULTS(),
+      ...(settings.rulePrefs || {})
+    };
+    delete p.slots;
+    return {
+      ...p,
+      ...twistRules(p)
+    };
+  };
+  const saveRulePrefs = r => {
+    const {
+      slots,
+      ...rest
+    } = r;
+    setSettings(x => ({
+      ...x,
+      rulePrefs: rest
+    }));
+  };
   const soloRulesFor = t => soloRules && t && soloRules.topicId === t.id ? soloRules.rules : {
-    ...DEFAULT_RULES,
+    ...rulePrefs(),
     slots: t ? [...t.slots] : []
+  };
+  const teamCfg = {
+    ...DEFAULT_TEAMS,
+    ...(settings.localTeams || {})
+  };
+  const setTeamCfg = c => setSettings(x => ({
+    ...x,
+    localTeams: c
+  }));
+  const localPlayers = () => teamCfg.on ? localTeamsToManagers(teamCfg) : managers;
+  const soloT = {
+    ...DEFAULT_SOLO.teams,
+    ...(soloCfg.teams || {})
+  };
+  const teamSummaryLocal = teamCfg.on ? {
+    teams: true,
+    text: teamCfg.count === 2 ? teamCfg.size + 'v' + teamCfg.size : teamCfg.count + ' teams of ' + teamCfg.size,
+    detail: localTeamsToManagers(teamCfg).map(t => t.name + ': ' + t.members.map(p => p.name).join(', ')).join(' · ')
+  } : {
+    teams: false,
+    text: 'Individual · ' + managers.length + ' managers',
+    detail: 'Everyone plays for themselves. Switch to Teams on the players screen.'
+  };
+  const teamSummarySolo = soloT.on ? {
+    teams: true,
+    text: soloT.count === 2 ? soloT.size + 'v' + soloT.size : soloT.count + ' teams of ' + soloT.size,
+    detail: 'Bots on your team advise you; other teams are all bots.'
+  } : {
+    teams: false,
+    text: 'Every bot for itself · ' + soloCfg.bots + ' bots',
+    detail: 'Switch to Teams on the solo setup screen.'
   };
   const playAgain = () => {
     if (!draft) return;
@@ -7047,6 +9310,8 @@ function App() {
       view = React.createElement(SetupManagers, {
         managers: managers,
         setManagers: setManagers,
+        teamCfg: teamCfg,
+        setTeamCfg: setTeamCfg,
         onBack: () => go('home'),
         onNext: () => go('setup-topic')
       });
@@ -7066,7 +9331,7 @@ function App() {
           onRules: () => go('setup-rules', {
             from: 'solo'
           }),
-          onStart: bots => {
+          onStart: players => {
             const human = {
               id: 'you',
               name: soloCfg.name.trim() || 'You',
@@ -7074,7 +9339,8 @@ function App() {
               emoji: '😎',
               human: true
             };
-            setDraft(createDraft(st, [human, ...bots], soloRulesFor(st), {
+            const list = players.length && players[0].members ? players : [human, ...players];
+            setDraft(createDraft(st, list, soloRulesFor(st), {
               mode: 'solo',
               solo: {
                 level: soloCfg.level,
@@ -7118,10 +9384,10 @@ function App() {
         onPick: id => {
           const t = topics.find(x => x.id === id);
           setTopicId(id);
-          setRules(r => ({
-            ...r,
+          setRules({
+            ...rulePrefs(),
             slots: [...t.slots]
-          }));
+          });
           go('setup-rules');
         }
       });
@@ -7131,7 +9397,7 @@ function App() {
         if (screen.from === 'solo') {
           const st = soloTopic();
           const fake = Array.from({
-            length: soloCfg.bots + 1
+            length: soloT.on ? soloT.count : soloCfg.bots + 1
           }, (_, i) => ({
             id: 'x' + i
           }));
@@ -7144,6 +9410,15 @@ function App() {
               rules: r
             }),
             onBack: () => go('solo-setup'),
+            teamSummary: teamSummarySolo,
+            onEditTeams: () => go('solo-setup'),
+            onReset: () => setSoloRules({
+              topicId: st.id,
+              rules: {
+                ...RULE_DEFAULTS(),
+                slots: [...st.slots]
+              }
+            }),
             title: "Solo \xB7 Rules",
             startLabel: "Save rules",
             onStart: r => {
@@ -7151,6 +9426,7 @@ function App() {
                 topicId: st.id,
                 rules: r
               });
+              saveRulePrefs(r);
               go('solo-setup');
             }
           }) : null;
@@ -7159,12 +9435,19 @@ function App() {
         const t = topics.find(x => x.id === topicId);
         view = t ? React.createElement(SetupRules, {
           topic: t,
-          managers: managers,
+          managers: localPlayers(),
           rules: rules,
           setRules: setRules,
           onBack: () => go('setup-topic'),
+          teamSummary: teamSummaryLocal,
+          onEditTeams: () => go('setup-managers'),
+          onReset: () => setRules({
+            ...RULE_DEFAULTS(),
+            slots: [...t.slots]
+          }),
           onStart: r => {
-            setDraft(createDraft(t, managers, r));
+            saveRulePrefs(r);
+            setDraft(createDraft(t, localPlayers(), r));
             go('draft');
           }
         }) : null;
@@ -7188,6 +9471,14 @@ function App() {
         goHome: () => go('home'),
         flashing: !!flash,
         onFlash: setFlash
+      });else if (draft.phase === 'nominate') view = React.createElement(Nominate, {
+        d: draft,
+        setDraft: setDraft,
+        goHome: () => go('home')
+      });else if (draft.phase === 'trade') view = React.createElement(TradeWindow, {
+        d: draft,
+        setDraft: setDraft,
+        goHome: () => go('home')
       });else view = React.createElement(Results, {
         d: draft,
         past: past,
@@ -7268,7 +9559,7 @@ function App() {
         onNew: () => {
           setDraft(null);
           setRules({
-            ...DEFAULT_RULES,
+            ...rulePrefs(),
             slots: []
           });
           go('setup-managers');
@@ -7353,7 +9644,38 @@ if (window.__DN_TEST__) window.__DN = {
     itemFame,
     seeded,
     BOT_LEVELS,
-    BOT_TYPES
+    BOT_TYPES,
+    botCardPlay,
+    botVeto,
+    botNominate,
+    botTradeDecision,
+    botTradeOffer
+  },
+  twists: {
+    twistRules,
+    TWIST_DEFAULTS,
+    playCard,
+    answerCard,
+    cardProblem,
+    doubleProblem,
+    nominate,
+    currentNominator,
+    nominationPool,
+    botActors,
+    botAdvisers,
+    participants,
+    visibleItem,
+    isHidden,
+    rarityOf,
+    frozenNow,
+    proposeTrade,
+    acceptTrade,
+    rejectTrade,
+    cancelTrade,
+    closeTrades,
+    tradeProblem,
+    openTrades,
+    hasCard
   },
   DEFAULT_SOLO,
   isFlex,

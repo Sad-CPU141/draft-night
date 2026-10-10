@@ -73,7 +73,7 @@ const slotKey = (d, item) => { const p = norm(item.pos); return p && d.rules.slo
 // Open demand vs remaining supply for this item's position (public information).
 function scarcityOf(d, item) {
   const key = slotKey(d, item);
-  const pool = [...d.queue, ...d.leftover].map((id) => d.items[id]);
+  const pool = [...d.queue, ...d.leftover].map((id) => visibleItem(d, id));
   const supply = pool.filter((it) => slotKey(d, it) === key || key === '*').length;
   const demand = d.managers.reduce((n, m) => n + d.rules.slots.filter((s, k) => !m.team[k] && (key === '*' || norm(s) === key || isFlex(s))).length, 0);
   return clamp(demand / Math.max(1, supply), 0.5, 2);
@@ -96,7 +96,7 @@ function botValue(d, bot, item, rng) {
   if (type === 'chaos' && unit('crush', bot.name, item.name) < 0.12) v *= 1.9; // a random favourite
   // Endgame: few options left for its empty slots → worth more.
   if (L.scarcity > 0.3) {
-    const options = d.queue.slice(1).filter((id) => assignSlot(bot, d.items[id], slots) >= 0).length;
+    const options = d.queue.slice(1).filter((id) => assignSlot(bot, visibleItem(d, id), slots) >= 0).length;
     if (options < emptyCount(bot) * 1.5) v *= 1 + 0.25 * L.scarcity;
   }
   return v * (1 + (rng() - 0.5) * 2 * L.noise);
@@ -125,8 +125,8 @@ function botLimit(d, bot, item, rng) {
 /* ---------- auction decisions ---------- */
 // Returns { botId, amount, delay, event } for one bot, or null to stay quiet.
 function botDecision(d, bot) {
-  const item = currentItem(d);
-  if (!item || !isBot(bot) || isFull(bot)) return null;
+  const item = d.queue.length ? visibleItem(d, d.queue[0]) : null; // bots never see a hidden mystery item
+  if (!item || !isBot(bot) || isFull(bot) || d.phase !== 'auction' || d.pending) return null;
   if (d.bid && d.bid.leaderId === bot.id) return null;
   const price = nextAmount(d);
   if (!canBid(d, bot, price)) return null;
@@ -134,7 +134,13 @@ function botDecision(d, bot) {
   const L = botLevel(bot); const type = bot.bot.type;
   if (rng() < L.miss) return null; // not paying attention
   const { limit, value } = botLimit(d, bot, item, rng);
-  if (price > limit) return null;
+  if (price > limit) {
+    // Out of normal range: a Double Bid (pay half, counts double) can still win it.
+    const pay = Math.ceil(price / 2);
+    const keen = type === 'spender' ? itemFame(item) > 0.55 : type === 'needs' ? scarcityOf(d, item) > 1.2 : type === 'chaos' ? rng() < 0.3 : value > price * 0.75;
+    if (keen && pay <= limit && !doubleProblem(d, bot.id, pay)) return { botId: bot.id, speaker: bot.speaker || bot.id, amount: pay, double: true, delay: clamp(Math.round(900 + rng() * 900), 650, 2300), event: 'jump' };
+    return null;
+  }
   const rivals = d.managers.filter((m) => m.id !== bot.id && !isFull(m) && assignSlot(m, item, d.rules.slots) >= 0);
   const rivalMax = rivals.reduce((mx, m) => Math.max(mx, maxBid(m, d.rules)), 0);
   if (type === 'bargain') {
@@ -157,11 +163,12 @@ function botDecision(d, bot) {
   if (type === 'bargain') delay += 300;
   if (type === 'chaos') delay -= rng() * 250;
   delay = clamp(delay, 650, 2300);
-  return { botId: bot.id, amount, delay: Math.round(delay), event: amount > price ? 'jump' : 'bid' };
+  return { botId: bot.id, speaker: bot.speaker || bot.id, amount, delay: Math.round(delay), event: amount > price ? 'jump' : 'bid' };
 }
-// Which bot (if any) acts next: the quickest one that wants in.
+// Which bot (if any) acts next: the quickest one that wants in. On an all-bot team every
+// member weighs in for the team; they share the team's money, so they never bid each other up.
 function nextBotAction(d) {
-  return d.managers.filter(isBot).map((b) => botDecision(d, b)).filter(Boolean).sort((a, b) => a.delay - b.delay || (a.botId < b.botId ? -1 : 1))[0] || null;
+  return botActors(d).map((b) => botDecision(d, b)).filter(Boolean).sort((a, b) => a.delay - b.delay || (a.botId < b.botId ? -1 : 1))[0] || null;
 }
 // Free picks: take the best leftover for this team.
 function botFreePickChoice(d, bot) {
@@ -169,7 +176,7 @@ function botFreePickChoice(d, bot) {
   const opts = d.leftover.filter((id) => canTake(d, bot, id));
   if (!opts.length) return null;
   const rng = seeded(d.seed || d.id, 'free', d.fp.round, d.fp.pos, bot.id);
-  return opts.map((id) => ({ id, s: botValue(d, bot, d.items[id], () => 0.5) * (1 + (rng() - 0.5) * 2 * L.freeNoise) })).sort((a, b) => b.s - a.s)[0].id;
+  return opts.map((id) => ({ id, s: botValue(d, bot, visibleItem(d, id), () => 0.5) * (1 + (rng() - 0.5) * 2 * L.freeNoise) })).sort((a, b) => b.s - a.s)[0].id;
 }
 
 /* ---------- judging teams ---------- */
@@ -188,12 +195,13 @@ function teamScore(d, m, judge) {
   return quality * (0.55 + 0.45 * completeness) + 0.15 * Math.max(0, vfm) + exact * fair * 0.1;
 }
 // Teams a voter may vote for: not their own, and the team must have at least one item.
-function voteChoices(d, voterId) { return d.managers.filter((m) => m.id !== voterId && m.team.some(Boolean)); }
+// voterTeamId is the voter's own team (in individual games that's the manager itself).
+function voteChoices(d, voterTeamId) { return d.managers.filter((m) => m.id !== voterTeamId && m.team.some(Boolean)); }
 function botVote(d, bot) {
-  const choices = voteChoices(d, bot.id);
+  const choices = voteChoices(d, bot.teamId || bot.id);
   if (!choices.length) return null;
   const L = botLevel(bot);
-  const rng = seeded(d.seed || d.id, 'vote', bot.id);
+  const rng = seeded(d.seed || d.id, 'vote', bot.speaker || bot.id);
   return choices.map((m) => ({ id: m.id, s: teamScore(d, m, bot) * (1 + (rng() - 0.5) * 2 * L.noise * 0.6) }))
     .sort((a, b) => b.s - a.s || (a.id < b.id ? -1 : 1))[0].id;
 }
@@ -254,4 +262,132 @@ function botLine(bot, event, extra) {
   return line.replace('{slot}', (extra && extra.slot) || 'player');
 }
 // How often each event gets a speech bubble (so they don't talk constantly).
-const TALK_CHANCE = { start: 1, bid: 0.22, jump: 0.75, win: 0.6, steal: 0.85, lose: 0.45, free: 0.5, rival: 0.45, need: 0.35 };
+TALK.spender.card = ['Rules are for people with less money.', 'Activating my secret weapon.'];
+TALK.bargain.card = ['A little trick I picked up at a yard sale.', 'Free value? Don’t mind if I do.'];
+TALK.needs.card = ['Exactly as planned.', 'This card fills a hole.'];
+TALK.chaos.card = ['Let’s spice things up!', 'I pressed a button. Something happened.'];
+['spender', 'bargain', 'needs', 'chaos'].forEach((k) => {
+  TALK[k].advise = ['I’d go up to {slot} for this one.', 'Worth {slot}, tops.', 'Let’s grab this. Max {slot}.'];
+  TALK[k].pass = ['Let this one go.', 'Not for us. Save the money.'];
+  TALK[k].nominate = ['Let’s see who wants this one.', 'Up next: my pick.'];
+});
+const TALK_CHANCE = { card: 0.9, advise: 0.6, pass: 0.4, nominate: 0.4, start: 1, bid: 0.22, jump: 0.75, win: 0.6, steal: 0.85, lose: 0.45, free: 0.5, rival: 0.45, need: 0.35 };
+
+
+/* ---------- chaos cards ---------- */
+// Bots consider a card once per item, before the first bid, and play it only if it helps.
+function botCardPlay(d, bot) {
+  if (!cardWindow(d) || !d.cards || !(d.cards[bot.id] || []).length) return null;
+  const L = botLevel(bot); const type = bot.bot.type;
+  const rng = seeded(d.seed, d.reveal, 'card', bot.speaker || bot.id);
+  if (rng() < (type === 'chaos' ? 0.45 : 0.72)) return null; // most items, no card
+  const item = visibleItem(d, d.queue[0]);
+  const fair = d.rules.budget / d.rules.slots.length;
+  const rivals = d.managers.filter((m) => m.id !== bot.id);
+  const opts = [];
+  if (hasCard(d, bot.id, 'freeze') && assignSlot(bot, item, d.rules.slots) >= 0) {
+    const v = botValue(d, bot, item, rng);
+    const threat = rivals.filter((m) => !isFull(m) && assignSlot(m, item, d.rules.slots) >= 0).sort((a, b) => maxBid(b, d.rules) - maxBid(a, d.rules))[0];
+    const want = type === 'spender' ? itemFame(item) > 0.6 : type === 'needs' ? scarcityOf(d, item) > 1.1 : type === 'bargain' ? v > fair * 0.9 : rng() < 0.5;
+    if (threat && want && v > fair * (type === 'chaos' ? 0.5 : 0.9) && !cardProblem(d, bot.id, 'freeze', { target: threat.id })) opts.push({ card: 'freeze', params: { target: threat.id }, gain: v * 0.6 });
+  }
+  if (hasCard(d, bot.id, 'steal')) {
+    rivals.forEach((m) => m.team.forEach((t) => {
+      if (!t) return;
+      const it = d.items[t.itemId];
+      if (cardProblem(d, bot.id, 'steal', { target: m.id, item: t.itemId })) return;
+      const v = botValue(d, bot, it, rng); const cost = stealPrice(d, t);
+      const edge = type === 'bargain' ? 0.65 : type === 'spender' ? 1.1 : 0.85;
+      if (v - cost * edge > fair * 0.3) opts.push({ card: 'steal', params: { target: m.id, item: t.itemId }, gain: v - cost });
+    }));
+  }
+  if (hasCard(d, bot.id, 'swap')) {
+    bot.team.forEach((mine) => { if (!mine) return; rivals.forEach((m) => m.team.forEach((t) => {
+      if (!t || cardProblem(d, bot.id, 'swap', { target: m.id, item: t.itemId, mine: mine.itemId })) return;
+      const gain = botValue(d, bot, d.items[t.itemId], () => 0.5) - botValue(d, bot, d.items[mine.itemId], () => 0.5);
+      if (gain > fair * 0.35) opts.push({ card: 'swap', params: { target: m.id, item: t.itemId, mine: mine.itemId }, gain });
+    })); });
+  }
+  if (!opts.length) return null;
+  // Easy bots grab any option; hard bots take the best one.
+  const pick = L.noise > 0.3 ? opts[Math.floor(rng() * opts.length)] : opts.sort((a, b) => b.gain - a.gain)[0];
+  return { ...pick, botId: bot.id, speaker: bot.speaker || bot.id, delay: clamp(Math.round(800 + rng() * 900), 650, 2200) };
+}
+// A bot targeted by a card decides whether to spend its Veto.
+function botVeto(d, team, play) {
+  if (!hasCard(d, team.id, 'veto')) return false;
+  const actor = isBotTeam(team) ? { ...team, name: team.members[0].name, bot: team.members[0].bot, speaker: team.members[0].id } : team;
+  if (!actor.bot) return false;
+  const rng = seeded(d.seed, 'veto', play.id);
+  const fair = d.rules.budget / d.rules.slots.length;
+  if (actor.bot.type === 'chaos') return rng() < 0.6;
+  if (play.card === 'freeze') { const item = visibleItem(d, d.queue[0]); return !!item && botValue(d, actor, item, rng) > fair * 0.9; }
+  const lost = play.card === 'steal' ? d.items[play.item] : d.items[play.item];
+  const loss = botValue(d, actor, lost, () => 0.5) - (play.card === 'swap' ? botValue(d, actor, d.items[play.mine], () => 0.5) : 0);
+  return loss > fair * (botLevel(actor).noise > 0.3 ? 0.2 : 0.45);
+}
+
+/* ---------- nomination ---------- */
+// Bots nominate something that suits them: gaps for strategists, stars for spenders,
+// things a rich rival will overpay for (or cheap gems) for bargain hunters, anything for chaos.
+function botNominate(d, bot) {
+  const pool = nominationPool(d);
+  if (!pool.length) return null;
+  const L = botLevel(bot); const type = bot.bot.type;
+  const rng = seeded(d.seed, 'nom', d.reveal, bot.speaker || bot.id);
+  const score = (id) => {
+    const it = visibleItem(d, id); const fame = itemFame(it);
+    const mine = assignSlot(bot, it, d.rules.slots) >= 0 ? botValue(d, bot, it, () => 0.5) : 0;
+    let s;
+    if (type === 'needs') s = mine * (assignSlot(bot, it, d.rules.slots) >= 0 && !isFlex(d.rules.slots[assignSlot(bot, it, d.rules.slots)]) ? 1.5 : 0.4);
+    else if (type === 'spender') s = mine + fame * 8;
+    else if (type === 'bargain') s = mine > 0 ? mine * (1.4 - fame) : fame * 3; // cheap gems, or drain rivals with a star
+    else s = rng() * 10 + mine * 0.3;
+    return s * (1 + (rng() - 0.5) * 2 * L.noise);
+  };
+  return pool.map((id) => ({ id, s: score(id) })).sort((a, b) => b.s - a.s)[0].id;
+}
+
+/* ---------- trades ---------- */
+// How much a team (seen by this bot) gains from a trade, in dollars.
+function tradeGain(d, bot, t) {
+  const me = bot.id; const fair = d.rules.budget / d.rules.slots.length;
+  const giveId = t.from === me ? t.give : t.get; const getId = t.from === me ? t.get : t.give;
+  const val = (id) => { const r = rarityOf(d, id); return botValue(d, { ...bot, team: bot.team.map((x) => (x && x.itemId === giveId ? null : x)) }, d.items[id], () => 0.5) * (r === 'legendary' ? 1.12 : r === 'rare' ? 1.04 : 1); };
+  let gain = val(getId) - val(giveId);
+  if (t.money && t.money.amount) gain += (t.money.payer === me ? -1 : 1) * t.money.amount * 0.9;
+  return { gain, fair };
+}
+// A bot's answer to a trade offered to its team, with a short reason.
+function botTradeDecision(d, bot, t) {
+  if (tradeProblem(d, t)) return { accept: false, reason: 'That trade doesn’t work any more.' };
+  const L = botLevel(bot); const type = bot.bot.type;
+  const rng = seeded(d.seed, 'trade', t.id, bot.speaker || bot.id);
+  const { gain, fair } = tradeGain(d, bot, t);
+  const noisy = gain + (rng() - 0.5) * 2 * L.noise * fair;
+  const need = type === 'bargain' ? fair * 0.3 : type === 'spender' ? -fair * 0.1 : type === 'needs' ? fair * 0.1 : -fair * 0.25;
+  const accept = type === 'chaos' ? noisy > need && rng() < 0.75 : noisy > need;
+  const reason = accept ? (gain > fair * 0.4 ? 'Deal! I like this a lot.' : 'Fair enough, deal.') : gain < -fair * 0.4 ? 'No chance. That’s a downgrade for us.' : 'Not quite worth it for us.';
+  return { accept, reason };
+}
+// A bot team's best trade idea, offered to a rival team (one offer per window).
+function botTradeOffer(d, bot) {
+  const fair = d.rules.budget / d.rules.slots.length;
+  const rng = seeded(d.seed, 'offer', bot.speaker || bot.id);
+  if (rng() < (botLevel(bot).rivals ? 0.25 : 0.5)) return null;
+  let best = null;
+  bot.team.forEach((mine) => { if (!mine) return; d.managers.forEach((m) => { if (m.id === bot.id) return; m.team.forEach((t) => {
+    if (!t) return;
+    const offer = { from: bot.id, to: m.id, give: mine.itemId, get: t.itemId, money: null };
+    if (tradeProblem(d, offer)) return;
+    const { gain } = tradeGain(d, bot, offer);
+    // Only suggest trades that look fair to the other side too (judged on public info).
+    const theirSide = (itemFame(d.items[mine.itemId]) - itemFame(d.items[t.itemId])) * fair;
+    if (gain > fair * 0.25 && theirSide > -fair * 0.35 && (!best || gain > best.gain)) best = { ...offer, gain };
+  }); }); });
+  if (!best) return null;
+  const { gain, ...offer } = best;
+  // Sweeten a lopsided offer with a little money when allowed.
+  if (d.rules.trades.money && gain > fair * 0.8 && bot.budget >= 1) offer.money = { payer: bot.id, amount: Math.min(bot.budget, Math.max(1, Math.round(gain * 0.25))) };
+  return offer;
+}

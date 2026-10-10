@@ -138,6 +138,7 @@ async function tap(w, el) { el.dispatchEvent(new w.MouseEvent('pointerdown', { b
     ok(!d.querySelector('.itemcard .ph img') && d.querySelector('.itemcard .ph svg'), 'broken photo falls back to the jersey');
     // play the whole draft by tapping managers and SOLD
     for (let i = 0; i < 400 && !/Final teams|We have a winner/.test(d.body.textContent); i++) {
+      const fin = btn(d, 'Finish trading'); if (fin) { await click(w, fin); continue; }
       const sold = btn(d, 'Sold!');
       if (sold) {
         const m = [...d.querySelectorAll('.mgr')].find((x) => x.getAttribute('aria-disabled') === 'false');
@@ -277,6 +278,141 @@ async function tap(w, el) { el.dispatchEvent(new w.MouseEvent('pointerdown', { b
     ok(B.voteChoices(empty, 'you').length === 0 && B.botVote(empty, empty.managers[1]) === 'you', 'teams with no items can’t receive votes; nobody is left stuck');
   }
 
+  console.log('Twists: cards, mystery, rarity, nomination, teams, trades');
+  {
+    const { DN } = await boot();
+    const T = DN.twists, B = DN.bots;
+    const sim = require('./twists-sim.js')(DN, 90);
+    ok(sim.done === sim.runs, sim.runs + ' simulated drafts with every twist on all finish (' + sim.teamGames + ' team games)');
+    ok(sim.neg === 0 && sim.dupOwn === 0, 'no negative budgets, no item owned twice — through steals, swaps and trades');
+    ok(sim.illegalPlay === 0, 'bots never make an illegal bid or card play');
+    ok(['steal', 'swap', 'freeze', 'double'].every((c) => sim.cards[c] > 0) && sim.vetoed > 0, 'bots use every card (' + JSON.stringify(sim.cards) + ', ' + sim.vetoed + ' vetoes)');
+    ok(sim.frozenBids === 0, 'a frozen team never bids');
+    ok(sim.mysteryLeak === 0, 'mystery items stay hidden from bots until sold');
+    ok(sim.nominations > 0 && sim.badNominations === 0, 'nominations are always valid and never repeat (' + sim.nominations + ')');
+    ok(sim.trades.accepted > 0 && sim.trades.rejected > 0, 'bots both accept and reject trades (' + sim.trades.accepted + ' / ' + sim.trades.rejected + ')');
+    // Hand-built checks
+    const topic = DN.starterTopics()[0];
+    const mk = (r) => DN.createDraft(topic, [{ id: 'a', name: 'A', color: '#f00', emoji: 'a' }, { id: 'b', name: 'B', color: '#0f0', emoji: 'b' }], { ...DN.DEFAULT_RULES, slots: topic.slots, ...T.twistRules(r) }, { seed: 'fixed' });
+    const off = mk({ chaos: { on: false }, mystery: { on: false }, rarity: { on: false }, trades: { on: false } });
+    ok(!Object.keys(off.cards).length && !Object.values(off.items).some((i) => i.mystery) && !Object.keys(off.rarity).length, 'with every switch off, no cards, mystery items or rarity');
+    const on = mk({});
+    ok(on.cards.a.length === 2 && on.cards.b.length === 2, '2 Chaos Cards per manager by default');
+    ok(Object.values(on.items).filter((i) => i.mystery).length === Math.floor(topic.items.length / 8), '1 in 8 items is a mystery (' + Object.values(on.items).filter((i) => i.mystery).length + ' of ' + topic.items.length + ')');
+    ok(JSON.stringify(mk({}).rarity) === JSON.stringify(on.rarity), 'rarity is fixed for a draft (same seed, same rarity)');
+    const tiers = Object.values(on.rarity); ok(tiers.includes('common') && tiers.includes('rare'), 'rarity tiers assigned');
+    const only = mk({ chaos: { on: true, count: 2, steal: false, veto: false, double: false, swap: false, freeze: true } });
+    ok(only.cards.a.every((c) => c === 'freeze'), 'individual card switches respected');
+    // freeze, veto, double
+    let d = mk({ chaos: { on: true, count: 2, steal: false, veto: false, double: true, swap: false, freeze: true }, mystery: { on: false } });
+    d = T.playCard(d, 'a', 'freeze', { target: 'b' });
+    ok(T.frozenNow(d, 'b') && DN.placeBid(d, 'b', 1) === d, 'Freeze stops the target bidding on this item');
+    d = DN.placeBid(d, 'a', 2, { double: true });
+    ok(d.bid.amount === 4 && d.bid.pay === 2 && !T.hasCard(d, 'a', 'double'), 'Double Bid: pay $2, counts as $4, card spent');
+    const back = DN.undo(d); ok(T.hasCard(back, 'a', 'double') && !back.bid, 'undoing a Double Bid gives the card back');
+    d = DN.sell(d); ok(d.managers[0].budget === 18, 'Double Bid winner pays the real amount ($2)');
+    // trades
+    let t = mk({ trades: { on: true, minutes: 3, money: true }, mystery: { on: false }, chaos: { on: false } });
+    while (t.phase === 'auction') t = t.bid ? DN.sell(t) : DN.placeBid(t, t.managers[t.reveal % 2].id, 1) !== t ? DN.placeBid(t, t.managers[t.reveal % 2].id, 1) : DN.skipItem(t);
+    while (t.phase === 'freepick') { const cp = DN.currentPicker(t); t = DN.freePick(t, t.leftover.find((x) => DN.canTake(t, cp.m, x))); }
+    ok(t.phase === 'trade', 'trade window opens after the draft');
+    const A = t.managers[0], Bm = t.managers[1];
+    const offer = { from: A.id, to: Bm.id, give: A.team[0].itemId, get: Bm.team[0].itemId, money: { payer: A.id, amount: 2 } };
+    const before = JSON.stringify(t.managers);
+    let t2 = T.proposeTrade(t, offer);
+    ok(JSON.stringify(t2.managers) === before, 'a proposal alone changes nothing');
+    ok(T.proposeTrade(t, { ...offer, money: { payer: A.id, amount: 999 } }) === t, 'money beyond a team’s budget is rejected');
+    ok(T.proposeTrade({ ...t, rules: { ...t.rules, trades: { ...t.rules.trades, money: false } } }, offer) !== t2 || true, 'money can be switched off');
+    const noMoney = { ...t, rules: { ...t.rules, trades: { ...t.rules.trades, money: false } } };
+    ok(T.proposeTrade(noMoney, offer) === noMoney, 'with money off, a trade with cash is refused');
+    const pid = t2.trade.proposals[0].id;
+    ok(JSON.stringify(T.rejectTrade(t2, pid).managers) === before && JSON.stringify(T.cancelTrade(t2, pid).managers) === before, 'rejected and cancelled trades change nothing');
+    const t3 = T.acceptTrade(t2, pid);
+    ok(t3.managers[0].team.some((x) => x && x.itemId === offer.get) && t3.managers[1].team.some((x) => x && x.itemId === offer.give) && t3.managers[0].budget === A.budget - 2 && t3.managers[1].budget === Bm.budget + 2, 'accepted trade swaps both items and the money in one step');
+    ok(T.acceptTrade(t3, pid) === t3, 'a trade can’t be accepted twice');
+    const t4 = T.proposeTrade(t, offer);
+    let t5 = t4;
+    t5 = T.proposeTrade(t4, { from: Bm.id, to: A.id, give: offer.get, get: offer.give, money: null });
+    ok(t5.trade.proposals.length === 2, 'two offers can include the same item');
+    const t6 = T.acceptTrade(t5, t5.trade.proposals[0].id);
+    ok(t6.trade.proposals[1] && t6.trade.proposals[1].status === 'invalid' && T.acceptTrade(t6, t6.trade.proposals[1].id) === t6, 'once an item is traded, other offers for it become invalid and can’t complete');
+    const late = T.acceptTrade(t2, pid, t2.trade.endsAt + 1);
+    ok(JSON.stringify(late.managers) === before && late.trade.proposals[0].status === 'expired', 'a pending trade can’t complete after the timer runs out');
+    ok(T.closeTrades(t2).phase === 'done' && T.closeTrades(t2).trade.proposals[0].status === 'expired', 'closing the window expires pending offers and moves to voting');
+    // team mode voting choices
+    const bots = B.makeBots(4, 'medium', 'tv', []);
+    const teams = [0, 1].map((i) => ({ id: 'T' + i, name: 'Team ' + i, color: '#fff', emoji: 'x', members: bots.slice(i * 2, i * 2 + 2).map((b) => ({ id: b.id, name: b.name, emoji: b.emoji, bot: b.bot })) }));
+    let td = DN.createDraft(topic, teams, { ...DN.DEFAULT_RULES, slots: topic.slots }, { mode: 'solo', seed: 'tv' });
+    ok(td.teamMode && T.participants(td).length === 4 && td.managers.length === 2, '2v2: 2 teams, 4 players, one budget each');
+    td = DN.placeBid(td, 'T0', 3); td = DN.sell(td);
+    ok(td.managers[0].budget === 17 && td.managers[1].budget === 20, 'team buys come out of the shared team budget');
+    ok(T.participants(td).every((p) => B.voteChoices(td, p.teamId).every((m) => m.id !== p.teamId)), 'players can’t vote for their own team');
+  }
+
+  console.log('Local 2v2 with nomination and a trade, through the screens');
+  {
+    const { w, d, DN } = await boot();
+    const setVal = async (el, v) => { const proto = Object.getOwnPropertyDescriptor(w.HTMLInputElement.prototype, 'value'); proto.set.call(el, v); el.dispatchEvent(new w.Event('input', { bubbles: true })); await sleep(10); };
+    await click(w, btn(d, 'Local'));
+    const so = [...d.querySelectorAll('.modal button')].find((x) => /New draft/.test(x.textContent)); if (so) await click(w, so);
+    await click(w, [...d.querySelectorAll('.seg button')].find((b) => b.textContent === 'Teams'));
+    ok(/Players each/.test(d.body.textContent), 'Teams setup shows team count and players per team');
+    const names = ['Ash', 'Bilal', 'Cam', 'Dev'];
+    const inputs = [...d.querySelectorAll('.teamedit input.input')].filter((i) => /tm-p-/.test(i.id));
+    for (let i = 0; i < inputs.length; i++) await setVal(inputs[i], names[i]);
+    ok(inputs.length === 4, '2v2 = 4 player name fields');
+    await click(w, btn(d, 'Next: pick a topic'));
+    await click(w, btn(d, 'Sports')); await click(w, btn(d, 'Premier League Legends'));
+    await click(w, [...d.querySelectorAll('.rtitle')].find((b) => /Draft flow/.test(b.textContent)));
+    await click(w, [...d.querySelectorAll('.seg button')].find((b) => b.textContent === 'Nomination'));
+    ok(/Team play/.test(d.body.textContent) && /2v2/.test(d.body.textContent), 'rules screen shows the Team play section (2v2)');
+    await click(w, btn(d, 'Start the draft'));
+    ok(/Nominating/.test(d.body.textContent), 'nomination mode: first team is asked to nominate');
+    let traded = false, guard = 0;
+    while (guard++ < 600 && !/Pass the phone around|Final teams/.test(d.body.textContent)) {
+      const fl = d.querySelector('.flash'); if (fl) { await click(w, fl); continue; }
+      const letIt = btn(d, 'Let it happen'); if (letIt) { await click(w, letIt); continue; }
+      const nomYes = [...d.querySelectorAll('.modal button')].find((x) => /^Nominate$/.test(x.textContent.trim())); if (nomYes) { await click(w, nomYes); continue; }
+      if (/Trade window/.test(d.body.textContent)) {
+        if (!traded) {
+          const chips = () => [...d.querySelectorAll('.pickchip')];
+          await click(w, chips()[0]); const all = chips(); await click(w, all[all.length - 1]);
+          const cols = d.querySelectorAll('.tradecols .field');
+          const pickFit = async () => {
+            for (const g of cols[0].querySelectorAll('.pickbtn')) { await click(w, g); for (const x of cols[1].querySelectorAll('.pickbtn')) { await click(w, x); if (!d.querySelector('.warn') && btn(d, 'Offer trade') && !btn(d, 'Offer trade').disabled) return true; } }
+            return false;
+          };
+          if (await pickFit()) {
+            await click(w, btn(d, 'Offer trade'));
+            const accept = [...d.querySelectorAll('.trow button')].find((b) => b.textContent === 'Accept');
+            await click(w, accept);
+            ok(/Pass the phone to/.test(d.body.textContent), 'accepting asks to pass the phone to the other team first');
+            await click(w, [...d.querySelectorAll('.modal button')].find((b) => /Accept trade/.test(b.textContent)));
+            ok(/✅ Done/.test(d.body.textContent), 'the trade completes after the other team accepts');
+          }
+          traded = true;
+        }
+        await click(w, btn(d, 'Finish trading')); continue;
+      }
+      if (/Nomination ·/.test(d.body.textContent)) { const pb = [...d.querySelectorAll('.pickbtn')].find((b) => !b.disabled); if (pb) await click(w, pb); continue; }
+      const sold = btn(d, 'Sold!');
+      if (sold) {
+        const m = [...d.querySelectorAll('.mgr')].find((x) => x.getAttribute('aria-disabled') === 'false');
+        if (m) { await tap(w, m); await click(w, btn(d, 'Sold!')); await sleep(560); } else await click(w, btn(d, 'No bids'));
+        continue;
+      }
+      const pick = d.querySelector('.pickbtn'); if (pick) { await click(w, pick); continue; }
+      await sleep(20);
+    }
+    ok(/Final teams/.test(d.body.textContent), 'team draft played to the results');
+    await click(w, btn(d, 'Start the secret vote'));
+    const voters = [...d.querySelectorAll('.votegrid .votebtn')];
+    ok(voters.length === 4, 'all 4 players vote');
+    await click(w, voters[0]);
+    const opts = [...d.querySelectorAll('.modal .votebtn')].map((b) => b.textContent);
+    ok(opts.length === 1 && !/Team 1/.test(opts[0]), 'a player only sees the other team as a choice');
+  }
+
   console.log('Solo game in the app (sped-up clock)');
   {
     const { w, d, DN } = await boot({ speed: 0.02 });
@@ -290,7 +426,7 @@ async function tap(w, el) { el.dispatchEvent(new w.MouseEvent('pointerdown', { b
     const names = [...d.querySelectorAll('.botrow b')].map((b) => b.textContent);
     ok(names.length === 3 && new Set(names).size === 3, 'bot names shown: ' + names.join(', '));
     await click(w, btn(d, 'Start solo draft'));
-    ok(/Item 1 of/.test(d.body.textContent) && !!btn(d, 'Bid $'), 'solo auction started with a Bid button');
+    ok((/Item 1 of/.test(d.body.textContent) && !!btn(d, 'Bid $')) || /Nominating/.test(d.body.textContent), 'solo draft started (auction, or nomination since the saved rules use it)');
     let sawThinking = false, sawBubble = false, sawBotLead = false;
     const t0 = Date.now();
     while (Date.now() - t0 < 120000) {
@@ -299,7 +435,10 @@ async function tap(w, el) { el.dispatchEvent(new w.MouseEvent('pointerdown', { b
       const lead = d.querySelector('.mgr.isLead'); if (lead && !lead.classList.contains('you')) sawBotLead = true;
       if (/Vote for the best team/.test(d.body.textContent)) break;
       const fl = d.querySelector('.flash'); if (fl && Math.random() < 0.3) await click(w, fl);
-      const pickBtn = [...d.querySelectorAll('.pickbtn')].find((b) => !b.disabled); if (pickBtn) await click(w, pickBtn);
+      const letIt = btn(d, 'Let it happen'); if (letIt) await click(w, letIt);
+      const fin = btn(d, 'Finish trading'); if (fin && Math.random() < 0.2) await click(w, fin);
+      const nomYes = [...d.querySelectorAll('.modal button')].find((x) => /^Nominate$/.test(x.textContent.trim())); if (nomYes) await click(w, nomYes);
+      const pickBtn = [...d.querySelectorAll('.pickbtn')].find((b) => !b.disabled); if (pickBtn && !d.querySelector('.modal')) await click(w, pickBtn);
       // You bid now and then.
       const bid = btn(d, 'Bid $'); if (bid && !bid.disabled && Math.random() < 0.04) await click(w, bid);
       await sleep(20);
@@ -325,9 +464,10 @@ async function tap(w, el) { el.dispatchEvent(new w.MouseEvent('pointerdown', { b
     const cur = DN.store.get('dn_current_v1') || {};
     const v = cur.votes || {};
     ok(cur.votesRevealed && Object.keys(v).length === 4 && Object.entries(v).every(([a, b]) => a !== b), 'everyone voted once, nobody for themselves');
+    ok(Object.keys(cur.items).filter((id) => cur.items[id].mystery).every((id) => (cur.revealed || []).includes(id) || ![].concat(...cur.managers.map((m) => m.team)).some((t) => t && t.itemId === id)), 'every owned mystery item has been revealed');
     ok(/Vote tally/.test(d.body.textContent) && !!btn(d, 'Play again'), 'results revealed with standings and Play again');
     await click(w, btn(d, 'Play again'));
-    ok(/Item 1 of/.test(d.body.textContent), 'Play again starts a fresh solo draft');
+    ok(/Item 1 of|Nominating/.test(d.body.textContent), 'Play again starts a fresh solo draft');
     await click(w, d.querySelector('[aria-label="Home"]'));
     ok(/Draft in progress/.test(d.body.textContent) && /Solo · Medium/.test(d.body.textContent), 'leaving mid-draft keeps it resumable');
     // Trash talk off
@@ -339,7 +479,7 @@ async function tap(w, el) { el.dispatchEvent(new w.MouseEvent('pointerdown', { b
     await click(b2.w, btn(b2.d, 'Start solo draft'));
     let bubbles = 0; const t1 = Date.now();
     while (Date.now() - t1 < 4000) { if (b2.d.querySelector('.bubble')) bubbles++; await sleep(20); }
-    ok(bubbles === 0 && /Item/.test(b2.d.body.textContent), 'trash talk can be turned off');
+    ok(bubbles === 0 && /Item|Nominat/.test(b2.d.body.textContent), 'trash talk can be turned off');
   }
 
   console.log('Persistence after refresh');

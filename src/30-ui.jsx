@@ -106,6 +106,14 @@ const spent = (d, m) => d.rules.budget - m.budget;
 
 // Which slot index this item would go into for this manager (-1 = can't take it).
 function assignSlot(m, item, slots) {
+  // Mystery items fit any open slot (best fit first), so being able to bid gives nothing away.
+  if (item.mystery) {
+    const p = norm(item.pos);
+    const exact = p ? slots.findIndex((s, k) => norm(s) === p && !m.team[k]) : -1;
+    if (exact >= 0) return exact;
+    const flex = slots.findIndex((s, k) => isFlex(s) && !m.team[k]);
+    return flex >= 0 ? flex : m.team.findIndex((x) => !x);
+  }
   const pos = norm(item.pos);
   const posInTemplate = pos && slots.some((s) => norm(s) === pos);
   if (posInTemplate) {
@@ -130,7 +138,7 @@ const nextAmount = (d) => (d.bid ? d.bid.amount + d.rules.inc : d.rules.minBid);
 // Can this manager bid `amount` on the current item?
 function canBid(d, m, amount) {
   const item = currentItem(d);
-  if (!item || isFull(m)) return false;
+  if (!item || isFull(m) || d.pending || d.phase !== 'auction' || frozenNow(d, m.id)) return false;
   if (assignSlot(m, item, d.rules.slots) < 0) return false;
   return amount >= d.rules.minBid && amount <= maxBid(m, d.rules);
 }
@@ -138,6 +146,7 @@ function canBid(d, m, amount) {
 function bidBlocker(d, m) {
   const item = currentItem(d);
   if (isFull(m)) return 'Team full';
+  if (frozenNow(d, m.id)) return 'Frozen 🧊';
   if (item && assignSlot(m, item, d.rules.slots) < 0) return 'No ' + (item.pos || 'open') + ' slot';
   if (maxBid(m, d.rules) < d.rules.minBid) return 'Out of money';
   if (maxBid(m, d.rules) < nextAmount(d)) return 'Max ' + money(maxBid(m, d.rules));
@@ -145,14 +154,11 @@ function bidBlocker(d, m) {
 }
 const canTake = (d, m, id) => !isFull(m) && assignSlot(m, d.items[id], d.rules.slots) >= 0;
 
-function snap(d) {
-  return JSON.stringify({ managers: d.managers, queue: d.queue, leftover: d.leftover, passed: d.passed, processed: d.processed, fp: d.fp, phase: d.phase, autoSkipped: d.autoSkipped || 0 });
-}
+// Everything an undo has to put back.
+const SNAP_KEYS = ['managers', 'queue', 'leftover', 'passed', 'processed', 'fp', 'phase', 'autoSkipped', 'cards', 'frozen', 'revealed', 'cardLog', 'nom', 'nominated', 'pending', 'trade'];
+function snap(d) { const o = {}; SNAP_KEYS.forEach((k) => { if (d[k] !== undefined) o[k] = d[k]; }); return JSON.stringify(o); }
 function withHistory(d, label) {
-  return { ...d,
-    managers: d.managers.map((m) => ({ ...m, team: [...m.team] })),
-    queue: [...d.queue], leftover: [...d.leftover], passed: [...d.passed], fp: { ...d.fp },
-    history: [...d.history, { s: snap(d), label }].slice(-80) };
+  return { ...d, ...JSON.parse(snap(d)), history: [...d.history, { s: snap(d), label }].slice(-80) };
 }
 
 // Snake-order free pick: whose turn is it?
@@ -184,42 +190,65 @@ function advance(n) {
     if (someoneCan) break;
     n.queue = n.queue.slice(1); n.leftover = [...n.leftover, id]; n.processed++; n.autoSkipped = (n.autoSkipped || 0) + 1;
   }
-  if (n.queue.length) n.phase = 'auction';
-  else if (isDraftOver(n)) n.phase = 'done';
+  if (n.queue.length) {
+    // Nomination: wait for the next team to choose, unless the front item was just nominated.
+    if (n.rules.order === 'nominate' && n.nominated !== n.queue[0]) { n.phase = 'nominate'; n.nominated = null; }
+    else n.phase = 'auction';
+  }
+  else if (isDraftOver(n)) finishDraft(n);
   else { if (n.phase !== 'freepick') n.fp = { round: 0, pos: 0 }; n.phase = 'freepick'; }
   n.reveal = (n.reveal || 0) + 1;
   return n;
 }
 
+// The draft is over: open the trade window if it's on, otherwise go to voting.
+function finishDraft(n) {
+  if (ruleOn(n, 'trades') && !(n.trade && n.trade.done)) openTrades(n);
+  else n.phase = 'done';
+  return n;
+}
+
 // extra: { mode: 'solo', solo: { level, talk, clock } } for solo games; local games omit it.
+// Managers with `members` make a team game: each team bids as one, with one budget.
 function createDraft(topic, managers, rules, extra) {
-  const items = {}; topic.items.forEach((it) => { items[it.id] = { ...it }; });
+  const seed = (extra && extra.seed) || uid();
   const ids = topic.items.map((it) => it.id);
+  const mystery = new Set(pickMystery(ids, rules, seed));
+  const items = {}; topic.items.forEach((it) => { items[it.id] = mystery.has(it.id) ? { ...it, mystery: true } : { ...it }; });
   const d = {
     id: uid(), createdAt: Date.now(),
     topic: { id: topic.id, name: topic.name, emoji: topic.emoji, layout: topic.layout, art: artOf(topic), kitShape: topic.kitShape || '', kitLabel: topic.kitLabel || '', photos: !!topic.photos },
     rules: { ...rules },
-    managers: managers.map((m) => ({ id: m.id, name: m.name.trim(), color: m.color, emoji: m.emoji, budget: rules.budget, team: rules.slots.map(() => null), ...(m.bot ? { bot: { ...m.bot } } : {}), ...(m.human ? { human: true } : {}) })),
+    managers: managers.map((m) => ({ id: m.id, name: m.name.trim(), color: m.color, emoji: m.emoji, budget: rules.budget, team: rules.slots.map(() => null), ...(m.bot ? { bot: { ...m.bot } } : {}), ...(m.human ? { human: true } : {}), ...(m.members ? { members: m.members.map((p) => ({ ...p })) } : {}) })),
+    teamMode: managers.some((m) => m.members),
     items, queue: rules.order === 'random' ? shuffle(ids) : ids, leftover: [], passed: [], processed: 0,
+    cards: dealCards(managers.map((m) => m.id), rules, seed), frozen: {}, revealed: [], cardLog: [], pending: null,
+    rarity: assignRarity(ids, rules, seed), nom: { idx: 0 }, nominated: null, trade: null,
     bid: null, bids: [], history: [], phase: 'auction', fp: { round: 0, pos: 0 }, reveal: 0,
     votes: {}, votesRevealed: false,
-    mode: 'local', seed: uid(),
-    ...(extra || {}),
+    mode: 'local',
+    ...(extra || {}), seed,
   };
   return advance(d);
 }
 
 // Tapping the current leader again raises their own bid (+increment).
-function placeBid(d, managerId, amount) {
+// opts.double: play a Double Bid card — `amount` is what you pay, it counts as twice that.
+function placeBid(d, managerId, amount, opts) {
   const m = d.managers.find((x) => x.id === managerId);
+  if (opts && opts.double) {
+    if (doubleProblem(d, managerId, amount)) return d;
+    return { ...d, cards: removeCard(d.cards, managerId, 'double'), bids: [...d.bids, d.bid], bid: { amount: amount * 2, pay: amount, leaderId: managerId, double: true } };
+  }
   if (!m || !canBid(d, m, amount)) return d;
   if (d.bid && amount <= d.bid.amount) return d;
-  return { ...d, bids: [...d.bids, d.bid], bid: { amount, leaderId: managerId } };
+  return { ...d, bids: [...d.bids, d.bid], bid: { amount, pay: amount, leaderId: managerId } };
 }
 function undoBid(d) {
   if (!d.bid) return d;
   const bids = [...d.bids]; const prev = bids.pop();
-  return { ...d, bids, bid: prev || null };
+  const cards = d.bid.double ? { ...d.cards, [d.bid.leaderId]: [...(d.cards[d.bid.leaderId] || []), 'double'] } : d.cards;
+  return { ...d, bids, bid: prev || null, cards };
 }
 function sell(d) {
   const id = d.queue[0]; const b = d.bid;
@@ -227,16 +256,18 @@ function sell(d) {
   const n = withHistory(d, 'Undo sale');
   const m = n.managers.find((x) => x.id === b.leaderId);
   const slot = assignSlot(m, n.items[id], n.rules.slots);
-  if (slot < 0) return d;
-  m.team[slot] = { itemId: id, price: b.amount };
-  m.budget -= b.amount;
-  n.queue = n.queue.slice(1); n.processed++;
+  const price = b.pay != null ? b.pay : b.amount;
+  if (slot < 0 || price > m.budget) return d;
+  m.team[slot] = { itemId: id, price, ...(b.double ? { doubled: true } : {}) };
+  m.budget -= price;
+  if (n.items[id].mystery) n.revealed = [...(n.revealed || []), id];
+  n.queue = n.queue.slice(1); n.processed++; n.nominated = null;
   return advance(n);
 }
 function skipItem(d) {
   const id = d.queue[0]; if (!id) return d;
   const n = withHistory(d, 'Undo skip');
-  n.queue = n.queue.slice(1);
+  n.queue = n.queue.slice(1); n.nominated = null;
   if (n.rules.noBids === 'back' && !n.passed.includes(id)) { n.queue.push(id); n.passed.push(id); }
   else { n.leftover.push(id); n.processed++; }
   return advance(n);
@@ -248,9 +279,10 @@ function freePick(d, itemId) {
   const slot = assignSlot(m, n.items[itemId], n.rules.slots);
   if (slot < 0) return d;
   m.team[slot] = { itemId, price: 0, free: true };
+  if (n.items[itemId].mystery) n.revealed = [...(n.revealed || []), itemId];
   n.leftover = n.leftover.filter((x) => x !== itemId);
   n.fp = { round: cp.round, pos: cp.pos + 1 };
-  if (isDraftOver(n)) n.phase = 'done';
+  if (isDraftOver(n)) finishDraft(n);
   n.reveal++;
   return n;
 }
@@ -409,7 +441,7 @@ function TeamList({ d, m }) {
           <div className="slotline" key={i}>
             <span className="s">{s}</span>
             {it && <ItemArt item={it} topic={d.topic} size={30} radius={7} />}
-            {it ? <span className="n">{it.name}{t.free && <span className="muted small"> · free</span>}</span> : <span className="n empty">Empty</span>}
+            {it ? <span className="n">{it.name}{(() => { const r = rarityOf(d, t.itemId); return r && r !== 'common' ? <span className={'rmark ' + r}>{r === 'legendary' ? '★' : '◆'}</span> : null; })()}{t.free && <span className="muted small"> · free</span>}{t.stolen && <span className="muted small"> · stolen</span>}{t.traded && <span className="muted small"> · traded</span>}</span> : <span className="n empty">Empty</span>}
             {t && <span className="p num">{money(t.price)}</span>}
           </div>
         );
@@ -425,7 +457,7 @@ function TeamsSheet({ d, onClose }) {
         {d.managers.map((m) => (
           <div className="tteam" key={m.id} style={mStyle(m)}>
             <div className="row" style={{ marginBottom: 4 }}>
-              <h3 className="grow">{m.emoji} {m.name}</h3>
+              <h3 className="grow">{m.emoji} {m.name}{m.members ? <span className="small muted" style={{ display: 'block', fontFamily: 'var(--body)', fontWeight: 600 }}>{m.members.map((p) => p.name).join(' · ')}</span> : null}{d.cards && (d.cards[m.id] || []).length ? <span className="small muted" style={{ display: 'block', fontFamily: 'var(--body)', fontWeight: 600 }}>🃏 {d.cards[m.id].map((c) => CARD_INFO[c].name).join(', ')}</span> : null}</h3>
               <span className="num" style={{ fontFamily: 'var(--display)', fontSize: 22, color: 'var(--gold)' }}>{money(m.budget)} left</span>
             </div>
             <TeamList d={d} m={m} />
@@ -442,7 +474,7 @@ function TeamsSheet({ d, onClose }) {
 function Home({ draft, past, onNew, onSolo, onResume, onTopics, onPast, onAbandon, onSettings, showInstall, onDismissInstall }) {
   const [ask, setAsk] = useState(null);
   const [soon, setSoon] = useState(false);
-  const status = draft && (draft.phase === 'auction' ? 'Item ' + (draft.processed + 1) + ' of ' + (draft.processed + draft.queue.length) : draft.phase === 'freepick' ? 'Free picks' : 'Results & voting');
+  const status = draft && (draft.phase === 'auction' ? 'Item ' + (draft.processed + 1) + ' of ' + (draft.processed + draft.queue.length) : draft.phase === 'nominate' ? 'Nominating' : draft.phase === 'trade' ? 'Trade window' : draft.phase === 'freepick' ? 'Free picks' : 'Results & voting');
   return (
     <div className="app">
       <div className="hero">
@@ -729,9 +761,29 @@ function TopicEditor({ topic, folders, onChange, onBack, onDuplicate, onDelete }
 /* ============================================================
    SOLO SETUP
    ============================================================ */
-const DEFAULT_SOLO = { name: 'You', bots: 3, level: 'medium', talk: true, clock: 8, topicId: 't-pl', seed: 'start' };
+const DEFAULT_SOLO = { name: 'You', bots: 3, level: 'medium', talk: true, clock: 8, topicId: 't-pl', seed: 'start', teams: { on: false, count: 2, size: 2, name: 'Team You' } };
+const DEFAULT_TEAMS = { on: false, count: 2, size: 2, teams: [] };
+// Solo team game: your team = you + bot advisers; every other team is all bots.
+function soloTeams(cfg) {
+  const T = { ...DEFAULT_SOLO.teams, ...(cfg.teams || {}) };
+  const total = T.count * T.size - 1;
+  const bots = makeBots(total, cfg.level, cfg.seed, [COLORS[1]]);
+  const rng = seeded('teamnames', cfg.seed);
+  const names = shuffle(TEAM_NAMES.map((n) => [n, rng()]).sort((a, b) => a[1] - b[1]).map((x) => x[0]));
+  const teams = [];
+  const toMember = (b) => ({ id: b.id, name: b.name, emoji: b.emoji, bot: b.bot });
+  teams.push({ id: 'team-you', name: (T.name || 'Team You').trim() || 'Team You', color: COLORS[1], emoji: '😎', human: true, members: [{ id: 'you', name: cfg.name.trim() || 'You', emoji: '😎', human: true }, ...bots.slice(0, T.size - 1).map(toMember)] });
+  for (let i = 1; i < T.count; i++) {
+    const ms = bots.slice(T.size - 1 + (i - 1) * T.size, T.size - 1 + i * T.size);
+    teams.push({ id: 'team-' + i + '-' + ms[0].id, name: names[i % names.length], color: ms[0].color, emoji: ms[0].emoji, members: ms.map(toMember) });
+  }
+  return teams;
+}
 function SoloSetup({ cfg, setCfg, topic, rules, onBack, onPickTopic, onRules, onStart }) {
+  const T = { ...DEFAULT_SOLO.teams, ...(cfg.teams || {}) };
+  const setT = (p) => setCfg({ ...cfg, teams: { ...T, ...p } });
   const bots = makeBots(cfg.bots, cfg.level, cfg.seed, [COLORS[1]]);
+  const teams = T.on ? soloTeams(cfg) : null;
   const valid = topic && topic.items.length && topic.slots.length && cfg.name.trim();
   const level = BOT_LEVELS[cfg.level];
   return (
@@ -740,7 +792,17 @@ function SoloSetup({ cfg, setCfg, topic, rules, onBack, onPickTopic, onRules, on
       <div><h2 className="display">You vs the bots</h2><p className="hint">Bots bid on their own. Each item sells when its clock runs out.</p></div>
       <div className="card stack">
         <div className="field"><label htmlFor="solo-name">Your name</label><input id="solo-name" className="input" maxLength={16} value={cfg.name} onChange={(e) => setCfg({ ...cfg, name: e.target.value })} placeholder="You" /></div>
-        <div className="field"><label htmlFor="solo-bots">Bots</label><Stepper id="solo-bots" value={cfg.bots} min={1} max={7} onChange={(v) => setCfg({ ...cfg, bots: v })} /></div>
+        <div className="field"><span className="label">Play style</span><Seg label="Play style" value={T.on ? 'teams' : 'solo'} options={[['solo', 'Every bot for itself'], ['teams', 'Teams']]} onChange={(v) => setT({ on: v === 'teams' })} /></div>
+        {T.on ? (
+          <>
+            <div className="row">
+              <div className="field grow"><label htmlFor="solo-tcount">Teams</label><Stepper id="solo-tcount" value={T.count} min={2} max={4} onChange={(v) => setT({ count: v })} /></div>
+              <div className="field grow"><label htmlFor="solo-tsize">Players each</label><Stepper id="solo-tsize" value={T.size} min={1} max={4} onChange={(v) => setT({ size: v })} /></div>
+            </div>
+            <div className="field"><label htmlFor="solo-tname">Your team name</label><input id="solo-tname" className="input" maxLength={20} value={T.name} onChange={(e) => setT({ name: e.target.value })} /></div>
+            <p className="hint">{T.count === 2 ? T.size + 'v' + T.size : T.count + ' teams of ' + T.size}. Bots on your team advise you; you make the bids. Other teams are all bots and bid together.</p>
+          </>
+        ) : <div className="field"><label htmlFor="solo-bots">Bots</label><Stepper id="solo-bots" value={cfg.bots} min={1} max={7} onChange={(v) => setCfg({ ...cfg, bots: v })} /></div>}
         <div className="field"><span className="label">Difficulty</span><Seg label="Difficulty" value={cfg.level} options={[['easy', 'Easy'], ['medium', 'Medium'], ['hard', 'Hard']]} onChange={(v) => setCfg({ ...cfg, level: v })} />
           <p className="hint">{cfg.level === 'easy' ? 'Bots make mistakes, waste money and miss bargains.' : cfg.level === 'medium' ? 'Bots play sensibly and avoid most silly bidding wars.' : 'Bots budget carefully, read the table and plan for the endgame. No cheating.'}</p></div>
         <div className="field"><span className="label">Bid clock</span><Seg label="Bid clock" value={cfg.clock} options={[[6, '6s'], [8, '8s'], [12, '12s']]} onChange={(v) => setCfg({ ...cfg, clock: v })} /></div>
@@ -748,15 +810,26 @@ function SoloSetup({ cfg, setCfg, topic, rules, onBack, onPickTopic, onRules, on
       </div>
       <div className="card stack">
         <div className="row"><h3 className="grow">The table</h3><button className="btn btn-sm" onClick={() => setCfg({ ...cfg, seed: uid() })}>Shuffle bots</button></div>
-        <div className="stack-sm">
-          {bots.map((b) => (
-            <div key={b.id} className="botrow" style={mStyle(b)}>
-              <span className="be">{b.emoji}</span>
-              <span className="grow" style={{ minWidth: 0 }}><b>{b.name}</b><span className="small muted" style={{ display: 'block' }}>{BOT_TYPES[b.bot.type].label}</span></span>
-              <span className="lvl">{level.label}</span>
-            </div>
-          ))}
-        </div>
+        {teams ? (
+          <div className="stack-sm">
+            {teams.map((t) => (
+              <div key={t.id} className="teamprev" style={mStyle(t)}>
+                <b>{t.emoji} {t.name}</b>
+                <span className="small">{t.members.map((p) => p.name + (p.bot ? ' (' + BOT_TYPES[p.bot.type].short + ')' : '')).join(' · ')}</span>
+              </div>
+            ))}
+          </div>
+        ) : (
+          <div className="stack-sm">
+            {bots.map((b) => (
+              <div key={b.id} className="botrow" style={mStyle(b)}>
+                <span className="be">{b.emoji}</span>
+                <span className="grow" style={{ minWidth: 0 }}><b>{b.name}</b><span className="small muted" style={{ display: 'block' }}>{BOT_TYPES[b.bot.type].label}</span></span>
+                <span className="lvl">{level.label}</span>
+              </div>
+            ))}
+          </div>
+        )}
       </div>
       <div className="card stack">
         <button className="tcard" style={{ border: 0, padding: 0, background: 'none' }} onClick={onPickTopic}>
@@ -766,13 +839,77 @@ function SoloSetup({ cfg, setCfg, topic, rules, onBack, onPickTopic, onRules, on
         </button>
         <button className="btn btn-sm" style={{ alignSelf: 'flex-start' }} onClick={onRules} disabled={!topic}>House rules: {money(rules.budget)} budget · min {money(rules.minBid)}</button>
       </div>
-      <p className="hint" style={{ textAlign: 'center' }}>{cfg.bots} {cfg.bots === 1 ? 'bot' : 'bots'} · {level.label} · {cfg.clock}s clock · trash talk {cfg.talk ? 'on' : 'off'}</p>
-      <button className="btn btn-gold" disabled={!valid} onClick={() => onStart(bots)}>Start solo draft</button>
+      <p className="hint" style={{ textAlign: 'center' }}>{T.on ? (T.count === 2 ? T.size + 'v' + T.size : T.count + ' teams of ' + T.size) : cfg.bots + ' ' + (cfg.bots === 1 ? 'bot' : 'bots')} · {level.label} · {cfg.clock}s clock · trash talk {cfg.talk ? 'on' : 'off'}</p>
+      <button className="btn btn-gold" disabled={!valid} onClick={() => onStart(teams || bots)}>Start solo draft</button>
     </div>
   );
 }
 
-function SetupManagers({ managers, setManagers, onBack, onNext }) {
+const TEAM_NAMES = ['The Overpayers', 'Budget Bandits', 'Chaos FC', 'Spreadsheet United', 'Bargain Bin Rovers', 'Team Mayhem', 'Deadline Dealers', 'The Free Agents'];
+// Build/resize local teams: `count` teams of `size` players, keeping names already typed.
+function shapeTeams(teams, count, size) {
+  const out = [];
+  for (let i = 0; i < count; i++) {
+    const t = teams[i] || { id: uid(), name: 'Team ' + (i + 1), color: COLORS[i % COLORS.length], emoji: EMOJIS[i % EMOJIS.length], members: [] };
+    const members = [];
+    for (let j = 0; j < size; j++) members.push((t.members || [])[j] || { id: uid(), name: '' });
+    out.push({ ...t, members });
+  }
+  return out;
+}
+function TeamsEditor({ cfg, setCfg }) {
+  const teams = shapeTeams(cfg.teams || [], cfg.count, cfg.size);
+  const setTeams = (ts) => setCfg({ ...cfg, teams: ts });
+  const upd = (i, patch) => setTeams(teams.map((t, k) => (k === i ? { ...t, ...patch } : t)));
+  const updMember = (i, j, name) => upd(i, { members: teams[i].members.map((p, k) => (k === j ? { ...p, name } : p)) });
+  const autoAssign = () => {
+    const names = shuffle(teams.flatMap((t) => t.members.map((p) => p.name.trim())).filter(Boolean));
+    let k = 0;
+    setTeams(teams.map((t) => ({ ...t, members: t.members.map((p) => ({ ...p, name: names[k++] || '' })) })));
+  };
+  return (
+    <div className="stack">
+      <div className="card stack">
+        <div className="row">
+          <div className="field grow"><label htmlFor="tm-count">Teams</label><Stepper id="tm-count" value={cfg.count} min={2} max={4} onChange={(v) => setCfg({ ...cfg, count: v, teams: shapeTeams(teams, v, cfg.size) })} /></div>
+          <div className="field grow"><label htmlFor="tm-size">Players each</label><Stepper id="tm-size" value={cfg.size} min={1} max={4} onChange={(v) => setCfg({ ...cfg, size: v, teams: shapeTeams(teams, cfg.count, v) })} /></div>
+        </div>
+        <p className="hint">{cfg.count === 2 ? cfg.size + 'v' + cfg.size : cfg.count + ' teams of ' + cfg.size} · each team shares one budget, one roster and its Chaos Cards. Everyone votes, but never for their own team.</p>
+        <button className="btn btn-sm" style={{ alignSelf: 'flex-start' }} onClick={autoAssign}>Shuffle players into teams</button>
+      </div>
+      {teams.map((t, i) => (
+        <div key={t.id} className="teamedit" style={mStyle(t)}>
+          <div className="row">
+            <button className="emo" onClick={() => upd(i, { emoji: EMOJIS[(EMOJIS.indexOf(t.emoji) + 1) % EMOJIS.length] })} aria-label="Change team emoji">{t.emoji}</button>
+            <button className="swatch" onClick={() => upd(i, { color: COLORS[(COLORS.indexOf(t.color) + 1) % COLORS.length] })} aria-label="Change team colour" />
+            <input id={'tm-name-' + t.id} className="input grow" value={t.name} maxLength={20} placeholder={'Team ' + (i + 1)} onChange={(e) => upd(i, { name: e.target.value })} />
+          </div>
+          <div className="stack-sm" style={{ marginTop: 8 }}>
+            {t.members.map((p, j) => <input key={p.id} id={'tm-p-' + p.id} className="input" value={p.name} maxLength={16} placeholder={'Player ' + (j + 1)} onChange={(e) => updMember(i, j, e.target.value)} />)}
+          </div>
+        </div>
+      ))}
+    </div>
+  );
+}
+// Local team config → draft managers (one per team, players inside).
+const localTeamsToManagers = (cfg) => shapeTeams(cfg.teams || [], cfg.count, cfg.size).map((t) => ({ id: t.id, name: t.name.trim(), color: t.color, emoji: t.emoji, members: t.members.map((p) => ({ id: p.id, name: p.name.trim(), emoji: '🙂' })) }));
+const teamsValid = (cfg) => { const ts = shapeTeams(cfg.teams || [], cfg.count, cfg.size); return ts.every((t) => t.name.trim() && t.members.every((p) => p.name.trim())); };
+
+function SetupManagers({ managers, setManagers, onBack, onNext, teamCfg, setTeamCfg }) {
+  if (teamCfg && teamCfg.on) return (
+    <div className="app">
+      <TopBar onBack={onBack} title="1 · Teams" />
+      <div><h2 className="display">Who's bidding?</h2></div>
+      <Seg label="Play style" value="teams" options={[['solo', 'Individual'], ['teams', 'Teams']]} onChange={(v) => setTeamCfg({ ...teamCfg, on: v === 'teams' })} />
+      <TeamsEditor cfg={teamCfg} setCfg={setTeamCfg} />
+      {!teamsValid(teamCfg) && <p className="hint">Every team and player needs a name.</p>}
+      <button className="btn btn-gold" disabled={!teamsValid(teamCfg)} onClick={onNext}>Next: pick a topic</button>
+    </div>
+  );
+  return <SetupManagersSolo managers={managers} setManagers={setManagers} onBack={onBack} onNext={onNext} teamCfg={teamCfg} setTeamCfg={setTeamCfg} />;
+}
+function SetupManagersSolo({ managers, setManagers, onBack, onNext, teamCfg, setTeamCfg }) {
   const upd = (i, patch) => setManagers(managers.map((m, k) => (k === i ? { ...m, ...patch } : m)));
   const move = (i, dir) => { const a = [...managers]; const j = i + dir; if (j < 0 || j >= a.length) return; [a[i], a[j]] = [a[j], a[i]]; setManagers(a); };
   const nextColor = (cur) => { const used = managers.map((m) => m.color); const start = COLORS.indexOf(cur); for (let k = 1; k <= COLORS.length; k++) { const c = COLORS[(start + k) % COLORS.length]; if (!used.includes(c) || c === cur) return c; } return cur; };
@@ -786,6 +923,7 @@ function SetupManagers({ managers, setManagers, onBack, onNext }) {
     <div className="app">
       <TopBar onBack={onBack} title="1 · Managers" />
       <div><h2 className="display">Who's bidding?</h2><p className="hint">2 to 8 managers. Tap the colour or emoji to change it.</p></div>
+      {setTeamCfg && <Seg label="Play style" value="solo" options={[['solo', 'Individual'], ['teams', 'Teams']]} onChange={(v) => setTeamCfg({ ...(teamCfg || DEFAULT_TEAMS), on: v === 'teams' })} />}
       <div className="stack-sm">
         {managers.map((m, i) => (
           <div className="mrow" key={m.id} style={mStyle(m)}>
@@ -867,43 +1005,103 @@ function SetupTopic({ topics, onBack, onPick, onTopics, folder, setFolder }) {
   );
 }
 
-function SetupRules({ topic, managers, rules, setRules, onBack, onStart, startLabel = 'Start the draft', title = '3 · Rules' }) {
+// Collapsible rules section with a master switch in its header.
+function RuleSection({ id, title, emoji, on, onToggle, summary, children, open: startOpen }) {
+  const [open, setOpen] = useState(!!startOpen);
+  return (
+    <section className={'rsec' + (on === false ? ' off' : '')}>
+      <div className="rhead2">
+        <button type="button" className="rtitle" aria-expanded={open} aria-controls={id} onClick={() => setOpen((o) => !o)}>
+          <span className="re">{emoji}</span><span className="grow" style={{ minWidth: 0 }}><b>{title}</b><span className="small muted" style={{ display: 'block' }}>{summary}</span></span><span className="chev">{open ? '▾' : '▸'}</span>
+        </button>
+        {onToggle && <button type="button" className="mini-sw" role="switch" aria-checked={!!on} aria-label={title + (on ? ' on' : ' off')} onClick={() => onToggle(!on)}><span /></button>}
+      </div>
+      {open && <div id={id} className="rbody stack">{children}</div>}
+    </section>
+  );
+}
+function PctField({ id, label, value, onChange, max }) {
+  return <div className="field grow"><label htmlFor={id}>{label}</label><Stepper id={id} value={value} min={0} max={max} onChange={onChange} /></div>;
+}
+
+function SetupRules({ topic, managers, rules, setRules, onBack, onStart, startLabel = 'Start the draft', title = '3 · Rules', teamSummary, onEditTeams, onReset }) {
   const [slotTxt, setSlotTxt] = useState(rules.slots.join(', '));
+  const [askReset, setAskReset] = useState(false);
   const slots = parseSlots(slotTxt);
+  const tw = twistRules(rules);
   const set = (p) => setRules({ ...rules, ...p });
+  const setTw = (k, p) => setRules({ ...rules, [k]: { ...tw[k], ...p } });
   const needed = rules.minBid * slots.length;
   const problems = [];
   if (!slots.length) problems.push('Add at least one slot.');
   if (rules.budget < needed) problems.push('A budget of ' + money(rules.budget) + " can't fill " + slots.length + ' slots at ' + money(rules.minBid) + ' each. Raise it to at least ' + money(needed) + '.');
+  if (tw.chaos.on && !CARD_TYPES.some((c) => tw.chaos[c])) problems.push('Chaos Cards are on but every card type is switched off. Turn one on, or switch Chaos Cards off.');
+  if (tw.rarity.on && tw.rarity.rare + tw.rarity.legendary > 100) problems.push('Rare + Legendary can’t be more than 100%.');
   if (topic.items.length < slots.length * managers.length) problems.push('Heads up: ' + topic.items.length + ' items for ' + slots.length * managers.length + ' slots. Some teams will finish short.');
+  if (tw.mystery.on && topic.items.length < tw.mystery.every) problems.push('Heads up: this topic has fewer than ' + tw.mystery.every + ' items, so there won’t be any mystery items.');
   const blocking = problems.filter((p) => !p.startsWith('Heads up'));
   const posMissing = [...new Set(topic.items.map((i) => i.pos).filter((p) => p && !slots.some((s) => norm(s) === norm(p))))];
+  const common = 100 - tw.rarity.rare - tw.rarity.legendary;
+  const mysteryCount = tw.mystery.on ? Math.floor(topic.items.length / Math.max(2, tw.mystery.every)) : 0;
   return (
     <div className="app">
       <TopBar onBack={onBack} title={title} />
-      <div><p className="eyebrow">{topic.emoji} {topic.name}</p><h2 className="display">House rules</h2></div>
-      <div className="card stack">
-        <div className="field"><label htmlFor="r-budget">Starting budget</label><Stepper id="r-budget" prefix="$" value={rules.budget} min={1} max={999} onChange={(v) => set({ budget: v })} /></div>
-        <div className="row">
-          <div className="field grow"><label htmlFor="r-min">Minimum bid</label><Stepper id="r-min" prefix="$" value={rules.minBid} min={1} max={99} onChange={(v) => set({ minBid: v })} /></div>
-        </div>
+      <div><p className="eyebrow">{topic.emoji} {topic.name}</p><h2 className="display">House rules</h2><p className="hint">Changes apply to new drafts only. A game in progress keeps its rules.</p></div>
+
+      <RuleSection id="rs-basic" emoji="💵" title="Money & slots" summary={money(rules.budget) + ' budget · min ' + money(rules.minBid) + ' · +' + money(rules.inc) + ' · ' + slots.length + ' slots'} open>
+        <div className="field"><label htmlFor="r-budget">Starting budget{teamSummary && teamSummary.teams ? ' (per team)' : ''}</label><Stepper id="r-budget" prefix="$" value={rules.budget} min={1} max={999} onChange={(v) => set({ budget: v })} /></div>
+        <div className="row"><div className="field grow"><label htmlFor="r-min">Minimum bid</label><Stepper id="r-min" prefix="$" value={rules.minBid} min={1} max={99} onChange={(v) => set({ minBid: v })} /></div></div>
         <div className="field"><label htmlFor="r-inc">Bid increment</label><Stepper id="r-inc" prefix="$" value={rules.inc} min={1} max={99} onChange={(v) => set({ inc: v })} /></div>
-      </div>
-      <div className="card stack">
         <div className="field">
           <label htmlFor="r-slots">Slots per team ({slots.length})</label>
           <input id="r-slots" className="input" value={slotTxt} onChange={(e) => { setSlotTxt(e.target.value); const p = parseSlots(e.target.value); if (p.length) set({ slots: p }); }} />
           {posMissing.length > 0 && <p className="hint">No slot for {posMissing.join(', ')}. Those items can go in any open slot.</p>}
         </div>
-        <div className="field"><span className="label">Item order</span><Seg label="Item order" value={rules.order} options={[['random', 'Shuffle'], ['saved', 'Saved order']]} onChange={(v) => set({ order: v })} /></div>
         <div className="field"><span className="label">Bid timer</span><Seg label="Bid timer" value={rules.timer} options={[[0, 'Off'], [10, '10s'], [15, '15s'], [30, '30s']]} onChange={(v) => set({ timer: v })} />
-          {rules.timer > 0 && <p className="hint">Resets on every bid. When it runs out with a leader, the item sells automatically.</p>}</div>
+          {rules.timer > 0 && <p className="hint">Resets on every bid. When it runs out with a leader, the item sells automatically. (Solo always uses its own bid clock.)</p>}</div>
         <Toggle on={rules.mustFill} onChange={(v) => set({ mustFill: v })} title="Must be able to fill your team" sub={'Max bid keeps ' + money(rules.minBid) + ' for every other empty slot.'} />
-        <div className="field"><span className="label">Items with no bids</span><Seg label="No bids" value={rules.noBids} options={[['skip', 'Skip them'], ['back', 'Back of queue']]} onChange={(v) => set({ noBids: v })} />
-          <p className="hint">{rules.noBids === 'back' ? 'An unsold item comes round once more, then goes to the leftovers.' : 'Unsold items go to the leftovers for free picks at the end.'}</p></div>
-      </div>
+        <div className="field"><span className="label">Items with no bids</span><Seg label="No bids" value={rules.noBids} options={[['skip', 'Skip them'], ['back', 'Back of queue']]} onChange={(v) => set({ noBids: v })} /></div>
+      </RuleSection>
+
+      <RuleSection id="rs-flow" emoji="🧭" title="Draft flow" summary={(rules.order === 'nominate' ? 'Nomination' : rules.order === 'saved' ? 'Topic order' : 'Random order') + ' · trades ' + (tw.trades.on ? tw.trades.minutes + ' min' + (tw.trades.money ? ' + money' : '') : 'off')}>
+        <div className="field"><span className="label">Draft order</span><Seg label="Draft order" value={rules.order} options={[['random', 'Random'], ['nominate', 'Nomination'], ['saved', 'Topic order']]} onChange={(v) => set({ order: v })} />
+          <p className="hint">{rules.order === 'nominate' ? 'Teams take turns choosing which item goes up next.' : rules.order === 'saved' ? 'Items come up in the order saved in the topic.' : 'Items come up in a random order.'}</p></div>
+        <Toggle on={tw.trades.on} onChange={(v) => setTw('trades', { on: v })} title="Trade window after the draft" sub="1-for-1 trades. Both teams must accept." />
+        {tw.trades.on && <>
+          <div className="field"><span className="label">Trade window</span><Seg label="Trade window length" value={tw.trades.minutes} options={[[1, '1 min'], [3, '3 min'], [5, '5 min'], [10, '10 min']]} onChange={(v) => setTw('trades', { minutes: v })} /></div>
+          <Toggle on={tw.trades.money} onChange={(v) => setTw('trades', { money: v })} title="Money in trades" sub="A team can add cash to sweeten a 1-for-1 trade." />
+        </>}
+      </RuleSection>
+
+      <RuleSection id="rs-chaos" emoji="🃏" title="Chaos Cards" on={tw.chaos.on} onToggle={(v) => setTw('chaos', { on: v })} summary={tw.chaos.on ? tw.chaos.count + ' per ' + (teamSummary && teamSummary.teams ? 'team' : 'manager') + ' · ' + CARD_TYPES.filter((c) => tw.chaos[c]).map((c) => CARD_INFO[c].name).join(', ') : 'Off'}>
+        <div className="field"><label htmlFor="r-cards">Cards per {teamSummary && teamSummary.teams ? 'team' : 'manager'}</label><Stepper id="r-cards" value={tw.chaos.count} min={1} max={5} onChange={(v) => setTw('chaos', { count: v })} />
+          {teamSummary && teamSummary.teams ? <p className="hint">In team games, cards belong to the team, not each player.</p> : null}</div>
+        {CARD_TYPES.map((c) => (
+          <Toggle key={c} on={tw.chaos[c]} onChange={(v) => setTw('chaos', { [c]: v })} title={CARD_INFO[c].emoji + ' ' + CARD_INFO[c].name} sub={CARD_INFO[c].text + (c === 'steal' ? money(rules.inc) + '.' : '')} />
+        ))}
+      </RuleSection>
+
+      <RuleSection id="rs-mys" emoji="❓" title="Mystery items" on={tw.mystery.on} onToggle={(v) => setTw('mystery', { on: v })} summary={tw.mystery.on ? '1 in ' + tw.mystery.every + ' · ' + mysteryCount + ' in this topic' : 'Off'}>
+        <div className="field"><span className="label">How often</span><Seg label="Mystery frequency" value={tw.mystery.every} options={[[5, '1 in 5'], [8, '1 in 8'], [12, '1 in 12']]} onChange={(v) => setTw('mystery', { every: v })} /></div>
+        <p className="hint">Mystery items are auctioned face down and fit any open slot. You find out what you bought after it sells.</p>
+      </RuleSection>
+
+      <RuleSection id="rs-rar" emoji="✨" title="Rarity" on={tw.rarity.on} onToggle={(v) => setTw('rarity', { on: v })} summary={tw.rarity.on ? common + '% Common · ' + tw.rarity.rare + '% Rare · ' + tw.rarity.legendary + '% Legendary' : 'Off'}>
+        <div className="row"><PctField id="r-rare" label="Rare %" value={tw.rarity.rare} max={100 - tw.rarity.legendary} onChange={(v) => setTw('rarity', { rare: v })} /><PctField id="r-leg" label="Legendary %" value={tw.rarity.legendary} max={100 - tw.rarity.rare} onChange={(v) => setTw('rarity', { legendary: v })} /></div>
+        <p className="hint">Common is the rest ({common}%). Rarity is just for show: it doesn’t change prices.</p>
+      </RuleSection>
+
+      {teamSummary && (
+        <RuleSection id="rs-team" emoji="👥" title="Team play" summary={teamSummary.text}>
+          <p className="hint">{teamSummary.detail}</p>
+          {onEditTeams && <button className="btn btn-sm" style={{ alignSelf: 'flex-start' }} onClick={onEditTeams}>Edit players &amp; teams</button>}
+        </RuleSection>
+      )}
+
       {problems.map((p) => <p key={p} className={p.startsWith('Heads up') ? 'hint' : 'warn'}>{p}</p>)}
       <button className="btn btn-gold" disabled={blocking.length > 0} onClick={() => onStart({ ...rules, slots })}>{startLabel}</button>
+      {onReset && <button className="btn btn-ghost" onClick={() => setAskReset(true)}>Reset rules to defaults</button>}
+      {askReset && <Confirm title="Reset rules?" body="Budget, bids and every twist go back to their defaults. Slots come from the topic." yes="Reset" onYes={() => { onReset(); setSlotTxt(topic.slots.join(', ')); }} onClose={() => setAskReset(false)} />}
     </div>
   );
 }
@@ -936,7 +1134,8 @@ function ManagerButton({ d, m, onBid, onCustom, disabledAll, readOnly, bubble, t
       style={mStyle(m)} onContextMenu={(e) => e.preventDefault()} {...handlers}>
       {bubble && <span className="bubble" key={bubble.id} role="status">{bubble.text}</span>}
       <span className="who">{m.emoji} {m.name}</span>
-      <span className="money num">{money(m.budget)}</span>
+      {m.members && <span className="mem">{m.members.map((p) => p.name).join(' · ')}</span>}
+      <span className="money num">{money(m.budget)}{d.cards && d.cards[m.id] && d.cards[m.id].length ? <span className="cardchip" title="Chaos Cards left">🃏{d.cards[m.id].length}</span> : null}</span>
       <span className="st">{status} · {filled}/{d.rules.slots.length}</span>
       {customOk && <button className="edit" aria-label={'Custom bid for ' + m.name} onPointerDown={(e) => e.stopPropagation()} onPointerUp={(e) => e.stopPropagation()} onClick={(e) => { e.stopPropagation(); onCustom(); }}>✎</button>}
     </div>
@@ -949,15 +1148,18 @@ function useBotTalk(d) {
   const last = useRef(0); const per = useRef({}); const timers = useRef([]);
   const enabled = d.mode === 'solo' && !(d.solo && d.solo.talk === false);
   useEffect(() => () => timers.current.forEach(clearTimeout), []);
-  const say = (botId, event, extra, force) => {
+  // who: a bot manager id, or a bot "actor" ({ id: team id, name, bot, speaker }) from a bot team.
+  const say = (who, event, extra, force) => {
     if (!enabled) return;
-    const bot = d.managers.find((m) => m.id === botId);
-    if (!isBot(bot)) return;
+    const bot = typeof who === 'object' ? who : (d.managers.find((m) => m.id === who) || botActors(d).find((a) => a.speaker === who));
+    if (!bot || !isBot(bot)) return;
+    const botId = bot.id;
     const now = Date.now();
     if (!force && (now - last.current < ms(3000) || now - (per.current[botId] || 0) < ms(7000))) return;
     if (!force && Math.random() > (TALK_CHANCE[event] != null ? TALK_CHANCE[event] : 0.3)) return;
-    const text = botLine(bot, event, extra);
-    if (!text) return;
+    const line = botLine({ ...bot, id: bot.speaker || bot.id }, event, extra);
+    if (!line) return;
+    const text = d.teamMode ? bot.name + ': ' + line : line;
     last.current = now; per.current[botId] = now;
     const id = now + '-' + Math.random();
     setBubbles((b) => ({ ...b, [botId]: { text, id } }));
@@ -994,17 +1196,36 @@ function WikiCredit({ item, topic }) {
   return <a className="credit" href={'https://en.wikipedia.org/wiki/' + encodeURIComponent(page.replace(/ /g, '_'))} target="_blank" rel="noopener noreferrer">Photo: Wikipedia ↗</a>;
 }
 
-function ItemCard({ item, d }) {
+function RarityTag({ r }) { return r && r !== 'common' ? <span className={'rtag ' + r}>{r === 'legendary' ? '★ Legendary' : '◆ Rare'}</span> : null; }
+function ItemCard({ item: real, d }) {
+  const item = visibleItem(d, real.id);
+  const rar = rarityOf(d, real.id);
+  if (item.hidden) return (
+    <div className="flip">
+      <div className="flip-inner">
+        <div className="face itemcard mysterycard">
+          <div className="ph mys" aria-hidden="true">?</div>
+          <div className="info">
+            <span><span className="pos">MYSTERY</span></span>
+            <div className="nm">Mystery item</div>
+            <div className="ds">Face down. You find out what it is after it sells.</div>
+            <div className="fits">Fits any open slot</div>
+          </div>
+        </div>
+        <div className="face back"><span>?</span></div>
+      </div>
+    </div>
+  );
   const pos = norm(item.pos);
   const inTemplate = pos && d.rules.slots.some((s) => norm(s) === pos);
   const hasFlex = d.rules.slots.some(isFlex);
   return (
-    <div className="flip">
+    <div className={'flip' + (rar ? ' r-' + rar : '')}>
       <div className="flip-inner">
-        <div className="face itemcard">
+        <div className={'face itemcard' + (rar ? ' r-' + rar : '')}>
           <div className="ph"><ItemArt item={item} topic={d.topic} size={104} radius={16} /></div>
           <div className="info">
-            {item.pos && <span><span className="pos">{item.pos}</span></span>}
+            <span className="row" style={{ gap: 6, flexWrap: 'wrap' }}>{item.pos && <span className="pos">{item.pos}</span>}<RarityTag r={rar} /></span>
             <div className="nm">{item.name}</div>
             {item.desc && <div className="ds">{item.desc}</div>}
             <div className="fits">{inTemplate ? 'Fills a ' + item.pos + ' slot' + (hasFlex ? ' or FLEX' : '') : 'Fills any open slot'}</div>
@@ -1014,6 +1235,123 @@ function ItemCard({ item, d }) {
         <div className="face back"><span>?</span></div>
       </div>
     </div>
+  );
+}
+
+/* ---------- Chaos Cards: play sheet and Veto prompt ---------- */
+function CardSheet({ d, by: fixedBy, onPlay, onDouble, onClose }) {
+  const [by, setBy] = useState(fixedBy || null);
+  const [card, setCard] = useState(null);
+  const [target, setTarget] = useState(null);
+  const [mine, setMine] = useState(null);
+  const [item, setItem] = useState(null);
+  const minPay = Math.max(d.rules.minBid, Math.ceil(nextAmount(d) / 2));
+  const [pay, setPay] = useState(minPay);
+  const team = by && teamOf(d, by);
+  const rivals = d.managers.filter((m) => m.id !== by);
+  const reset = () => { setCard(null); setTarget(null); setMine(null); setItem(null); };
+  const itemsOf = (m) => m.team.filter(Boolean);
+  const title = (t) => <h2 className="display" style={{ fontSize: 30 }}>{t}</h2>;
+  if (!by) return (
+    <Sheet center onClose={onClose}>
+      {title('Who’s playing a card?')}
+      <div className="stack-sm">
+        {d.managers.map((m) => (
+          <button key={m.id} className="votebtn" style={{ ...mStyle(m), flexDirection: 'row', justifyContent: 'space-between' }} disabled={!(d.cards[m.id] || []).length} onClick={() => setBy(m.id)}>
+            <span>{m.emoji} {m.name}</span><span>🃏 {(d.cards[m.id] || []).length}</span>
+          </button>
+        ))}
+      </div>
+      <button className="btn btn-ghost" onClick={onClose}>Close</button>
+    </Sheet>
+  );
+  const params = { target, item, mine };
+  const problem = card === 'double' ? doubleProblem(d, by, pay) : card ? cardProblem(d, by, card, params) : null;
+  const ready = card && !problem && (card === 'double' || card === 'freeze' ? (card === 'double' || target) : card === 'steal' ? target && item : target && item && mine);
+  let summary = '';
+  if (card === 'double') summary = 'Bid ' + money(pay) + '. It counts as ' + money(pay * 2) + '. You pay ' + money(pay) + ' if you win.';
+  if (card === 'freeze' && target) summary = teamOf(d, target).name + ' can’t bid on this item.';
+  if (card === 'steal' && item) { const owner = teamOf(d, target); const t = owner.team.find((x) => x && x.itemId === item); summary = 'Take ' + d.items[item].name + ' from ' + owner.name + '. You pay them ' + money(stealPrice(d, t)) + '.'; }
+  if (card === 'swap' && item && mine) summary = 'Give ' + d.items[mine].name + ', get ' + d.items[item].name + ' from ' + teamOf(d, target).name + '.';
+  return (
+    <Sheet center onClose={onClose}>
+      <p className="eyebrow">{team.emoji} {team.name} · Chaos Cards</p>
+      {!card ? (
+        <>
+          {title('Play a card')}
+          {!cardWindow(d) && <p className="hint">Steal, Swap and Freeze can only be played before the first bid on an item.</p>}
+          <div className="stack-sm">
+            {(d.cards[by] || []).map((c, i) => {
+              const info = CARD_INFO[c];
+              const why = c === 'veto' ? 'Kept for defence. It’s used when someone targets you.' : c === 'double' ? doubleProblem(d, by, Math.max(minPay, d.rules.minBid)) : (!cardWindow(d) ? 'Only before the first bid.' : null);
+              return (
+                <button key={c + i} className="cardbtn" disabled={c === 'veto' || (c !== 'double' && !cardWindow(d))} onClick={() => { setCard(c); setPay(minPay); }}>
+                  <span className="ce">{info.emoji}</span>
+                  <span className="grow" style={{ minWidth: 0 }}><b>{info.name}</b><span className="small" style={{ display: 'block', opacity: 0.85 }}>{info.text}{c === 'steal' ? money(d.rules.inc) + '.' : ''}</span>{why && <span className="small muted" style={{ display: 'block' }}>{why}</span>}</span>
+                </button>
+              );
+            })}
+            {!(d.cards[by] || []).length && <p className="hint">No cards left.</p>}
+          </div>
+          <button className="btn btn-ghost" onClick={fixedBy ? onClose : () => setBy(null)}>{fixedBy ? 'Close' : 'Back'}</button>
+        </>
+      ) : (
+        <>
+          {title(CARD_INFO[card].emoji + ' ' + CARD_INFO[card].name)}
+          {card === 'double' && (
+            <div className="field"><label htmlFor="dbl-pay">You pay</label><Stepper id="dbl-pay" prefix="$" value={pay} min={minPay} max={Math.max(minPay, maxBid(team, d.rules))} onChange={setPay} /></div>
+          )}
+          {(card === 'freeze' || card === 'steal' || card === 'swap') && (
+            <div className="field"><span className="label">Rival team</span>
+              <div className="chips">{rivals.map((m) => <button key={m.id} className={'pickchip' + (target === m.id ? ' on' : '')} style={mStyle(m)} onClick={() => { setTarget(m.id); setItem(null); }}>{m.emoji} {m.name}</button>)}</div>
+            </div>
+          )}
+          {card === 'swap' && (
+            <div className="field"><span className="label">Your item to give</span>
+              <div className="stack-sm">{itemsOf(team).map((t) => <button key={t.itemId} className={'pickbtn' + (mine === t.itemId ? ' on' : '')} onClick={() => setMine(t.itemId)}><Thumb item={d.items[t.itemId]} topic={d.topic} /><span className="grow">{d.items[t.itemId].name}</span></button>)}
+                {!itemsOf(team).length && <p className="hint">You don’t own anything yet.</p>}</div>
+            </div>
+          )}
+          {(card === 'steal' || card === 'swap') && target && (
+            <div className="field"><span className="label">{card === 'steal' ? 'Item to steal' : 'Item to get'}</span>
+              <div className="stack-sm">{itemsOf(teamOf(d, target)).map((t) => (
+                <button key={t.itemId} className={'pickbtn' + (item === t.itemId ? ' on' : '')} onClick={() => setItem(t.itemId)}>
+                  <Thumb item={d.items[t.itemId]} topic={d.topic} /><span className="grow">{d.items[t.itemId].name}</span>{card === 'steal' && <span className="num" style={{ fontFamily: 'var(--display)', color: 'var(--gold)' }}>{money(stealPrice(d, t))}</span>}
+                </button>
+              ))}{!itemsOf(teamOf(d, target)).length && <p className="hint">They don’t own anything yet.</p>}</div>
+            </div>
+          )}
+          {summary && <p className="summary">{summary}</p>}
+          {problem && (card === 'double' || target) && <p className="warn">{problem}</p>}
+          <div className="row pin">
+            <button className="btn btn-ghost grow" onClick={reset}>Back</button>
+            <button className="btn btn-gold grow" disabled={!ready} onClick={() => { if (card === 'double') onDouble(by, pay); else onPlay(by, card, params); onClose(); }}>Play {CARD_INFO[card].name}</button>
+          </div>
+        </>
+      )}
+    </Sheet>
+  );
+}
+function cardPlayText(d, play) {
+  const by = teamOf(d, play.by), them = teamOf(d, play.target);
+  if (play.card === 'freeze') return by.name + ' wants to FREEZE ' + them.name + ' for this item.';
+  if (play.card === 'steal') { const t = them.team.find((x) => x && x.itemId === play.item); return by.name + ' wants to STEAL ' + d.items[play.item].name + ' from ' + them.name + (t ? ' for ' + money(stealPrice(d, t)) : '') + '.'; }
+  if (play.card === 'swap') return by.name + ' wants to SWAP ' + d.items[play.mine].name + ' for ' + them.name + '’s ' + d.items[play.item].name + '.';
+  return '';
+}
+function VetoSheet({ d, onAnswer }) {
+  const play = d.pending; const them = teamOf(d, play.target);
+  return (
+    <Sheet center onClose={() => {}}>
+      <p className="eyebrow">🛑 Veto?</p>
+      <h2 className="display" style={{ fontSize: 30, color: them.color }}>{them.emoji} {them.name}</h2>
+      <p className="summary">{cardPlayText(d, play)}</p>
+      <p className="hint">You have a Veto card. Use it to block this? {d.mode !== 'solo' ? 'Pass the phone to ' + them.name + '.' : ''}</p>
+      <div className="row pin">
+        <button className="btn grow" onClick={() => onAnswer(false)}>Let it happen</button>
+        <button className="btn btn-gold grow" onClick={() => onAnswer(true)}>Use Veto</button>
+      </div>
+    </Sheet>
   );
 }
 
@@ -1028,6 +1366,9 @@ function Auction({ d, setDraft, goHome, flashing, onFlash }) {
   const [teams, setTeams] = useState(false);
   const [thinking, setThinking] = useState(null);
   const [out, setOut] = useState(false); // solo: you tapped "I'm out" for this item
+  const [cardsOpen, setCardsOpen] = useState(false);
+  const cardTried = useRef(new Set()); // each bot considers a card at most once per item
+  const hold = paused || !!d.pending;   // a card waiting for a Veto answer pauses the item
   const busy = useRef(false);
   // Solo games always run a closing clock so items sell on their own.
   const timer = solo ? ((d.solo && d.solo.clock) || 8) : (d.rules.timer || 0);
@@ -1035,7 +1376,7 @@ function Auction({ d, setDraft, goHome, flashing, onFlash }) {
   const bidKey = bidKeyOf(d);
   const talk = useBotTalk(d);
   // Refs let delayed bot actions check the *current* game before acting.
-  const live = useRef({}); live.current = { d, paused, flashing, gavel, left };
+  const live = useRef({}); live.current = { d, paused: hold, flashing, gavel, left };
   useEffect(() => { setLeft(timer); }, [bidKey, timer]);
   useEffect(() => { setOut(false); }, [d.reveal]);
 
@@ -1048,7 +1389,8 @@ function Auction({ d, setDraft, goHome, flashing, onFlash }) {
     busy.current = true;
     const price = d.bid.amount; const winnerId = d.bid.leaderId;
     const bidders = [...new Set(d.bids.filter(Boolean).map((b) => b.leaderId))].filter((id) => id !== winnerId);
-    const info = { kind: 'sold', name: leader.name, emoji: leader.emoji, color: leader.color, price, item: item.name };
+    const real = d.items[d.queue[0]];
+    const info = { kind: 'sold', name: leader.name, emoji: leader.emoji, color: leader.color, price, item: real.name, mystery: !!real.mystery, rarity: (d.rarity || {})[real.id] || null, doubled: !!d.bid.double };
     buzz([40, 30, 160]); setGavel(true); setThinking(null);
     setTimeout(() => {
       setGavel(false); onFlash(info); setDraft((p) => sell(p)); busy.current = false;
@@ -1065,38 +1407,88 @@ function Auction({ d, setDraft, goHome, flashing, onFlash }) {
     if (busy.current || flashing) return;
     const back = d.rules.noBids === 'back' && !d.passed.includes(d.queue[0]);
     setThinking(null);
-    onFlash({ kind: 'skip', item: item.name, back });
+    onFlash({ kind: 'skip', item: visibleItem(d, item.id).name, back });
     setDraft((p) => skipItem(p));
   }
 
   // Closing clock: a steady ticker that restarts on every bid, so a bid landing on the
   // same instant as a tick can never stall it.
   useEffect(() => {
-    if (!timer || paused || flashing || gavel) return undefined;
+    if (!timer || hold || flashing || gavel) return undefined;
     const t = setInterval(() => setLeft((l) => (l > 0 ? l - 1 : 0)), ms(1000));
     return () => clearInterval(t);
-  }, [bidKey, paused, flashing, gavel, timer]);
+  }, [bidKey, hold, flashing, gavel, timer]);
   useEffect(() => {
-    if (!timer || paused || flashing || gavel || left > 0) return;
+    if (!timer || hold || flashing || gavel || left > 0) return;
     if (d.bid) sold(); else if (solo) skip();
-  }, [left, paused, flashing, gavel, timer]);
+  }, [left, hold, flashing, gavel, timer]);
 
   // Solo: one bot at a time considers the current price, then bids after a short, human-ish delay.
+  const cardKey = bidKey + ':' + JSON.stringify(d.cards || {}) + ':' + ((d.cardLog || []).length);
   useEffect(() => {
-    if (!solo || paused || flashing || gavel || busy.current || d.phase !== 'auction') { setThinking(null); return undefined; }
-    const plan = nextBotAction(d);
+    if (!solo || hold || flashing || gavel || busy.current || d.phase !== 'auction') { setThinking(null); return undefined; }
+    // Before the first bid, a bot may play a card (once per item); otherwise the quickest bidder acts.
+    let cardPlan = null;
+    if (cardWindow(d)) {
+      for (const a of botActors(d)) {
+        const k = d.reveal + ':' + a.speaker;
+        if (cardTried.current.has(k)) continue;
+        cardTried.current.add(k);
+        const c = botCardPlay(d, a);
+        if (c) { cardPlan = c; break; }
+      }
+    }
+    const plan = cardPlan || nextBotAction(d);
     if (!plan) { setThinking(null); return undefined; }
     setThinking(plan.botId);
-    const key = bidKey;
     const t = setTimeout(() => {
       const cur = live.current;
-      if (bidKeyOf(cur.d) !== key || cur.paused || cur.flashing || cur.gavel || busy.current || cur.left <= 0 || cur.d.phase !== 'auction') return;
+      if (cur.paused || cur.flashing || cur.gavel || busy.current || cur.left <= 0 || cur.d.phase !== 'auction') return;
       setThinking(null);
-      setDraft((p) => (bidKeyOf(p) === key && p.phase === 'auction' ? placeBid(p, plan.botId, plan.amount) : p));
-      talk.say(plan.botId, plan.event);
+      const speaker = botActors(d).find((a) => a.speaker === plan.speaker) || plan.botId;
+      if (plan.card) {
+        setDraft((p) => (p.reveal === d.reveal && !p.bid ? playCard(p, plan.botId, plan.card, plan.params) : p));
+        talk.say(speaker, 'card', null, true);
+        return;
+      }
+      setDraft((p) => (bidKeyOf(p) === bidKey && p.phase === 'auction' ? placeBid(p, plan.botId, plan.amount, plan.double ? { double: true } : undefined) : p));
+      talk.say(speaker, plan.event);
     }, ms(plan.delay));
     return () => clearTimeout(t);
-  }, [bidKey, paused, flashing, gavel, solo]);
+  }, [cardKey, hold, flashing, gavel, solo]);
+
+  // A card aimed at a bot team that holds a Veto: the bot answers on its own.
+  useEffect(() => {
+    if (!d.pending) return undefined;
+    const victim = teamOf(d, d.pending.target);
+    const botVictim = d.mode === 'solo' && victim && (isBot(victim) || isBotTeam(victim));
+    if (!botVictim) return undefined;
+    const id = d.pending.id;
+    const t = setTimeout(() => setDraft((p) => (p.pending && p.pending.id === id ? answerCard(p, botVeto(p, teamOf(p, p.pending.target), p.pending)) : p)), ms(1200));
+    return () => clearTimeout(t);
+  }, [d.pending && d.pending.id]);
+
+  // Announce card results.
+  const logLen = (d.cardLog || []).length;
+  const seenLog = useRef(logLen);
+  useEffect(() => {
+    if (logLen > seenLog.current) {
+      const e = d.cardLog[logLen - 1];
+      onFlash({ kind: 'card', card: e.card, result: e.result, text: e.detail, by: teamOf(d, e.by) });
+    }
+    seenLog.current = logLen;
+  }, [logLen]);
+
+  // Bots on your team give advice when a new item comes up.
+  useEffect(() => {
+    if (!solo || flashing || d.bid || !item) return;
+    const advisers = botAdvisers(d); if (!advisers.length) return;
+    const a = advisers[d.reveal % advisers.length];
+    const vis = visibleItem(d, item.id);
+    if (assignSlot(a, vis, d.rules.slots) < 0) return;
+    const { limit } = botLimit(d, a, vis, seeded(d.seed, 'adv', d.reveal));
+    if (limit >= d.rules.minBid) talk.say(a, 'advise', { slot: money(limit) }); else talk.say(a, 'pass');
+  }, [d.reveal, flashing]);
 
   // Solo: a little pre-game talk, and the strategist grumbles about items it can't use.
   useEffect(() => {
@@ -1110,6 +1502,7 @@ function Auction({ d, setDraft, goHome, flashing, onFlash }) {
   const lc = leader ? leader.color : null;
   const showCard = !flashing;
   const thinker = thinking && d.managers.find((m) => m.id === thinking);
+  const frozenTeam = d.managers.find((m) => frozenNow(d, m.id));
   const youAmt = you ? nextAmount(d) : 0;
   const youCan = you && !paused && !flashing && !gavel && canBid(d, you, youAmt);
   const going = timer > 0 && d.bid && left <= 2 && left > 0 ? (left === 2 ? 'Going once…' : 'Going twice…') : null;
@@ -1119,6 +1512,7 @@ function Auction({ d, setDraft, goHome, flashing, onFlash }) {
       <div className="topbar">
         <button className="iconbtn" onClick={goHome} aria-label="Home">⌂</button>
         <div className="title num">Item {d.processed + 1} of {total}</div>
+        {ruleOn(d, 'chaos') && <button className="pillbtn" onClick={() => setCardsOpen(true)} aria-label="Chaos Cards">🃏</button>}
         <button className="pillbtn" onClick={() => setTeams(true)}>Teams</button>
         <button className="iconbtn" onClick={() => setPaused((p) => !p)} aria-label={paused ? 'Resume' : 'Pause'}>{paused ? '▶' : 'Ⅱ'}</button>
       </div>
@@ -1130,7 +1524,7 @@ function Auction({ d, setDraft, goHome, flashing, onFlash }) {
           {timer > 0 && <span className={'timernum num' + (left <= 3 ? ' hot' : '')}>{Math.max(0, left)}</span>}
           <div key={bidKey} className={'amount num' + (leader ? ' pop' : '')}>{money(d.bid ? d.bid.amount : d.rules.minBid)}</div>
           <div className="leader" style={{ color: lc || 'var(--muted)' }}>{leader ? leader.emoji + ' ' + leader.name + ' leads' : timer > 0 && left <= 0 ? "Time's up · no bids" : solo ? 'Opening bid · bid or wait' : 'Opening bid · tap a manager'}</div>
-          <div className="going" aria-live="polite">{going || (thinker ? '💭 ' + thinker.name + ' is thinking…' : solo && out ? 'You’re out on this one' : ' ')}</div>
+          <div className="going" aria-live="polite">{d.pending ? '🛑 Waiting for a Veto answer…' : going || (thinker ? '💭 ' + thinker.name + ' is thinking…' : solo && out ? 'You’re out on this one' : frozenTeam ? '🧊 ' + frozenTeam.name + ' is frozen for this item' : ' ')}</div>
           {timer > 0 && <span className="timer" style={{ width: (Math.max(0, left) / timer) * 100 + '%' }} />}
         </div>
         {paused && (
@@ -1145,7 +1539,7 @@ function Auction({ d, setDraft, goHome, flashing, onFlash }) {
 
       <div className="mgr-grid">
         {ordered.map((m) => (
-          <ManagerButton key={m.id} d={d} m={m} disabledAll={paused || flashing || gavel} readOnly={solo && !m.human}
+          <ManagerButton key={m.id} d={d} m={m} disabledAll={hold || flashing || gavel} readOnly={solo && !m.human}
             bubble={talk.bubbles[m.id]} thinking={thinking === m.id}
             onBid={(amt) => { buzz(12); setOut(false); setDraft((p) => placeBid(p, m.id, amt)); }}
             onCustom={() => setCustom(m.id)} />
@@ -1155,21 +1549,209 @@ function Auction({ d, setDraft, goHome, flashing, onFlash }) {
 
       {solo ? (
         <div className="actions duo">
-          <button className="btn" disabled={paused || flashing || out || !(you && canBid(d, you, youAmt))} onClick={() => { setOut(true); setLeft((l) => Math.min(l, 3)); }}>I’m out</button>
+          <button className="btn" disabled={hold || flashing || out || !(you && canBid(d, you, youAmt))} onClick={() => { setOut(true); setLeft((l) => Math.min(l, 3)); }}>I’m out</button>
           <button className="btn btn-gold sold" disabled={!youCan} onClick={() => { buzz(12); setOut(false); setDraft((p) => placeBid(p, you.id, nextAmount(p))); }}>
             {you && isFull(you) ? 'Team full' : you && !canBid(d, you, youAmt) ? 'Can’t bid' : (d.bid && d.bid.leaderId === you.id ? 'Raise to ' : 'Bid ') + money(youAmt)}
           </button>
         </div>
       ) : (
         <div className="actions">
-          <button className="btn" onClick={() => setDraft((p) => undo(p))} disabled={paused || flashing || (!d.bid && !d.history.length)}>{undoLabel(d)}</button>
-          <button className="btn" onClick={skip} disabled={paused || flashing || !!d.bid}>No bids</button>
-          <button className="btn btn-gold sold" onClick={sold} disabled={paused || flashing || !d.bid}>Sold!</button>
+          <button className="btn" onClick={() => setDraft((p) => undo(p))} disabled={hold || flashing || (!d.bid && !d.history.length)}>{undoLabel(d)}</button>
+          <button className="btn" onClick={skip} disabled={hold || flashing || !!d.bid}>No bids</button>
+          <button className="btn btn-gold sold" onClick={sold} disabled={hold || flashing || !d.bid}>Sold!</button>
         </div>
       )}
       {gavel && <div className="gavel" aria-hidden="true">🔨</div>}
       {custom && <CustomBid d={d} m={d.managers.find((x) => x.id === custom)} onSet={(n) => { buzz(12); setOut(false); setDraft((p) => placeBid(p, custom, n)); }} onClose={() => setCustom(null)} />}
       {teams && <TeamsSheet d={d} onClose={() => setTeams(false)} />}
+      {cardsOpen && <CardSheet d={d} by={solo && you ? you.id : null} onClose={() => setCardsOpen(false)}
+        onPlay={(by, card, params) => setDraft((p) => playCard(p, by, card, params))}
+        onDouble={(by, pay) => { buzz(20); setOut(false); setDraft((p) => placeBid(p, by, pay, { double: true })); }} />}
+      {d.pending && !(d.mode === 'solo' && (isBot(teamOf(d, d.pending.target)) || isBotTeam(teamOf(d, d.pending.target)))) && <VetoSheet d={d} onAnswer={(v) => setDraft((p) => answerCard(p, v))} />}
+    </div>
+  );
+}
+
+/* ============================================================
+   NOMINATION
+   ============================================================ */
+function Nominate({ d, setDraft, goHome }) {
+  const [q, setQ] = useState('');
+  const [pick, setPick] = useState(null);
+  const [teams, setTeams] = useState(false);
+  const [paused, setPaused] = useState(false);
+  const cur = currentNominator(d);
+  const solo = d.mode === 'solo';
+  const botTurn = !!(cur && solo && (isBot(cur.m) || isBotTeam(cur.m)));
+  const talk = useBotTalk(d);
+  const live = useRef({}); live.current = { d, paused };
+  useEffect(() => {
+    if (!botTurn || paused) return undefined;
+    const actor = botActors(d).find((a) => a.id === cur.m.id);
+    const id = actor && botNominate(d, actor);
+    if (!id) return undefined;
+    const reveal = d.reveal;
+    const t = setTimeout(() => { if (live.current.paused || live.current.d.reveal !== reveal) return; setDraft((p) => (p.reveal === reveal ? nominate(p, id) : p)); talk.say(actor, 'nominate'); }, ms(1300));
+    return () => clearTimeout(t);
+  }, [d.reveal, botTurn, paused]);
+  if (!cur) return null;
+  const pool = nominationPool(d).map((id) => visibleItem(d, id));
+  const shown = pool.filter((it) => !q.trim() || (it.name + ' ' + (it.pos || '') + ' ' + (it.desc || '')).toLowerCase().includes(q.trim().toLowerCase()));
+  return (
+    <div className="app">
+      <div className="topbar">
+        <button className="iconbtn" onClick={goHome} aria-label="Home">⌂</button>
+        <div className="title">Nomination · {d.processed + 1} of {d.processed + d.queue.length}</div>
+        <button className="pillbtn" onClick={() => setTeams(true)}>Teams</button>
+        {solo && <button className="iconbtn" onClick={() => setPaused((p) => !p)} aria-label={paused ? 'Resume' : 'Pause'}>{paused ? '▶' : 'Ⅱ'}</button>}
+      </div>
+      <div className="picker" style={mStyle(cur.m)}>
+        <p className="eyebrow">Nominating</p>
+        <h2 className="display" style={{ fontSize: 40 }}>{cur.m.emoji} {cur.m.name}</h2>
+        <p className="small" style={{ margin: 0 }}>{botTurn ? (paused ? 'Paused' : '💭 Choosing what goes up next…') : 'Pick the next item to auction.'}</p>
+      </div>
+      {Object.entries(talk.bubbles).map(([id, bb]) => <p key={bb.id} className="bubble inline">{bb.text}</p>)}
+      {!botTurn && <TopicSearch q={q} setQ={setQ} />}
+      <div className="pickgrid">
+        {shown.map((it) => { const r = rarityOf(d, it.id); return (
+          <button key={it.id} className="pickbtn" disabled={botTurn} onClick={() => setPick(it.id)}>
+            {it.hidden ? <span className="thumb" style={{ background: '#2c2659', color: '#c9a6ff', fontSize: 24 }}>?</span> : <Thumb item={it} topic={d.topic} />}
+            <span className="grow" style={{ minWidth: 0 }}><b style={{ display: 'block' }}>{it.name} {it.pos && <span className="pos">{it.pos}</span>} <RarityTag r={r} /></b><span className="small muted">{it.desc}</span></span>
+          </button>
+        ); })}
+        {!shown.length && <p className="muted">Nothing matches “{q}”.</p>}
+      </div>
+      {pick && (
+        <Confirm title="Nominate this?" body={visibleItem(d, pick).name + ' goes up for auction next.'} yes="Nominate"
+          onYes={() => setDraft((p) => nominate(p, pick))} onClose={() => setPick(null)} />
+      )}
+      {teams && <TeamsSheet d={d} onClose={() => setTeams(false)} />}
+    </div>
+  );
+}
+
+/* ============================================================
+   TRADE WINDOW
+   ============================================================ */
+function tradeText(d, t) {
+  const A = teamOf(d, t.from), B = teamOf(d, t.to);
+  const m = t.money && t.money.amount ? ' + ' + money(t.money.amount) + ' from ' + teamOf(d, t.money.payer).name : '';
+  return A.name + ' gives ' + d.items[t.give].name + ' ↔ ' + B.name + ' gives ' + d.items[t.get].name + m;
+}
+function TradeWindow({ d, setDraft, goHome }) {
+  const solo = d.mode === 'solo';
+  const you = solo ? d.managers.find((m) => m.human) : null;
+  const [now, setNow] = useState(Date.now());
+  const [from, setFrom] = useState(you ? you.id : null);
+  const [to, setTo] = useState(null);
+  const [give, setGive] = useState(null);
+  const [get, setGet] = useState(null);
+  const [payer, setPayer] = useState(null);
+  const [amount, setAmount] = useState(0);
+  const [handoff, setHandoff] = useState(null); // local: confirm the receiving team has the phone
+  const [msg, setMsg] = useState('');
+  const left = Math.max(0, d.trade.endsAt - now);
+  useEffect(() => { const t = setInterval(() => setNow(Date.now()), ms(1000)); return () => clearInterval(t); }, []);
+  useEffect(() => { if (left <= 0) setDraft((p) => closeTrades(p)); }, [left <= 0]);
+  // Solo: bot teams make at most one offer each when the window opens…
+  const offered = useRef(false);
+  useEffect(() => {
+    if (!solo || offered.current) return undefined;
+    offered.current = true;
+    const timers = botActors(d).filter((a, i, arr) => arr.findIndex((x) => x.id === a.id) === i).map((a, i) => setTimeout(() => setDraft((p) => {
+      if (p.phase !== 'trade') return p;
+      const actor = botActors(p).find((x) => x.speaker === a.speaker); const offer = actor && botTradeOffer(p, actor);
+      return offer ? proposeTrade(p, offer) : p;
+    }), ms(2500 + i * 2200)));
+    return () => timers.forEach(clearTimeout);
+  }, []);
+  // …and answer offers made to them after a short think.
+  const pendingForBots = d.trade.proposals.filter((t) => t.status === 'pending' && solo && (isBot(teamOf(d, t.to)) || isBotTeam(teamOf(d, t.to)))).map((t) => t.id).join(',');
+  useEffect(() => {
+    if (!pendingForBots) return undefined;
+    const ids = pendingForBots.split(',');
+    const t = setTimeout(() => setDraft((p) => {
+      let n = p;
+      ids.forEach((id) => {
+        const tr = n.trade.proposals.find((x) => x.id === id); if (!tr || tr.status !== 'pending') return;
+        const actor = botActors(n).find((a) => a.id === tr.to); if (!actor) return;
+        const ans = botTradeDecision(n, actor, tr);
+        n = ans.accept ? acceptTrade(n, id) : setTradeStatus(rejectTrade(n, id), id, 'rejected', ans.reason);
+        if (ans.accept) n = setTradeStatus(n, id, n.trade.proposals.find((x) => x.id === id).status, ans.reason);
+      });
+      return n;
+    }), ms(1600));
+    return () => clearTimeout(t);
+  }, [pendingForBots]);
+
+  const A = from && teamOf(d, from), B = to && teamOf(d, to);
+  const draftTrade = { from, to, give, get, money: d.rules.trades.money && amount > 0 && payer ? { payer, amount } : null };
+  const problem = from && to && give && get ? tradeProblem(d, draftTrade, now) : null;
+  const propose = () => { const n = proposeTrade(d, draftTrade, now); if (n === d) { setMsg(problem || 'That trade can’t be offered.'); return; } setDraft(n); setGive(null); setGet(null); setAmount(0); setMsg('Offer sent to ' + B.name + '.'); };
+  const mm = Math.floor(left / 60000), ss = Math.floor((left % 60000) / 1000);
+  const list = [...d.trade.proposals].reverse();
+  const canAnswer = (t) => t.status === 'pending' && (!solo || (you && t.to === you.id));
+  const canCancel = (t) => t.status === 'pending' && (!solo || (you && t.from === you.id));
+  return (
+    <div className="app">
+      <div className="topbar">
+        <button className="iconbtn" onClick={goHome} aria-label="Home">⌂</button>
+        <div className="title">Trade window</div>
+        <span className={'tclock num' + (left < 30000 ? ' hot' : '')} aria-live="polite">{mm}:{String(ss).padStart(2, '0')}</span>
+      </div>
+      <p className="hint" style={{ textAlign: 'center' }}>1-for-1 trades{d.rules.trades.money ? ', plus optional money' : ''}. The other team must accept. Anything not accepted when the clock hits 0:00 expires.</p>
+      <div className="card stack">
+        <h3>Offer a trade</h3>
+        {!solo && <div className="field"><span className="label">Your team</span><div className="chips">{d.managers.map((m) => <button key={m.id} className={'pickchip' + (from === m.id ? ' on' : '')} style={mStyle(m)} onClick={() => { setFrom(m.id); setGive(null); if (to === m.id) setTo(null); }}>{m.emoji} {m.name}</button>)}</div></div>}
+        {A && <div className="field"><span className="label">Trade with</span><div className="chips">{d.managers.filter((m) => m.id !== from).map((m) => <button key={m.id} className={'pickchip' + (to === m.id ? ' on' : '')} style={mStyle(m)} onClick={() => { setTo(m.id); setGet(null); }}>{m.emoji} {m.name}</button>)}</div></div>}
+        {A && B && (
+          <div className="tradecols">
+            <div className="field"><span className="label">You give</span><div className="stack-sm">{A.team.filter(Boolean).map((t) => <button key={t.itemId} className={'pickbtn small' + (give === t.itemId ? ' on' : '')} onClick={() => setGive(t.itemId)}><Thumb item={d.items[t.itemId]} topic={d.topic} size={34} /><span className="grow">{d.items[t.itemId].name}</span></button>)}</div></div>
+            <div className="field"><span className="label">You get</span><div className="stack-sm">{B.team.filter(Boolean).map((t) => <button key={t.itemId} className={'pickbtn small' + (get === t.itemId ? ' on' : '')} onClick={() => setGet(t.itemId)}><Thumb item={d.items[t.itemId]} topic={d.topic} size={34} /><span className="grow">{d.items[t.itemId].name}</span></button>)}</div></div>
+          </div>
+        )}
+        {A && B && d.rules.trades.money && (
+          <div className="field"><span className="label">Add money (optional)</span>
+            <Seg label="Who pays" value={payer || 'none'} options={[['none', 'No money'], [A.id, A.name + ' pays'], [B.id, B.name + ' pays']]} onChange={(v) => { setPayer(v === 'none' ? null : v); if (v === 'none') setAmount(0); else setAmount(Math.min(Math.max(1, amount), teamOf(d, v).budget)); }} />
+            {payer && <Stepper id="trade-money" prefix="$" value={amount} min={1} max={Math.max(1, teamOf(d, payer).budget)} onChange={setAmount} />}
+          </div>
+        )}
+        {give && get && <p className="summary">{tradeText(d, { ...draftTrade, money: draftTrade.money })}</p>}
+        {problem && <p className="warn">{problem}</p>}
+        {msg && <p className="hint" style={{ color: 'var(--ok)' }}>{msg}</p>}
+        <button className="btn btn-gold" disabled={!(give && get) || !!problem} onClick={propose}>Offer trade</button>
+      </div>
+      <div className="stack-sm">
+        <h3>Offers</h3>
+        {!list.length && <p className="hint">No offers yet.</p>}
+        {list.map((t) => (
+          <div key={t.id} className={'trow ' + t.status}>
+            <span className="tstat">{{ pending: '⏳ Waiting', accepted: '✅ Done', rejected: '❌ Rejected', cancelled: '↩️ Cancelled', expired: '⌛ Expired', invalid: '⚠️ No longer valid' }[t.status]}</span>
+            <span className="small">{tradeText(d, t)}</span>
+            {t.note && <span className="small muted">“{t.note}”</span>}
+            {(canAnswer(t) || canCancel(t)) && (
+              <div className="row">
+                {canAnswer(t) && <button className="btn btn-sm btn-gold grow" onClick={() => (solo ? setDraft((p) => acceptTrade(p, t.id)) : setHandoff(t.id))}>Accept</button>}
+                {canAnswer(t) && <button className="btn btn-sm grow" onClick={() => setDraft((p) => rejectTrade(p, t.id))}>Reject</button>}
+                {canCancel(t) && <button className="btn btn-sm btn-ghost grow" onClick={() => setDraft((p) => cancelTrade(p, t.id))}>Cancel offer</button>}
+              </div>
+            )}
+          </div>
+        ))}
+      </div>
+      <details className="card"><summary className="label">Rosters</summary><div className="stack" style={{ marginTop: 10 }}>{d.managers.map((m) => <div key={m.id} className="tteam" style={mStyle(m)}><h3>{m.emoji} {m.name} · {money(m.budget)}</h3><TeamList d={d} m={m} /></div>)}</div></details>
+      <button className="btn" onClick={() => setDraft((p) => closeTrades(p))}>Finish trading · go to voting</button>
+      {handoff && (() => { const t = d.trade.proposals.find((x) => x.id === handoff); if (!t) return null; const R = teamOf(d, t.to); return (
+        <Sheet center onClose={() => setHandoff(null)}>
+          <p className="eyebrow">Pass the phone to</p>
+          <h2 className="display" style={{ fontSize: 34, color: R.color }}>{R.emoji} {R.name}</h2>
+          <p className="summary">{tradeText(d, t)}</p>
+          <div className="row pin">
+            <button className="btn grow" onClick={() => { setDraft((p) => rejectTrade(p, t.id)); setHandoff(null); }}>Reject</button>
+            <button className="btn btn-gold grow" onClick={() => { setDraft((p) => acceptTrade(p, t.id)); setHandoff(null); }}>Accept trade</button>
+          </div>
+        </Sheet>
+      ); })()}
     </div>
   );
 }
@@ -1276,7 +1858,7 @@ function TeamCard({ d, m, win }) {
     <div className={'team' + (win ? ' win' : '')} style={mStyle(m)}>
       <div className="th">
         <span style={{ fontSize: 26 }}>{win ? '👑' : m.emoji}</span>
-        <span className="nm">{m.name}</span>
+        <span className="nm">{m.name}{m.members ? <small className="memline">{m.members.map((p) => p.name).join(' · ')}</small> : null}</span>
         <span className="mo">spent<b className="num">{money(spent(d, m))}</b></span>
         <span className="mo">left<b className="num">{money(m.budget)}</b></span>
       </div>
@@ -1308,7 +1890,8 @@ const hasVoted = (d, id) => Object.prototype.hasOwnProperty.call(d.votes || {}, 
 // Secret vote. Local: pass the phone, everyone votes. Solo: you vote, then the bots vote.
 function Voting({ d, onVote, onReveal, onClose, onSoloVote }) {
   const solo = d.mode === 'solo';
-  const you = solo ? d.managers.find((m) => m.human) : null;
+  const people = participants(d);
+  const you = solo ? people.find((p) => p.human) : null;
   const [voter, setVoter] = useState(solo && you ? you.id : null);
   const [choice, setChoice] = useState(null);
   const [locked, setLocked] = useState(false);
@@ -1324,8 +1907,8 @@ function Voting({ d, onVote, onReveal, onClose, onSoloVote }) {
     </Sheet>
   );
   if (voter) {
-    const v = d.managers.find((m) => m.id === voter);
-    const choices = voteChoices(d, voter);
+    const v = people.find((p) => p.id === voter);
+    const choices = voteChoices(d, v.teamId);
     const submit = (target) => {
       buzz(30);
       if (solo) { setLocked(true); onSoloVote(target); } else { onVote(voter, target); setLocked(true); }
@@ -1334,6 +1917,7 @@ function Voting({ d, onVote, onReveal, onClose, onSoloVote }) {
       <Sheet center onClose={() => { if (solo) onClose(); else { setVoter(null); setChoice(null); } }}>
         <p className="eyebrow">Secret vote</p>
         <h2 className="display" style={{ fontSize: 32, color: v.color }}>{v.emoji} {v.name}, pick the best team</h2>
+        {v.teamName && <p className="eyebrow" style={{ color: v.color }}>Playing for {v.teamName}</p>}
         {choices.length ? <p className="hint">You can't vote for your own team.</p> : <p className="hint">There's no other team with players to vote for, so you can skip your vote.</p>}
         <div className="stack-sm">
           {choices.map((m) => (
@@ -1354,19 +1938,19 @@ function Voting({ d, onVote, onReveal, onClose, onSoloVote }) {
   }
   return (
     <Sheet center onClose={onClose}>
-      <p className="eyebrow">Secret vote · {voted} of {d.managers.length} in</p>
+      <p className="eyebrow">Secret vote · {voted} of {people.length} in</p>
       <h2 className="display" style={{ fontSize: 34 }}>Pass the phone around</h2>
       <p className="hint">Each manager taps their own name, then votes in private. Votes stay hidden until the reveal.</p>
       <div className="votegrid">
-        {d.managers.map((m) => { const done = hasVoted(d, m.id); return (
+        {people.map((m) => { const done = hasVoted(d, m.id); return (
           <button key={m.id} className="votebtn" style={mStyle(m)} disabled={done} onClick={() => setVoter(m.id)}>
-            <span style={{ fontSize: 24 }}>{done ? '✅' : m.emoji}</span>{m.name}
+            <span style={{ fontSize: 24 }}>{done ? '✅' : m.emoji}</span>{m.name}{m.teamName ? <small style={{ fontFamily: 'var(--body)', fontWeight: 600, opacity: 0.8 }}>{m.teamName}</small> : null}
           </button>
         ); })}
       </div>
       <div className="row pin">
         <button type="button" className="btn btn-ghost" style={{ width: 'auto' }} onClick={onClose}>Close</button>
-        <button type="button" className="btn btn-gold grow" disabled={!voted} onClick={onReveal}>{voted === d.managers.length ? 'Reveal winner' : 'Reveal (' + voted + '/' + d.managers.length + ')'}</button>
+        <button type="button" className="btn btn-gold grow" disabled={!voted} onClick={onReveal}>{voted === people.length ? 'Reveal winner' : 'Reveal (' + voted + '/' + people.length + ')'}</button>
       </div>
     </Sheet>
   );
@@ -1389,9 +1973,14 @@ function Results({ d, past, onChange, onBack, onUndo, onFinish, onPlayAgain, liv
   const soloVote = (target) => {
     setTimeout(() => {
       const votes = { ...(d.votes || {}) };
-      const you = d.managers.find((m) => m.human);
+      const people = participants(d);
+      const you = people.find((p) => p.human);
       if (you && !hasVoted(d, you.id)) votes[you.id] = target;
-      d.managers.filter(isBot).forEach((b) => { if (!Object.prototype.hasOwnProperty.call(votes, b.id)) votes[b.id] = botVote(d, b); });
+      // Each bot player votes for the team it rates highest, never its own team.
+      people.filter((p) => p.bot).forEach((p) => {
+        if (Object.prototype.hasOwnProperty.call(votes, p.id)) return;
+        votes[p.id] = botVote(d, { ...teamOf(d, p.teamId), name: p.name, bot: p.bot, speaker: p.id, teamId: p.teamId });
+      });
       onChange({ ...d, votes, votesRevealed: true });
       doReveal();
     }, ms(1400));
@@ -1451,9 +2040,15 @@ function Results({ d, past, onChange, onBack, onUndo, onFinish, onPlayAgain, liv
           </div>
         )}
         {d.votesRevealed && !noVotes && (
-          <p className="hint" style={{ textAlign: 'center' }}>{d.managers.map((m) => { const t = d.votes && d.votes[m.id]; const to = t && d.managers.find((x) => x.id === t); return m.name + ' → ' + (to ? to.name : 'no vote'); }).join(' · ')}</p>
+          <p className="hint" style={{ textAlign: 'center' }}>{participants(d).map((m) => { const t = d.votes && d.votes[m.id]; const to = t && d.managers.find((x) => x.id === t); return m.name + ' → ' + (to ? to.name : 'no vote'); }).join(' · ')}</p>
         )}
         {revealed && <Leaderboard rows={winsBoard([...(past || []).filter((p) => p.id !== d.id), d])} highlight={winners.map((w) => w.name.trim().toLowerCase())} />}
+        {d.trade && d.trade.proposals.some((t) => t.status === 'accepted') && (
+          <div className="board"><h3>🤝 Trades</h3>{d.trade.proposals.filter((t) => t.status === 'accepted').map((t) => <p key={t.id} className="small" style={{ margin: 0 }}>{tradeText(d, t)}</p>)}</div>
+        )}
+        {(d.cardLog || []).length > 0 && (
+          <div className="board"><h3>🃏 Chaos Cards</h3>{d.cardLog.map((e) => <p key={e.id} className="small" style={{ margin: 0 }}>{CARD_INFO[e.card].emoji} {e.result === 'vetoed' ? teamOf(d, e.by).name + '’s ' + CARD_INFO[e.card].name + ' was vetoed' : e.result === 'fizzled' ? teamOf(d, e.by).name + '’s ' + CARD_INFO[e.card].name + ' fizzled' : e.detail}</p>)}</div>
+        )}
         <p className="exportfoot">DRAFT NIGHT · {(location.host + location.pathname).replace(/\/(index\.html)?$/, '')}</p>
       </div>
 
@@ -1519,14 +2114,20 @@ function PastList({ past, onBack, onOpen, onDelete }) {
    FLASH (sold / skipped / free pick banner)
    ============================================================ */
 function Flash({ f, onDone }) {
-  useEffect(() => { const t = setTimeout(onDone, ms(f.kind === 'skip' ? 1100 : 1800)); return () => clearTimeout(t); }, [f]);
+  useEffect(() => { const t = setTimeout(onDone, ms(f.kind === 'skip' ? 1100 : f.mystery || f.rarity === 'legendary' ? 2600 : 1800)); return () => clearTimeout(t); }, [f]);
   return (
     <div className="flash" onClick={onDone} style={{ '--fc': f.color || 'var(--muted)' }}>
-      {f.kind === 'sold' && <div className="inner">
+      {f.kind === 'sold' && <div className={'inner' + (f.rarity === 'legendary' ? ' legendary' : '')}>
         <div className="big" style={{ color: 'var(--gold)' }}>SOLD!</div>
         <div className="to" style={{ color: f.color }}>to {f.emoji} {f.name}</div>
-        <div className="price num">{money(f.price)}</div>
-        <div className="it">{f.item}</div>
+        <div className="price num">{money(f.price)}{f.doubled ? <small className="dbl"> (Double Bid)</small> : null}</div>
+        {f.mystery && <div className="it" style={{ color: '#c9a6ff', fontWeight: 800 }}>❓ The mystery item was…</div>}
+        <div className="it">{f.item} {f.rarity && f.rarity !== 'common' ? <RarityTag r={f.rarity} /> : null}</div>
+      </div>}
+      {f.kind === 'card' && <div className="inner">
+        <div className="big" style={{ fontSize: 64, color: f.result === 'done' ? 'var(--gold)' : 'var(--danger)' }}>{CARD_INFO[f.card].emoji} {f.result === 'vetoed' ? 'Vetoed!' : f.result === 'fizzled' ? 'Fizzled' : CARD_INFO[f.card].name + '!'}</div>
+        {f.by && <div className="to" style={{ color: f.by.color }}>{f.by.emoji} {f.by.name}</div>}
+        <div className="it">{f.text}</div>
       </div>}
       {f.kind === 'skip' && <div className="inner">
         <div className="big" style={{ color: 'var(--muted)', fontSize: 72 }}>No bids</div>
@@ -1545,6 +2146,8 @@ function Flash({ f, onDone }) {
    APP
    ============================================================ */
 const DEFAULT_RULES = { budget: 20, minBid: 1, inc: 1, order: 'random', timer: 0, mustFill: true, noBids: 'skip' };
+// What new players get: the classic rules plus every twist at its default.
+const RULE_DEFAULTS = () => ({ ...DEFAULT_RULES, ...JSON.parse(JSON.stringify(TWIST_DEFAULTS)) });
 const defaultManagers = () => ['Ash', 'Bilal', 'Cam', 'Dev'].map((name, i) => ({ id: uid(), name, color: COLORS[i], emoji: EMOJIS[i] }));
 const stripDraft = (d) => ({ ...d, history: [] });
 
@@ -1706,7 +2309,18 @@ function App() {
   const dupTopic = (id) => { const t = topics.find((x) => x.id === id); if (!t) return null; const copy = { ...t, id: uid(), name: t.name + ' (copy)', items: t.items.map((it) => ({ ...it, id: uid() })) }; setTopics((ts) => [...ts, copy]); return copy.id; };
 
   const soloTopic = () => topics.find((t) => t.id === soloCfg.topicId && t.items.length) || topics.find((t) => t.items.length && t.slots.length) || null;
-  const soloRulesFor = (t) => (soloRules && t && soloRules.topicId === t.id ? soloRules.rules : { ...DEFAULT_RULES, slots: t ? [...t.slots] : [] });
+  // Saved house rules (everything except slots, which come from the topic). New drafts start from these.
+  const rulePrefs = () => { const p = { ...RULE_DEFAULTS(), ...(settings.rulePrefs || {}) }; delete p.slots; return { ...p, ...twistRules(p) }; };
+  const saveRulePrefs = (r) => { const { slots, ...rest } = r; setSettings((x) => ({ ...x, rulePrefs: rest })); };
+  const soloRulesFor = (t) => (soloRules && t && soloRules.topicId === t.id ? soloRules.rules : { ...rulePrefs(), slots: t ? [...t.slots] : [] });
+  const teamCfg = { ...DEFAULT_TEAMS, ...(settings.localTeams || {}) };
+  const setTeamCfg = (c) => setSettings((x) => ({ ...x, localTeams: c }));
+  const localPlayers = () => (teamCfg.on ? localTeamsToManagers(teamCfg) : managers);
+  const soloT = { ...DEFAULT_SOLO.teams, ...(soloCfg.teams || {}) };
+  const teamSummaryLocal = teamCfg.on ? { teams: true, text: (teamCfg.count === 2 ? teamCfg.size + 'v' + teamCfg.size : teamCfg.count + ' teams of ' + teamCfg.size), detail: localTeamsToManagers(teamCfg).map((t) => t.name + ': ' + t.members.map((p) => p.name).join(', ')).join(' · ') }
+    : { teams: false, text: 'Individual · ' + managers.length + ' managers', detail: 'Everyone plays for themselves. Switch to Teams on the players screen.' };
+  const teamSummarySolo = soloT.on ? { teams: true, text: (soloT.count === 2 ? soloT.size + 'v' + soloT.size : soloT.count + ' teams of ' + soloT.size), detail: 'Bots on your team advise you; other teams are all bots.' }
+    : { teams: false, text: 'Every bot for itself · ' + soloCfg.bots + ' bots', detail: 'Switch to Teams on the solo setup screen.' };
   // Same topic, same managers (or bots), same rules — fresh draft.
   const playAgain = () => {
     if (!draft) return;
@@ -1731,15 +2345,16 @@ function App() {
       if (!topic) setTimeout(() => go('topics'), 0);
       break;
     case 'setup-managers':
-      view = <SetupManagers managers={managers} setManagers={setManagers} onBack={() => go('home')} onNext={() => go('setup-topic')} />;
+      view = <SetupManagers managers={managers} setManagers={setManagers} teamCfg={teamCfg} setTeamCfg={setTeamCfg} onBack={() => go('home')} onNext={() => go('setup-topic')} />;
       break;
     case 'solo-setup': {
       const st = soloTopic();
       view = <SoloSetup cfg={soloCfg} setCfg={setSoloCfg} topic={st} rules={soloRulesFor(st)} onBack={() => go('home')}
         onPickTopic={() => go('setup-topic', { from: 'solo' })} onRules={() => go('setup-rules', { from: 'solo' })}
-        onStart={(bots) => {
+        onStart={(players) => {
           const human = { id: 'you', name: soloCfg.name.trim() || 'You', color: COLORS[1], emoji: '😎', human: true };
-          setDraft(createDraft(st, [human, ...bots], soloRulesFor(st), { mode: 'solo', solo: { level: soloCfg.level, talk: soloCfg.talk, clock: soloCfg.clock } }));
+          const list = players.length && players[0].members ? players : [human, ...players];
+          setDraft(createDraft(st, list, soloRulesFor(st), { mode: 'solo', solo: { level: soloCfg.level, talk: soloCfg.talk, clock: soloCfg.clock } }));
           go('draft');
         }} />;
       break;
@@ -1751,25 +2366,29 @@ function App() {
         break;
       }
       view = <SetupTopic topics={topics} folder={folder} setFolder={setFolder} onBack={() => go('setup-managers')} onTopics={() => go('topics', { from: 'setup-topic' })}
-        onPick={(id) => { const t = topics.find((x) => x.id === id); setTopicId(id); setRules((r) => ({ ...r, slots: [...t.slots] })); go('setup-rules'); }} />;
+        onPick={(id) => { const t = topics.find((x) => x.id === id); setTopicId(id); setRules({ ...rulePrefs(), slots: [...t.slots] }); go('setup-rules'); }} />;
       break;
     case 'setup-rules': {
       if (screen.from === 'solo') {
         const st = soloTopic();
-        const fake = Array.from({ length: soloCfg.bots + 1 }, (_, i) => ({ id: 'x' + i }));
+        const fake = Array.from({ length: soloT.on ? soloT.count : soloCfg.bots + 1 }, (_, i) => ({ id: 'x' + i }));
         view = st ? <SetupRules topic={st} managers={fake} rules={soloRulesFor(st)} setRules={(r) => setSoloRules({ topicId: st.id, rules: r })} onBack={() => go('solo-setup')}
-          title="Solo · Rules" startLabel="Save rules" onStart={(r) => { setSoloRules({ topicId: st.id, rules: r }); go('solo-setup'); }} /> : null;
+          teamSummary={teamSummarySolo} onEditTeams={() => go('solo-setup')} onReset={() => setSoloRules({ topicId: st.id, rules: { ...RULE_DEFAULTS(), slots: [...st.slots] } })}
+          title="Solo · Rules" startLabel="Save rules" onStart={(r) => { setSoloRules({ topicId: st.id, rules: r }); saveRulePrefs(r); go('solo-setup'); }} /> : null;
         break;
       }
       const t = topics.find((x) => x.id === topicId);
-      view = t ? <SetupRules topic={t} managers={managers} rules={rules} setRules={setRules} onBack={() => go('setup-topic')}
-        onStart={(r) => { setDraft(createDraft(t, managers, r)); go('draft'); }} /> : null;
+      view = t ? <SetupRules topic={t} managers={localPlayers()} rules={rules} setRules={setRules} onBack={() => go('setup-topic')}
+        teamSummary={teamSummaryLocal} onEditTeams={() => go('setup-managers')} onReset={() => setRules({ ...RULE_DEFAULTS(), slots: [...t.slots] })}
+        onStart={(r) => { saveRulePrefs(r); setDraft(createDraft(t, localPlayers(), r)); go('draft'); }} /> : null;
       break;
     }
     case 'draft':
       if (!draft) { view = null; setTimeout(() => go('home'), 0); break; }
       if (draft.phase === 'auction') view = <Auction d={draft} setDraft={setDraft} goHome={() => go('home')} flashing={!!flash} onFlash={setFlash} />;
       else if (draft.phase === 'freepick') view = <FreePick d={draft} setDraft={setDraft} goHome={() => go('home')} flashing={!!flash} onFlash={setFlash} />;
+      else if (draft.phase === 'nominate') view = <Nominate d={draft} setDraft={setDraft} goHome={() => go('home')} />;
+      else if (draft.phase === 'trade') view = <TradeWindow d={draft} setDraft={setDraft} goHome={() => go('home')} />;
       else view = <Results d={draft} past={past} live onChange={setDraft} onBack={() => go('home')} onUndo={draft.mode === 'solo' ? null : () => setDraft((p) => undo(p))} onFinish={() => { setDraft(null); go('home'); }} onPlayAgain={playAgain} />;
       break;
     case 'past':
@@ -1797,7 +2416,7 @@ function App() {
     default:
       view = <Home draft={draft} past={past} onSettings={() => go('settings')}
         showInstall={!app.standalone && !settings.installDismissed && (app.canPrompt || isIOS())} onDismissInstall={() => setSettings((x) => ({ ...x, installDismissed: true }))}
-        onNew={() => { setDraft(null); setRules({ ...DEFAULT_RULES, slots: [] }); go('setup-managers'); }}
+        onNew={() => { setDraft(null); setRules({ ...rulePrefs(), slots: [] }); go('setup-managers'); }}
         onSolo={() => { setDraft(null); go('solo-setup'); }}
         onResume={() => go('draft')} onTopics={() => go('topics')} onPast={() => go('past')} onAbandon={() => setDraft(null)} />;
   }
@@ -1828,7 +2447,7 @@ class Boundary extends React.Component {
   }
 }
 
-if (window.__DN_TEST__) window.__DN = { bots: { makeBots, nextBotAction, botDecision, botFreePickChoice, botVote, teamScore, voteChoices, itemFame, seeded, BOT_LEVELS, BOT_TYPES }, DEFAULT_SOLO, isFlex, canBid, createDraft, placeBid, sell, skipItem, undo, freePick, currentPicker, canTake, nextAmount, isDraftOver, draftStats, winsBoard, tally, starterTopics, migrateTopics, validateBackup, makeBackup, wikiTitleFor, PHOTO_TOPICS, store, wiki, DEFAULT_RULES, COLORS, emptyCount, assignSlot, maxBid };
+if (window.__DN_TEST__) window.__DN = { bots: { makeBots, nextBotAction, botDecision, botFreePickChoice, botVote, teamScore, voteChoices, itemFame, seeded, BOT_LEVELS, BOT_TYPES, botCardPlay, botVeto, botNominate, botTradeDecision, botTradeOffer }, twists: { twistRules, TWIST_DEFAULTS, playCard, answerCard, cardProblem, doubleProblem, nominate, currentNominator, nominationPool, botActors, botAdvisers, participants, visibleItem, isHidden, rarityOf, frozenNow, proposeTrade, acceptTrade, rejectTrade, cancelTrade, closeTrades, tradeProblem, openTrades, hasCard }, DEFAULT_SOLO, isFlex, canBid, createDraft, placeBid, sell, skipItem, undo, freePick, currentPicker, canTake, nextAmount, isDraftOver, draftStats, winsBoard, tally, starterTopics, migrateTopics, validateBackup, makeBackup, wikiTitleFor, PHOTO_TOPICS, store, wiki, DEFAULT_RULES, COLORS, emptyCount, assignSlot, maxBid };
 store.init().finally(() => {
   ReactDOM.createRoot(document.getElementById('root')).render(<Boundary><App /></Boundary>);
 });
