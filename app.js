@@ -1,6 +1,7 @@
-/* Draft Night f411601699 — built from src/ by build.js. Edit src/, not this file. */
+/* Draft Night 01db533eb2 — built from src/ by build.js. Edit src/, not this file. */
 "use strict";
 (function(){
+function _extends() { return _extends = Object.assign ? Object.assign.bind() : function (n) { for (var e = 1; e < arguments.length; e++) { var t = arguments[e]; for (var r in t) ({}).hasOwnProperty.call(t, r) && (n[r] = t[r]); } return n; }, _extends.apply(null, arguments); }
 const {
   useState,
   useEffect,
@@ -458,6 +459,8 @@ function usePwa() {
   return pwa;
 }
 const isIOS = () => /iphone|ipad|ipod/i.test(navigator.userAgent) || navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1;
+const GAME_SPEED = typeof window !== 'undefined' && window.__DN_TEST_SPEED || 1;
+const ms = n => Math.max(1, Math.round(n * GAME_SPEED));
 const uid = () => Math.random().toString(36).slice(2, 9) + Date.now().toString(36).slice(-4);
 const norm = s => (s || '').trim().toUpperCase();
 const isFlex = s => norm(s) === 'FLEX';
@@ -2495,6 +2498,340 @@ function wikiTitleFor(item, topic) {
   if (SENTENCE_CASE.has(topic.id)) return item.name.charAt(0) + item.name.slice(1).toLowerCase();
   return item.name;
 }
+const BOT_TYPES = {
+  spender: {
+    label: 'Big Spender',
+    short: 'Spender',
+    color: '#ff8a3a',
+    emojis: ['💸', '🤑', '💰', '🎩', '💎', '🛥️'],
+    names: ['Sir Overpays-a-Lot', 'Baron Von Big Bucks', 'Lady Splash-the-Cash', 'The Human Wallet', 'King Cha-Ching', 'Count Overbid', 'Duke of Debt']
+  },
+  bargain: {
+    label: 'Bargain Hunter',
+    short: 'Bargains',
+    color: '#2fd17c',
+    emojis: ['🧾', '🏷️', '🪙', '🛒', '🦝', '🧮'],
+    names: ['The Discount Goblin', 'Coupon Carl', 'Clearance Rack Rita', 'Penny Pincher Pete', 'Two-for-One Tony', 'Aunty Haggles', 'Buy-One-Get-None']
+  },
+  needs: {
+    label: 'Position Strategist',
+    short: 'Strategist',
+    color: '#3d8bff',
+    emojis: ['📋', '🧠', '📐', '🗂️', '🎯', '🧩'],
+    names: ['Captain Empty Slot', 'The Spreadsheet', 'Professor Positions', 'Coach Clipboard', 'Formation Freddie', 'Gap Filler Greg', 'Doctor Depth Chart']
+  },
+  chaos: {
+    label: 'Chaos',
+    short: 'Chaos',
+    color: '#ff5cbc',
+    emojis: ['🌀', '🃏', '🎲', '🤪', '🦄', '🎪'],
+    names: ['Lord Chaos', 'Random Randy', 'The Wildcard', 'Agent of Mayhem', 'Captain Coin Flip', 'Mystery Max', 'Unpredictable Ursula']
+  }
+};
+const BOT_TYPE_ORDER = ['spender', 'bargain', 'needs', 'chaos'];
+const BOT_LEVELS = {
+  easy: {
+    label: 'Easy',
+    noise: 0.38,
+    miss: 0.2,
+    reserve: 0.15,
+    scarcity: 0.1,
+    rivals: false,
+    waste: 0.22,
+    freeNoise: 0.6
+  },
+  medium: {
+    label: 'Medium',
+    noise: 0.18,
+    miss: 0.06,
+    reserve: 0.6,
+    scarcity: 0.45,
+    rivals: true,
+    waste: 0.06,
+    freeNoise: 0.2
+  },
+  hard: {
+    label: 'Hard',
+    noise: 0.06,
+    miss: 0,
+    reserve: 1,
+    scarcity: 0.8,
+    rivals: true,
+    waste: 0,
+    freeNoise: 0
+  }
+};
+function mulberry32(a) {
+  return function () {
+    a |= 0;
+    a = a + 0x6D2B79F5 | 0;
+    let t = Math.imul(a ^ a >>> 15, 1 | a);
+    t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t;
+    return ((t ^ t >>> 14) >>> 0) / 4294967296;
+  };
+}
+const seeded = (...parts) => mulberry32(hashStr(parts.join('|')));
+const unit = (...parts) => hashStr(parts.join('|')) % 10000 / 10000;
+const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
+const isBot = m => !!(m && m.bot);
+const botLevel = m => BOT_LEVELS[m.bot && m.bot.level || 'medium'] || BOT_LEVELS.medium;
+function makeBots(count, level, seed, avoidColors) {
+  const rng = seeded('bots', seed);
+  const order = [];
+  while (order.length < count) {
+    const round = [...BOT_TYPE_ORDER];
+    for (let i = round.length - 1; i > 0; i--) {
+      const j = Math.floor(rng() * (i + 1));
+      [round[i], round[j]] = [round[j], round[i]];
+    }
+    order.push(...round);
+  }
+  const usedNames = new Set();
+  const usedColors = new Set(avoidColors || []);
+  return order.slice(0, count).map((type, i) => {
+    const T = BOT_TYPES[type];
+    const names = T.names.filter(n => !usedNames.has(n));
+    const name = names[Math.floor(rng() * names.length)] || T.names[0] + ' ' + (i + 1);
+    usedNames.add(name);
+    const color = [T.color, ...COLORS].find(c => !usedColors.has(c)) || COLORS[i % COLORS.length];
+    usedColors.add(color);
+    return {
+      id: 'bot-' + i + '-' + hashStr(seed + name).toString(36).slice(0, 4),
+      name,
+      color,
+      emoji: T.emojis[Math.floor(rng() * T.emojis.length)],
+      bot: {
+        type,
+        level
+      }
+    };
+  });
+}
+function itemFame(item) {
+  const s = (item.desc || '') + ' ';
+  let f = 0.32 + unit('fame', item.name) * 0.22;
+  const n = s.match(/(\d+)\s*[×x]\s/);
+  if (n) f += Math.min(0.32, 0.06 * parseInt(n[1], 10));
+  if (/MVP|Ballon d'Or|World Cup|champion|Golden|legend|record|GOAT|Hall of Fame|all-time|greatest|King|icon|the original/i.test(s)) f += 0.18;
+  if (/No\. 1 pick|Rookie|All-Star|Norris|Vezina|Hart|Defensive POY|Finals MVP|Grand Slam|Wimbledon|Olympic/i.test(s)) f += 0.1;
+  return clamp(f, 0.15, 1);
+}
+function botTaste(bot, item) {
+  const spread = bot.bot.type === 'chaos' ? 0.5 : 0.16;
+  return 1 + (unit('taste', bot.name, item.name) - 0.5) * 2 * spread;
+}
+const slotKey = (d, item) => {
+  const p = norm(item.pos);
+  return p && d.rules.slots.some(s => norm(s) === p) ? p : '*';
+};
+function scarcityOf(d, item) {
+  const key = slotKey(d, item);
+  const pool = [...d.queue, ...d.leftover].map(id => d.items[id]);
+  const supply = pool.filter(it => slotKey(d, it) === key || key === '*').length;
+  const demand = d.managers.reduce((n, m) => n + d.rules.slots.filter((s, k) => !m.team[k] && (key === '*' || norm(s) === key || isFlex(s))).length, 0);
+  return clamp(demand / Math.max(1, supply), 0.5, 2);
+}
+function botValue(d, bot, item, rng) {
+  const slots = d.rules.slots;
+  const idx = assignSlot(bot, item, slots);
+  if (idx < 0) return 0;
+  const L = botLevel(bot);
+  const type = bot.bot.type;
+  const fair = d.rules.budget / slots.length;
+  const fame = itemFame(item);
+  let v = fair * (0.5 + 1.15 * fame) * botTaste(bot, item);
+  const exact = !isFlex(slots[idx]);
+  const sc = scarcityOf(d, item);
+  if (type === 'spender') {
+    v *= fame > 0.6 ? 1.75 : 0.95;
+    if (bot.budget >= d.rules.budget * 0.6) v *= 1.15;
+  }
+  if (type === 'bargain') v *= 0.72;
+  if (type === 'needs') {
+    v *= exact ? 1.3 : fame > 0.7 ? 0.7 : 0.3;
+    v *= Math.pow(sc, 0.5 + L.scarcity);
+  } else v *= Math.pow(sc, L.scarcity * 0.5);
+  if (type === 'chaos' && unit('crush', bot.name, item.name) < 0.12) v *= 1.9;
+  if (L.scarcity > 0.3) {
+    const options = d.queue.slice(1).filter(id => assignSlot(bot, d.items[id], slots) >= 0).length;
+    if (options < emptyCount(bot) * 1.5) v *= 1 + 0.25 * L.scarcity;
+  }
+  return v * (1 + (rng() - 0.5) * 2 * L.noise);
+}
+function botLimit(d, bot, item, rng) {
+  const L = botLevel(bot);
+  const type = bot.bot.type;
+  const others = emptyCount(bot) - 1;
+  const fair = d.rules.budget / d.rules.slots.length;
+  const legal = maxBid(bot, d.rules);
+  const keepMin = d.rules.mustFill || L.reserve >= 0.5 ? d.rules.minBid * others : 0;
+  const extraShare = type === 'spender' ? 0.08 : type === 'chaos' ? 0.12 * rng() : 0.22;
+  const keepExtra = L.reserve * others * Math.max(0, fair * extraShare);
+  const value = botValue(d, bot, item, rng);
+  let limit = Math.floor(Math.min(legal, bot.budget - keepMin - keepExtra, value));
+  const idx = assignSlot(bot, item, d.rules.slots);
+  const flexOnly = idx >= 0 && isFlex(d.rules.slots[idx]);
+  const endgame = d.queue.length - 1 < emptyCount(bot) * 2;
+  const holdFlex = type === 'needs' && flexOnly && !endgame;
+  if (!holdFlex && value >= fair * 0.45 && limit < d.rules.minBid + d.rules.inc && legal >= d.rules.minBid) limit = Math.min(legal, d.rules.minBid + (type === 'bargain' ? d.rules.inc : 0));
+  return {
+    limit: Math.max(0, limit),
+    value
+  };
+}
+function botDecision(d, bot) {
+  const item = currentItem(d);
+  if (!item || !isBot(bot) || isFull(bot)) return null;
+  if (d.bid && d.bid.leaderId === bot.id) return null;
+  const price = nextAmount(d);
+  if (!canBid(d, bot, price)) return null;
+  const rng = seeded(d.seed || d.id, d.reveal, price, bot.id);
+  const L = botLevel(bot);
+  const type = bot.bot.type;
+  if (rng() < L.miss) return null;
+  const {
+    limit,
+    value
+  } = botLimit(d, bot, item, rng);
+  if (price > limit) return null;
+  const rivals = d.managers.filter(m => m.id !== bot.id && !isFull(m) && assignSlot(m, item, d.rules.slots) >= 0);
+  const rivalMax = rivals.reduce((mx, m) => Math.max(mx, maxBid(m, d.rules)), 0);
+  if (type === 'bargain') {
+    if (price > value * 0.85) return null;
+    const bigRival = d.bid && d.managers.find(m => m.id === d.bid.leaderId && m.budget >= bot.budget * 1.8);
+    if (bigRival && price > d.rules.minBid + 2 * d.rules.inc) return null;
+  }
+  if (L.rivals && rivalMax > limit && price > value * 0.9 && type !== 'spender') return null;
+  let amount = price;
+  const fame = itemFame(item);
+  if (type === 'spender' && fame > 0.55 && rng() < 0.35) amount += d.rules.inc * (1 + Math.floor(rng() * 3));
+  if (type === 'chaos' && rng() < 0.16) amount += d.rules.inc * (1 + Math.floor(rng() * 4));
+  if (rng() < L.waste) amount += d.rules.inc;
+  if (L.rivals && rivalMax < amount && type !== 'chaos') amount = Math.max(price, Math.min(amount, rivalMax + d.rules.inc));
+  amount = Math.min(amount, limit);
+  if (!canBid(d, bot, amount)) amount = price;
+  let delay = 700 + rng() * 900;
+  if (price > limit * 0.8) delay += 350;
+  if (type === 'bargain') delay += 300;
+  if (type === 'chaos') delay -= rng() * 250;
+  delay = clamp(delay, 650, 2300);
+  return {
+    botId: bot.id,
+    amount,
+    delay: Math.round(delay),
+    event: amount > price ? 'jump' : 'bid'
+  };
+}
+function nextBotAction(d) {
+  return d.managers.filter(isBot).map(b => botDecision(d, b)).filter(Boolean).sort((a, b) => a.delay - b.delay || (a.botId < b.botId ? -1 : 1))[0] || null;
+}
+function botFreePickChoice(d, bot) {
+  const L = botLevel(bot);
+  const opts = d.leftover.filter(id => canTake(d, bot, id));
+  if (!opts.length) return null;
+  const rng = seeded(d.seed || d.id, 'free', d.fp.round, d.fp.pos, bot.id);
+  return opts.map(id => ({
+    id,
+    s: botValue(d, bot, d.items[id], () => 0.5) * (1 + (rng() - 0.5) * 2 * L.freeNoise)
+  })).sort((a, b) => b.s - a.s)[0].id;
+}
+function teamScore(d, m, judge) {
+  const slots = d.rules.slots;
+  const fair = d.rules.budget / slots.length;
+  let quality = 0,
+    vfm = 0,
+    exact = 0,
+    filled = 0;
+  m.team.forEach((t, i) => {
+    if (!t) return;
+    const it = d.items[t.itemId];
+    filled++;
+    const q = fair * (0.5 + 1.15 * itemFame(it)) * (judge && judge.bot ? botTaste(judge, it) : 1);
+    quality += q;
+    vfm += q - t.price;
+    if (!isFlex(slots[i]) && (!it.pos || norm(it.pos) === norm(slots[i]))) exact++;
+  });
+  const completeness = filled / slots.length;
+  return quality * (0.55 + 0.45 * completeness) + 0.15 * Math.max(0, vfm) + exact * fair * 0.1;
+}
+function voteChoices(d, voterId) {
+  return d.managers.filter(m => m.id !== voterId && m.team.some(Boolean));
+}
+function botVote(d, bot) {
+  const choices = voteChoices(d, bot.id);
+  if (!choices.length) return null;
+  const L = botLevel(bot);
+  const rng = seeded(d.seed || d.id, 'vote', bot.id);
+  return choices.map(m => ({
+    id: m.id,
+    s: teamScore(d, m, bot) * (1 + (rng() - 0.5) * 2 * L.noise * 0.6)
+  })).sort((a, b) => b.s - a.s || (a.id < b.id ? -1 : 1))[0].id;
+}
+const TALK = {
+  spender: {
+    start: ['Money is temporary. Greatness is forever.', 'I brought the whole piggy bank.', 'Price tags are just suggestions.'],
+    bid: ['Is that all? Cute.', 'Put it on my tab.', 'I want it. I have money. Simple.', 'Bidding is my cardio.'],
+    jump: ['Let me just end this.', 'Big money, big moves.', 'Make it rain!', 'Nobody touch my future star.'],
+    win: ['Worth every cent. Probably.', 'Another trophy for the cabinet.', 'Expensive taste, I know.'],
+    steal: ['Even I can’t believe how cheap that was.', 'I paid less than I wanted to. Weird feeling.'],
+    lose: ['Fine, keep it. I’m saving for something shinier.', 'That was a terrible financial decision. Respect.', 'I let you have that one.'],
+    free: ['Free? I’d have paid double.', 'My wallet is resting.'],
+    rival: ['Big spender in the building, I see.', 'Ooh, someone opened their wallet.']
+  },
+  bargain: {
+    start: ['I’m not cheap. I’m financially intelligent.', 'Wake me up when something’s on sale.', 'I can smell a discount.'],
+    bid: ['A modest offer.', 'Not a cent more than it’s worth.', 'Let’s keep this reasonable.', 'Opening at clearance prices.'],
+    jump: ['Okay, okay, a little more.', 'Fine. Small splurge.'],
+    win: ['A steal! Probably. Don’t check the numbers.', 'Bought low. Will brag high.', 'Cha-ching… for ME.'],
+    steal: ['Robbery. Absolute robbery.', 'I’d like to thank the other bidders for not bidding.'],
+    lose: ['Overpay all you like. I’ll wait.', 'Enjoy paying full price.', 'Too rich for my blood.'],
+    free: ['Free is my favourite price.', 'Zero dollars. Perfection.'],
+    rival: ['You paid HOW much?', 'My calculator just fainted.', 'That was a choice.']
+  },
+  needs: {
+    start: ['I have a plan and a clipboard.', 'Every slot has a purpose.', 'Balance wins drafts.'],
+    bid: ['This fills a gap.', 'Exactly what the formation needs.', 'Checks out on the spreadsheet.'],
+    jump: ['I need this one. Seriously.', 'This is the missing piece.'],
+    win: ['Slot filled. Next.', 'The plan is coming together.', 'Depth chart looking healthy.'],
+    steal: ['Need filled and on budget. Chef’s kiss.'],
+    lose: ['Fine, I’ll adjust the formation.', 'Back to the drawing board.', 'Plan B it is.'],
+    free: ['Hole plugged. Thank you.', 'Free and useful. My favourite.'],
+    rival: ['Do you even need that position?', 'Interesting team building strategy.'],
+    need: ['I need a {slot}, not another anything else!', 'Somebody sell me a {slot}.']
+  },
+  chaos: {
+    start: ['I have absolutely no plan.', 'Let’s make this weird.', 'I flipped a coin to decide my strategy. It landed on its side.'],
+    bid: ['Why not?', 'My horoscope said bid.', 'Vibes say yes.', 'I don’t even know what this is.'],
+    jump: ['SURPRISE!', 'Chaos tax: applied.', 'Big number because I said so.'],
+    win: ['I meant to do that.', 'No idea why I wanted this. Love it.', 'Chaos reigns!'],
+    steal: ['Got it cheap. Accidentally.'],
+    lose: ['I wasn’t even trying. Mostly.', 'Plot twist incoming.', 'You win this round, sensible person.'],
+    free: ['Random pick, random glory.', 'Eeny, meeny, mine.'],
+    rival: ['Bold. I like bold.', 'Respect the madness.']
+  }
+};
+const talkMemory = new Map();
+function botLine(bot, event, extra) {
+  const lines = (TALK[bot.bot.type] || {})[event];
+  if (!lines || !lines.length) return null;
+  const recent = talkMemory.get(bot.id) || [];
+  const fresh = lines.filter(l => !recent.includes(l));
+  const pool = fresh.length ? fresh : lines;
+  const line = pool[Math.floor(Math.random() * pool.length)];
+  talkMemory.set(bot.id, [...recent, line].slice(-6));
+  return line.replace('{slot}', extra && extra.slot || 'player');
+}
+const TALK_CHANCE = {
+  start: 1,
+  bid: 0.22,
+  jump: 0.75,
+  win: 0.6,
+  steal: 0.85,
+  lose: 0.45,
+  free: 0.5,
+  rival: 0.45,
+  need: 0.35
+};
 const KITS = {
   'brazil': ['#FFDC02', '#1B7A3E'],
   'italy': ['#1F4FA8', '#ffffff'],
@@ -2881,7 +3218,7 @@ function advance(n) {
   n.reveal = (n.reveal || 0) + 1;
   return n;
 }
-function createDraft(topic, managers, rules) {
+function createDraft(topic, managers, rules, extra) {
   const items = {};
   topic.items.forEach(it => {
     items[it.id] = {
@@ -2911,7 +3248,15 @@ function createDraft(topic, managers, rules) {
       color: m.color,
       emoji: m.emoji,
       budget: rules.budget,
-      team: rules.slots.map(() => null)
+      team: rules.slots.map(() => null),
+      ...(m.bot ? {
+        bot: {
+          ...m.bot
+        }
+      } : {}),
+      ...(m.human ? {
+        human: true
+      } : {})
     })),
     items,
     queue: rules.order === 'random' ? shuffle(ids) : ids,
@@ -2928,7 +3273,10 @@ function createDraft(topic, managers, rules) {
     },
     reveal: 0,
     votes: {},
-    votesRevealed: false
+    votesRevealed: false,
+    mode: 'local',
+    seed: uid(),
+    ...(extra || {})
   };
   return advance(d);
 }
@@ -3394,6 +3742,7 @@ function Home({
   draft,
   past,
   onNew,
+  onSolo,
   onResume,
   onTopics,
   onPast,
@@ -3403,6 +3752,7 @@ function Home({
   onDismissInstall
 }) {
   const [ask, setAsk] = useState(null);
+  const [soon, setSoon] = useState(false);
   const status = draft && (draft.phase === 'auction' ? 'Item ' + (draft.processed + 1) + ' of ' + (draft.processed + draft.queue.length) : draft.phase === 'freepick' ? 'Free picks' : 'Results & voting');
   return React.createElement("div", {
     className: "app"
@@ -3435,7 +3785,7 @@ function Home({
     className: "grow"
   }, React.createElement("h3", null, draft.topic.name), React.createElement("span", {
     className: "small muted"
-  }, status))), React.createElement("div", {
+  }, draft.mode === 'solo' ? 'Solo · ' + (BOT_LEVELS[(draft.solo || {}).level] || BOT_LEVELS.medium).label + ' · ' : '', status))), React.createElement("div", {
     className: "chips"
   }, draft.managers.map(m => React.createElement(MChip, {
     key: m.id,
@@ -3452,11 +3802,43 @@ function Home({
     },
     onClick: () => setAsk('abandon')
   }, "Abandon this draft")), React.createElement("div", {
+    className: "modes",
+    role: "group",
+    "aria-label": "Game mode"
+  }, React.createElement("button", {
+    className: "mode solo",
+    onClick: () => draft ? setAsk('solo') : onSolo()
+  }, React.createElement("span", {
+    className: "mi"
+  }, "\uD83E\uDD16"), React.createElement("span", {
+    className: "mt"
+  }, "Solo"), React.createElement("span", {
+    className: "ms"
+  }, "You vs bots")), React.createElement("button", {
+    className: "mode local",
+    onClick: () => draft ? setAsk('new') : onNew()
+  }, React.createElement("span", {
+    className: "mi"
+  }, "\uD83D\uDCF1"), React.createElement("span", {
+    className: "mt"
+  }, "Local"), React.createElement("span", {
+    className: "ms"
+  }, "Pass the phone")), React.createElement("button", {
+    className: "mode online",
+    "aria-disabled": "true",
+    onClick: () => setSoon(true)
+  }, React.createElement("span", {
+    className: "mi"
+  }, "\uD83C\uDF10"), React.createElement("span", {
+    className: "mt"
+  }, "Online"), React.createElement("span", {
+    className: "ms"
+  }, "Coming soon"))), soon && React.createElement("p", {
+    className: "hint soon",
+    role: "status"
+  }, "Online rooms, where everyone bids from their own phone, are coming in a later update. For now, play Solo or Local."), React.createElement("div", {
     className: "menu"
   }, React.createElement("button", {
-    className: 'btn ' + (draft ? '' : 'btn-gold'),
-    onClick: () => draft ? setAsk('new') : onNew()
-  }, "New draft"), React.createElement("button", {
     className: "btn",
     onClick: onTopics
   }, "Topics"), React.createElement("button", {
@@ -3485,12 +3867,12 @@ function Home({
     className: "mini",
     "aria-label": "Hide",
     onClick: onDismissInstall
-  }, "\u2715")), ask === 'new' && React.createElement(Confirm, {
+  }, "\u2715")), (ask === 'new' || ask === 'solo') && React.createElement(Confirm, {
     title: "Start over?",
     body: "A new draft replaces the one in progress. Finished drafts stay in Past Drafts.",
     yes: "New draft",
     danger: true,
-    onYes: onNew,
+    onYes: ask === 'solo' ? onSolo : onNew,
     onClose: () => setAsk(null)
   }), ask === 'abandon' && React.createElement(Confirm, {
     title: "Abandon draft?",
@@ -4265,6 +4647,174 @@ function TopicEditor({
     onClose: () => setDel(false)
   }));
 }
+const DEFAULT_SOLO = {
+  name: 'You',
+  bots: 3,
+  level: 'medium',
+  talk: true,
+  clock: 8,
+  topicId: 't-pl',
+  seed: 'start'
+};
+function SoloSetup({
+  cfg,
+  setCfg,
+  topic,
+  rules,
+  onBack,
+  onPickTopic,
+  onRules,
+  onStart
+}) {
+  const bots = makeBots(cfg.bots, cfg.level, cfg.seed, [COLORS[1]]);
+  const valid = topic && topic.items.length && topic.slots.length && cfg.name.trim();
+  const level = BOT_LEVELS[cfg.level];
+  return React.createElement("div", {
+    className: "app"
+  }, React.createElement(TopBar, {
+    onBack: onBack,
+    title: "Solo \xB7 vs bots"
+  }), React.createElement("div", null, React.createElement("h2", {
+    className: "display"
+  }, "You vs the bots"), React.createElement("p", {
+    className: "hint"
+  }, "Bots bid on their own. Each item sells when its clock runs out.")), React.createElement("div", {
+    className: "card stack"
+  }, React.createElement("div", {
+    className: "field"
+  }, React.createElement("label", {
+    htmlFor: "solo-name"
+  }, "Your name"), React.createElement("input", {
+    id: "solo-name",
+    className: "input",
+    maxLength: 16,
+    value: cfg.name,
+    onChange: e => setCfg({
+      ...cfg,
+      name: e.target.value
+    }),
+    placeholder: "You"
+  })), React.createElement("div", {
+    className: "field"
+  }, React.createElement("label", {
+    htmlFor: "solo-bots"
+  }, "Bots"), React.createElement(Stepper, {
+    id: "solo-bots",
+    value: cfg.bots,
+    min: 1,
+    max: 7,
+    onChange: v => setCfg({
+      ...cfg,
+      bots: v
+    })
+  })), React.createElement("div", {
+    className: "field"
+  }, React.createElement("span", {
+    className: "label"
+  }, "Difficulty"), React.createElement(Seg, {
+    label: "Difficulty",
+    value: cfg.level,
+    options: [['easy', 'Easy'], ['medium', 'Medium'], ['hard', 'Hard']],
+    onChange: v => setCfg({
+      ...cfg,
+      level: v
+    })
+  }), React.createElement("p", {
+    className: "hint"
+  }, cfg.level === 'easy' ? 'Bots make mistakes, waste money and miss bargains.' : cfg.level === 'medium' ? 'Bots play sensibly and avoid most silly bidding wars.' : 'Bots budget carefully, read the table and plan for the endgame. No cheating.')), React.createElement("div", {
+    className: "field"
+  }, React.createElement("span", {
+    className: "label"
+  }, "Bid clock"), React.createElement(Seg, {
+    label: "Bid clock",
+    value: cfg.clock,
+    options: [[6, '6s'], [8, '8s'], [12, '12s']],
+    onChange: v => setCfg({
+      ...cfg,
+      clock: v
+    })
+  })), React.createElement(Toggle, {
+    on: cfg.talk,
+    onChange: v => setCfg({
+      ...cfg,
+      talk: v
+    }),
+    title: "Trash talk",
+    sub: "Bots react to bids, wins and losses with short speech bubbles."
+  })), React.createElement("div", {
+    className: "card stack"
+  }, React.createElement("div", {
+    className: "row"
+  }, React.createElement("h3", {
+    className: "grow"
+  }, "The table"), React.createElement("button", {
+    className: "btn btn-sm",
+    onClick: () => setCfg({
+      ...cfg,
+      seed: uid()
+    })
+  }, "Shuffle bots")), React.createElement("div", {
+    className: "stack-sm"
+  }, bots.map(b => React.createElement("div", {
+    key: b.id,
+    className: "botrow",
+    style: mStyle(b)
+  }, React.createElement("span", {
+    className: "be"
+  }, b.emoji), React.createElement("span", {
+    className: "grow",
+    style: {
+      minWidth: 0
+    }
+  }, React.createElement("b", null, b.name), React.createElement("span", {
+    className: "small muted",
+    style: {
+      display: 'block'
+    }
+  }, BOT_TYPES[b.bot.type].label)), React.createElement("span", {
+    className: "lvl"
+  }, level.label))))), React.createElement("div", {
+    className: "card stack"
+  }, React.createElement("button", {
+    className: "tcard",
+    style: {
+      border: 0,
+      padding: 0,
+      background: 'none'
+    },
+    onClick: onPickTopic
+  }, React.createElement("span", {
+    className: "em"
+  }, topic ? topic.emoji : '🎲'), React.createElement("span", {
+    className: "meta"
+  }, React.createElement("span", {
+    className: "name"
+  }, topic ? topic.name : 'Pick a topic'), React.createElement("span", {
+    className: "sub"
+  }, topic ? topic.items.length + ' items · ' + rules.slots.join(', ') : 'Tap to choose')), React.createElement("span", {
+    className: "muted",
+    style: {
+      fontSize: 15,
+      fontWeight: 700
+    }
+  }, "Change")), React.createElement("button", {
+    className: "btn btn-sm",
+    style: {
+      alignSelf: 'flex-start'
+    },
+    onClick: onRules,
+    disabled: !topic
+  }, "House rules: ", money(rules.budget), " budget \xB7 min ", money(rules.minBid))), React.createElement("p", {
+    className: "hint",
+    style: {
+      textAlign: 'center'
+    }
+  }, cfg.bots, " ", cfg.bots === 1 ? 'bot' : 'bots', " \xB7 ", level.label, " \xB7 ", cfg.clock, "s clock \xB7 trash talk ", cfg.talk ? 'on' : 'off'), React.createElement("button", {
+    className: "btn btn-gold",
+    disabled: !valid,
+    onClick: () => onStart(bots)
+  }, "Start solo draft"));
+}
 function SetupManagers({
   managers,
   setManagers,
@@ -4497,7 +5047,9 @@ function SetupRules({
   rules,
   setRules,
   onBack,
-  onStart
+  onStart,
+  startLabel = 'Start the draft',
+  title = '3 · Rules'
 }) {
   const [slotTxt, setSlotTxt] = useState(rules.slots.join(', '));
   const slots = parseSlots(slotTxt);
@@ -4516,7 +5068,7 @@ function SetupRules({
     className: "app"
   }, React.createElement(TopBar, {
     onBack: onBack,
-    title: "3 \xB7 Rules"
+    title: title
   }), React.createElement("div", null, React.createElement("p", {
     className: "eyebrow"
   }, topic.emoji, " ", topic.name), React.createElement("h2", {
@@ -4637,20 +5189,23 @@ function SetupRules({
       ...rules,
       slots
     })
-  }, "Start the draft"));
+  }, startLabel));
 }
 function ManagerButton({
   d,
   m,
   onBid,
   onCustom,
-  disabledAll
+  disabledAll,
+  readOnly,
+  bubble,
+  thinking
 }) {
   const amt = nextAmount(d);
   const isLead = d.bid && d.bid.leaderId === m.id;
   const blocker = bidBlocker(d, m);
-  const enabled = !disabledAll && !blocker && canBid(d, m, amt);
-  const customOk = !disabledAll && canBid(d, m, d.bid ? d.bid.amount + 1 : d.rules.minBid);
+  const enabled = !readOnly && !disabledAll && !blocker && canBid(d, m, amt);
+  const customOk = !readOnly && !disabledAll && canBid(d, m, d.bid ? d.bid.amount + 1 : d.rules.minBid);
   const t = useRef(null);
   const fired = useRef(true);
   const down = () => {
@@ -4672,32 +5227,44 @@ function ManagerButton({
     fired.current = true;
   };
   const filled = d.rules.slots.length - emptyCount(m);
-  return React.createElement("div", {
-    role: "button",
-    tabIndex: enabled ? 0 : -1,
-    "aria-disabled": !enabled,
-    className: 'mgr' + (isLead ? ' isLead' : '') + (!isLead && !enabled && !customOk ? ' off' : ''),
-    style: mStyle(m),
+  const botInfo = isBot(m) ? BOT_TYPES[m.bot.type] : null;
+  const status = isLead ? React.createElement("span", {
+    className: "badge"
+  }, "\u2605 Leading", enabled ? ' · tap +' + money(d.rules.inc) : '') : thinking ? React.createElement("span", {
+    className: "badge think"
+  }, "Thinking\u2026") : readOnly ? blocker || (botInfo ? botInfo.short : 'Watching') : blocker || 'Tap: ' + money(amt);
+  const dim = readOnly ? !!blocker && !isLead : !isLead && !enabled && !customOk;
+  const handlers = readOnly ? {} : {
     onPointerDown: down,
     onPointerUp: up,
     onPointerLeave: cancel,
     onPointerCancel: cancel,
-    onContextMenu: e => e.preventDefault(),
     onKeyDown: e => {
       if ((e.key === 'Enter' || e.key === ' ') && enabled) {
         e.preventDefault();
         onBid(amt);
       }
     }
-  }, React.createElement("span", {
+  };
+  return React.createElement("div", _extends({
+    role: readOnly ? 'group' : 'button',
+    tabIndex: enabled ? 0 : -1,
+    "aria-disabled": readOnly ? undefined : !enabled,
+    "aria-label": readOnly ? m.name + (botInfo ? ', ' + botInfo.label : '') : undefined,
+    className: 'mgr' + (isLead ? ' isLead' : '') + (dim ? ' off' : '') + (thinking ? ' thinking' : '') + (m.human ? ' you' : ''),
+    style: mStyle(m),
+    onContextMenu: e => e.preventDefault()
+  }, handlers), bubble && React.createElement("span", {
+    className: "bubble",
+    key: bubble.id,
+    role: "status"
+  }, bubble.text), React.createElement("span", {
     className: "who"
   }, m.emoji, " ", m.name), React.createElement("span", {
     className: "money num"
   }, money(m.budget)), React.createElement("span", {
     className: "st"
-  }, isLead ? React.createElement("span", {
-    className: "badge"
-  }, "\u2605 Leading", enabled ? ' · tap +' + money(d.rules.inc) : '') : blocker || 'Tap: ' + money(amt), " \xB7 ", filled, "/", d.rules.slots.length), customOk && React.createElement("button", {
+  }, status, " \xB7 ", filled, "/", d.rules.slots.length), customOk && React.createElement("button", {
     className: "edit",
     "aria-label": 'Custom bid for ' + m.name,
     onPointerDown: e => e.stopPropagation(),
@@ -4707,6 +5274,50 @@ function ManagerButton({
       onCustom();
     }
   }, "\u270E"));
+}
+function useBotTalk(d) {
+  const [bubbles, setBubbles] = useState({});
+  const last = useRef(0);
+  const per = useRef({});
+  const timers = useRef([]);
+  const enabled = d.mode === 'solo' && !(d.solo && d.solo.talk === false);
+  useEffect(() => () => timers.current.forEach(clearTimeout), []);
+  const say = (botId, event, extra, force) => {
+    if (!enabled) return;
+    const bot = d.managers.find(m => m.id === botId);
+    if (!isBot(bot)) return;
+    const now = Date.now();
+    if (!force && (now - last.current < ms(3000) || now - (per.current[botId] || 0) < ms(7000))) return;
+    if (!force && Math.random() > (TALK_CHANCE[event] != null ? TALK_CHANCE[event] : 0.3)) return;
+    const text = botLine(bot, event, extra);
+    if (!text) return;
+    last.current = now;
+    per.current[botId] = now;
+    const id = now + '-' + Math.random();
+    setBubbles(b => ({
+      ...b,
+      [botId]: {
+        text,
+        id
+      }
+    }));
+    timers.current.push(setTimeout(() => setBubbles(b => {
+      if (!b[botId] || b[botId].id !== id) return b;
+      const n = {
+        ...b
+      };
+      delete n[botId];
+      return n;
+    }), Math.max(ms(2800), 300)));
+  };
+  const later = (delay, fn) => {
+    timers.current.push(setTimeout(fn, delay));
+  };
+  return {
+    bubbles,
+    say,
+    later
+  };
 }
 function CustomBid({
   d,
@@ -4820,6 +5431,7 @@ function ItemCard({
     className: "face back"
   }, React.createElement("span", null, "?"))));
 }
+const bidKeyOf = d => d.reveal + ':' + (d.bid ? d.bid.amount + d.bid.leaderId : 'none');
 function Auction({
   d,
   setDraft,
@@ -4828,42 +5440,72 @@ function Auction({
   onFlash
 }) {
   const item = currentItem(d);
+  const solo = d.mode === 'solo';
   const [paused, setPaused] = useState(false);
   const [gavel, setGavel] = useState(false);
   const [custom, setCustom] = useState(null);
   const [teams, setTeams] = useState(false);
+  const [thinking, setThinking] = useState(null);
+  const [out, setOut] = useState(false);
   const busy = useRef(false);
-  const timer = d.rules.timer || 0;
+  const timer = solo ? d.solo && d.solo.clock || 8 : d.rules.timer || 0;
   const [left, setLeft] = useState(timer);
-  const bidKey = d.reveal + ':' + (d.bid ? d.bid.amount + d.bid.leaderId : 'none');
+  const bidKey = bidKeyOf(d);
+  const talk = useBotTalk(d);
+  const live = useRef({});
+  live.current = {
+    d,
+    paused,
+    flashing,
+    gavel,
+    left
+  };
   useEffect(() => {
     setLeft(timer);
   }, [bidKey, timer]);
+  useEffect(() => {
+    setOut(false);
+  }, [d.reveal]);
   const leader = d.bid && d.managers.find(m => m.id === d.bid.leaderId);
   const total = d.processed + d.queue.length;
+  const you = solo ? d.managers.find(m => m.human) : null;
   function sold() {
     if (!d.bid || busy.current || flashing) return;
     busy.current = true;
+    const price = d.bid.amount;
+    const winnerId = d.bid.leaderId;
+    const bidders = [...new Set(d.bids.filter(Boolean).map(b => b.leaderId))].filter(id => id !== winnerId);
     const info = {
       kind: 'sold',
       name: leader.name,
       emoji: leader.emoji,
       color: leader.color,
-      price: d.bid.amount,
+      price,
       item: item.name
     };
     buzz([40, 30, 160]);
     setGavel(true);
+    setThinking(null);
     setTimeout(() => {
       setGavel(false);
       onFlash(info);
       setDraft(p => sell(p));
       busy.current = false;
-    }, 520);
+      if (solo) talk.later(ms(1900), () => {
+        const fair = d.rules.budget / d.rules.slots.length;
+        if (isBot(leader)) talk.say(winnerId, price <= d.rules.minBid + d.rules.inc && itemFame(item) > 0.45 ? 'steal' : 'win');else if (price >= fair * 1.4) {
+          const b = d.managers.find(m => isBot(m));
+          if (b) talk.say(b.id, 'rival');
+        }
+        const loser = bidders.map(id => d.managers.find(m => m.id === id)).find(isBot);
+        if (loser) talk.later(ms(900), () => talk.say(loser.id, 'lose'));
+      });
+    }, ms(520));
   }
   function skip() {
     if (busy.current || flashing) return;
     const back = d.rules.noBids === 'back' && !d.passed.includes(d.queue[0]);
+    setThinking(null);
     onFlash({
       kind: 'skip',
       item: item.name,
@@ -4872,19 +5514,60 @@ function Auction({
     setDraft(p => skipItem(p));
   }
   useEffect(() => {
-    if (!timer || paused || flashing || gavel) return;
-    if (left <= 0) {
-      if (d.bid) sold();
+    if (!timer || paused || flashing || gavel) return undefined;
+    const t = setInterval(() => setLeft(l => l > 0 ? l - 1 : 0), ms(1000));
+    return () => clearInterval(t);
+  }, [bidKey, paused, flashing, gavel, timer]);
+  useEffect(() => {
+    if (!timer || paused || flashing || gavel || left > 0) return;
+    if (d.bid) sold();else if (solo) skip();
+  }, [left, paused, flashing, gavel, timer]);
+  useEffect(() => {
+    if (!solo || paused || flashing || gavel || busy.current || d.phase !== 'auction') {
+      setThinking(null);
+      return undefined;
+    }
+    const plan = nextBotAction(d);
+    if (!plan) {
+      setThinking(null);
+      return undefined;
+    }
+    setThinking(plan.botId);
+    const key = bidKey;
+    const t = setTimeout(() => {
+      const cur = live.current;
+      if (bidKeyOf(cur.d) !== key || cur.paused || cur.flashing || cur.gavel || busy.current || cur.left <= 0 || cur.d.phase !== 'auction') return;
+      setThinking(null);
+      setDraft(p => bidKeyOf(p) === key && p.phase === 'auction' ? placeBid(p, plan.botId, plan.amount) : p);
+      talk.say(plan.botId, plan.event);
+    }, ms(plan.delay));
+    return () => clearTimeout(t);
+  }, [bidKey, paused, flashing, gavel, solo]);
+  useEffect(() => {
+    if (!solo || flashing) return;
+    if (d.processed === 0 && !d.bid) {
+      const b = d.managers.filter(isBot);
+      if (b.length) talk.say(b[Math.floor(Math.random() * b.length)].id, 'start', null, true);
       return;
     }
-    const t = setTimeout(() => setLeft(l => l - 1), 1000);
-    return () => clearTimeout(t);
-  }, [left, paused, flashing, gavel, timer]);
+    const planner = d.managers.find(m => isBot(m) && m.bot.type === 'needs' && !isFull(m) && item && assignSlot(m, item, d.rules.slots) < 0);
+    if (planner) {
+      const k = planner.team.findIndex(x => !x);
+      talk.say(planner.id, 'need', {
+        slot: d.rules.slots[k]
+      });
+    }
+  }, [d.reveal, flashing]);
   if (!item) return null;
   const lc = leader ? leader.color : null;
   const showCard = !flashing;
+  const thinker = thinking && d.managers.find(m => m.id === thinking);
+  const youAmt = you ? nextAmount(d) : 0;
+  const youCan = you && !paused && !flashing && !gavel && canBid(d, you, youAmt);
+  const going = timer > 0 && d.bid && left <= 2 && left > 0 ? left === 2 ? 'Going once…' : 'Going twice…' : null;
+  const ordered = solo ? [...d.managers].sort((a, b) => (b.human ? 1 : 0) - (a.human ? 1 : 0)) : d.managers;
   return React.createElement("div", {
-    className: "app auction"
+    className: 'app auction' + (solo ? ' solo' : '')
   }, React.createElement("div", {
     className: "topbar"
   }, React.createElement("button", {
@@ -4935,7 +5618,10 @@ function Auction({
     style: {
       color: lc || 'var(--muted)'
     }
-  }, leader ? leader.emoji + ' ' + leader.name + ' leads' : timer > 0 && left <= 0 ? "Time's up · no bids" : 'Opening bid · tap a manager'), timer > 0 && React.createElement("span", {
+  }, leader ? leader.emoji + ' ' + leader.name + ' leads' : timer > 0 && left <= 0 ? "Time's up · no bids" : solo ? 'Opening bid · bid or wait' : 'Opening bid · tap a manager'), React.createElement("div", {
+    className: "going",
+    "aria-live": "polite"
+  }, going || (thinker ? '💭 ' + thinker.name + ' is thinking…' : solo && out ? 'You’re out on this one' : ' ')), timer > 0 && React.createElement("span", {
     className: "timer",
     style: {
       width: Math.max(0, left) / timer * 100 + '%'
@@ -4961,13 +5647,17 @@ function Auction({
     onClick: () => setPaused(false)
   }, "Resume")))), React.createElement("div", {
     className: "mgr-grid"
-  }, d.managers.map(m => React.createElement(ManagerButton, {
+  }, ordered.map(m => React.createElement(ManagerButton, {
     key: m.id,
     d: d,
     m: m,
     disabledAll: paused || flashing || gavel,
+    readOnly: solo && !m.human,
+    bubble: talk.bubbles[m.id],
+    thinking: thinking === m.id,
     onBid: amt => {
       buzz(12);
+      setOut(false);
       setDraft(p => placeBid(p, m.id, amt));
     },
     onCustom: () => setCustom(m.id)
@@ -4976,7 +5666,24 @@ function Auction({
     style: {
       textAlign: 'center'
     }
-  }, "Tap to bid +", money(d.rules.inc), " \xB7 hold or \u270E for a custom bid"), React.createElement("div", {
+  }, solo ? 'Tap Bid to raise +' + money(d.rules.inc) + ' · ✎ on your card for a custom bid · it sells when the clock runs out' : 'Tap to bid +' + money(d.rules.inc) + ' · hold or ✎ for a custom bid'), solo ? React.createElement("div", {
+    className: "actions duo"
+  }, React.createElement("button", {
+    className: "btn",
+    disabled: paused || flashing || out || !(you && canBid(d, you, youAmt)),
+    onClick: () => {
+      setOut(true);
+      setLeft(l => Math.min(l, 3));
+    }
+  }, "I\u2019m out"), React.createElement("button", {
+    className: "btn btn-gold sold",
+    disabled: !youCan,
+    onClick: () => {
+      buzz(12);
+      setOut(false);
+      setDraft(p => placeBid(p, you.id, nextAmount(p)));
+    }
+  }, you && isFull(you) ? 'Team full' : you && !canBid(d, you, youAmt) ? 'Can’t bid' : (d.bid && d.bid.leaderId === you.id ? 'Raise to ' : 'Bid ') + money(youAmt))) : React.createElement("div", {
     className: "actions"
   }, React.createElement("button", {
     className: "btn",
@@ -4998,6 +5705,7 @@ function Auction({
     m: d.managers.find(x => x.id === custom),
     onSet: n => {
       buzz(12);
+      setOut(false);
       setDraft(p => placeBid(p, custom, n));
     },
     onClose: () => setCustom(null)
@@ -5014,12 +5722,19 @@ function FreePick({
   onFlash
 }) {
   const [teams, setTeams] = useState(false);
+  const [paused, setPaused] = useState(false);
+  const talk = useBotTalk(d);
   const cp = currentPicker(d);
-  if (!cp) return null;
-  const m = cp.m;
-  const avail = d.leftover.filter(id => canTake(d, m, id));
+  const m = cp && cp.m;
+  const botTurn = !!(m && d.mode === 'solo' && isBot(m));
+  const live = useRef({});
+  live.current = {
+    d,
+    flashing,
+    paused
+  };
   const pick = id => {
-    if (flashing) return;
+    if (flashing || !m) return;
     onFlash({
       kind: 'free',
       name: m.name,
@@ -5029,6 +5744,21 @@ function FreePick({
     });
     setDraft(p => freePick(p, id));
   };
+  const turnKey = d.reveal + ':' + (m ? m.id : '');
+  useEffect(() => {
+    if (!botTurn || flashing || paused) return undefined;
+    const choice = botFreePickChoice(d, m);
+    if (!choice) return undefined;
+    const t = setTimeout(() => {
+      const cur = live.current;
+      if (cur.flashing || cur.paused || cur.d.reveal + ':' + ((currentPicker(cur.d) || {}).m || {}).id !== turnKey) return;
+      pick(choice);
+      talk.later(ms(1900), () => talk.say(m.id, 'free'));
+    }, ms(1100));
+    return () => clearTimeout(t);
+  }, [turnKey, flashing, paused, botTurn]);
+  if (!cp) return null;
+  const avail = d.leftover.filter(id => canTake(d, m, id));
   return React.createElement("div", {
     className: "app"
   }, React.createElement("div", {
@@ -5042,7 +5772,11 @@ function FreePick({
   }, "Free picks \xB7 round ", cp.round + 1), React.createElement("button", {
     className: "pillbtn",
     onClick: () => setTeams(true)
-  }, "Teams")), React.createElement("p", {
+  }, "Teams"), d.mode === 'solo' && React.createElement("button", {
+    className: "iconbtn",
+    onClick: () => setPaused(p => !p),
+    "aria-label": paused ? 'Resume' : 'Pause'
+  }, paused ? '▶' : 'Ⅱ')), React.createElement("p", {
     className: "hint",
     style: {
       textAlign: 'center'
@@ -5062,7 +5796,19 @@ function FreePick({
     style: {
       margin: 0
     }
-  }, emptyCount(m), " empty slot", emptyCount(m) === 1 ? '' : 's', " \xB7 ", money(m.budget), " left")), React.createElement("div", {
+  }, emptyCount(m), " empty slot", emptyCount(m) === 1 ? '' : 's', " \xB7 ", money(m.budget), " left"), botTurn && React.createElement("p", {
+    className: "going",
+    style: {
+      margin: '6px 0 0'
+    }
+  }, paused ? 'Paused' : '💭 Picking…')), Object.entries(talk.bubbles).map(([id, bb]) => {
+    const who = d.managers.find(x => x.id === id);
+    return who ? React.createElement("p", {
+      key: bb.id,
+      className: "bubble inline",
+      style: mStyle(who)
+    }, React.createElement("b", null, who.emoji, " ", who.name, ":"), " ", bb.text) : null;
+  }), React.createElement("div", {
     className: "pickgrid"
   }, avail.map(id => {
     const it = d.items[id];
@@ -5070,7 +5816,7 @@ function FreePick({
       key: id,
       className: "pickbtn",
       onClick: () => pick(id),
-      disabled: flashing
+      disabled: flashing || botTurn
     }, React.createElement(Thumb, {
       item: it,
       topic: d.topic
@@ -5094,7 +5840,7 @@ function FreePick({
         fontSize: 18
       }
     }, "FREE"));
-  })), React.createElement("button", {
+  })), d.mode !== 'solo' && React.createElement("button", {
     className: "btn",
     onClick: () => setDraft(p => undo(p)),
     disabled: !d.history.length || flashing
@@ -5281,13 +6027,17 @@ function Confetti({
     "aria-hidden": "true"
   });
 }
+const hasVoted = (d, id) => Object.prototype.hasOwnProperty.call(d.votes || {}, id);
 function Voting({
   d,
   onVote,
   onReveal,
-  onClose
+  onClose,
+  onSoloVote
 }) {
-  const [voter, setVoter] = useState(null);
+  const solo = d.mode === 'solo';
+  const you = solo ? d.managers.find(m => m.human) : null;
+  const [voter, setVoter] = useState(solo && you ? you.id : null);
   const [choice, setChoice] = useState(null);
   const [locked, setLocked] = useState(false);
   const voted = Object.keys(d.votes || {}).length;
@@ -5300,7 +6050,13 @@ function Voting({
       fontSize: 40,
       textAlign: 'center'
     }
-  }, "Vote locked \uD83D\uDD12"), React.createElement("p", {
+  }, "Vote locked \uD83D\uDD12"), solo ? React.createElement("p", {
+    className: "muted",
+    style: {
+      textAlign: 'center',
+      margin: 0
+    }
+  }, "\uD83E\uDD16 The bots are voting\u2026") : React.createElement(React.Fragment, null, React.createElement("p", {
     className: "muted",
     style: {
       textAlign: 'center',
@@ -5313,14 +6069,27 @@ function Voting({
       setVoter(null);
       setChoice(null);
     }
-  }, "Next voter"));
+  }, "Next voter")));
   if (voter) {
     const v = d.managers.find(m => m.id === voter);
+    const choices = voteChoices(d, voter);
+    const submit = target => {
+      buzz(30);
+      if (solo) {
+        setLocked(true);
+        onSoloVote(target);
+      } else {
+        onVote(voter, target);
+        setLocked(true);
+      }
+    };
     return React.createElement(Sheet, {
       center: true,
       onClose: () => {
-        setVoter(null);
-        setChoice(null);
+        if (solo) onClose();else {
+          setVoter(null);
+          setChoice(null);
+        }
       }
     }, React.createElement("p", {
       className: "eyebrow"
@@ -5330,11 +6099,13 @@ function Voting({
         fontSize: 32,
         color: v.color
       }
-    }, v.emoji, " ", v.name, ", pick the best team"), React.createElement("p", {
+    }, v.emoji, " ", v.name, ", pick the best team"), choices.length ? React.createElement("p", {
       className: "hint"
-    }, "You can't vote for your own."), React.createElement("div", {
+    }, "You can't vote for your own team.") : React.createElement("p", {
+      className: "hint"
+    }, "There's no other team with players to vote for, so you can skip your vote."), React.createElement("div", {
       className: "stack-sm"
-    }, d.managers.filter(m => m.id !== voter).map(m => React.createElement("button", {
+    }, choices.map(m => React.createElement("button", {
       key: m.id,
       className: "votebtn",
       style: {
@@ -5344,28 +6115,37 @@ function Voting({
       },
       "aria-pressed": choice === m.id,
       onClick: () => setChoice(m.id)
-    }, React.createElement("span", null, m.emoji, " ", m.name), React.createElement("span", {
+    }, React.createElement("span", null, m.emoji, " ", m.name, isBot(m) ? React.createElement("small", {
+      style: {
+        fontFamily: 'var(--body)',
+        fontWeight: 600,
+        opacity: 0.8
+      }
+    }, " \xB7 ", BOT_TYPES[m.bot.type].label) : null), React.createElement("span", {
       className: "teamtxt"
-    }, m.team.filter(Boolean).map(t => d.items[t.itemId].name).join(', ') || 'No items')))), React.createElement("div", {
+    }, m.team.filter(Boolean).map(t => d.items[t.itemId].name).join(', '))))), React.createElement("div", {
       className: "row pin"
     }, React.createElement("button", {
       type: "button",
       className: "btn btn-ghost grow",
       onClick: () => {
-        setVoter(null);
-        setChoice(null);
+        if (solo) onClose();else {
+          setVoter(null);
+          setChoice(null);
+        }
       }
-    }, "Back"), React.createElement("button", {
+    }, "Back"), choices.length ? React.createElement("button", {
       type: "button",
       className: "btn btn-gold grow",
       disabled: !choice,
       onClick: () => {
-        if (!choice) return;
-        buzz(30);
-        onVote(voter, choice);
-        setLocked(true);
+        if (choice) submit(choice);
       }
-    }, choice ? 'Lock in ' + d.managers.find(m => m.id === choice).name : 'Pick a team')));
+    }, choice ? 'Lock in ' + d.managers.find(m => m.id === choice).name : 'Pick a team') : React.createElement("button", {
+      type: "button",
+      className: "btn btn-gold grow",
+      onClick: () => submit(null)
+    }, "Skip my vote")));
   }
   return React.createElement(Sheet, {
     center: true,
@@ -5379,15 +6159,15 @@ function Voting({
     }
   }, "Pass the phone around"), React.createElement("p", {
     className: "hint"
-  }, "Each manager taps their own name, then votes in private."), React.createElement("div", {
+  }, "Each manager taps their own name, then votes in private. Votes stay hidden until the reveal."), React.createElement("div", {
     className: "votegrid"
   }, d.managers.map(m => {
-    const done = d.votes && d.votes[m.id];
+    const done = hasVoted(d, m.id);
     return React.createElement("button", {
       key: m.id,
       className: "votebtn",
       style: mStyle(m),
-      disabled: !!done,
+      disabled: done,
       onClick: () => setVoter(m.id)
     }, React.createElement("span", {
       style: {
@@ -5417,6 +6197,7 @@ function Results({
   onBack,
   onUndo,
   onFinish,
+  onPlayAgain,
   live
 }) {
   const ref = useRef(null);
@@ -5431,6 +6212,35 @@ function Results({
     winners
   } = tally(d);
   const revealed = d.votesRevealed && winners.length > 0;
+  const noVotes = d.votesRevealed && !winners.length;
+  const solo = d.mode === 'solo';
+  const doReveal = () => {
+    setVoting(false);
+    setParty(x => x + 1);
+    buzz([60, 40, 60, 40, 200]);
+    window.scrollTo({
+      top: 0,
+      behavior: 'smooth'
+    });
+  };
+  const soloVote = target => {
+    setTimeout(() => {
+      const votes = {
+        ...(d.votes || {})
+      };
+      const you = d.managers.find(m => m.human);
+      if (you && !hasVoted(d, you.id)) votes[you.id] = target;
+      d.managers.filter(isBot).forEach(b => {
+        if (!Object.prototype.hasOwnProperty.call(votes, b.id)) votes[b.id] = botVote(d, b);
+      });
+      onChange({
+        ...d,
+        votes,
+        votesRevealed: true
+      });
+      doReveal();
+    }, ms(1400));
+  };
   const winIds = revealed ? winners.map(w => w.id) : [];
   const ordered = revealed ? [...d.managers].sort((a, b) => counts[b.id] - counts[a.id]) : d.managers;
   const exportImg = async () => {
@@ -5497,7 +6307,14 @@ function Results({
     style: {
       fontSize: 46
     }
-  }, revealed ? 'We have a winner' : 'Final teams')), revealed && React.createElement("div", {
+  }, revealed ? 'We have a winner' : 'Final teams')), noVotes && React.createElement("div", {
+    className: "card"
+  }, React.createElement("b", null, "No votes were cast"), React.createElement("p", {
+    className: "hint",
+    style: {
+      margin: '4px 0 0'
+    }
+  }, "Nobody had a team they could vote for, so there's no winner this time.")), revealed && React.createElement("div", {
     className: "winner"
   }, React.createElement("p", {
     className: "eyebrow",
@@ -5512,7 +6329,13 @@ function Results({
       margin: 0,
       fontWeight: 700
     }
-  }, "It's a tie!")), ordered.map(m => React.createElement(TeamCard, {
+  }, "It's a tie!"), solo && winners.some(w => w.human) && React.createElement("p", {
+    className: "small",
+    style: {
+      margin: '4px 0 0',
+      fontWeight: 700
+    }
+  }, "You beat the bots!")), ordered.map(m => React.createElement(TeamCard, {
     key: m.id,
     d: d,
     m: m,
@@ -5555,9 +6378,9 @@ function Results({
     className: "v num"
   }, money(stats.cheapest.s)), React.createElement("span", {
     className: "d"
-  }, stats.cheapest.m.emoji, " ", stats.cheapest.m.name))), revealed && React.createElement("div", {
+  }, stats.cheapest.m.emoji, " ", stats.cheapest.m.name))), d.votesRevealed && !noVotes && React.createElement("div", {
     className: "board"
-  }, React.createElement("h3", null, "\uD83D\uDDF3\uFE0F Vote tally"), ordered.map(m => React.createElement("div", {
+  }, React.createElement("h3", null, "\uD83D\uDDF3\uFE0F Vote tally", solo ? ' · final standings' : ''), ordered.map(m => React.createElement("div", {
     key: m.id,
     className: 'brow' + (winIds.includes(m.id) ? ' hl' : ''),
     style: mStyle(m)
@@ -5571,30 +6394,45 @@ function Results({
     }
   })), React.createElement("span", {
     className: "bw num"
-  }, counts[m.id])))), revealed && React.createElement(Leaderboard, {
+  }, counts[m.id])))), d.votesRevealed && !noVotes && React.createElement("p", {
+    className: "hint",
+    style: {
+      textAlign: 'center'
+    }
+  }, d.managers.map(m => {
+    const t = d.votes && d.votes[m.id];
+    const to = t && d.managers.find(x => x.id === t);
+    return m.name + ' → ' + (to ? to.name : 'no vote');
+  }).join(' · ')), revealed && React.createElement(Leaderboard, {
     rows: winsBoard([...(past || []).filter(p => p.id !== d.id), d]),
     highlight: winners.map(w => w.name.trim().toLowerCase())
   }), React.createElement("p", {
     className: "exportfoot"
   }, "DRAFT NIGHT \xB7 ", (location.host + location.pathname).replace(/\/(index\.html)?$/, ''))), React.createElement("div", {
     className: "stack"
-  }, !revealed && React.createElement("button", {
+  }, !d.votesRevealed && React.createElement("button", {
     className: "btn btn-gold",
     onClick: () => setVoting(true)
-  }, Object.keys(d.votes || {}).length ? 'Continue the vote' : 'Start the secret vote'), React.createElement("button", {
+  }, solo ? 'Vote for the best team' : Object.keys(d.votes || {}).length ? 'Continue the vote' : 'Start the secret vote'), live && onPlayAgain && d.votesRevealed && React.createElement("button", {
+    className: "btn btn-gold",
+    onClick: onPlayAgain
+  }, "Play again"), React.createElement("button", {
     className: "btn",
     onClick: exportImg,
     disabled: imgBusy
   }, imgBusy ? 'Making image…' : 'Save as image'), imgErr && React.createElement("p", {
     className: "warn"
-  }, imgErr), revealed && React.createElement("button", {
+  }, imgErr), d.votesRevealed && React.createElement("button", {
     className: "btn btn-ghost",
     onClick: () => onChange({
       ...d,
       votes: {},
       votesRevealed: false
     })
-  }, "Redo the vote"), live && React.createElement("button", {
+  }, "Redo the vote"), live && onPlayAgain && !d.votesRevealed && React.createElement("button", {
+    className: "btn btn-ghost",
+    onClick: onPlayAgain
+  }, "Play again"), live && React.createElement("button", {
     className: "btn btn-ghost",
     onClick: onFinish
   }, "Finish \xB7 back to home"), React.createElement("p", {
@@ -5604,25 +6442,22 @@ function Results({
     }
   }, live ? 'This draft is saved in Past Drafts.' : 'Saved in Past Drafts.')), voting && React.createElement(Voting, {
     d: d,
-    onVote: (v, t) => onChange({
-      ...d,
-      votes: {
-        ...(d.votes || {}),
-        [v]: t
-      }
-    }),
+    onSoloVote: soloVote,
+    onVote: (v, t) => {
+      if (!hasVoted(d, v)) onChange({
+        ...d,
+        votes: {
+          ...(d.votes || {}),
+          [v]: t
+        }
+      });
+    },
     onReveal: () => {
       onChange({
         ...d,
         votesRevealed: true
       });
-      setVoting(false);
-      setParty(x => x + 1);
-      buzz([60, 40, 60, 40, 200]);
-      window.scrollTo({
-        top: 0,
-        behavior: 'smooth'
-      });
+      doReveal();
     },
     onClose: () => setVoting(false)
   }), party > 0 && revealed && React.createElement(Confetti, {
@@ -5704,7 +6539,7 @@ function PastList({
       className: "name"
     }, p.topic.name), React.createElement("span", {
       className: "sub"
-    }, new Date(p.createdAt).toLocaleDateString(), " \xB7 ", p.managers.map(m => m.name).join(', ')), p.votesRevealed && winners.length > 0 && React.createElement("span", {
+    }, new Date(p.createdAt).toLocaleDateString(), " \xB7 ", p.mode === 'solo' ? 'Solo (' + (BOT_LEVELS[(p.solo || {}).level] || BOT_LEVELS.medium).label + ') · ' : '', p.managers.map(m => m.name).join(', ')), p.votesRevealed && winners.length > 0 && React.createElement("span", {
       className: "sub",
       style: {
         color: 'var(--gold)'
@@ -5728,7 +6563,7 @@ function Flash({
   onDone
 }) {
   useEffect(() => {
-    const t = setTimeout(onDone, f.kind === 'skip' ? 1100 : 1800);
+    const t = setTimeout(onDone, ms(f.kind === 'skip' ? 1100 : 1800));
     return () => clearTimeout(t);
   }, [f]);
   return React.createElement("div", {
@@ -6051,6 +6886,15 @@ function App() {
   const [toast, setToast] = useState(null);
   const [folder, setFolder] = useState(null);
   const [settings, setSettings] = useState(() => store.get(K.settings, {}));
+  const soloCfg = {
+    ...DEFAULT_SOLO,
+    ...(settings.solo || {})
+  };
+  const setSoloCfg = c => setSettings(x => ({
+    ...x,
+    solo: c
+  }));
+  const [soloRules, setSoloRules] = useState(null);
   const warned = useRef(false);
   const app = usePwa();
   useEffect(() => {
@@ -6118,6 +6962,30 @@ function App() {
     setTopics(ts => [...ts, copy]);
     return copy.id;
   };
+  const soloTopic = () => topics.find(t => t.id === soloCfg.topicId && t.items.length) || topics.find(t => t.items.length && t.slots.length) || null;
+  const soloRulesFor = t => soloRules && t && soloRules.topicId === t.id ? soloRules.rules : {
+    ...DEFAULT_RULES,
+    slots: t ? [...t.slots] : []
+  };
+  const playAgain = () => {
+    if (!draft) return;
+    const t = topics.find(x => x.id === draft.topic.id && x.items.length);
+    if (!t) {
+      setDraft(null);
+      go(draft.mode === 'solo' ? 'solo-setup' : 'setup-topic');
+      return;
+    }
+    const extra = draft.mode === 'solo' ? {
+      mode: 'solo',
+      solo: {
+        ...draft.solo
+      }
+    } : undefined;
+    setDraft(createDraft(t, draft.managers, {
+      ...draft.rules
+    }, extra));
+    go('draft');
+  };
   let view;
   switch (screen.name) {
     case 'topics':
@@ -6183,7 +7051,62 @@ function App() {
         onNext: () => go('setup-topic')
       });
       break;
+    case 'solo-setup':
+      {
+        const st = soloTopic();
+        view = React.createElement(SoloSetup, {
+          cfg: soloCfg,
+          setCfg: setSoloCfg,
+          topic: st,
+          rules: soloRulesFor(st),
+          onBack: () => go('home'),
+          onPickTopic: () => go('setup-topic', {
+            from: 'solo'
+          }),
+          onRules: () => go('setup-rules', {
+            from: 'solo'
+          }),
+          onStart: bots => {
+            const human = {
+              id: 'you',
+              name: soloCfg.name.trim() || 'You',
+              color: COLORS[1],
+              emoji: '😎',
+              human: true
+            };
+            setDraft(createDraft(st, [human, ...bots], soloRulesFor(st), {
+              mode: 'solo',
+              solo: {
+                level: soloCfg.level,
+                talk: soloCfg.talk,
+                clock: soloCfg.clock
+              }
+            }));
+            go('draft');
+          }
+        });
+        break;
+      }
     case 'setup-topic':
+      if (screen.from === 'solo') {
+        view = React.createElement(SetupTopic, {
+          topics: topics,
+          folder: folder,
+          setFolder: setFolder,
+          onBack: () => go('solo-setup'),
+          onTopics: () => go('topics', {
+            from: 'solo-setup'
+          }),
+          onPick: id => {
+            setSoloCfg({
+              ...soloCfg,
+              topicId: id
+            });
+            go('solo-setup');
+          }
+        });
+        break;
+      }
       view = React.createElement(SetupTopic, {
         topics: topics,
         folder: folder,
@@ -6205,6 +7128,34 @@ function App() {
       break;
     case 'setup-rules':
       {
+        if (screen.from === 'solo') {
+          const st = soloTopic();
+          const fake = Array.from({
+            length: soloCfg.bots + 1
+          }, (_, i) => ({
+            id: 'x' + i
+          }));
+          view = st ? React.createElement(SetupRules, {
+            topic: st,
+            managers: fake,
+            rules: soloRulesFor(st),
+            setRules: r => setSoloRules({
+              topicId: st.id,
+              rules: r
+            }),
+            onBack: () => go('solo-setup'),
+            title: "Solo \xB7 Rules",
+            startLabel: "Save rules",
+            onStart: r => {
+              setSoloRules({
+                topicId: st.id,
+                rules: r
+              });
+              go('solo-setup');
+            }
+          }) : null;
+          break;
+        }
         const t = topics.find(x => x.id === topicId);
         view = t ? React.createElement(SetupRules, {
           topic: t,
@@ -6243,11 +7194,12 @@ function App() {
         live: true,
         onChange: setDraft,
         onBack: () => go('home'),
-        onUndo: () => setDraft(p => undo(p)),
+        onUndo: draft.mode === 'solo' ? null : () => setDraft(p => undo(p)),
         onFinish: () => {
           setDraft(null);
           go('home');
-        }
+        },
+        onPlayAgain: playAgain
       });
       break;
     case 'past':
@@ -6321,6 +7273,10 @@ function App() {
           });
           go('setup-managers');
         },
+        onSolo: () => {
+          setDraft(null);
+          go('solo-setup');
+        },
         onResume: () => go('draft'),
         onTopics: () => go('topics'),
         onPast: () => go('past'),
@@ -6386,6 +7342,22 @@ class Boundary extends React.Component {
   }
 }
 if (window.__DN_TEST__) window.__DN = {
+  bots: {
+    makeBots,
+    nextBotAction,
+    botDecision,
+    botFreePickChoice,
+    botVote,
+    teamScore,
+    voteChoices,
+    itemFame,
+    seeded,
+    BOT_LEVELS,
+    BOT_TYPES
+  },
+  DEFAULT_SOLO,
+  isFlex,
+  canBid,
   createDraft,
   placeBid,
   sell,

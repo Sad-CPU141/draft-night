@@ -5,6 +5,11 @@ One phone, one auctioneer, everyone shouting bids. Build the best team for the m
 
 **Play:** https://sad-cpu141.github.io/draft-night/
 
+## Game modes
+- **Solo:** you against 1–7 bots (3 by default) on Easy, Medium or Hard. Each bot has a personality that really changes how it bids — Big Spender, Bargain Hunter, Position Strategist or Chaos — plus a funny name and optional trash talk. Items sell when the bid clock runs out; bots vote at the end and never for themselves.
+- **Local:** one phone, one auctioneer, everyone shouting bids (pass the phone to vote).
+- **Online:** coming in a later update.
+
 ## Features
 - 48 starter topics in 7 folders (Sports, Food & Drink, Entertainment, Travel & Places, Animals, Style & Rides, Just for Fun), plus your own topics.
 - Real photos from Wikipedia for people, places, food, animals and more, with jerseys or emoji as a fallback. Upload your own photo or paste an image link for any item.
@@ -29,6 +34,7 @@ npm test         # rules, photo lookups, full click-through, backup, persistence
 ```
 
 - Edit files in `src/`, then run the build. Don't edit `app.js` directly.
+- `src/27-bots.js` is the bot brain: pure functions that read the draft and return a bid, a delay or a vote.
 - `src/25-wiki-titles.js` holds the exact Wikipedia page names and which topics show photos.
 - `sw.js` is versioned on every build, so phones pick up new versions automatically.
 

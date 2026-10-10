@@ -191,17 +191,20 @@ function advance(n) {
   return n;
 }
 
-function createDraft(topic, managers, rules) {
+// extra: { mode: 'solo', solo: { level, talk, clock } } for solo games; local games omit it.
+function createDraft(topic, managers, rules, extra) {
   const items = {}; topic.items.forEach((it) => { items[it.id] = { ...it }; });
   const ids = topic.items.map((it) => it.id);
   const d = {
     id: uid(), createdAt: Date.now(),
     topic: { id: topic.id, name: topic.name, emoji: topic.emoji, layout: topic.layout, art: artOf(topic), kitShape: topic.kitShape || '', kitLabel: topic.kitLabel || '', photos: !!topic.photos },
     rules: { ...rules },
-    managers: managers.map((m) => ({ id: m.id, name: m.name.trim(), color: m.color, emoji: m.emoji, budget: rules.budget, team: rules.slots.map(() => null) })),
+    managers: managers.map((m) => ({ id: m.id, name: m.name.trim(), color: m.color, emoji: m.emoji, budget: rules.budget, team: rules.slots.map(() => null), ...(m.bot ? { bot: { ...m.bot } } : {}), ...(m.human ? { human: true } : {}) })),
     items, queue: rules.order === 'random' ? shuffle(ids) : ids, leftover: [], passed: [], processed: 0,
     bid: null, bids: [], history: [], phase: 'auction', fp: { round: 0, pos: 0 }, reveal: 0,
     votes: {}, votesRevealed: false,
+    mode: 'local', seed: uid(),
+    ...(extra || {}),
   };
   return advance(d);
 }
@@ -436,8 +439,9 @@ function TeamsSheet({ d, onClose }) {
 /* ============================================================
    HOME
    ============================================================ */
-function Home({ draft, past, onNew, onResume, onTopics, onPast, onAbandon, onSettings, showInstall, onDismissInstall }) {
+function Home({ draft, past, onNew, onSolo, onResume, onTopics, onPast, onAbandon, onSettings, showInstall, onDismissInstall }) {
   const [ask, setAsk] = useState(null);
+  const [soon, setSoon] = useState(false);
   const status = draft && (draft.phase === 'auction' ? 'Item ' + (draft.processed + 1) + ' of ' + (draft.processed + draft.queue.length) : draft.phase === 'freepick' ? 'Free picks' : 'Results & voting');
   return (
     <div className="app">
@@ -449,14 +453,25 @@ function Home({ draft, past, onNew, onResume, onTopics, onPast, onAbandon, onSet
       {draft && (
         <div className="card resume stack">
           <p className="eyebrow" style={{ color: 'var(--gold)' }}>Draft in progress</p>
-          <div className="row"><span style={{ fontSize: 30 }}>{draft.topic.emoji}</span><div className="grow"><h3>{draft.topic.name}</h3><span className="small muted">{status}</span></div></div>
+          <div className="row"><span style={{ fontSize: 30 }}>{draft.topic.emoji}</span><div className="grow"><h3>{draft.topic.name}</h3><span className="small muted">{draft.mode === 'solo' ? 'Solo · ' + (BOT_LEVELS[(draft.solo || {}).level] || BOT_LEVELS.medium).label + ' · ' : ''}{status}</span></div></div>
           <div className="chips">{draft.managers.map((m) => <MChip key={m.id} m={m} />)}</div>
           <button className="btn btn-gold" onClick={onResume}>Resume draft</button>
           <button className="btn btn-sm btn-ghost" style={{ alignSelf: 'center', border: 0, color: 'var(--muted)' }} onClick={() => setAsk('abandon')}>Abandon this draft</button>
         </div>
       )}
+      <div className="modes" role="group" aria-label="Game mode">
+        <button className="mode solo" onClick={() => (draft ? setAsk('solo') : onSolo())}>
+          <span className="mi">🤖</span><span className="mt">Solo</span><span className="ms">You vs bots</span>
+        </button>
+        <button className="mode local" onClick={() => (draft ? setAsk('new') : onNew())}>
+          <span className="mi">📱</span><span className="mt">Local</span><span className="ms">Pass the phone</span>
+        </button>
+        <button className="mode online" aria-disabled="true" onClick={() => setSoon(true)}>
+          <span className="mi">🌐</span><span className="mt">Online</span><span className="ms">Coming soon</span>
+        </button>
+      </div>
+      {soon && <p className="hint soon" role="status">Online rooms, where everyone bids from their own phone, are coming in a later update. For now, play Solo or Local.</p>}
       <div className="menu">
-        <button className={'btn ' + (draft ? '' : 'btn-gold')} onClick={() => (draft ? setAsk('new') : onNew())}>New draft</button>
         <button className="btn" onClick={onTopics}>Topics</button>
         <button className="btn" onClick={onPast}>Past drafts{past.length ? ' (' + past.length + ')' : ''}</button>
         <button className="btn btn-ghost" onClick={onSettings}>Backup &amp; app settings</button>
@@ -469,7 +484,7 @@ function Home({ draft, past, onNew, onResume, onTopics, onPast, onAbandon, onSet
           <button className="mini" aria-label="Hide" onClick={onDismissInstall}>✕</button>
         </div>
       )}
-      {ask === 'new' && <Confirm title="Start over?" body="A new draft replaces the one in progress. Finished drafts stay in Past Drafts." yes="New draft" danger onYes={onNew} onClose={() => setAsk(null)} />}
+      {(ask === 'new' || ask === 'solo') && <Confirm title="Start over?" body="A new draft replaces the one in progress. Finished drafts stay in Past Drafts." yes="New draft" danger onYes={ask === 'solo' ? onSolo : onNew} onClose={() => setAsk(null)} />}
       {ask === 'abandon' && <Confirm title="Abandon draft?" body="The draft in progress will be deleted." yes="Abandon" danger onYes={onAbandon} onClose={() => setAsk(null)} />}
     </div>
   );
@@ -711,6 +726,52 @@ function TopicEditor({ topic, folders, onChange, onBack, onDuplicate, onDelete }
 /* ============================================================
    SETUP: managers → topic → rules
    ============================================================ */
+/* ============================================================
+   SOLO SETUP
+   ============================================================ */
+const DEFAULT_SOLO = { name: 'You', bots: 3, level: 'medium', talk: true, clock: 8, topicId: 't-pl', seed: 'start' };
+function SoloSetup({ cfg, setCfg, topic, rules, onBack, onPickTopic, onRules, onStart }) {
+  const bots = makeBots(cfg.bots, cfg.level, cfg.seed, [COLORS[1]]);
+  const valid = topic && topic.items.length && topic.slots.length && cfg.name.trim();
+  const level = BOT_LEVELS[cfg.level];
+  return (
+    <div className="app">
+      <TopBar onBack={onBack} title="Solo · vs bots" />
+      <div><h2 className="display">You vs the bots</h2><p className="hint">Bots bid on their own. Each item sells when its clock runs out.</p></div>
+      <div className="card stack">
+        <div className="field"><label htmlFor="solo-name">Your name</label><input id="solo-name" className="input" maxLength={16} value={cfg.name} onChange={(e) => setCfg({ ...cfg, name: e.target.value })} placeholder="You" /></div>
+        <div className="field"><label htmlFor="solo-bots">Bots</label><Stepper id="solo-bots" value={cfg.bots} min={1} max={7} onChange={(v) => setCfg({ ...cfg, bots: v })} /></div>
+        <div className="field"><span className="label">Difficulty</span><Seg label="Difficulty" value={cfg.level} options={[['easy', 'Easy'], ['medium', 'Medium'], ['hard', 'Hard']]} onChange={(v) => setCfg({ ...cfg, level: v })} />
+          <p className="hint">{cfg.level === 'easy' ? 'Bots make mistakes, waste money and miss bargains.' : cfg.level === 'medium' ? 'Bots play sensibly and avoid most silly bidding wars.' : 'Bots budget carefully, read the table and plan for the endgame. No cheating.'}</p></div>
+        <div className="field"><span className="label">Bid clock</span><Seg label="Bid clock" value={cfg.clock} options={[[6, '6s'], [8, '8s'], [12, '12s']]} onChange={(v) => setCfg({ ...cfg, clock: v })} /></div>
+        <Toggle on={cfg.talk} onChange={(v) => setCfg({ ...cfg, talk: v })} title="Trash talk" sub="Bots react to bids, wins and losses with short speech bubbles." />
+      </div>
+      <div className="card stack">
+        <div className="row"><h3 className="grow">The table</h3><button className="btn btn-sm" onClick={() => setCfg({ ...cfg, seed: uid() })}>Shuffle bots</button></div>
+        <div className="stack-sm">
+          {bots.map((b) => (
+            <div key={b.id} className="botrow" style={mStyle(b)}>
+              <span className="be">{b.emoji}</span>
+              <span className="grow" style={{ minWidth: 0 }}><b>{b.name}</b><span className="small muted" style={{ display: 'block' }}>{BOT_TYPES[b.bot.type].label}</span></span>
+              <span className="lvl">{level.label}</span>
+            </div>
+          ))}
+        </div>
+      </div>
+      <div className="card stack">
+        <button className="tcard" style={{ border: 0, padding: 0, background: 'none' }} onClick={onPickTopic}>
+          <span className="em">{topic ? topic.emoji : '🎲'}</span>
+          <span className="meta"><span className="name">{topic ? topic.name : 'Pick a topic'}</span><span className="sub">{topic ? topic.items.length + ' items · ' + rules.slots.join(', ') : 'Tap to choose'}</span></span>
+          <span className="muted" style={{ fontSize: 15, fontWeight: 700 }}>Change</span>
+        </button>
+        <button className="btn btn-sm" style={{ alignSelf: 'flex-start' }} onClick={onRules} disabled={!topic}>House rules: {money(rules.budget)} budget · min {money(rules.minBid)}</button>
+      </div>
+      <p className="hint" style={{ textAlign: 'center' }}>{cfg.bots} {cfg.bots === 1 ? 'bot' : 'bots'} · {level.label} · {cfg.clock}s clock · trash talk {cfg.talk ? 'on' : 'off'}</p>
+      <button className="btn btn-gold" disabled={!valid} onClick={() => onStart(bots)}>Start solo draft</button>
+    </div>
+  );
+}
+
 function SetupManagers({ managers, setManagers, onBack, onNext }) {
   const upd = (i, patch) => setManagers(managers.map((m, k) => (k === i ? { ...m, ...patch } : m)));
   const move = (i, dir) => { const a = [...managers]; const j = i + dir; if (j < 0 || j >= a.length) return; [a[i], a[j]] = [a[j], a[i]]; setManagers(a); };
@@ -806,7 +867,7 @@ function SetupTopic({ topics, onBack, onPick, onTopics, folder, setFolder }) {
   );
 }
 
-function SetupRules({ topic, managers, rules, setRules, onBack, onStart }) {
+function SetupRules({ topic, managers, rules, setRules, onBack, onStart, startLabel = 'Start the draft', title = '3 · Rules' }) {
   const [slotTxt, setSlotTxt] = useState(rules.slots.join(', '));
   const slots = parseSlots(slotTxt);
   const set = (p) => setRules({ ...rules, ...p });
@@ -819,7 +880,7 @@ function SetupRules({ topic, managers, rules, setRules, onBack, onStart }) {
   const posMissing = [...new Set(topic.items.map((i) => i.pos).filter((p) => p && !slots.some((s) => norm(s) === norm(p))))];
   return (
     <div className="app">
-      <TopBar onBack={onBack} title="3 · Rules" />
+      <TopBar onBack={onBack} title={title} />
       <div><p className="eyebrow">{topic.emoji} {topic.name}</p><h2 className="display">House rules</h2></div>
       <div className="card stack">
         <div className="field"><label htmlFor="r-budget">Starting budget</label><Stepper id="r-budget" prefix="$" value={rules.budget} min={1} max={999} onChange={(v) => set({ budget: v })} /></div>
@@ -842,7 +903,7 @@ function SetupRules({ topic, managers, rules, setRules, onBack, onStart }) {
           <p className="hint">{rules.noBids === 'back' ? 'An unsold item comes round once more, then goes to the leftovers.' : 'Unsold items go to the leftovers for free picks at the end.'}</p></div>
       </div>
       {problems.map((p) => <p key={p} className={p.startsWith('Heads up') ? 'hint' : 'warn'}>{p}</p>)}
-      <button className="btn btn-gold" disabled={blocking.length > 0} onClick={() => onStart({ ...rules, slots })}>Start the draft</button>
+      <button className="btn btn-gold" disabled={blocking.length > 0} onClick={() => onStart({ ...rules, slots })}>{startLabel}</button>
     </div>
   );
 }
@@ -850,30 +911,60 @@ function SetupRules({ topic, managers, rules, setRules, onBack, onStart }) {
 /* ============================================================
    AUCTION
    ============================================================ */
-function ManagerButton({ d, m, onBid, onCustom, disabledAll }) {
+function ManagerButton({ d, m, onBid, onCustom, disabledAll, readOnly, bubble, thinking }) {
   const amt = nextAmount(d);
   const isLead = d.bid && d.bid.leaderId === m.id;
   const blocker = bidBlocker(d, m);
-  const enabled = !disabledAll && !blocker && canBid(d, m, amt);
-  const customOk = !disabledAll && canBid(d, m, d.bid ? d.bid.amount + 1 : d.rules.minBid);
+  const enabled = !readOnly && !disabledAll && !blocker && canBid(d, m, amt);
+  const customOk = !readOnly && !disabledAll && canBid(d, m, d.bid ? d.bid.amount + 1 : d.rules.minBid);
   const t = useRef(null); const fired = useRef(true);
   const down = () => { if (!customOk) return; fired.current = false; t.current = setTimeout(() => { fired.current = true; buzz(25); onCustom(); }, 550); };
   const up = () => { clearTimeout(t.current); if (!fired.current && enabled) onBid(amt); fired.current = true; };
   const cancel = () => { clearTimeout(t.current); fired.current = true; };
   const filled = d.rules.slots.length - emptyCount(m);
+  const botInfo = isBot(m) ? BOT_TYPES[m.bot.type] : null;
+  const status = isLead ? <span className="badge">★ Leading{enabled ? ' · tap +' + money(d.rules.inc) : ''}</span>
+    : thinking ? <span className="badge think">Thinking…</span>
+    : readOnly ? (blocker || (botInfo ? botInfo.short : 'Watching'))
+    : (blocker || 'Tap: ' + money(amt));
+  const dim = readOnly ? !!blocker && !isLead : (!isLead && !enabled && !customOk);
+  const handlers = readOnly ? {} : { onPointerDown: down, onPointerUp: up, onPointerLeave: cancel, onPointerCancel: cancel,
+    onKeyDown: (e) => { if ((e.key === 'Enter' || e.key === ' ') && enabled) { e.preventDefault(); onBid(amt); } } };
   return (
-    <div role="button" tabIndex={enabled ? 0 : -1} aria-disabled={!enabled}
-      className={'mgr' + (isLead ? ' isLead' : '') + (!isLead && !enabled && !customOk ? ' off' : '')}
-      style={mStyle(m)}
-      onPointerDown={down} onPointerUp={up} onPointerLeave={cancel} onPointerCancel={cancel}
-      onContextMenu={(e) => e.preventDefault()}
-      onKeyDown={(e) => { if ((e.key === 'Enter' || e.key === ' ') && enabled) { e.preventDefault(); onBid(amt); } }}>
+    <div role={readOnly ? 'group' : 'button'} tabIndex={enabled ? 0 : -1} aria-disabled={readOnly ? undefined : !enabled} aria-label={readOnly ? m.name + (botInfo ? ', ' + botInfo.label : '') : undefined}
+      className={'mgr' + (isLead ? ' isLead' : '') + (dim ? ' off' : '') + (thinking ? ' thinking' : '') + (m.human ? ' you' : '')}
+      style={mStyle(m)} onContextMenu={(e) => e.preventDefault()} {...handlers}>
+      {bubble && <span className="bubble" key={bubble.id} role="status">{bubble.text}</span>}
       <span className="who">{m.emoji} {m.name}</span>
       <span className="money num">{money(m.budget)}</span>
-      <span className="st">{isLead ? <span className="badge">★ Leading{enabled ? ' · tap +' + money(d.rules.inc) : ''}</span> : (blocker || 'Tap: ' + money(amt))} · {filled}/{d.rules.slots.length}</span>
+      <span className="st">{status} · {filled}/{d.rules.slots.length}</span>
       {customOk && <button className="edit" aria-label={'Custom bid for ' + m.name} onPointerDown={(e) => e.stopPropagation()} onPointerUp={(e) => e.stopPropagation()} onClick={(e) => { e.stopPropagation(); onCustom(); }}>✎</button>}
     </div>
   );
+}
+
+// Speech bubbles for bots: only on real events, rate-limited, never the same line twice in a row.
+function useBotTalk(d) {
+  const [bubbles, setBubbles] = useState({});
+  const last = useRef(0); const per = useRef({}); const timers = useRef([]);
+  const enabled = d.mode === 'solo' && !(d.solo && d.solo.talk === false);
+  useEffect(() => () => timers.current.forEach(clearTimeout), []);
+  const say = (botId, event, extra, force) => {
+    if (!enabled) return;
+    const bot = d.managers.find((m) => m.id === botId);
+    if (!isBot(bot)) return;
+    const now = Date.now();
+    if (!force && (now - last.current < ms(3000) || now - (per.current[botId] || 0) < ms(7000))) return;
+    if (!force && Math.random() > (TALK_CHANCE[event] != null ? TALK_CHANCE[event] : 0.3)) return;
+    const text = botLine(bot, event, extra);
+    if (!text) return;
+    last.current = now; per.current[botId] = now;
+    const id = now + '-' + Math.random();
+    setBubbles((b) => ({ ...b, [botId]: { text, id } }));
+    timers.current.push(setTimeout(() => setBubbles((b) => { if (!b[botId] || b[botId].id !== id) return b; const n = { ...b }; delete n[botId]; return n; }), Math.max(ms(2800), 300)));
+  };
+  const later = (delay, fn) => { timers.current.push(setTimeout(fn, delay)); };
+  return { bubbles, say, later };
 }
 
 function CustomBid({ d, m, onSet, onClose }) {
@@ -926,47 +1017,105 @@ function ItemCard({ item, d }) {
   );
 }
 
+const bidKeyOf = (d) => d.reveal + ':' + (d.bid ? d.bid.amount + d.bid.leaderId : 'none');
+
 function Auction({ d, setDraft, goHome, flashing, onFlash }) {
   const item = currentItem(d);
+  const solo = d.mode === 'solo';
   const [paused, setPaused] = useState(false);
   const [gavel, setGavel] = useState(false);
   const [custom, setCustom] = useState(null);
   const [teams, setTeams] = useState(false);
+  const [thinking, setThinking] = useState(null);
+  const [out, setOut] = useState(false); // solo: you tapped "I'm out" for this item
   const busy = useRef(false);
-  const timer = d.rules.timer || 0;
+  // Solo games always run a closing clock so items sell on their own.
+  const timer = solo ? ((d.solo && d.solo.clock) || 8) : (d.rules.timer || 0);
   const [left, setLeft] = useState(timer);
-  const bidKey = d.reveal + ':' + (d.bid ? d.bid.amount + d.bid.leaderId : 'none');
+  const bidKey = bidKeyOf(d);
+  const talk = useBotTalk(d);
+  // Refs let delayed bot actions check the *current* game before acting.
+  const live = useRef({}); live.current = { d, paused, flashing, gavel, left };
   useEffect(() => { setLeft(timer); }, [bidKey, timer]);
+  useEffect(() => { setOut(false); }, [d.reveal]);
 
   const leader = d.bid && d.managers.find((m) => m.id === d.bid.leaderId);
   const total = d.processed + d.queue.length;
+  const you = solo ? d.managers.find((m) => m.human) : null;
 
   function sold() {
     if (!d.bid || busy.current || flashing) return;
     busy.current = true;
-    const info = { kind: 'sold', name: leader.name, emoji: leader.emoji, color: leader.color, price: d.bid.amount, item: item.name };
-    buzz([40, 30, 160]); setGavel(true);
-    setTimeout(() => { setGavel(false); onFlash(info); setDraft((p) => sell(p)); busy.current = false; }, 520);
+    const price = d.bid.amount; const winnerId = d.bid.leaderId;
+    const bidders = [...new Set(d.bids.filter(Boolean).map((b) => b.leaderId))].filter((id) => id !== winnerId);
+    const info = { kind: 'sold', name: leader.name, emoji: leader.emoji, color: leader.color, price, item: item.name };
+    buzz([40, 30, 160]); setGavel(true); setThinking(null);
+    setTimeout(() => {
+      setGavel(false); onFlash(info); setDraft((p) => sell(p)); busy.current = false;
+      if (solo) talk.later(ms(1900), () => {
+        const fair = d.rules.budget / d.rules.slots.length;
+        if (isBot(leader)) talk.say(winnerId, price <= d.rules.minBid + d.rules.inc && itemFame(item) > 0.45 ? 'steal' : 'win');
+        else if (price >= fair * 1.4) { const b = d.managers.find((m) => isBot(m)); if (b) talk.say(b.id, 'rival'); }
+        const loser = bidders.map((id) => d.managers.find((m) => m.id === id)).find(isBot);
+        if (loser) talk.later(ms(900), () => talk.say(loser.id, 'lose'));
+      });
+    }, ms(520));
   }
   function skip() {
     if (busy.current || flashing) return;
     const back = d.rules.noBids === 'back' && !d.passed.includes(d.queue[0]);
+    setThinking(null);
     onFlash({ kind: 'skip', item: item.name, back });
     setDraft((p) => skipItem(p));
   }
 
+  // Closing clock: a steady ticker that restarts on every bid, so a bid landing on the
+  // same instant as a tick can never stall it.
   useEffect(() => {
-    if (!timer || paused || flashing || gavel) return;
-    if (left <= 0) { if (d.bid) sold(); return; }
-    const t = setTimeout(() => setLeft((l) => l - 1), 1000);
-    return () => clearTimeout(t);
+    if (!timer || paused || flashing || gavel) return undefined;
+    const t = setInterval(() => setLeft((l) => (l > 0 ? l - 1 : 0)), ms(1000));
+    return () => clearInterval(t);
+  }, [bidKey, paused, flashing, gavel, timer]);
+  useEffect(() => {
+    if (!timer || paused || flashing || gavel || left > 0) return;
+    if (d.bid) sold(); else if (solo) skip();
   }, [left, paused, flashing, gavel, timer]);
+
+  // Solo: one bot at a time considers the current price, then bids after a short, human-ish delay.
+  useEffect(() => {
+    if (!solo || paused || flashing || gavel || busy.current || d.phase !== 'auction') { setThinking(null); return undefined; }
+    const plan = nextBotAction(d);
+    if (!plan) { setThinking(null); return undefined; }
+    setThinking(plan.botId);
+    const key = bidKey;
+    const t = setTimeout(() => {
+      const cur = live.current;
+      if (bidKeyOf(cur.d) !== key || cur.paused || cur.flashing || cur.gavel || busy.current || cur.left <= 0 || cur.d.phase !== 'auction') return;
+      setThinking(null);
+      setDraft((p) => (bidKeyOf(p) === key && p.phase === 'auction' ? placeBid(p, plan.botId, plan.amount) : p));
+      talk.say(plan.botId, plan.event);
+    }, ms(plan.delay));
+    return () => clearTimeout(t);
+  }, [bidKey, paused, flashing, gavel, solo]);
+
+  // Solo: a little pre-game talk, and the strategist grumbles about items it can't use.
+  useEffect(() => {
+    if (!solo || flashing) return;
+    if (d.processed === 0 && !d.bid) { const b = d.managers.filter(isBot); if (b.length) talk.say(b[Math.floor(Math.random() * b.length)].id, 'start', null, true); return; }
+    const planner = d.managers.find((m) => isBot(m) && m.bot.type === 'needs' && !isFull(m) && item && assignSlot(m, item, d.rules.slots) < 0);
+    if (planner) { const k = planner.team.findIndex((x) => !x); talk.say(planner.id, 'need', { slot: d.rules.slots[k] }); }
+  }, [d.reveal, flashing]);
 
   if (!item) return null;
   const lc = leader ? leader.color : null;
   const showCard = !flashing;
+  const thinker = thinking && d.managers.find((m) => m.id === thinking);
+  const youAmt = you ? nextAmount(d) : 0;
+  const youCan = you && !paused && !flashing && !gavel && canBid(d, you, youAmt);
+  const going = timer > 0 && d.bid && left <= 2 && left > 0 ? (left === 2 ? 'Going once…' : 'Going twice…') : null;
+  const ordered = solo ? [...d.managers].sort((a, b) => (b.human ? 1 : 0) - (a.human ? 1 : 0)) : d.managers;
   return (
-    <div className="app auction">
+    <div className={'app auction' + (solo ? ' solo' : '')}>
       <div className="topbar">
         <button className="iconbtn" onClick={goHome} aria-label="Home">⌂</button>
         <div className="title num">Item {d.processed + 1} of {total}</div>
@@ -980,7 +1129,8 @@ function Auction({ d, setDraft, goHome, flashing, onFlash }) {
         <div className={'bidbox' + (leader ? ' lead' : '')} style={lc ? { '--lc': lc } : null}>
           {timer > 0 && <span className={'timernum num' + (left <= 3 ? ' hot' : '')}>{Math.max(0, left)}</span>}
           <div key={bidKey} className={'amount num' + (leader ? ' pop' : '')}>{money(d.bid ? d.bid.amount : d.rules.minBid)}</div>
-          <div className="leader" style={{ color: lc || 'var(--muted)' }}>{leader ? leader.emoji + ' ' + leader.name + ' leads' : timer > 0 && left <= 0 ? "Time's up · no bids" : 'Opening bid · tap a manager'}</div>
+          <div className="leader" style={{ color: lc || 'var(--muted)' }}>{leader ? leader.emoji + ' ' + leader.name + ' leads' : timer > 0 && left <= 0 ? "Time's up · no bids" : solo ? 'Opening bid · bid or wait' : 'Opening bid · tap a manager'}</div>
+          <div className="going" aria-live="polite">{going || (thinker ? '💭 ' + thinker.name + ' is thinking…' : solo && out ? 'You’re out on this one' : ' ')}</div>
           {timer > 0 && <span className="timer" style={{ width: (Math.max(0, left) / timer) * 100 + '%' }} />}
         </div>
         {paused && (
@@ -994,21 +1144,31 @@ function Auction({ d, setDraft, goHome, flashing, onFlash }) {
       </div>
 
       <div className="mgr-grid">
-        {d.managers.map((m) => (
-          <ManagerButton key={m.id} d={d} m={m} disabledAll={paused || flashing || gavel}
-            onBid={(amt) => { buzz(12); setDraft((p) => placeBid(p, m.id, amt)); }}
+        {ordered.map((m) => (
+          <ManagerButton key={m.id} d={d} m={m} disabledAll={paused || flashing || gavel} readOnly={solo && !m.human}
+            bubble={talk.bubbles[m.id]} thinking={thinking === m.id}
+            onBid={(amt) => { buzz(12); setOut(false); setDraft((p) => placeBid(p, m.id, amt)); }}
             onCustom={() => setCustom(m.id)} />
         ))}
       </div>
-      <p className="hint" style={{ textAlign: 'center' }}>Tap to bid +{money(d.rules.inc)} · hold or ✎ for a custom bid</p>
+      <p className="hint" style={{ textAlign: 'center' }}>{solo ? 'Tap Bid to raise +' + money(d.rules.inc) + ' · ✎ on your card for a custom bid · it sells when the clock runs out' : 'Tap to bid +' + money(d.rules.inc) + ' · hold or ✎ for a custom bid'}</p>
 
-      <div className="actions">
-        <button className="btn" onClick={() => setDraft((p) => undo(p))} disabled={paused || flashing || (!d.bid && !d.history.length)}>{undoLabel(d)}</button>
-        <button className="btn" onClick={skip} disabled={paused || flashing || !!d.bid}>No bids</button>
-        <button className="btn btn-gold sold" onClick={sold} disabled={paused || flashing || !d.bid}>Sold!</button>
-      </div>
+      {solo ? (
+        <div className="actions duo">
+          <button className="btn" disabled={paused || flashing || out || !(you && canBid(d, you, youAmt))} onClick={() => { setOut(true); setLeft((l) => Math.min(l, 3)); }}>I’m out</button>
+          <button className="btn btn-gold sold" disabled={!youCan} onClick={() => { buzz(12); setOut(false); setDraft((p) => placeBid(p, you.id, nextAmount(p))); }}>
+            {you && isFull(you) ? 'Team full' : you && !canBid(d, you, youAmt) ? 'Can’t bid' : (d.bid && d.bid.leaderId === you.id ? 'Raise to ' : 'Bid ') + money(youAmt)}
+          </button>
+        </div>
+      ) : (
+        <div className="actions">
+          <button className="btn" onClick={() => setDraft((p) => undo(p))} disabled={paused || flashing || (!d.bid && !d.history.length)}>{undoLabel(d)}</button>
+          <button className="btn" onClick={skip} disabled={paused || flashing || !!d.bid}>No bids</button>
+          <button className="btn btn-gold sold" onClick={sold} disabled={paused || flashing || !d.bid}>Sold!</button>
+        </div>
+      )}
       {gavel && <div className="gavel" aria-hidden="true">🔨</div>}
-      {custom && <CustomBid d={d} m={d.managers.find((x) => x.id === custom)} onSet={(n) => { buzz(12); setDraft((p) => placeBid(p, custom, n)); }} onClose={() => setCustom(null)} />}
+      {custom && <CustomBid d={d} m={d.managers.find((x) => x.id === custom)} onSet={(n) => { buzz(12); setOut(false); setDraft((p) => placeBid(p, custom, n)); }} onClose={() => setCustom(null)} />}
       {teams && <TeamsSheet d={d} onClose={() => setTeams(false)} />}
     </div>
   );
@@ -1019,38 +1179,59 @@ function Auction({ d, setDraft, goHome, flashing, onFlash }) {
    ============================================================ */
 function FreePick({ d, setDraft, goHome, flashing, onFlash }) {
   const [teams, setTeams] = useState(false);
+  const [paused, setPaused] = useState(false);
+  const talk = useBotTalk(d);
   const cp = currentPicker(d);
-  if (!cp) return null;
-  const m = cp.m;
-  const avail = d.leftover.filter((id) => canTake(d, m, id));
+  const m = cp && cp.m;
+  const botTurn = !!(m && d.mode === 'solo' && isBot(m));
+  const live = useRef({}); live.current = { d, flashing, paused };
   const pick = (id) => {
-    if (flashing) return;
+    if (flashing || !m) return;
     onFlash({ kind: 'free', name: m.name, emoji: m.emoji, color: m.color, item: d.items[id].name });
     setDraft((p) => freePick(p, id));
   };
+  // Solo: bots take their free pick after a short pause.
+  const turnKey = d.reveal + ':' + (m ? m.id : '');
+  useEffect(() => {
+    if (!botTurn || flashing || paused) return undefined;
+    const choice = botFreePickChoice(d, m);
+    if (!choice) return undefined;
+    const t = setTimeout(() => {
+      const cur = live.current;
+      if (cur.flashing || cur.paused || (cur.d.reveal + ':' + ((currentPicker(cur.d) || {}).m || {}).id) !== turnKey) return;
+      pick(choice);
+      talk.later(ms(1900), () => talk.say(m.id, 'free'));
+    }, ms(1100));
+    return () => clearTimeout(t);
+  }, [turnKey, flashing, paused, botTurn]);
+  if (!cp) return null;
+  const avail = d.leftover.filter((id) => canTake(d, m, id));
   return (
     <div className="app">
       <div className="topbar">
         <button className="iconbtn" onClick={goHome} aria-label="Home">⌂</button>
         <div className="title">Free picks · round {cp.round + 1}</div>
         <button className="pillbtn" onClick={() => setTeams(true)}>Teams</button>
+        {d.mode === 'solo' && <button className="iconbtn" onClick={() => setPaused((p) => !p)} aria-label={paused ? 'Resume' : 'Pause'}>{paused ? '▶' : 'Ⅱ'}</button>}
       </div>
       <p className="hint" style={{ textAlign: 'center' }}>The auction is over and some teams still have empty slots. Leftovers are free, picked in snake order.</p>
       <div className="picker" style={mStyle(m)}>
         <p className="eyebrow">On the clock</p>
         <h2 className="display" style={{ fontSize: 48 }}>{m.emoji} {m.name}</h2>
         <p className="small" style={{ margin: 0 }}>{emptyCount(m)} empty slot{emptyCount(m) === 1 ? '' : 's'} · {money(m.budget)} left</p>
+        {botTurn && <p className="going" style={{ margin: '6px 0 0' }}>{paused ? 'Paused' : '💭 Picking…'}</p>}
       </div>
+      {Object.entries(talk.bubbles).map(([id, bb]) => { const who = d.managers.find((x) => x.id === id); return who ? <p key={bb.id} className="bubble inline" style={mStyle(who)}><b>{who.emoji} {who.name}:</b> {bb.text}</p> : null; })}
       <div className="pickgrid">
         {avail.map((id) => { const it = d.items[id]; return (
-          <button key={id} className="pickbtn" onClick={() => pick(id)} disabled={flashing}>
+          <button key={id} className="pickbtn" onClick={() => pick(id)} disabled={flashing || botTurn}>
             <Thumb item={it} topic={d.topic} />
             <span className="grow" style={{ minWidth: 0 }}><b style={{ display: 'block' }}>{it.name} {it.pos && <span className="pos">{it.pos}</span>}</b><span className="small muted">{it.desc}</span></span>
             <span style={{ fontFamily: 'var(--display)', color: 'var(--ok)', fontSize: 18 }}>FREE</span>
           </button>
         ); })}
       </div>
-      <button className="btn" onClick={() => setDraft((p) => undo(p))} disabled={!d.history.length || flashing}>{undoLabel(d)}</button>
+      {d.mode !== 'solo' && <button className="btn" onClick={() => setDraft((p) => undo(p))} disabled={!d.history.length || flashing}>{undoLabel(d)}</button>}
       {teams && <TeamsSheet d={d} onClose={() => setTeams(false)} />}
     </div>
   );
@@ -1122,38 +1303,51 @@ function Confetti({ colors }) {
   return <canvas ref={ref} className="confetti" aria-hidden="true" />;
 }
 
-function Voting({ d, onVote, onReveal, onClose }) {
-  const [voter, setVoter] = useState(null);
+const hasVoted = (d, id) => Object.prototype.hasOwnProperty.call(d.votes || {}, id);
+
+// Secret vote. Local: pass the phone, everyone votes. Solo: you vote, then the bots vote.
+function Voting({ d, onVote, onReveal, onClose, onSoloVote }) {
+  const solo = d.mode === 'solo';
+  const you = solo ? d.managers.find((m) => m.human) : null;
+  const [voter, setVoter] = useState(solo && you ? you.id : null);
   const [choice, setChoice] = useState(null);
   const [locked, setLocked] = useState(false);
   const voted = Object.keys(d.votes || {}).length;
   if (locked) return (
     <Sheet center onClose={() => {}}>
       <h2 className="display" style={{ fontSize: 40, textAlign: 'center' }}>Vote locked 🔒</h2>
-      <p className="muted" style={{ textAlign: 'center', margin: 0 }}>Pass the phone to the next manager.</p>
-      <button className="btn btn-gold" onClick={() => { setLocked(false); setVoter(null); setChoice(null); }}>Next voter</button>
+      {solo ? <p className="muted" style={{ textAlign: 'center', margin: 0 }}>🤖 The bots are voting…</p>
+        : <>
+          <p className="muted" style={{ textAlign: 'center', margin: 0 }}>Pass the phone to the next manager.</p>
+          <button className="btn btn-gold" onClick={() => { setLocked(false); setVoter(null); setChoice(null); }}>Next voter</button>
+        </>}
     </Sheet>
   );
   if (voter) {
     const v = d.managers.find((m) => m.id === voter);
+    const choices = voteChoices(d, voter);
+    const submit = (target) => {
+      buzz(30);
+      if (solo) { setLocked(true); onSoloVote(target); } else { onVote(voter, target); setLocked(true); }
+    };
     return (
-      <Sheet center onClose={() => { setVoter(null); setChoice(null); }}>
+      <Sheet center onClose={() => { if (solo) onClose(); else { setVoter(null); setChoice(null); } }}>
         <p className="eyebrow">Secret vote</p>
         <h2 className="display" style={{ fontSize: 32, color: v.color }}>{v.emoji} {v.name}, pick the best team</h2>
-        <p className="hint">You can't vote for your own.</p>
+        {choices.length ? <p className="hint">You can't vote for your own team.</p> : <p className="hint">There's no other team with players to vote for, so you can skip your vote.</p>}
         <div className="stack-sm">
-          {d.managers.filter((m) => m.id !== voter).map((m) => (
+          {choices.map((m) => (
             <button key={m.id} className="votebtn" style={{ ...mStyle(m), alignItems: 'stretch', textAlign: 'left' }} aria-pressed={choice === m.id} onClick={() => setChoice(m.id)}>
-              <span>{m.emoji} {m.name}</span>
-              <span className="teamtxt">{m.team.filter(Boolean).map((t) => d.items[t.itemId].name).join(', ') || 'No items'}</span>
+              <span>{m.emoji} {m.name}{isBot(m) ? <small style={{ fontFamily: 'var(--body)', fontWeight: 600, opacity: 0.8 }}> · {BOT_TYPES[m.bot.type].label}</small> : null}</span>
+              <span className="teamtxt">{m.team.filter(Boolean).map((t) => d.items[t.itemId].name).join(', ')}</span>
             </button>
           ))}
         </div>
         <div className="row pin">
-          <button type="button" className="btn btn-ghost grow" onClick={() => { setVoter(null); setChoice(null); }}>Back</button>
-          <button type="button" className="btn btn-gold grow" disabled={!choice} onClick={() => { if (!choice) return; buzz(30); onVote(voter, choice); setLocked(true); }}>
-            {choice ? 'Lock in ' + d.managers.find((m) => m.id === choice).name : 'Pick a team'}
-          </button>
+          <button type="button" className="btn btn-ghost grow" onClick={() => { if (solo) onClose(); else { setVoter(null); setChoice(null); } }}>Back</button>
+          {choices.length
+            ? <button type="button" className="btn btn-gold grow" disabled={!choice} onClick={() => { if (choice) submit(choice); }}>{choice ? 'Lock in ' + d.managers.find((m) => m.id === choice).name : 'Pick a team'}</button>
+            : <button type="button" className="btn btn-gold grow" onClick={() => submit(null)}>Skip my vote</button>}
         </div>
       </Sheet>
     );
@@ -1162,10 +1356,10 @@ function Voting({ d, onVote, onReveal, onClose }) {
     <Sheet center onClose={onClose}>
       <p className="eyebrow">Secret vote · {voted} of {d.managers.length} in</p>
       <h2 className="display" style={{ fontSize: 34 }}>Pass the phone around</h2>
-      <p className="hint">Each manager taps their own name, then votes in private.</p>
+      <p className="hint">Each manager taps their own name, then votes in private. Votes stay hidden until the reveal.</p>
       <div className="votegrid">
-        {d.managers.map((m) => { const done = d.votes && d.votes[m.id]; return (
-          <button key={m.id} className="votebtn" style={mStyle(m)} disabled={!!done} onClick={() => setVoter(m.id)}>
+        {d.managers.map((m) => { const done = hasVoted(d, m.id); return (
+          <button key={m.id} className="votebtn" style={mStyle(m)} disabled={done} onClick={() => setVoter(m.id)}>
             <span style={{ fontSize: 24 }}>{done ? '✅' : m.emoji}</span>{m.name}
           </button>
         ); })}
@@ -1178,7 +1372,7 @@ function Voting({ d, onVote, onReveal, onClose }) {
   );
 }
 
-function Results({ d, past, onChange, onBack, onUndo, onFinish, live }) {
+function Results({ d, past, onChange, onBack, onUndo, onFinish, onPlayAgain, live }) {
   const ref = useRef(null);
   const [voting, setVoting] = useState(false);
   const [img, setImg] = useState(null);
@@ -1188,6 +1382,20 @@ function Results({ d, past, onChange, onBack, onUndo, onFinish, live }) {
   const stats = useMemo(() => draftStats(d), [d]);
   const { counts, winners } = tally(d);
   const revealed = d.votesRevealed && winners.length > 0;
+  const noVotes = d.votesRevealed && !winners.length;
+  const solo = d.mode === 'solo';
+  const doReveal = () => { setVoting(false); setParty((x) => x + 1); buzz([60, 40, 60, 40, 200]); window.scrollTo({ top: 0, behavior: 'smooth' }); };
+  // Solo: your vote, then every bot votes for the team it rates highest (never its own), all revealed together.
+  const soloVote = (target) => {
+    setTimeout(() => {
+      const votes = { ...(d.votes || {}) };
+      const you = d.managers.find((m) => m.human);
+      if (you && !hasVoted(d, you.id)) votes[you.id] = target;
+      d.managers.filter(isBot).forEach((b) => { if (!Object.prototype.hasOwnProperty.call(votes, b.id)) votes[b.id] = botVote(d, b); });
+      onChange({ ...d, votes, votesRevealed: true });
+      doReveal();
+    }, ms(1400));
+  };
   const winIds = revealed ? winners.map((w) => w.id) : [];
   const ordered = revealed ? [...d.managers].sort((a, b) => counts[b.id] - counts[a.id]) : d.managers;
   const exportImg = async () => {
@@ -1214,11 +1422,13 @@ function Results({ d, past, onChange, onBack, onUndo, onFinish, live }) {
           <p className="eyebrow">{d.topic.emoji} {d.topic.name} · {new Date(d.createdAt).toLocaleDateString()}</p>
           <h2 className="display" style={{ fontSize: 46 }}>{revealed ? 'We have a winner' : 'Final teams'}</h2>
         </div>
+        {noVotes && <div className="card"><b>No votes were cast</b><p className="hint" style={{ margin: '4px 0 0' }}>Nobody had a team they could vote for, so there's no winner this time.</p></div>}
         {revealed && (
           <div className="winner">
             <p className="eyebrow" style={{ color: 'var(--gold-ink)' }}>Best team · {counts[winners[0].id]} vote{counts[winners[0].id] === 1 ? '' : 's'}</p>
             <div className="display">{winners.map((w) => w.emoji + ' ' + w.name).join(' & ')}</div>
             {winners.length > 1 && <p className="small" style={{ margin: 0, fontWeight: 700 }}>It's a tie!</p>}
+            {solo && winners.some((w) => w.human) && <p className="small" style={{ margin: '4px 0 0', fontWeight: 700 }}>You beat the bots!</p>}
           </div>
         )}
         {ordered.map((m) => <TeamCard key={m.id} d={d} m={m} win={winIds.includes(m.id)} />)}
@@ -1228,9 +1438,9 @@ function Results({ d, past, onChange, onBack, onUndo, onFinish, live }) {
           <div className="stat"><span className="k">Biggest spender</span><span className="v num">{money(stats.spender.s)}</span><span className="d">{stats.spender.m.emoji} {stats.spender.m.name}</span></div>
           <div className="stat"><span className="k">Cheapest team</span><span className="v num">{money(stats.cheapest.s)}</span><span className="d">{stats.cheapest.m.emoji} {stats.cheapest.m.name}</span></div>
         </div>
-        {revealed && (
+        {d.votesRevealed && !noVotes && (
           <div className="board">
-            <h3>🗳️ Vote tally</h3>
+            <h3>🗳️ Vote tally{solo ? ' · final standings' : ''}</h3>
             {ordered.map((m) => (
               <div key={m.id} className={'brow' + (winIds.includes(m.id) ? ' hl' : '')} style={mStyle(m)}>
                 <span className="bn">{m.emoji} {m.name}</span>
@@ -1240,21 +1450,27 @@ function Results({ d, past, onChange, onBack, onUndo, onFinish, live }) {
             ))}
           </div>
         )}
+        {d.votesRevealed && !noVotes && (
+          <p className="hint" style={{ textAlign: 'center' }}>{d.managers.map((m) => { const t = d.votes && d.votes[m.id]; const to = t && d.managers.find((x) => x.id === t); return m.name + ' → ' + (to ? to.name : 'no vote'); }).join(' · ')}</p>
+        )}
         {revealed && <Leaderboard rows={winsBoard([...(past || []).filter((p) => p.id !== d.id), d])} highlight={winners.map((w) => w.name.trim().toLowerCase())} />}
         <p className="exportfoot">DRAFT NIGHT · {(location.host + location.pathname).replace(/\/(index\.html)?$/, '')}</p>
       </div>
 
       <div className="stack">
-        {!revealed && <button className="btn btn-gold" onClick={() => setVoting(true)}>{Object.keys(d.votes || {}).length ? 'Continue the vote' : 'Start the secret vote'}</button>}
+        {!d.votesRevealed && <button className="btn btn-gold" onClick={() => setVoting(true)}>{solo ? 'Vote for the best team' : Object.keys(d.votes || {}).length ? 'Continue the vote' : 'Start the secret vote'}</button>}
+        {live && onPlayAgain && d.votesRevealed && <button className="btn btn-gold" onClick={onPlayAgain}>Play again</button>}
         <button className="btn" onClick={exportImg} disabled={imgBusy}>{imgBusy ? 'Making image…' : 'Save as image'}</button>
         {imgErr && <p className="warn">{imgErr}</p>}
-        {revealed && <button className="btn btn-ghost" onClick={() => onChange({ ...d, votes: {}, votesRevealed: false })}>Redo the vote</button>}
+        {d.votesRevealed && <button className="btn btn-ghost" onClick={() => onChange({ ...d, votes: {}, votesRevealed: false })}>Redo the vote</button>}
+        {live && onPlayAgain && !d.votesRevealed && <button className="btn btn-ghost" onClick={onPlayAgain}>Play again</button>}
         {live && <button className="btn btn-ghost" onClick={onFinish}>Finish · back to home</button>}
         <p className="hint" style={{ textAlign: 'center' }}>{live ? 'This draft is saved in Past Drafts.' : 'Saved in Past Drafts.'}</p>
       </div>
 
-      {voting && <Voting d={d} onVote={(v, t) => onChange({ ...d, votes: { ...(d.votes || {}), [v]: t } })}
-        onReveal={() => { onChange({ ...d, votesRevealed: true }); setVoting(false); setParty((x) => x + 1); buzz([60, 40, 60, 40, 200]); window.scrollTo({ top: 0, behavior: 'smooth' }); }}
+      {voting && <Voting d={d} onSoloVote={soloVote}
+        onVote={(v, t) => { if (!hasVoted(d, v)) onChange({ ...d, votes: { ...(d.votes || {}), [v]: t } }); }}
+        onReveal={() => { onChange({ ...d, votesRevealed: true }); doReveal(); }}
         onClose={() => setVoting(false)} />}
       {party > 0 && revealed && <Confetti key={party} colors={[...winners.map((w) => w.color), '#ffc83d', '#ffffff']} />}
       {img && (
@@ -1286,7 +1502,7 @@ function PastList({ past, onBack, onOpen, onDelete }) {
             <button className="tcard" style={{ border: 0, padding: 0, background: 'none' }} onClick={() => onOpen(p.id)}>
               <span className="em">{p.topic.emoji}</span>
               <span className="meta"><span className="name">{p.topic.name}</span>
-                <span className="sub">{new Date(p.createdAt).toLocaleDateString()} · {p.managers.map((m) => m.name).join(', ')}</span>
+                <span className="sub">{new Date(p.createdAt).toLocaleDateString()} · {p.mode === 'solo' ? 'Solo (' + (BOT_LEVELS[(p.solo || {}).level] || BOT_LEVELS.medium).label + ') · ' : ''}{p.managers.map((m) => m.name).join(', ')}</span>
                 {p.votesRevealed && winners.length > 0 && <span className="sub" style={{ color: 'var(--gold)' }}>👑 {winners.map((w) => w.name).join(' & ')}</span>}
               </span>
             </button>
@@ -1303,7 +1519,7 @@ function PastList({ past, onBack, onOpen, onDelete }) {
    FLASH (sold / skipped / free pick banner)
    ============================================================ */
 function Flash({ f, onDone }) {
-  useEffect(() => { const t = setTimeout(onDone, f.kind === 'skip' ? 1100 : 1800); return () => clearTimeout(t); }, [f]);
+  useEffect(() => { const t = setTimeout(onDone, ms(f.kind === 'skip' ? 1100 : 1800)); return () => clearTimeout(t); }, [f]);
   return (
     <div className="flash" onClick={onDone} style={{ '--fc': f.color || 'var(--muted)' }}>
       {f.kind === 'sold' && <div className="inner">
@@ -1464,6 +1680,9 @@ function App() {
   const [toast, setToast] = useState(null);
   const [folder, setFolder] = useState(null);
   const [settings, setSettings] = useState(() => store.get(K.settings, {}));
+  const soloCfg = { ...DEFAULT_SOLO, ...(settings.solo || {}) };
+  const setSoloCfg = (c) => setSettings((x) => ({ ...x, solo: c }));
+  const [soloRules, setSoloRules] = useState(null); // { topicId, rules }
   const warned = useRef(false);
   const app = usePwa();
   useEffect(() => { store.onError = (msg) => { if (!warned.current) { warned.current = true; setToast(msg); } }; }, []);
@@ -1486,6 +1705,18 @@ function App() {
   const updTopic = (t) => setTopics((ts) => ts.map((x) => (x.id === t.id ? t : x)));
   const dupTopic = (id) => { const t = topics.find((x) => x.id === id); if (!t) return null; const copy = { ...t, id: uid(), name: t.name + ' (copy)', items: t.items.map((it) => ({ ...it, id: uid() })) }; setTopics((ts) => [...ts, copy]); return copy.id; };
 
+  const soloTopic = () => topics.find((t) => t.id === soloCfg.topicId && t.items.length) || topics.find((t) => t.items.length && t.slots.length) || null;
+  const soloRulesFor = (t) => (soloRules && t && soloRules.topicId === t.id ? soloRules.rules : { ...DEFAULT_RULES, slots: t ? [...t.slots] : [] });
+  // Same topic, same managers (or bots), same rules — fresh draft.
+  const playAgain = () => {
+    if (!draft) return;
+    const t = topics.find((x) => x.id === draft.topic.id && x.items.length);
+    if (!t) { setDraft(null); go(draft.mode === 'solo' ? 'solo-setup' : 'setup-topic'); return; }
+    const extra = draft.mode === 'solo' ? { mode: 'solo', solo: { ...draft.solo } } : undefined;
+    setDraft(createDraft(t, draft.managers, { ...draft.rules }, extra));
+    go('draft');
+  };
+
   let view;
   switch (screen.name) {
     case 'topics':
@@ -1502,11 +1733,34 @@ function App() {
     case 'setup-managers':
       view = <SetupManagers managers={managers} setManagers={setManagers} onBack={() => go('home')} onNext={() => go('setup-topic')} />;
       break;
+    case 'solo-setup': {
+      const st = soloTopic();
+      view = <SoloSetup cfg={soloCfg} setCfg={setSoloCfg} topic={st} rules={soloRulesFor(st)} onBack={() => go('home')}
+        onPickTopic={() => go('setup-topic', { from: 'solo' })} onRules={() => go('setup-rules', { from: 'solo' })}
+        onStart={(bots) => {
+          const human = { id: 'you', name: soloCfg.name.trim() || 'You', color: COLORS[1], emoji: '😎', human: true };
+          setDraft(createDraft(st, [human, ...bots], soloRulesFor(st), { mode: 'solo', solo: { level: soloCfg.level, talk: soloCfg.talk, clock: soloCfg.clock } }));
+          go('draft');
+        }} />;
+      break;
+    }
     case 'setup-topic':
+      if (screen.from === 'solo') {
+        view = <SetupTopic topics={topics} folder={folder} setFolder={setFolder} onBack={() => go('solo-setup')} onTopics={() => go('topics', { from: 'solo-setup' })}
+          onPick={(id) => { setSoloCfg({ ...soloCfg, topicId: id }); go('solo-setup'); }} />;
+        break;
+      }
       view = <SetupTopic topics={topics} folder={folder} setFolder={setFolder} onBack={() => go('setup-managers')} onTopics={() => go('topics', { from: 'setup-topic' })}
         onPick={(id) => { const t = topics.find((x) => x.id === id); setTopicId(id); setRules((r) => ({ ...r, slots: [...t.slots] })); go('setup-rules'); }} />;
       break;
     case 'setup-rules': {
+      if (screen.from === 'solo') {
+        const st = soloTopic();
+        const fake = Array.from({ length: soloCfg.bots + 1 }, (_, i) => ({ id: 'x' + i }));
+        view = st ? <SetupRules topic={st} managers={fake} rules={soloRulesFor(st)} setRules={(r) => setSoloRules({ topicId: st.id, rules: r })} onBack={() => go('solo-setup')}
+          title="Solo · Rules" startLabel="Save rules" onStart={(r) => { setSoloRules({ topicId: st.id, rules: r }); go('solo-setup'); }} /> : null;
+        break;
+      }
       const t = topics.find((x) => x.id === topicId);
       view = t ? <SetupRules topic={t} managers={managers} rules={rules} setRules={setRules} onBack={() => go('setup-topic')}
         onStart={(r) => { setDraft(createDraft(t, managers, r)); go('draft'); }} /> : null;
@@ -1516,7 +1770,7 @@ function App() {
       if (!draft) { view = null; setTimeout(() => go('home'), 0); break; }
       if (draft.phase === 'auction') view = <Auction d={draft} setDraft={setDraft} goHome={() => go('home')} flashing={!!flash} onFlash={setFlash} />;
       else if (draft.phase === 'freepick') view = <FreePick d={draft} setDraft={setDraft} goHome={() => go('home')} flashing={!!flash} onFlash={setFlash} />;
-      else view = <Results d={draft} past={past} live onChange={setDraft} onBack={() => go('home')} onUndo={() => setDraft((p) => undo(p))} onFinish={() => { setDraft(null); go('home'); }} />;
+      else view = <Results d={draft} past={past} live onChange={setDraft} onBack={() => go('home')} onUndo={draft.mode === 'solo' ? null : () => setDraft((p) => undo(p))} onFinish={() => { setDraft(null); go('home'); }} onPlayAgain={playAgain} />;
       break;
     case 'past':
       view = <PastList past={past} onBack={() => go('home')} onOpen={(id) => go('past-view', { id })} onDelete={(id) => setPast((p) => p.filter((x) => x.id !== id))} />;
@@ -1544,6 +1798,7 @@ function App() {
       view = <Home draft={draft} past={past} onSettings={() => go('settings')}
         showInstall={!app.standalone && !settings.installDismissed && (app.canPrompt || isIOS())} onDismissInstall={() => setSettings((x) => ({ ...x, installDismissed: true }))}
         onNew={() => { setDraft(null); setRules({ ...DEFAULT_RULES, slots: [] }); go('setup-managers'); }}
+        onSolo={() => { setDraft(null); go('solo-setup'); }}
         onResume={() => go('draft')} onTopics={() => go('topics')} onPast={() => go('past')} onAbandon={() => setDraft(null)} />;
   }
 
@@ -1573,7 +1828,7 @@ class Boundary extends React.Component {
   }
 }
 
-if (window.__DN_TEST__) window.__DN = { createDraft, placeBid, sell, skipItem, undo, freePick, currentPicker, canTake, nextAmount, isDraftOver, draftStats, winsBoard, tally, starterTopics, migrateTopics, validateBackup, makeBackup, wikiTitleFor, PHOTO_TOPICS, store, wiki, DEFAULT_RULES, COLORS, emptyCount, assignSlot, maxBid };
+if (window.__DN_TEST__) window.__DN = { bots: { makeBots, nextBotAction, botDecision, botFreePickChoice, botVote, teamScore, voteChoices, itemFame, seeded, BOT_LEVELS, BOT_TYPES }, DEFAULT_SOLO, isFlex, canBid, createDraft, placeBid, sell, skipItem, undo, freePick, currentPicker, canTake, nextAmount, isDraftOver, draftStats, winsBoard, tally, starterTopics, migrateTopics, validateBackup, makeBackup, wikiTitleFor, PHOTO_TOPICS, store, wiki, DEFAULT_RULES, COLORS, emptyCount, assignSlot, maxBid };
 store.init().finally(() => {
   ReactDOM.createRoot(document.getElementById('root')).render(<Boundary><App /></Boundary>);
 });
