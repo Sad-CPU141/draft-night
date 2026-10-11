@@ -30,7 +30,7 @@ const canCompress = () => typeof window !== 'undefined' && typeof window.Compres
 
 // Only what a topic needs: no profiles, drafts or other private data.
 function packTopic(t, withPhotos) {
-  return { v: 1, n: t.name, e: t.emoji, s: t.slots, l: t.layout || 'list', a: t.art || 'emoji', ks: t.kitShape || '', kl: t.kitLabel || '', ph: !!t.photos, f: t.folder || '',
+  return { v: 1, n: t.name, e: t.emoji, s: t.slots, l: t.layout || 'list', a: t.art || 'emoji', ks: t.kitShape || '', kl: t.kitLabel || '', ph: !!t.photos, f: t.folder || '', sc: t.scene || '',
     i: t.items.map((it) => { const r = [it.name, it.pos || '', it.desc || '', it.emoji || '', it.imageUrl || '', it.wiki || '', it.kit || null, it.photosOff ? 1 : 0]; if (withPhotos && it.photo) r.push(it.photo); if (validRating(it.rating)) { while (r.length < 9) r.push(''); r[9] = Math.round(+it.rating); } return r; }) };
 }
 // Rebuild a safe topic from shared data. Returns { ok, topic, error }.
@@ -52,7 +52,7 @@ function unpackTopic(o) {
     return it;
   });
   if (!items.length) return { ok: false, error: 'That topic has no items.' };
-  return { ok: true, topic: { id: uid(), name: clip(o.n, 60).trim() || 'Shared topic', emoji: clip(o.e, 12) || '🎲', slots, layout: o.l === 'pitch' ? 'pitch' : 'list', art: o.a === 'kit' ? 'kit' : 'emoji', kitShape: o.ks === 'tank' ? 'tank' : '', kitLabel: o.kl === 'initials' ? 'initials' : '', photos: !!o.ph, folder: clip(o.f, 24) || 'My Topics', items } };
+  return { ok: true, topic: { id: uid(), name: clip(o.n, 60).trim() || 'Shared topic', emoji: clip(o.e, 12) || '🎲', slots, layout: o.l === 'pitch' ? 'pitch' : 'list', art: o.a === 'kit' ? 'kit' : o.a === 'scene' && SCENES[o.sc] ? 'scene' : 'emoji', ...(typeof o.sc === 'string' && SCENES[o.sc] ? { scene: o.sc } : {}), kitShape: o.ks === 'tank' ? 'tank' : '', kitLabel: o.kl === 'initials' ? 'initials' : '', photos: !!o.ph, folder: clip(o.f, 24) || 'My Topics', items } };
 }
 // Fingerprint of a topic's contents, shown as DN-XXXXXX.
 function topicCode(t) {

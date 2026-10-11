@@ -68,7 +68,7 @@ function TvGame({ d, net, flash, setFlash, past, settings }) {
   else if (d.phase === 'forcepick') view = <ForcedPick d={d} setDraft={noop} goHome={noop} />;
   else if (d.phase === 'trade') view = <TradeWindow d={d} setDraft={noop} goHome={noop} />;
   else view = <Results d={d} past={past} showShame={settings.showShame} onChange={noop} onBack={noop} />;
-  return <NetCtx.Provider value={net}><div className="tvmode">{view}{flash && <Flash f={flash} onDone={() => setFlash(null)} />}</div></NetCtx.Provider>;
+  return <NetCtx.Provider value={net}><div className="tvmode">{view}{flash && <Flash f={flash} d={d} onDone={() => setFlash(null)} />}</div></NetCtx.Provider>;
 }
 
 // A second window showing a local game from this browser.

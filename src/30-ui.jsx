@@ -69,6 +69,7 @@ function ItemArt({ item, topic, size = 44, round = false, radius }) {
   return <ArtFallback item={item} topic={topic} size={size} box={box} />;
 }
 function ArtFallback({ item, topic, size, box }) {
+  if (sceneOf(topic)) return <SceneArt topic={topic} item={item} size={size} box={box} />;
   if (artOf(topic) === 'kit') {
     const [c1, c2] = kitColors(item);
     const ink = Math.abs(lum(c1) - lum(c2)) < 0.3 ? onColor(c1) : c2;
@@ -252,7 +253,7 @@ function createDraft(topic, managers, rules, extra) {
   const items = {}; topic.items.forEach((it) => { items[it.id] = mystery.has(it.id) ? { ...it, mystery: true } : { ...it }; });
   const d = {
     id: uid(), createdAt: Date.now(),
-    topic: { id: topic.id, name: topic.name, emoji: topic.emoji, layout: topic.layout, art: artOf(topic), kitShape: topic.kitShape || '', kitLabel: topic.kitLabel || '', photos: !!topic.photos },
+    topic: { id: topic.id, name: topic.name, emoji: topic.emoji, layout: topic.layout, art: artOf(topic), kitShape: topic.kitShape || '', kitLabel: topic.kitLabel || '', photos: !!topic.photos, ...(topic.scene ? { scene: topic.scene } : {}) },
     rules: { ...rules },
     managers: managers.map((m) => ({ id: m.id, name: m.name.trim(), color: m.color, emoji: m.emoji, budget: rules.budget, team: rules.slots.map(() => null), ...(m.bot ? { bot: { ...m.bot } } : {}), ...(m.human ? { human: true } : {}), ...(m.uid ? { uid: m.uid } : {}), ...(m.members ? { members: m.members.map((p) => ({ ...p })) } : {}) })),
     teamMode: managers.some((m) => m.members),
@@ -499,6 +500,12 @@ function Thumb({ item, topic, size = 44 }) {
 }
 function MChip({ m }) { return <span className="mchip" style={mStyle(m)}><b>{m.emoji}</b>{m.name}</span>; }
 
+// A team's picture: the pitch (football), a buildable scene, or the plain list.
+function TeamView({ d, m, highlight }) {
+  if (d.topic.layout === 'pitch') return <Pitch d={d} m={m} />;
+  if (sceneOf(d.topic)) return <div className="stack-sm"><SceneView d={d} m={m} highlight={highlight} /><TeamList d={d} m={m} /></div>;
+  return <TeamList d={d} m={m} />;
+}
 function TeamList({ d, m }) {
   return (
     <div>
@@ -528,7 +535,7 @@ function TeamsSheet({ d, onClose }) {
               <h3 className="grow">{m.emoji} {m.name}{m.members ? <span className="small muted" style={{ display: 'block', fontFamily: 'var(--body)', fontWeight: 600 }}>{m.members.map((p) => p.name).join(' · ')}</span> : null}{d.cards && (d.cards[m.id] || []).length ? <span className="small muted" style={{ display: 'block', fontFamily: 'var(--body)', fontWeight: 600 }}>🃏 {d.cards[m.id].map((c) => CARD_INFO[c].name).join(', ')}</span> : null}</h3>
               <span className="num" style={{ fontFamily: 'var(--display)', fontSize: 22, color: 'var(--gold)' }}>{money(m.budget)} left</span>
             </div>
-            <TeamList d={d} m={m} />
+            <TeamView d={d} m={m} />
             <TeamRatingPanel d={d} m={m} />
           </div>
         ))}
@@ -1650,7 +1657,7 @@ function Auction({ d, setDraft, goHome, flashing, onFlash }) {
     const price = d.bid.amount; const winnerId = d.bid.leaderId;
     const bidders = [...new Set(d.bids.filter(Boolean).map((b) => b.leaderId))].filter((id) => id !== winnerId);
     const real = d.items[d.queue[0]];
-    const info = { kind: 'sold', name: leader.name, emoji: leader.emoji, color: leader.color, price, item: real.name, mystery: !!real.mystery, rarity: (d.rarity || {})[real.id] || null, doubled: !!d.bid.double };
+    const info = { kind: 'sold', name: leader.name, emoji: leader.emoji, color: leader.color, price, item: real.name, mid: winnerId, itemId: real.id, scene: !!sceneOf(d.topic), mystery: !!real.mystery, rarity: (d.rarity || {})[real.id] || null, doubled: !!d.bid.double };
     buzz([40, 30, 160]); setGavel(true); setThinking(null);
     const big = price >= d.rules.budget * ((audio.cfg.bigSale || 40) / 100);
     info.big = big;
@@ -1682,7 +1689,7 @@ function Auction({ d, setDraft, goHome, flashing, onFlash }) {
       const real = d.items[d.queue[0]]; const m = out.m;
       buzz([60, 40, 60]); audio.play('buzzer');
       audio.say(callLine('forced', { who: m.name, amt: money(d.rules.minBid) }), 2, d.id + ':forced:' + d.reveal);
-      onFlash({ kind: 'forced', name: m.name, emoji: m.emoji, color: m.color, price: d.rules.minBid, item: real.name, mystery: !!real.mystery });
+      onFlash({ kind: 'forced', name: m.name, emoji: m.emoji, color: m.color, price: d.rules.minBid, item: real.name, mystery: !!real.mystery, mid: m.id, itemId: real.id, scene: !!sceneOf(d.topic) });
     } else {
       const c = skipCfg(d);
       let note = null;
@@ -2293,7 +2300,7 @@ function TeamCard({ d, m, win }) {
         <span className="mo">spent<b className="num">{money(spent(d, m))}</b></span>
         <span className="mo">left<b className="num">{money(m.budget)}</b></span>
       </div>
-      <div className="tb">{d.topic.layout === 'pitch' ? <Pitch d={d} m={m} /> : <TeamList d={d} m={m} />}<TeamRatingPanel d={d} m={m} /></div>
+      <div className="tb"><TeamView d={d} m={m} /><TeamRatingPanel d={d} m={m} /></div>
     </div>
   );
 }
@@ -2675,8 +2682,11 @@ function PastList({ past, onBack, onOpen, onDelete }) {
 /* ============================================================
    FLASH (sold / skipped / free pick banner)
    ============================================================ */
-function Flash({ f, onDone }) {
-  useEffect(() => { const t = setTimeout(onDone, ms(f.kind === 'skip' ? (f.note ? 1700 : 1100) : f.kind === 'dodge' ? 2200 : f.mystery || f.rarity === 'legendary' ? 2600 : 1800)); return () => clearTimeout(t); }, [f]);
+function Flash({ f, onDone, d }) {
+  useEffect(() => { const t = setTimeout(onDone, ms(f.kind === 'skip' ? (f.note ? 1700 : 1100) : f.kind === 'dodge' ? 2200 : f.scene || f.mystery || f.rarity === 'legendary' ? 2600 : 1800)); return () => clearTimeout(t); }, [f]);
+  // Buildable topics: show the winner's build with the new item popping into place.
+  const build = f.scene && d && sceneOf(d.topic) && d.managers.find((x) => x.id === f.mid);
+  const buildView = build ? <div className="flashscene"><SceneView d={d} m={build} highlight={f.itemId} /></div> : null;
   return (
     <div className="flash" onClick={onDone} style={{ '--fc': f.color || 'var(--muted)' }}>
       {f.kind === 'sold' && <div className={'inner' + (f.rarity === 'legendary' ? ' legendary' : '') + (f.big ? ' bigsale' : '')}>
@@ -2685,6 +2695,7 @@ function Flash({ f, onDone }) {
         <div className="price num">{money(f.price)}{f.doubled ? <small className="dbl"> (Double Bid)</small> : null}</div>
         {f.mystery && <div className="it" style={{ color: '#c9a6ff', fontWeight: 800 }}>❓ The mystery item was…</div>}
         <div className="it">{f.item} {f.rarity && f.rarity !== 'common' ? <RarityTag r={f.rarity} /> : null}</div>
+        {buildView}
       </div>}
       {f.kind === 'card' && <div className="inner">
         <div className="big" style={{ fontSize: 64, color: f.result === 'done' ? 'var(--gold)' : 'var(--danger)' }}>{CARD_INFO[f.card].emoji} {f.result === 'vetoed' ? 'Vetoed!' : f.result === 'fizzled' ? 'Fizzled' : CARD_INFO[f.card].name + '!'}</div>
@@ -2707,6 +2718,7 @@ function Flash({ f, onDone }) {
         <div className="price num">{money(f.price)}</div>
         {f.mystery && <div className="it" style={{ color: '#c9a6ff', fontWeight: 800 }}>❓ The mystery item was…</div>}
         <div className="it">takes {f.item}</div>
+        {buildView}
       </div>}
       {f.kind === 'free' && <div className="inner">
         <div className="big" style={{ color: 'var(--ok)', fontSize: 80 }}>Free pick</div>
@@ -2738,6 +2750,7 @@ function migrateSettings(st) {
   }
   return x;
 }
+const OLD_HOUSE_NAMES = ['Infinity Pool', 'Home Cinema', 'Gaming Room', 'Indoor Basketball Court', 'Home Gym', 'Rooftop Terrace', 'Walk-in Closet', 'Secret Room', 'Slide Between Floors', '10-Car Garage', "Chef's Kitchen", 'Library', 'Aquarium Wall', 'Bowling Alley', 'Sauna', 'Hot Tub', 'Treehouse', 'Music Studio', 'Mini Golf', 'Football Pitch', 'Bubble Tea Bar', 'Arcade', 'Panic Room', 'Helipad', 'Ice Cream Machine', 'Smart Home', 'Glass Elevator', 'Ocean View', 'Fireplace', 'Quiet Room'].sort().join('|');
 function migrateTopics(stored) {
   const starters = starterTopics();
   const allIds = starters.map((s) => s.id);
@@ -2746,6 +2759,12 @@ function migrateTopics(stored) {
   const out = stored.map((t) => {
     const s = starters.find((x) => x.id === t.id);
     if (!s) return { ...t, art: artOf(t), folder: folderOf(t) };
+    // Buildable scenes: an untouched old "Dream House Features" becomes the new Dream House;
+    // an edited copy is kept exactly as the user left it. Other scene topics just gain the scene.
+    if (s.scene && !t.scene) {
+      if (t.id === 't-house') { const names = t.items.map((i) => i.name).sort().join('|'); return names === OLD_HOUSE_NAMES ? { ...s } : t; }
+      t = { ...t, scene: s.scene };
+    }
     const byId = {}; s.items.forEach((i) => { byId[i.id] = i; });
     return { ...t, art: t.art || s.art, folder: t.folder || s.folder, kitShape: t.kitShape || s.kitShape, kitLabel: t.kitLabel || s.kitLabel, photos: t.photos === undefined ? s.photos : t.photos,
       items: t.items.map((i) => (byId[i.id] && !i.emoji && byId[i.id].emoji ? { ...i, emoji: byId[i.id].emoji } : i)) };
@@ -3336,7 +3355,7 @@ function App() {
   return (
     <AudioCtx.Provider value={{ cfg: audioCfg, set: setAudioCfg }}>
       {view}
-      {flash && <Flash f={flash} onDone={() => setFlash(null)} />}
+      {flash && <Flash f={flash} d={draft} onDone={() => setFlash(null)} />}
       {importing !== null && <ImportTopicSheet topics={topics} initial={importing} onClose={() => setImporting(null)} onImport={(t) => { setTopics((ts) => [...ts, t]); setToast('Added “' + t.name + '” to ' + t.folder + '.'); }} />}
       {app.updateReady && !toast && <div className="toast ok" role="status"><span className="grow">A new version of Draft Night is ready.</span><button onClick={() => app.applyUpdate()}>Reload</button></div>}
       {toast && <div className="toast" role="status"><span className="grow">{toast}</span><button onClick={() => setToast(null)}>OK</button></div>}
@@ -3360,7 +3379,7 @@ class Boundary extends React.Component {
   }
 }
 
-if (window.__DN_TEST__) window.__DN = { finale: { buildBracket, advanceBracket, nextMatchup, matchVoters, canVoteFor, decideMatchup, simulateMatch, playerRating, teamRating, matchupVoteBot, finaleMode, isFootball, startFinale, castMatchVote, botMatchVotes, playMatchup, resolveMatchup, getMatchup, needsVote, needsMatch, votingDone, finaleStandings, finaleRecord, championStory, goldenBoot, matchVoteProblem, roundName, FINALE_DEFAULTS, validRating, matchScript, revealedEvents, matchFrame, lineupOf, expectedGoals, strength2, squad }, audio, AUDIO_DEFAULTS, share: { encodeTopic, decodeShared, packTopic, unpackTopic, topicCode, shareLink, MAX_LINK }, stats: { careerStats, computeAwards, computeShame, hallOfShame, humanPlayers }, bots: { makeBots, nextBotAction, botDecision, botFreePickChoice, botVote, teamScore, voteChoices, itemFame, seeded, BOT_LEVELS, BOT_TYPES, botCardPlay, botVeto, botNominate, botTradeDecision, botTradeOffer }, twists: { twistRules, TWIST_DEFAULTS, playCard, answerCard, cardProblem, doubleProblem, nominate, currentNominator, nominationPool, botActors, botAdvisers, participants, visibleItem, isHidden, rarityOf, frozenNow, proposeTrade, acceptTrade, rejectTrade, cancelTrade, closeTrades, tradeProblem, openTrades, hasCard }, auction: { withdraw, isOut, auctionEnd, owesBid, withdrawProblem, outIds, owing, botPassers, botForcedBid, runAction, ownerInfo, migrateSettings, rulesLines }, skips: { SKIP_DEFAULTS, skipCfg, skipRulesOn, presenter, skipVerdict, eligibleFor, endgameNow, endgameSoon, chooseForced, autoChooseForced, presenterLine, botSkipSave, botForcedChoice, unsoldOutcome, skipChip }, topicsLib: { POPULARITY, popScore, byPopularity, folderOrder, favouritesOrder, prefsOf, isBuiltIn, folderOf, folderList, matchTopic, toggleIn }, DEFAULT_SOLO, isFlex, canBid, createDraft, placeBid, sell, skipItem, undo, freePick, currentPicker, canTake, nextAmount, isDraftOver, draftStats, winsBoard, tally, starterTopics, migrateTopics, validateBackup, makeBackup, wikiTitleFor, PHOTO_TOPICS, store, wiki, DEFAULT_RULES, COLORS, emptyCount, assignSlot, maxBid };
+if (window.__DN_TEST__) window.__DN = { finale: { buildBracket, advanceBracket, nextMatchup, matchVoters, canVoteFor, decideMatchup, simulateMatch, playerRating, teamRating, matchupVoteBot, finaleMode, isFootball, startFinale, castMatchVote, botMatchVotes, playMatchup, resolveMatchup, getMatchup, needsVote, needsMatch, votingDone, finaleStandings, finaleRecord, championStory, goldenBoot, matchVoteProblem, roundName, FINALE_DEFAULTS, validRating, matchScript, revealedEvents, matchFrame, lineupOf, expectedGoals, strength2, squad }, audio, AUDIO_DEFAULTS, share: { encodeTopic, decodeShared, packTopic, unpackTopic, topicCode, shareLink, MAX_LINK }, stats: { careerStats, computeAwards, computeShame, hallOfShame, humanPlayers }, bots: { makeBots, nextBotAction, botDecision, botFreePickChoice, botVote, teamScore, voteChoices, itemFame, seeded, BOT_LEVELS, BOT_TYPES, botCardPlay, botVeto, botNominate, botTradeDecision, botTradeOffer }, twists: { twistRules, TWIST_DEFAULTS, playCard, answerCard, cardProblem, doubleProblem, nominate, currentNominator, nominationPool, botActors, botAdvisers, participants, visibleItem, isHidden, rarityOf, frozenNow, proposeTrade, acceptTrade, rejectTrade, cancelTrade, closeTrades, tradeProblem, openTrades, hasCard }, auction: { withdraw, isOut, auctionEnd, owesBid, withdrawProblem, outIds, owing, botPassers, botForcedBid, runAction, ownerInfo, migrateSettings, rulesLines }, scenes: { SCENES, sceneOf, placeScene, sceneKey, SceneCanvas, SceneView, sceneHasArt }, skips: { SKIP_DEFAULTS, skipCfg, skipRulesOn, presenter, skipVerdict, eligibleFor, endgameNow, endgameSoon, chooseForced, autoChooseForced, presenterLine, botSkipSave, botForcedChoice, unsoldOutcome, skipChip }, topicsLib: { POPULARITY, popScore, byPopularity, folderOrder, favouritesOrder, prefsOf, isBuiltIn, folderOf, folderList, matchTopic, toggleIn }, DEFAULT_SOLO, isFlex, canBid, createDraft, placeBid, sell, skipItem, undo, freePick, currentPicker, canTake, nextAmount, isDraftOver, draftStats, winsBoard, tally, starterTopics, migrateTopics, validateBackup, makeBackup, wikiTitleFor, PHOTO_TOPICS, store, wiki, DEFAULT_RULES, COLORS, emptyCount, assignSlot, maxBid };
 store.init().finally(() => {
   ReactDOM.createRoot(document.getElementById('root')).render(<Boundary><App /></Boundary>);
 });

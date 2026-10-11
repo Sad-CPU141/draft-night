@@ -261,7 +261,7 @@ function RoomGame({ room, d, setHd, onLeave, onPlayAgain, onFinished, past, sett
           </div>
         )}
         <TvSwitch on={!tv && isHost && !tvView} code={room.code} onThisScreen={() => setTvView(true)}>{view}</TvSwitch>
-        {flash && <Flash f={flash} onDone={() => setFlash(null)} />}
+        {flash && <Flash f={flash} d={d} onDone={() => setFlash(null)} />}
         {tv && <TvExit />}
         {!tv && isHost && tvView && <TvExit onExit={() => setTvView(false)} />}
         {askLeave && <Confirm title="Leave the room?" body={isHost ? 'Another player takes over as host and the game carries on. You can rejoin from Online.' : 'The game carries on. A bot covers your seat after a minute; you can rejoin from Online.'} yes="Leave" onYes={onLeave} onClose={() => setAskLeave(false)} />}

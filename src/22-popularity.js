@@ -44,7 +44,7 @@ const POPULARITY = {
   't-streetwear': 81, 't-watches': 76, 't-luxcars': 78, 't-bballshoes': 77, 't-fragrance': 74, 't-motorbikes': 70,
   't-classics': 71, 't-evs': 66, 't-suvs': 67, 't-pickups': 62, 't-hairstyles': 69, 't-bags': 65, 't-outerwear': 63, 't-sunglasses': 59,
   // Just for Fun
-  't-pow': 96, 't-zomb': 90, 't-island': 87, 't-redflags': 91, 't-myth': 85, 't-house': 84, 't-job': 82, 't-greenflags': 83,
+  't-pow': 96, 't-zomb': 90, 't-island': 87, 't-redflags': 91, 't-myth': 85, 't-house': 86, 't-outfit': 85, 't-backyard': 80, 't-job': 82, 't-greenflags': 83,
   't-worstpowers': 86, 't-powercombos': 85, 't-worldslive': 84, 't-worldsavoid': 80, 't-annoying': 81, 't-satisfying': 79,
   't-board': 78, 't-toys': 77, 't-emoji': 76, 't-spend1000': 79, 't-spend100': 77, 't-3am': 78, 't-business': 74,
   't-shouldexist': 75, 't-overrated': 76, 't-underrated': 72, 't-inv': 72, 't-gadget': 73, 't-dayimprovers': 71,

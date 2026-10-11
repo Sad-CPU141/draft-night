@@ -14,7 +14,7 @@ const STARTER_FOLDER = {
   't-ani': 'Animals', 't-pet': 'Animals',
   't-car': 'Style & Rides', 't-shoe': 'Style & Rides',
   't-pow': 'Just for Fun', 't-myth': 'Just for Fun', 't-job': 'Just for Fun', 't-zomb': 'Just for Fun',
-  't-island': 'Just for Fun', 't-house': 'Just for Fun', 't-inv': 'Just for Fun', 't-board': 'Just for Fun', 't-toys': 'Just for Fun', 't-emoji': 'Just for Fun',
+  't-island': 'Just for Fun', 't-house': 'Just for Fun', 't-backyard': 'Just for Fun', 't-outfit': 'Style & Rides', 't-inv': 'Just for Fun', 't-board': 'Just for Fun', 't-toys': 'Just for Fun', 't-emoji': 'Just for Fun',
   't-hobby': 'Just for Fun', 't-road': 'Just for Fun', 't-smell': 'Just for Fun', 't-holi': 'Just for Fun', 't-gadget': 'Just for Fun', 't-wknd': 'Just for Fun', 't-school': 'Just for Fun',
 };
 const folderOf = (t) => (t && t.folder) || 'My Topics';
@@ -66,37 +66,85 @@ Inflatable Boat||Escape plan|🚤
 Mosquito Net||No bites|🦟
 Endless Snacks||Never hungry|🍫
 Mirror||Signal and selfies|🪞`),
-    mkTopic('t-house', 'Dream House Features', '🏡', 'Feature 1, Feature 2, Feature 3, Feature 4', 'list', 'emoji', `
+    mkTopic('t-house', 'Dream House', '🏡', 'Feature 1, Feature 2, Feature 3, Feature 4, Feature 5, Feature 6', 'list', 'scene', `
+Private Beach||Sand and sea at the end of the garden|🏖️
 Infinity Pool||Overlooking the sea|🏊
-Home Cinema||Recliners included|🎬
-Gaming Room||Every console|🎮
-Indoor Basketball Court||Full size|🏀
-Home Gym||No membership|🏋️
-Rooftop Terrace||City views|🌇
-Walk-in Closet||Sneaker wall|👔
-Secret Room||Behind a bookshelf|🚪
-Slide Between Floors||Faster than stairs|🛝
+Waterslide||Straight into the pool|🛝
+Hot Tub||Bubbles by the pool|🛁
+Fire Pit||Late nights outside|🔥
+Outdoor Kitchen||Grill, sink and stools|🍖
+Helipad||With your own helicopter|🚁
+Rooftop Terrace||Deck and umbrellas on the roof|🌇
+Guest House||For visiting friends|🏠
 10-Car Garage||Room for the collection|🚗
-Chef's Kitchen||Restaurant level|🧑‍🍳
-Library||Floor-to-ceiling|📚
-Aquarium Wall||Sharks in the living room|🐠
-Bowling Alley||Two lanes|🎳
-Sauna||Relax|🧖
-Hot Tub||Under the stars|🛁
-Treehouse||For grown-ups|🌳
-Music Studio||Soundproof|🎙️
-Mini Golf||Backyard course|⛳
-Football Pitch||Five-a-side|⚽
-Bubble Tea Bar||Unlimited|🧋
-Arcade||Retro machines|🕹️
-Panic Room||Just in case|🔒
-Helipad||Skip traffic|🚁
-Ice Cream Machine||Soft serve on tap|🍦
-Smart Home||Voice controls everything|🤖
-Glass Elevator||Fancy|🛗
-Ocean View||Every window|🌊
-Fireplace||Cozy winters|🔥
-Quiet Room||Peace and calm|🧘`),
+Supercar||Parked in the driveway|🏎️
+Luxury SUV||The everyday ride|🚙
+Security Gate||Private entrance|🚧
+Fountain||In the middle of the driveway|⛲
+Treehouse||Up in the big tree|🌳
+Hedge Maze||Get lost in the garden|🌿
+Tennis Court||Full-size, with a net|🎾
+Basketball Court||Two hoops, full court|🏀
+Football Pitch||Goals and floodlights|⚽
+Mini Golf||Nine holes and a pond|⛳
+Home Cinema||Big screen, red seats|🎬
+Home Gym||Treadmill and weights|🏋️
+Gaming Room||Every console, neon lights|🎮
+Music Studio||Piano and speakers|🎹`, { scene: 'house' }),
+    mkTopic('t-backyard', 'Dream Backyard', '🌳', 'Feature 1, Feature 2, Feature 3, Feature 4, Feature 5, Feature 6', 'list', 'scene', `
+Swimming Pool||A curvy pool with steps|🏊
+Hot Tub||Bubbles all year round|🛁
+Pool Loungers||Towels and an umbrella|🏖️
+Hammock||Between two trees|😴
+BBQ Grill||Burgers on the deck|🍖
+Outdoor Dining Table||Seats for eight|🍽️
+Patio Sofa||Cushions and a coffee table|🛋️
+Pergola||Wooden roof with vines|🌿
+Outdoor Bar||Stools and drinks|🍹
+String Lights||Glowing over the lawn|💡
+Fire Pit||Chairs round the fire|🔥
+Outdoor Cinema||Big screen and beanbags|🎬
+Trampoline||Bounce all day|🤸
+Basketball Hoop||Half court on the patio|🏀
+Football Goal||Penalties after dinner|⚽
+Table Tennis||Bats and a ball included|🏓
+Playground||Swings, slide and sandpit|🛝
+Vegetable Garden||Grow your own|🥕
+Koi Pond||Lily pads and koi|🐟
+Fruit Trees||Oranges, apples, lemons|🍊
+Flower Beds||Colour along the fence|🌸
+Sauna||Wooden barrel sauna|🧖`, { scene: 'backyard' }),
+    mkTopic('t-outfit', 'Build an Outfit', '🧥', 'Hat, Top, Jacket, Bottoms, Shoes, Accessory', 'list', 'scene', `
+Baseball Cap|Hat|Classic curved brim|🧢
+Beanie|Hat|Knitted, with a bobble|🧶
+Bucket Hat|Hat|Brim all the way round|👒
+Fedora|Hat|Sharp and classic|🎩
+Cowboy Hat|Hat|Yeehaw|🤠
+Plain T-Shirt|Top|Crisp white tee|👕
+Graphic T-Shirt|Top|Black tee with a star|⭐
+Hoodie|Top|Hood and drawstrings|🧥
+Sweater|Top|Knitted with stripes|🧶
+Button-Up Shirt|Top|Light blue, collar and buttons|👔
+Denim Jacket|Jacket|Blue with stitching|🧥
+Bomber Jacket|Jacket|Olive with ribbed cuffs|🧥
+Leather Jacket|Jacket|Black with silver zips|🧥
+Puffer Jacket|Jacket|Big, warm and orange|🧥
+Varsity Jacket|Jacket|Red with cream sleeves|🧥
+Jeans|Bottoms|Classic blue|👖
+Cargo Pants|Bottoms|Pockets on the legs|👖
+Sweatpants|Bottoms|Grey and comfy|👖
+Shorts|Bottoms|Chino shorts|🩳
+Tailored Trousers|Bottoms|Charcoal, sharp crease|👖
+Sneakers|Shoes|Clean white trainers|👟
+High-Top Sneakers|Shoes|Red, up past the ankle|👟
+Boots|Shoes|Brown leather|🥾
+Loafers|Shoes|Smart slip-ons|👞
+Sandals|Shoes|Summer straps|🩴
+Sunglasses|Accessory|Dark lenses|🕶️
+Necklace|Accessory|Gold chain and pendant|📿
+Watch|Accessory|Gold face|⌚
+Crossbody Bag|Accessory|Leather, across the chest|👜
+Scarf|Accessory|Red and green check|🧣`, { scene: 'outfit' }),
     mkTopic('t-inv', 'Greatest Inventions', '💡', 'Invention 1, Invention 2, Invention 3, Invention 4', 'list', 'emoji', `
 The Internet||Connects everyone|🌐
 Smartphone||Everything in your pocket|📱
@@ -979,7 +1027,7 @@ Frosty|Dessert|Wendy's|🍨
 Timbits|Dessert|Tim Hortons|🍩
 Blizzard|Dessert|Dairy Queen|🍦
 Baked Apple Pie|Dessert|McDonald's|🥧
-Cinnabon Delights|Dessert|Taco Bell|🥐`),
+Cinnabon Delights|Dessert|Taco Bell|🥐`, { scene: 'tray' }),
     ...moreTopics(),
   ];
 }

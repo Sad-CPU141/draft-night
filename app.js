@@ -1,4 +1,4 @@
-/* Draft Night 80ec4c2d3d — built from src/ by build.js. Edit src/, not this file. */
+/* Draft Night c4401248cd — built from src/ by build.js. Edit src/, not this file. */
 "use strict";
 (function(){
 function _extends() { return _extends = Object.assign ? Object.assign.bind() : function (n) { for (var e = 1; e < arguments.length; e++) { var t = arguments[e]; for (var r in t) ({}).hasOwnProperty.call(t, r) && (n[r] = t[r]); } return n; }, _extends.apply(null, arguments); }
@@ -589,6 +589,8 @@ const STARTER_FOLDER = {
   't-zomb': 'Just for Fun',
   't-island': 'Just for Fun',
   't-house': 'Just for Fun',
+  't-backyard': 'Just for Fun',
+  't-outfit': 'Style & Rides',
   't-inv': 'Just for Fun',
   't-board': 'Just for Fun',
   't-toys': 'Just for Fun',
@@ -656,37 +658,89 @@ Flare Gun||Signal a ship|🎆
 Inflatable Boat||Escape plan|🚤
 Mosquito Net||No bites|🦟
 Endless Snacks||Never hungry|🍫
-Mirror||Signal and selfies|🪞`), mkTopic('t-house', 'Dream House Features', '🏡', 'Feature 1, Feature 2, Feature 3, Feature 4', 'list', 'emoji', `
+Mirror||Signal and selfies|🪞`), mkTopic('t-house', 'Dream House', '🏡', 'Feature 1, Feature 2, Feature 3, Feature 4, Feature 5, Feature 6', 'list', 'scene', `
+Private Beach||Sand and sea at the end of the garden|🏖️
 Infinity Pool||Overlooking the sea|🏊
-Home Cinema||Recliners included|🎬
-Gaming Room||Every console|🎮
-Indoor Basketball Court||Full size|🏀
-Home Gym||No membership|🏋️
-Rooftop Terrace||City views|🌇
-Walk-in Closet||Sneaker wall|👔
-Secret Room||Behind a bookshelf|🚪
-Slide Between Floors||Faster than stairs|🛝
+Waterslide||Straight into the pool|🛝
+Hot Tub||Bubbles by the pool|🛁
+Fire Pit||Late nights outside|🔥
+Outdoor Kitchen||Grill, sink and stools|🍖
+Helipad||With your own helicopter|🚁
+Rooftop Terrace||Deck and umbrellas on the roof|🌇
+Guest House||For visiting friends|🏠
 10-Car Garage||Room for the collection|🚗
-Chef's Kitchen||Restaurant level|🧑‍🍳
-Library||Floor-to-ceiling|📚
-Aquarium Wall||Sharks in the living room|🐠
-Bowling Alley||Two lanes|🎳
-Sauna||Relax|🧖
-Hot Tub||Under the stars|🛁
-Treehouse||For grown-ups|🌳
-Music Studio||Soundproof|🎙️
-Mini Golf||Backyard course|⛳
-Football Pitch||Five-a-side|⚽
-Bubble Tea Bar||Unlimited|🧋
-Arcade||Retro machines|🕹️
-Panic Room||Just in case|🔒
-Helipad||Skip traffic|🚁
-Ice Cream Machine||Soft serve on tap|🍦
-Smart Home||Voice controls everything|🤖
-Glass Elevator||Fancy|🛗
-Ocean View||Every window|🌊
-Fireplace||Cozy winters|🔥
-Quiet Room||Peace and calm|🧘`), mkTopic('t-inv', 'Greatest Inventions', '💡', 'Invention 1, Invention 2, Invention 3, Invention 4', 'list', 'emoji', `
+Supercar||Parked in the driveway|🏎️
+Luxury SUV||The everyday ride|🚙
+Security Gate||Private entrance|🚧
+Fountain||In the middle of the driveway|⛲
+Treehouse||Up in the big tree|🌳
+Hedge Maze||Get lost in the garden|🌿
+Tennis Court||Full-size, with a net|🎾
+Basketball Court||Two hoops, full court|🏀
+Football Pitch||Goals and floodlights|⚽
+Mini Golf||Nine holes and a pond|⛳
+Home Cinema||Big screen, red seats|🎬
+Home Gym||Treadmill and weights|🏋️
+Gaming Room||Every console, neon lights|🎮
+Music Studio||Piano and speakers|🎹`, {
+    scene: 'house'
+  }), mkTopic('t-backyard', 'Dream Backyard', '🌳', 'Feature 1, Feature 2, Feature 3, Feature 4, Feature 5, Feature 6', 'list', 'scene', `
+Swimming Pool||A curvy pool with steps|🏊
+Hot Tub||Bubbles all year round|🛁
+Pool Loungers||Towels and an umbrella|🏖️
+Hammock||Between two trees|😴
+BBQ Grill||Burgers on the deck|🍖
+Outdoor Dining Table||Seats for eight|🍽️
+Patio Sofa||Cushions and a coffee table|🛋️
+Pergola||Wooden roof with vines|🌿
+Outdoor Bar||Stools and drinks|🍹
+String Lights||Glowing over the lawn|💡
+Fire Pit||Chairs round the fire|🔥
+Outdoor Cinema||Big screen and beanbags|🎬
+Trampoline||Bounce all day|🤸
+Basketball Hoop||Half court on the patio|🏀
+Football Goal||Penalties after dinner|⚽
+Table Tennis||Bats and a ball included|🏓
+Playground||Swings, slide and sandpit|🛝
+Vegetable Garden||Grow your own|🥕
+Koi Pond||Lily pads and koi|🐟
+Fruit Trees||Oranges, apples, lemons|🍊
+Flower Beds||Colour along the fence|🌸
+Sauna||Wooden barrel sauna|🧖`, {
+    scene: 'backyard'
+  }), mkTopic('t-outfit', 'Build an Outfit', '🧥', 'Hat, Top, Jacket, Bottoms, Shoes, Accessory', 'list', 'scene', `
+Baseball Cap|Hat|Classic curved brim|🧢
+Beanie|Hat|Knitted, with a bobble|🧶
+Bucket Hat|Hat|Brim all the way round|👒
+Fedora|Hat|Sharp and classic|🎩
+Cowboy Hat|Hat|Yeehaw|🤠
+Plain T-Shirt|Top|Crisp white tee|👕
+Graphic T-Shirt|Top|Black tee with a star|⭐
+Hoodie|Top|Hood and drawstrings|🧥
+Sweater|Top|Knitted with stripes|🧶
+Button-Up Shirt|Top|Light blue, collar and buttons|👔
+Denim Jacket|Jacket|Blue with stitching|🧥
+Bomber Jacket|Jacket|Olive with ribbed cuffs|🧥
+Leather Jacket|Jacket|Black with silver zips|🧥
+Puffer Jacket|Jacket|Big, warm and orange|🧥
+Varsity Jacket|Jacket|Red with cream sleeves|🧥
+Jeans|Bottoms|Classic blue|👖
+Cargo Pants|Bottoms|Pockets on the legs|👖
+Sweatpants|Bottoms|Grey and comfy|👖
+Shorts|Bottoms|Chino shorts|🩳
+Tailored Trousers|Bottoms|Charcoal, sharp crease|👖
+Sneakers|Shoes|Clean white trainers|👟
+High-Top Sneakers|Shoes|Red, up past the ankle|👟
+Boots|Shoes|Brown leather|🥾
+Loafers|Shoes|Smart slip-ons|👞
+Sandals|Shoes|Summer straps|🩴
+Sunglasses|Accessory|Dark lenses|🕶️
+Necklace|Accessory|Gold chain and pendant|📿
+Watch|Accessory|Gold face|⌚
+Crossbody Bag|Accessory|Leather, across the chest|👜
+Scarf|Accessory|Red and green check|🧣`, {
+    scene: 'outfit'
+  }), mkTopic('t-inv', 'Greatest Inventions', '💡', 'Invention 1, Invention 2, Invention 3, Invention 4', 'list', 'emoji', `
 The Internet||Connects everyone|🌐
 Smartphone||Everything in your pocket|📱
 Electricity||Powers the world|⚡
@@ -1539,7 +1593,9 @@ Frosty|Dessert|Wendy's|🍨
 Timbits|Dessert|Tim Hortons|🍩
 Blizzard|Dessert|Dairy Queen|🍦
 Baked Apple Pie|Dessert|McDonald's|🥧
-Cinnabon Delights|Dessert|Taco Bell|🥐`), ...moreTopics()];
+Cinnabon Delights|Dessert|Taco Bell|🥐`, {
+    scene: 'tray'
+  }), ...moreTopics()];
 }
 function moreTopics() {
   return [mkTopic('t-goat', 'Football GOATs', '🐐', 'GK, DEF, DEF, MID, MID, FWD', 'pitch', 'kit', `
@@ -6360,7 +6416,9 @@ const POPULARITY = {
   't-island': 87,
   't-redflags': 91,
   't-myth': 85,
-  't-house': 84,
+  't-house': 86,
+  't-outfit': 85,
+  't-backyard': 80,
   't-job': 82,
   't-greenflags': 83,
   't-worstpowers': 86,
@@ -6840,6 +6898,4335 @@ function wikiTitleFor(item, topic) {
   if (Object.prototype.hasOwnProperty.call(map, item.name)) return map[item.name];
   if (SENTENCE_CASE.has(topic.id)) return item.name.charAt(0) + item.name.slice(1).toLowerCase();
   return item.name;
+}
+function BackyardBg() {
+  return React.createElement("g", null, React.createElement("rect", {
+    width: "520",
+    height: "380",
+    fill: "#73c04f"
+  }), Array.from({
+    length: 13
+  }, (_, r) => Array.from({
+    length: 13
+  }, (__, c) => (r + c) % 2 ? React.createElement("rect", {
+    key: r + '-' + c,
+    x: c * 40,
+    y: 112 + r * 22,
+    width: "40",
+    height: "22",
+    fill: "#6bb748"
+  }) : null)), React.createElement("rect", {
+    width: "520",
+    height: "54",
+    fill: "#5c6377"
+  }), Array.from({
+    length: 27
+  }, (_, i) => React.createElement("path", {
+    key: i,
+    d: 'M' + i * 20 + ' 0 V48',
+    stroke: "rgba(0,0,0,.12)",
+    strokeWidth: "1"
+  })), [10, 22, 34].map(y => React.createElement("path", {
+    key: y,
+    d: 'M0 ' + y + ' H520',
+    stroke: "rgba(255,255,255,.07)",
+    strokeWidth: "2"
+  })), React.createElement("rect", {
+    y: "46",
+    width: "520",
+    height: "8",
+    fill: "#4a5063"
+  }), React.createElement("rect", {
+    x: "72",
+    y: "8",
+    width: "26",
+    height: "18",
+    rx: "2",
+    fill: "#a9d7ee",
+    stroke: "#3e4456",
+    strokeWidth: "1.5"
+  }), React.createElement("rect", {
+    x: "420",
+    y: "10",
+    width: "26",
+    height: "18",
+    rx: "2",
+    fill: "#a9d7ee",
+    stroke: "#3e4456",
+    strokeWidth: "1.5"
+  }), React.createElement("rect", {
+    x: "250",
+    y: "4",
+    width: "14",
+    height: "14",
+    fill: "#8f5a43"
+  }), React.createElement("rect", {
+    y: "54",
+    width: "520",
+    height: "58",
+    fill: "#c79763"
+  }), Array.from({
+    length: 11
+  }, (_, i) => React.createElement("path", {
+    key: i,
+    d: 'M0 ' + (58 + i * 5) + ' H520',
+    stroke: "rgba(0,0,0,.1)",
+    strokeWidth: ".8"
+  })), React.createElement("rect", {
+    y: "108",
+    width: "520",
+    height: "5",
+    fill: "#a7774a"
+  }), React.createElement("rect", {
+    x: "236",
+    y: "112",
+    width: "48",
+    height: "10",
+    fill: "#b8865a"
+  }), React.createElement("path", {
+    d: "M236 117 H284",
+    stroke: "rgba(0,0,0,.15)"
+  }), [132, 152, 172, 192, 212, 232, 252, 272, 292, 312, 332, 352].map((y, i) => React.createElement("ellipse", {
+    key: y,
+    cx: 260 + (i % 2 ? 6 : -6),
+    cy: y,
+    rx: "9",
+    ry: "6",
+    fill: "#ddd5c6",
+    stroke: "rgba(0,0,0,.15)",
+    strokeWidth: ".6"
+  })), React.createElement("path", {
+    d: "M4 54 V376 H516 V54",
+    fill: "none",
+    stroke: "#a8784a",
+    strokeWidth: "8"
+  }), React.createElement("path", {
+    d: "M4 54 V376 H516 V54",
+    fill: "none",
+    stroke: "#c99a68",
+    strokeWidth: "3",
+    strokeDasharray: "2 10"
+  }), [[18, 126, 9], [502, 126, 9], [500, 366, 8]].map(([x, y, r], i) => React.createElement(TreeTop, {
+    key: i,
+    x: x,
+    y: y,
+    r: r,
+    c: "#3d9b3b"
+  })));
+}
+const Lounger = ({
+  x,
+  y,
+  c = '#52c6ef'
+}) => React.createElement("g", null, React.createElement("rect", {
+  x: x + 2,
+  y: y + 2,
+  width: "14",
+  height: "26",
+  rx: "3",
+  fill: SC.shadow
+}), React.createElement("rect", {
+  x: x,
+  y: y,
+  width: "14",
+  height: "26",
+  rx: "3",
+  fill: "#fff",
+  stroke: SC.line,
+  strokeWidth: ".6"
+}), React.createElement("rect", {
+  x: x + 2,
+  y: y + 8,
+  width: "10",
+  height: "16",
+  rx: "2",
+  fill: c
+}));
+const Chair = ({
+  x,
+  y,
+  c = '#f4f1ea'
+}) => React.createElement("g", null, React.createElement("rect", {
+  x: x + 1.5,
+  y: y + 2,
+  width: "9",
+  height: "9",
+  rx: "2",
+  fill: SC.shadow
+}), React.createElement("rect", {
+  x: x,
+  y: y,
+  width: "9",
+  height: "9",
+  rx: "2",
+  fill: c,
+  stroke: SC.line,
+  strokeWidth: ".6"
+}));
+const BACKYARD_ITEMS = [['Outdoor Dining Table', [32, 60, 104, 50], 3, () => React.createElement("g", null, [44, 64, 84, 104].map(x => React.createElement(Chair, {
+  key: 't' + x,
+  x: x,
+  y: 62
+})), [44, 64, 84, 104].map(x => React.createElement(Chair, {
+  key: 'b' + x,
+  x: x,
+  y: 95
+})), React.createElement(ShRect, {
+  x: 40,
+  y: 73,
+  w: 80,
+  h: 20
+}), React.createElement("rect", {
+  x: "40",
+  y: "73",
+  width: "80",
+  height: "20",
+  rx: "3",
+  fill: SC.wood2,
+  stroke: SC.line,
+  strokeWidth: ".8"
+}), [52, 72, 92, 108].map(x => React.createElement("circle", {
+  key: x,
+  cx: x,
+  cy: "83",
+  r: "3.5",
+  fill: "#fff",
+  stroke: "#ccc",
+  strokeWidth: ".5"
+})), React.createElement("circle", {
+  cx: "80",
+  cy: "83",
+  r: "3",
+  fill: "#e2463b"
+}))], ['Patio Sofa', [142, 58, 90, 52], 3, () => React.createElement("g", null, React.createElement("rect", {
+  x: "146",
+  y: "62",
+  width: "82",
+  height: "44",
+  rx: "3",
+  fill: "#e4d9c4",
+  opacity: ".7"
+}), React.createElement(ShRect, {
+  x: 148,
+  y: 64,
+  w: 74,
+  h: 14,
+  r: 4
+}), React.createElement(ShRect, {
+  x: 148,
+  y: 64,
+  w: 14,
+  h: 38,
+  r: 4
+}), React.createElement("path", {
+  d: "M148 64 H222 V78 H162 V102 H148 Z",
+  fill: "#3b4a63",
+  stroke: SC.line,
+  strokeWidth: ".8"
+}), [166, 184, 202].map(x => React.createElement("rect", {
+  key: x,
+  x: x,
+  y: "66",
+  width: "16",
+  height: "10",
+  rx: "3",
+  fill: "#f2a65a"
+})), React.createElement("rect", {
+  x: "150",
+  y: "80",
+  width: "10",
+  height: "16",
+  rx: "3",
+  fill: "#f2a65a"
+}), React.createElement(ShRect, {
+  x: 176,
+  y: 84,
+  w: 34,
+  h: 18
+}), React.createElement("rect", {
+  x: "176",
+  y: "84",
+  width: "34",
+  height: "18",
+  rx: "3",
+  fill: SC.wood,
+  stroke: SC.line,
+  strokeWidth: ".6"
+}), React.createElement("circle", {
+  cx: "193",
+  cy: "93",
+  r: "3",
+  fill: "#7ac36a"
+}))], ['Pergola', [238, 56, 100, 56], 4, () => React.createElement("g", null, React.createElement("rect", {
+  x: "246",
+  y: "64",
+  width: "84",
+  height: "44",
+  fill: "rgba(0,0,0,.08)"
+}), Array.from({
+  length: 9
+}, (_, i) => React.createElement("rect", {
+  key: i,
+  x: 244 + i * 10,
+  y: "60",
+  width: "4",
+  height: "46",
+  fill: SC.wood2,
+  stroke: "rgba(0,0,0,.2)",
+  strokeWidth: ".4"
+})), React.createElement("rect", {
+  x: "242",
+  y: "62",
+  width: "88",
+  height: "5",
+  fill: SC.wood
+}), React.createElement("rect", {
+  x: "242",
+  y: "99",
+  width: "88",
+  height: "5",
+  fill: SC.wood
+}), [[250, 64], [262, 101], [300, 63], [318, 100], [284, 66], [326, 66]].map(([x, y], i) => React.createElement("circle", {
+  key: i,
+  cx: x,
+  cy: y,
+  r: "5",
+  fill: i % 2 ? '#4aa84a' : '#e86fa3',
+  opacity: ".9"
+})), [[244, 60], [326, 60], [244, 100], [326, 100]].map(([x, y], i) => React.createElement("rect", {
+  key: i,
+  x: x,
+  y: y,
+  width: "6",
+  height: "6",
+  fill: "#6b4728"
+})))], ['Outdoor Bar', [342, 58, 94, 52], 3, () => React.createElement("g", null, React.createElement(ShRect, {
+  x: 350,
+  y: 64,
+  w: 78,
+  h: 16,
+  r: 8
+}), React.createElement("path", {
+  d: "M350 64 H428 V80 Q389 92 350 80 Z",
+  fill: "#6d4a2f",
+  stroke: SC.line,
+  strokeWidth: ".8"
+}), React.createElement("path", {
+  d: "M352 68 H426",
+  stroke: "#c9a072",
+  strokeWidth: "3"
+}), [[362, 70, '#3fb57a'], [372, 69, '#d9a441'], [384, 70, '#c0392b'], [404, 69, '#7fc8ff']].map(([x, y, c], i) => React.createElement("rect", {
+  key: i,
+  x: x,
+  y: y - 4,
+  width: "4",
+  height: "7",
+  rx: "1",
+  fill: c
+})), [358, 378, 398, 418].map(x => React.createElement("g", {
+  key: x
+}, React.createElement("circle", {
+  cx: x + 1.5,
+  cy: 98,
+  r: "5",
+  fill: SC.shadow
+}), React.createElement("circle", {
+  cx: x,
+  cy: 96,
+  r: "5",
+  fill: "#e0e0e0",
+  stroke: SC.line,
+  strokeWidth: ".6"
+}), React.createElement("circle", {
+  cx: x,
+  cy: 96,
+  r: "3",
+  fill: "#2a2a2a"
+}))))], ['BBQ Grill', [440, 60, 68, 50], 4, () => React.createElement("g", null, React.createElement(ShRect, {
+  x: 444,
+  y: 70,
+  w: 40,
+  h: 26,
+  r: 6
+}), React.createElement("rect", {
+  x: "444",
+  y: "70",
+  width: "40",
+  height: "26",
+  rx: "6",
+  fill: "#2b2e35",
+  stroke: SC.line,
+  strokeWidth: ".8"
+}), React.createElement("rect", {
+  x: "448",
+  y: "74",
+  width: "32",
+  height: "18",
+  rx: "3",
+  fill: "#3a3d45"
+}), [0, 1, 2, 3, 4].map(i => React.createElement("path", {
+  key: i,
+  d: 'M' + (451 + i * 6.5) + ' 75 V91',
+  stroke: "#777",
+  strokeWidth: ".8"
+})), [[455, 80], [468, 84], [462, 78]].map(([x, y], i) => React.createElement("rect", {
+  key: i,
+  x: x,
+  y: y,
+  width: "9",
+  height: "5",
+  rx: "2",
+  fill: "#9b4a2b",
+  stroke: "#5a2412",
+  strokeWidth: ".5"
+})), React.createElement("rect", {
+  x: "486",
+  y: "74",
+  width: "16",
+  height: "18",
+  rx: "2",
+  fill: "#9aa1ab",
+  stroke: SC.line,
+  strokeWidth: ".6"
+}), React.createElement("circle", {
+  cx: "494",
+  cy: "83",
+  r: "4",
+  fill: "#f4f1ea"
+}), React.createElement("path", {
+  d: "M448 104 Q456 98 462 104",
+  stroke: "rgba(255,255,255,.5)",
+  fill: "none",
+  strokeWidth: "1.5"
+}))], ['String Lights', [0, 112, 520, 26], 20, () => React.createElement("g", null, [[8, 260], [260, 512]].map(([a, b], k) => React.createElement("g", {
+  key: k
+}, React.createElement("path", {
+  d: 'M' + a + ' 116 Q' + (a + b) / 2 + ' 140 ' + b + ' 116',
+  fill: "none",
+  stroke: "#333",
+  strokeWidth: "1"
+}), Array.from({
+  length: 11
+}, (_, i) => {
+  const t = (i + 0.5) / 11;
+  const x = a + (b - a) * t;
+  const y = 116 + 48 * t * (1 - t);
+  return React.createElement("g", {
+    key: i
+  }, React.createElement("circle", {
+    cx: x,
+    cy: y + 2,
+    r: "4.2",
+    fill: "rgba(255,226,120,.35)"
+  }), React.createElement("circle", {
+    cx: x,
+    cy: y + 2,
+    r: "2.2",
+    fill: "#ffe27a",
+    stroke: "#c9a23a",
+    strokeWidth: ".5"
+  }));
+}))))], ['Swimming Pool', [20, 134, 182, 88], 3, () => React.createElement("g", null, React.createElement("path", {
+  d: "M30 140 Q110 128 190 146 Q204 174 184 206 Q120 222 46 212 Q18 196 30 140 Z",
+  fill: SC.shadow,
+  transform: "translate(3 4)"
+}), React.createElement("path", {
+  d: "M30 140 Q110 128 190 146 Q204 174 184 206 Q120 222 46 212 Q18 196 30 140 Z",
+  fill: "#efe9dd",
+  stroke: SC.line,
+  strokeWidth: ".8"
+}), React.createElement("path", {
+  d: "M38 146 Q110 136 182 151 Q194 175 178 200 Q120 214 50 205 Q28 192 38 146 Z",
+  fill: SC.water
+}), React.createElement("path", {
+  d: "M38 146 Q110 136 182 151 L180 156 Q110 142 40 152 Z",
+  fill: SC.water2
+}), React.createElement("path", {
+  d: "M60 172 Q72 167 84 172 T108 172 M118 188 Q130 183 142 188 T166 188 M70 196 Q80 192 90 196",
+  stroke: "#fff",
+  strokeWidth: "1.2",
+  fill: "none",
+  opacity: ".8"
+}), React.createElement("path", {
+  d: "M170 152 h8 m-8 6 h8 m-8 6 h8",
+  stroke: "#fff",
+  strokeWidth: "1.4"
+}), React.createElement("circle", {
+  cx: "120",
+  cy: "178",
+  r: "6",
+  fill: "none",
+  stroke: "#ff5d5d",
+  strokeWidth: "3"
+}))], ['Hot Tub', [198, 140, 52, 52], 4, () => React.createElement("g", null, React.createElement(ShRect, {
+  x: 202,
+  y: 144,
+  w: 42,
+  h: 42,
+  r: 8
+}), React.createElement("rect", {
+  x: "202",
+  y: "144",
+  width: "42",
+  height: "42",
+  rx: "8",
+  fill: "#8a6748",
+  stroke: SC.line,
+  strokeWidth: ".8"
+}), React.createElement("rect", {
+  x: "207",
+  y: "149",
+  width: "32",
+  height: "32",
+  rx: "6",
+  fill: "#63d3f3"
+}), [[213, 156], [226, 160], [218, 170], [232, 172], [229, 154], [212, 174]].map(([x, y], i) => React.createElement("circle", {
+  key: i,
+  cx: x,
+  cy: y,
+  r: "1.8",
+  fill: "#fff",
+  opacity: ".85"
+})))], ['Pool Loungers', [20, 218, 184, 36], 4, () => React.createElement("g", null, React.createElement(Lounger, {
+  x: 36,
+  y: 222,
+  c: "#ffd84d"
+}), React.createElement(Lounger, {
+  x: 60,
+  y: 222,
+  c: "#52c6ef"
+}), React.createElement(Lounger, {
+  x: 108,
+  y: 222,
+  c: "#ff7a7a"
+}), React.createElement(Lounger, {
+  x: 132,
+  y: 222,
+  c: "#ffd84d"
+}), React.createElement("circle", {
+  cx: "90",
+  cy: "236",
+  r: "12",
+  fill: SC.shadow,
+  transform: "translate(2 2)"
+}), React.createElement("circle", {
+  cx: "90",
+  cy: "236",
+  r: "12",
+  fill: "#ff7a7a",
+  stroke: SC.line,
+  strokeWidth: ".6"
+}), React.createElement("path", {
+  d: "M78 236 H102 M90 224 V248",
+  stroke: "#fff",
+  strokeWidth: "1.6"
+}), React.createElement("circle", {
+  cx: "170",
+  cy: "236",
+  r: "5",
+  fill: "#fff",
+  stroke: SC.line,
+  strokeWidth: ".5"
+}))], ['Trampoline', [262, 144, 76, 76], 5, () => React.createElement("g", null, React.createElement(ShCircle, {
+  cx: 300,
+  cy: 182,
+  r: 32
+}), React.createElement("circle", {
+  cx: "300",
+  cy: "182",
+  r: "32",
+  fill: "#2f6fd0",
+  stroke: SC.line,
+  strokeWidth: ".8"
+}), React.createElement("circle", {
+  cx: "300",
+  cy: "182",
+  r: "25",
+  fill: "#1d1f26"
+}), Array.from({
+  length: 16
+}, (_, i) => {
+  const a = i / 16 * Math.PI * 2;
+  return React.createElement("path", {
+    key: i,
+    d: 'M' + (300 + 25 * Math.cos(a)) + ' ' + (182 + 25 * Math.sin(a)) + ' L' + (300 + 31 * Math.cos(a)) + ' ' + (182 + 31 * Math.sin(a)),
+    stroke: "#9fb7e8",
+    strokeWidth: ".8"
+  });
+}), React.createElement("circle", {
+  cx: "294",
+  cy: "176",
+  r: "8",
+  fill: "rgba(255,255,255,.08)"
+}))], ['Outdoor Cinema', [362, 132, 148, 72], 4, () => React.createElement("g", null, React.createElement("path", {
+  d: "M384 196 L430 146 L452 146 L408 196 Z",
+  fill: "rgba(255,248,200,.18)"
+}), React.createElement("rect", {
+  x: "378",
+  y: "190",
+  width: "14",
+  height: "10",
+  rx: "2",
+  fill: "#2b2e35"
+}), React.createElement("circle", {
+  cx: "388",
+  cy: "195",
+  r: "2.5",
+  fill: "#bfe6ff"
+}), React.createElement("rect", {
+  x: "402",
+  y: "152",
+  width: "10",
+  height: "5",
+  fill: "#555"
+}), React.createElement("rect", {
+  x: "476",
+  y: "152",
+  width: "10",
+  height: "5",
+  fill: "#555"
+}), React.createElement("rect", {
+  x: "398",
+  y: "134",
+  width: "94",
+  height: "16",
+  rx: "2",
+  fill: SC.shadow,
+  transform: "translate(2 3)"
+}), React.createElement("rect", {
+  x: "398",
+  y: "134",
+  width: "94",
+  height: "16",
+  rx: "2",
+  fill: "#2b2e35"
+}), React.createElement("rect", {
+  x: "402",
+  y: "136",
+  width: "86",
+  height: "12",
+  rx: "1",
+  fill: "#e9f3ff"
+}), React.createElement("path", {
+  d: "M402 148 L430 140 L450 144 L488 137 V148 Z",
+  fill: "#9fd0ff",
+  opacity: ".7"
+}), [[420, 174, '#ff7a7a'], [444, 180, '#ffd84d'], [468, 174, '#7ad1ff'], [492, 182, '#9be37a']].map(([x, y, c], i) => React.createElement("g", {
+  key: i
+}, React.createElement("ellipse", {
+  cx: x + 2,
+  cy: y + 3,
+  rx: "10",
+  ry: "8",
+  fill: SC.shadow
+}), React.createElement("ellipse", {
+  cx: x,
+  cy: y,
+  rx: "10",
+  ry: "8",
+  fill: c,
+  stroke: SC.line,
+  strokeWidth: ".6"
+}), React.createElement("ellipse", {
+  cx: x - 2,
+  cy: y - 2,
+  rx: "4",
+  ry: "3",
+  fill: SC.hi
+}))))], ['Table Tennis', [210, 222, 84, 50], 4, () => React.createElement("g", null, React.createElement(ShRect, {
+  x: 216,
+  y: 230,
+  w: 70,
+  h: 36
+}), React.createElement("rect", {
+  x: "216",
+  y: "230",
+  width: "70",
+  height: "36",
+  rx: "1",
+  fill: "#1f5fb0",
+  stroke: SC.line,
+  strokeWidth: ".8"
+}), React.createElement("path", {
+  d: "M216 230 h70 v36 h-70 Z M216 248 H286",
+  stroke: "#fff",
+  strokeWidth: "1.2",
+  fill: "none"
+}), React.createElement("path", {
+  d: "M251 228 V268",
+  stroke: "#eee",
+  strokeWidth: "2.4"
+}), React.createElement("path", {
+  d: "M251 228 V268",
+  stroke: "#555",
+  strokeWidth: ".6",
+  strokeDasharray: "1.5 1.5"
+}), React.createElement("g", null, React.createElement("circle", {
+  cx: "230",
+  cy: "224",
+  r: "5",
+  fill: "#d7322b"
+}), React.createElement("rect", {
+  x: "228.5",
+  y: "227",
+  width: "3",
+  height: "6",
+  rx: "1",
+  fill: "#8a5a33"
+})), React.createElement("g", null, React.createElement("circle", {
+  cx: "276",
+  cy: "272",
+  r: "5",
+  fill: "#222"
+}), React.createElement("rect", {
+  x: "274.5",
+  y: "263",
+  width: "3",
+  height: "6",
+  rx: "1",
+  fill: "#8a5a33"
+})), React.createElement("circle", {
+  cx: "262",
+  cy: "242",
+  r: "1.8",
+  fill: "#fff"
+}))], ['Fire Pit', [302, 222, 58, 58], 5, () => React.createElement("g", null, [0, 72, 144, 216, 288].map(a => {
+  const r = a * Math.PI / 180;
+  const x = 331 + 22 * Math.cos(r),
+    y = 251 + 22 * Math.sin(r);
+  return React.createElement("g", {
+    key: a,
+    transform: 'rotate(' + (a + 90) + ' ' + x + ' ' + y + ')'
+  }, React.createElement("rect", {
+    x: x - 5 + 1.5,
+    y: y - 6 + 2,
+    width: "10",
+    height: "12",
+    rx: "2",
+    fill: SC.shadow
+  }), React.createElement("rect", {
+    x: x - 5,
+    y: y - 6,
+    width: "10",
+    height: "12",
+    rx: "2",
+    fill: "#f0ece2",
+    stroke: SC.line,
+    strokeWidth: ".6"
+  }));
+}), React.createElement(ShCircle, {
+  cx: 331,
+  cy: 251,
+  r: 11
+}), React.createElement("circle", {
+  cx: "331",
+  cy: "251",
+  r: "11",
+  fill: "#8a837a",
+  stroke: SC.line,
+  strokeWidth: ".8"
+}), React.createElement("circle", {
+  cx: "331",
+  cy: "251",
+  r: "7.5",
+  fill: "#ff7a1a"
+}), React.createElement("circle", {
+  cx: "331",
+  cy: "251",
+  r: "4",
+  fill: "#ffd23f"
+}))], ['Basketball Hoop', [394, 204, 116, 88], 4, () => React.createElement("g", null, React.createElement("rect", {
+  x: "398",
+  y: "208",
+  width: "108",
+  height: "80",
+  rx: "2",
+  fill: "#b9b4ab",
+  stroke: SC.line,
+  strokeWidth: ".8"
+}), React.createElement("g", {
+  stroke: "#fff",
+  strokeWidth: "1.3",
+  fill: "none"
+}, React.createElement("rect", {
+  x: "438",
+  y: "208",
+  width: "28",
+  height: "36"
+}), React.createElement("path", {
+  d: "M438 244 Q452 262 466 244"
+}), React.createElement("path", {
+  d: "M408 208 Q408 270 452 274 Q496 270 496 208"
+})), React.createElement("rect", {
+  x: "440",
+  y: "208",
+  width: "24",
+  height: "5",
+  fill: "#f4f4f4",
+  stroke: SC.line,
+  strokeWidth: ".6"
+}), React.createElement("circle", {
+  cx: "452",
+  cy: "219",
+  r: "5",
+  fill: "none",
+  stroke: "#ff5a1f",
+  strokeWidth: "2"
+}), React.createElement("circle", {
+  cx: "478",
+  cy: "262",
+  r: "4",
+  fill: "#ff7b29",
+  stroke: "#3a1a08",
+  strokeWidth: ".6"
+}), React.createElement("path", {
+  d: "M474 262 H482 M478 258 V266",
+  stroke: "#3a1a08",
+  strokeWidth: ".5"
+}))], ['Vegetable Garden', [14, 260, 88, 68], 3, () => React.createElement("g", null, [0, 1].map(r => React.createElement("g", {
+  key: r
+}, React.createElement(ShRect, {
+  x: 20,
+  y: 266 + r * 30,
+  w: 76,
+  h: 24
+}), React.createElement("rect", {
+  x: "20",
+  y: 266 + r * 30,
+  width: "76",
+  height: "24",
+  rx: "2",
+  fill: "#7a5233",
+  stroke: SC.line,
+  strokeWidth: ".8"
+}), React.createElement("rect", {
+  x: "23",
+  y: 269 + r * 30,
+  width: "70",
+  height: "18",
+  fill: "#5a3d24"
+}), Array.from({
+  length: 6
+}, (_, i) => React.createElement("circle", {
+  key: i,
+  cx: 30 + i * 11.5,
+  cy: 278 + r * 30,
+  r: "4.5",
+  fill: r ? '#3d9b3b' : '#5fb84a'
+})), r ? [34, 57, 80].map(x => React.createElement("circle", {
+  key: x,
+  cx: x,
+  cy: 276 + 30,
+  r: "2",
+  fill: "#e8402f"
+})) : [41, 64, 87].map(x => React.createElement("circle", {
+  key: x,
+  cx: x,
+  cy: 281,
+  r: "1.8",
+  fill: "#f28b2b"
+})))))], ['Koi Pond', [100, 258, 98, 70], 3, () => React.createElement("g", null, React.createElement("path", {
+  d: "M110 276 Q130 258 166 266 Q196 274 190 298 Q184 322 148 322 Q110 322 106 300 Q102 286 110 276 Z",
+  fill: "#9b968c"
+}), React.createElement("path", {
+  d: "M114 278 Q132 264 164 270 Q190 278 185 297 Q180 316 148 316 Q114 316 111 299 Q108 287 114 278 Z",
+  fill: "#3aa6c9"
+}), [[130, 286, 15], [160, 300, -20], [145, 276, 40]].map(([x, y, r], i) => React.createElement("g", {
+  key: i,
+  transform: 'rotate(' + r + ' ' + x + ' ' + y + ')'
+}, React.createElement("ellipse", {
+  cx: x,
+  cy: y,
+  rx: "6",
+  ry: "2.6",
+  fill: i === 1 ? '#fff' : '#ff8a1f'
+}), React.createElement("path", {
+  d: 'M' + (x + 5) + ' ' + y + ' l4 -2.5 v5 Z',
+  fill: i === 1 ? '#fff' : '#ff8a1f'
+}), i === 1 && React.createElement("circle", {
+  cx: x - 1,
+  cy: y,
+  r: "1.4",
+  fill: "#e63b2e"
+}))), [[170, 286], [124, 304]].map(([x, y], i) => React.createElement("g", {
+  key: i
+}, React.createElement("circle", {
+  cx: x,
+  cy: y,
+  r: "6",
+  fill: "#4cae4a"
+}), React.createElement("path", {
+  d: 'M' + x + ' ' + y + ' l6 -2',
+  stroke: "#3aa6c9",
+  strokeWidth: "1.5"
+}))), [[108, 284], [188, 306], [150, 320]].map(([x, y], i) => React.createElement("circle", {
+  key: i,
+  cx: x,
+  cy: y,
+  r: "4",
+  fill: "#b9b2a6",
+  stroke: SC.line,
+  strokeWidth: ".5"
+})))], ['Football Goal', [200, 282, 112, 70], 4, () => React.createElement("g", null, React.createElement("g", {
+  stroke: "#fff",
+  strokeWidth: "1.4",
+  fill: "none",
+  opacity: ".9"
+}, React.createElement("rect", {
+  x: "216",
+  y: "306",
+  width: "80",
+  height: "40"
+}), React.createElement("rect", {
+  x: "236",
+  y: "306",
+  width: "40",
+  height: "18"
+}), React.createElement("path", {
+  d: "M236 346 Q256 330 276 346"
+})), React.createElement("rect", {
+  x: "228",
+  y: "290",
+  width: "56",
+  height: "16",
+  fill: "rgba(255,255,255,.35)"
+}), Array.from({
+  length: 8
+}, (_, i) => React.createElement("path", {
+  key: i,
+  d: 'M' + (230 + i * 7) + ' 290 V306',
+  stroke: "rgba(255,255,255,.7)",
+  strokeWidth: ".5"
+})), [294, 298, 302].map(y => React.createElement("path", {
+  key: y,
+  d: 'M228 ' + y + ' H284',
+  stroke: "rgba(255,255,255,.7)",
+  strokeWidth: ".5"
+})), React.createElement("path", {
+  d: "M228 306 V290 H284 V306",
+  stroke: "#fff",
+  strokeWidth: "3",
+  fill: "none"
+}), React.createElement("circle", {
+  cx: "256",
+  cy: "336",
+  r: "4",
+  fill: "#fff",
+  stroke: "#222",
+  strokeWidth: ".7"
+}), React.createElement("path", {
+  d: "M254 334 l2 2 l2 -2",
+  stroke: "#222",
+  strokeWidth: ".6",
+  fill: "none"
+}))], ['Playground', [312, 286, 90, 76], 4, () => React.createElement("g", null, React.createElement("rect", {
+  x: "316",
+  y: "290",
+  width: "82",
+  height: "68",
+  rx: "6",
+  fill: "#e6c98f"
+}), React.createElement("path", {
+  d: "M322 298 H372",
+  stroke: "#d94a3a",
+  strokeWidth: "3.5",
+  strokeLinecap: "round"
+}), [332, 360].map(x => React.createElement("g", {
+  key: x
+}, React.createElement("path", {
+  d: 'M' + x + ' 298 V312',
+  stroke: "#555",
+  strokeWidth: ".8"
+}), React.createElement("rect", {
+  x: x - 4,
+  y: "312",
+  width: "8",
+  height: "3",
+  rx: "1",
+  fill: "#2f6fd0"
+}))), React.createElement(ShRect, {
+  x: 376,
+  y: 300,
+  w: 14,
+  h: 44
+}), React.createElement("rect", {
+  x: "376",
+  y: "300",
+  width: "14",
+  height: "10",
+  rx: "1",
+  fill: "#4aa0e0",
+  stroke: SC.line,
+  strokeWidth: ".6"
+}), React.createElement("rect", {
+  x: "378",
+  y: "310",
+  width: "10",
+  height: "34",
+  rx: "4",
+  fill: "#ffd23f",
+  stroke: SC.line,
+  strokeWidth: ".6"
+}), React.createElement("rect", {
+  x: "324",
+  y: "326",
+  width: "36",
+  height: "24",
+  rx: "3",
+  fill: "#f2ddb1",
+  stroke: "#b58a52",
+  strokeWidth: "2"
+}), React.createElement("circle", {
+  cx: "336",
+  cy: "336",
+  r: "3",
+  fill: "#e2463b"
+}), React.createElement("path", {
+  d: "M346 340 l6 -6",
+  stroke: "#2f6fd0",
+  strokeWidth: "2"
+}))], ['Fruit Trees', [402, 290, 108, 78], 4, () => React.createElement("g", null, React.createElement(TreeTop, {
+  x: 424,
+  y: 314,
+  r: 18,
+  c: "#3f9b3b",
+  fruit: "#ff8a1f"
+}), React.createElement(TreeTop, {
+  x: 486,
+  y: 312,
+  r: 17,
+  c: "#47a242",
+  fruit: "#e8402f"
+}), React.createElement(TreeTop, {
+  x: 456,
+  y: 346,
+  r: 17,
+  c: "#3a9437",
+  fruit: "#ffd23f"
+}))], ['Hammock', [204, 348, 108, 28], 5, () => React.createElement("g", null, React.createElement(TreeTop, {
+  x: 214,
+  y: 360,
+  r: 8,
+  c: "#3a9437"
+}), React.createElement(TreeTop, {
+  x: 302,
+  y: 360,
+  r: 8,
+  c: "#3a9437"
+}), React.createElement("path", {
+  d: "M222 360 Q258 376 294 360",
+  stroke: SC.shadow,
+  strokeWidth: "9",
+  fill: "none",
+  transform: "translate(2 3)"
+}), React.createElement("path", {
+  d: "M222 360 Q258 376 294 360",
+  stroke: "#f2a65a",
+  strokeWidth: "9",
+  fill: "none",
+  strokeLinecap: "round"
+}), React.createElement("path", {
+  d: "M222 360 Q258 376 294 360",
+  stroke: "#fff",
+  strokeWidth: "2",
+  fill: "none",
+  strokeDasharray: "4 4"
+}))], ['Sauna', [14, 330, 66, 46], 4, () => React.createElement("g", null, React.createElement(ShRect, {
+  x: 20,
+  y: 336,
+  w: 52,
+  h: 32,
+  r: 14
+}), React.createElement("rect", {
+  x: "20",
+  y: "336",
+  width: "52",
+  height: "32",
+  rx: "14",
+  fill: "#b07a46",
+  stroke: SC.line,
+  strokeWidth: ".8"
+}), Array.from({
+  length: 6
+}, (_, i) => React.createElement("path", {
+  key: i,
+  d: 'M' + (26 + i * 8) + ' 337 V367',
+  stroke: "rgba(0,0,0,.15)",
+  strokeWidth: "1"
+})), React.createElement("rect", {
+  x: "58",
+  y: "340",
+  width: "7",
+  height: "7",
+  fill: "#555"
+}), React.createElement("circle", {
+  cx: "64",
+  cy: "336",
+  r: "3",
+  fill: "rgba(255,255,255,.6)"
+}), React.createElement("circle", {
+  cx: "68",
+  cy: "331",
+  r: "2.4",
+  fill: "rgba(255,255,255,.45)"
+}))], ['Flower Beds', [80, 330, 122, 44], 3, () => React.createElement("g", null, React.createElement("path", {
+  d: "M88 346 Q140 328 196 344 Q198 366 150 368 Q96 370 88 358 Z",
+  fill: "#6a4a2c"
+}), Array.from({
+  length: 16
+}, (_, i) => {
+  const x = 96 + i * 6.3;
+  const y = 352 + i % 3 * 4 - 4;
+  const c = ['#ff5d8f', '#ffd23f', '#b06cff', '#ff8a1f', '#fff'][i % 5];
+  return React.createElement("g", {
+    key: i
+  }, React.createElement("circle", {
+    cx: x,
+    cy: y,
+    r: "3.2",
+    fill: c
+  }), React.createElement("circle", {
+    cx: x,
+    cy: y,
+    r: "1.1",
+    fill: "#ffe680"
+  }));
+}), [92, 120, 160, 190].map(x => React.createElement("circle", {
+  key: x,
+  cx: x,
+  cy: "364",
+  r: "3",
+  fill: "#3d9b3b"
+})))]];
+const BACKYARD_SCENE = {
+  id: 'backyard',
+  title: 'Dream Backyard',
+  view: [520, 380],
+  mode: 'fixed',
+  cardBg: '#73c04f',
+  Background: BackyardBg,
+  list: BACKYARD_ITEMS,
+  spare: [[360, 270], [210, 200], [100, 250], [360, 120], [480, 130], [150, 130]],
+  generic: item => ({
+    box: [-16, -26, 32, 38],
+    draw: ({
+      item: it
+    }) => React.createElement(SceneSign, {
+      item: it,
+      c: "#ffd84d"
+    })
+  })
+};
+const SC = {
+  shadow: 'rgba(14,22,10,.24)',
+  line: 'rgba(0,0,0,.3)',
+  hi: 'rgba(255,255,255,.22)',
+  grass: '#6abb48',
+  grass2: '#62b142',
+  grassDark: '#4b9634',
+  hedge: '#2f7a2c',
+  hedge2: '#3c8d36',
+  path: '#eadfc6',
+  pave: '#d8d0c2',
+  pave2: '#c8bfae',
+  stone: '#b9b2a6',
+  water: '#52c6ef',
+  water2: '#2a9bd4',
+  sand: '#f1d9a0',
+  sand2: '#e6c582',
+  wood: '#c08a55',
+  wood2: '#9b6a3c',
+  roof: '#7b8296',
+  roof2: '#666d82',
+  roof3: '#8d94a8',
+  white: '#fbfaf6',
+  red: '#e2463b',
+  gold: '#f2c14e'
+};
+const ShRect = ({
+  x,
+  y,
+  w,
+  h,
+  r = 3,
+  dx = 3,
+  dy = 4
+}) => React.createElement("rect", {
+  x: x + dx,
+  y: y + dy,
+  width: w,
+  height: h,
+  rx: r,
+  fill: SC.shadow
+});
+const ShCircle = ({
+  cx,
+  cy,
+  r,
+  dx = 3,
+  dy = 4
+}) => React.createElement("circle", {
+  cx: cx + dx,
+  cy: cy + dy,
+  r: r,
+  fill: SC.shadow
+});
+function TreeTop({
+  x,
+  y,
+  r = 12,
+  c = '#3e9a3c',
+  fruit
+}) {
+  return React.createElement("g", null, React.createElement("circle", {
+    cx: x + 3,
+    cy: y + 4,
+    r: r,
+    fill: SC.shadow
+  }), React.createElement("circle", {
+    cx: x,
+    cy: y,
+    r: r,
+    fill: c,
+    stroke: "rgba(0,0,0,.18)",
+    strokeWidth: ".8"
+  }), React.createElement("circle", {
+    cx: x + r * 0.25,
+    cy: y + r * 0.2,
+    r: r * 0.62,
+    fill: "rgba(0,0,0,.08)"
+  }), React.createElement("circle", {
+    cx: x - r * 0.3,
+    cy: y - r * 0.3,
+    r: r * 0.5,
+    fill: SC.hi
+  }), fruit && [[-0.45, -0.1], [0.3, -0.45], [0.4, 0.3], [-0.15, 0.45], [0.05, 0]].map(([a, b], i) => React.createElement("circle", {
+    key: i,
+    cx: x + a * r,
+    cy: y + b * r,
+    r: Math.max(1.4, r * 0.13),
+    fill: fruit,
+    stroke: "rgba(0,0,0,.25)",
+    strokeWidth: ".4"
+  })));
+}
+function CarTop({
+  x,
+  y,
+  w = 22,
+  h = 44,
+  c = '#e2463b',
+  rot = 0,
+  suv,
+  low
+}) {
+  const L = x - w / 2,
+    T = y - h / 2;
+  return React.createElement("g", {
+    transform: 'rotate(' + rot + ' ' + x + ' ' + y + ')'
+  }, React.createElement("rect", {
+    x: L + 3,
+    y: T + 4,
+    width: w,
+    height: h,
+    rx: w * 0.32,
+    fill: SC.shadow
+  }), [[L - 1.6, T + h * 0.16], [L + w - 1.6, T + h * 0.16], [L - 1.6, T + h * 0.68], [L + w - 1.6, T + h * 0.68]].map(([a, b], i) => React.createElement("rect", {
+    key: i,
+    x: a,
+    y: b,
+    width: "3.2",
+    height: h * 0.17,
+    rx: "1",
+    fill: "#1d1d24"
+  })), React.createElement("rect", {
+    x: L,
+    y: T,
+    width: w,
+    height: h,
+    rx: low ? w * 0.42 : w * 0.3,
+    fill: c,
+    stroke: SC.line,
+    strokeWidth: ".8"
+  }), React.createElement("path", {
+    d: 'M' + (L + w * 0.16) + ' ' + (T + h * (suv ? 0.24 : 0.3)) + ' L' + (L + w * 0.84) + ' ' + (T + h * (suv ? 0.24 : 0.3)) + ' L' + (L + w * 0.76) + ' ' + (T + h * (suv ? 0.36 : 0.44)) + ' L' + (L + w * 0.24) + ' ' + (T + h * (suv ? 0.36 : 0.44)) + ' Z',
+    fill: "#1c2733"
+  }), React.createElement("rect", {
+    x: L + w * 0.24,
+    y: T + h * (suv ? 0.36 : 0.44),
+    width: w * 0.52,
+    height: h * (suv ? 0.4 : 0.26),
+    rx: "2",
+    fill: "rgba(255,255,255,.16)"
+  }), React.createElement("path", {
+    d: 'M' + (L + w * 0.24) + ' ' + (T + h * (suv ? 0.76 : 0.7)) + ' L' + (L + w * 0.76) + ' ' + (T + h * (suv ? 0.76 : 0.7)) + ' L' + (L + w * 0.82) + ' ' + (T + h * 0.84) + ' L' + (L + w * 0.18) + ' ' + (T + h * 0.84) + ' Z',
+    fill: "#1c2733"
+  }), React.createElement("rect", {
+    x: L + w * 0.12,
+    y: T + 1.2,
+    width: w * 0.2,
+    height: "2.4",
+    rx: "1",
+    fill: "#fff6c8"
+  }), React.createElement("rect", {
+    x: L + w * 0.68,
+    y: T + 1.2,
+    width: w * 0.2,
+    height: "2.4",
+    rx: "1",
+    fill: "#fff6c8"
+  }), React.createElement("rect", {
+    x: L + w * 0.12,
+    y: T + h - 3.4,
+    width: w * 0.2,
+    height: "2",
+    rx: "1",
+    fill: "#ff5a5a"
+  }), React.createElement("rect", {
+    x: L + w * 0.68,
+    y: T + h - 3.4,
+    width: w * 0.2,
+    height: "2",
+    rx: "1",
+    fill: "#ff5a5a"
+  }), React.createElement("path", {
+    d: 'M' + (L + 2) + ' ' + (T + 4) + ' Q' + (L + w * 0.5) + ' ' + (T - 1) + ' ' + (L + w - 2) + ' ' + (T + 4),
+    fill: "none",
+    stroke: SC.hi,
+    strokeWidth: "1.2"
+  }));
+}
+const MirrorX = ({
+  cx,
+  children
+}) => React.createElement("g", {
+  transform: 'translate(' + 2 * cx + ' 0) scale(-1 1)'
+}, children);
+function GlassPavilion({
+  x,
+  y,
+  w,
+  h,
+  tint = '#bfe6f5',
+  children
+}) {
+  return React.createElement("g", null, React.createElement(ShRect, {
+    x: x,
+    y: y,
+    w: w,
+    h: h,
+    r: 3
+  }), React.createElement("rect", {
+    x: x,
+    y: y,
+    width: w,
+    height: h,
+    rx: "3",
+    fill: "#ecebe6",
+    stroke: SC.line,
+    strokeWidth: ".8"
+  }), React.createElement("rect", {
+    x: x + 3,
+    y: y + 3,
+    width: w - 6,
+    height: h - 6,
+    rx: "2",
+    fill: tint
+  }), children, React.createElement("rect", {
+    x: x + 3,
+    y: y + 3,
+    width: w - 6,
+    height: h - 6,
+    rx: "2",
+    fill: "rgba(255,255,255,.18)"
+  }), React.createElement("path", {
+    d: 'M' + (x + w / 2) + ' ' + (y + 3) + ' V' + (y + h - 3) + ' M' + (x + 3) + ' ' + (y + h / 2) + ' H' + (x + w - 3),
+    stroke: "rgba(255,255,255,.55)",
+    strokeWidth: ".8"
+  }), React.createElement("path", {
+    d: 'M' + (x + 5) + ' ' + (y + 5) + ' L' + (x + 13) + ' ' + (y + 5),
+    stroke: "#fff",
+    strokeWidth: "1.2",
+    opacity: ".7"
+  }));
+}
+function SceneSign({
+  item,
+  c = '#f2c14e'
+}) {
+  const ch = (item && item.name ? item.name.trim()[0] : '?').toUpperCase();
+  return React.createElement("g", null, React.createElement("rect", {
+    x: "-1",
+    y: "-6",
+    width: "3",
+    height: "16",
+    fill: SC.wood2
+  }), React.createElement(ShRect, {
+    x: -14,
+    y: -24,
+    w: 28,
+    h: 20,
+    r: 4
+  }), React.createElement("rect", {
+    x: "-14",
+    y: "-24",
+    width: "28",
+    height: "20",
+    rx: "4",
+    fill: c,
+    stroke: SC.line,
+    strokeWidth: ".8"
+  }), React.createElement("text", {
+    x: "0",
+    y: "-9",
+    textAnchor: "middle",
+    fontSize: "13",
+    fontWeight: "900",
+    fill: "#2a2140",
+    fontFamily: "system-ui, sans-serif"
+  }, ch));
+}
+function HouseBg() {
+  return React.createElement("g", null, React.createElement("rect", {
+    width: "520",
+    height: "380",
+    fill: SC.grass
+  }), Array.from({
+    length: 14
+  }, (_, i) => React.createElement("rect", {
+    key: i,
+    x: i * 40,
+    y: "44",
+    width: "20",
+    height: "336",
+    fill: SC.grass2
+  })), React.createElement("rect", {
+    width: "520",
+    height: "44",
+    fill: "#5aa63e"
+  }), [[30, 18], [90, 24], [160, 14], [250, 22], [330, 16], [410, 24], [490, 16]].map(([x, y], i) => React.createElement(TreeTop, {
+    key: i,
+    x: x,
+    y: y,
+    r: 11,
+    c: "#3b8f37"
+  })), React.createElement("rect", {
+    x: "6",
+    y: "42",
+    width: "508",
+    height: "334",
+    rx: "10",
+    fill: "none",
+    stroke: SC.hedge,
+    strokeWidth: "7"
+  }), React.createElement("rect", {
+    x: "6",
+    y: "42",
+    width: "508",
+    height: "334",
+    rx: "10",
+    fill: "none",
+    stroke: SC.hedge2,
+    strokeWidth: "3",
+    strokeDasharray: "6 5"
+  }), React.createElement("rect", {
+    x: "164",
+    y: "48",
+    width: "184",
+    height: "72",
+    rx: "6",
+    fill: SC.pave
+  }), React.createElement("rect", {
+    x: "164",
+    y: "48",
+    width: "184",
+    height: "72",
+    rx: "6",
+    fill: "none",
+    stroke: SC.pave2,
+    strokeWidth: "1"
+  }), React.createElement("path", {
+    d: "M248 380 L248 290 L272 290 L272 380 Z",
+    fill: SC.pave
+  }), React.createElement("circle", {
+    cx: "260",
+    cy: "258",
+    r: "40",
+    fill: SC.pave
+  }), React.createElement("circle", {
+    cx: "260",
+    cy: "258",
+    r: "22",
+    fill: SC.grass2,
+    stroke: SC.pave2,
+    strokeWidth: "1.5"
+  }), React.createElement("rect", {
+    x: "248",
+    y: "206",
+    width: "24",
+    height: "20",
+    fill: SC.pave
+  }), React.createElement("rect", {
+    x: "192",
+    y: "280",
+    width: "42",
+    height: "58",
+    rx: "5",
+    fill: SC.pave
+  }), React.createElement("rect", {
+    x: "286",
+    y: "280",
+    width: "42",
+    height: "58",
+    rx: "5",
+    fill: SC.pave
+  }), [192, 286].map(x => React.createElement("path", {
+    key: x,
+    d: 'M' + (x + 4) + ' 284 H' + (x + 38) + ' M' + (x + 4) + ' 334 H' + (x + 38),
+    stroke: "#fff",
+    strokeWidth: "1",
+    opacity: ".7"
+  })), React.createElement("path", {
+    d: "M234 300 H248 M272 300 H286",
+    stroke: SC.pave,
+    strokeWidth: "10"
+  }), React.createElement("path", {
+    d: "M170 160 H180 M222 258 Q160 262 130 205 Q112 170 106 150 M298 258 Q350 250 352 216",
+    fill: "none",
+    stroke: SC.path,
+    strokeWidth: "7",
+    strokeLinecap: "round"
+  }), React.createElement("path", {
+    d: "M340 70 H392 M164 86 H120 Q86 86 70 110 M440 78 H418 M232 120 V116 M488 118 V120",
+    fill: "none",
+    stroke: SC.path,
+    strokeWidth: "6",
+    strokeLinecap: "round"
+  }), React.createElement("rect", {
+    x: "184",
+    y: "122",
+    width: "160",
+    height: "96",
+    rx: "2",
+    fill: SC.shadow
+  }), React.createElement("rect", {
+    x: "180",
+    y: "118",
+    width: "160",
+    height: "94",
+    rx: "2",
+    fill: SC.roof,
+    stroke: SC.line,
+    strokeWidth: "1"
+  }), React.createElement("path", {
+    d: "M180 118 L218 152 L302 152 L340 118 Z",
+    fill: SC.roof3
+  }), React.createElement("path", {
+    d: "M180 212 L218 178 L302 178 L340 212 Z",
+    fill: SC.roof2
+  }), React.createElement("path", {
+    d: "M180 118 L218 152 L218 178 L180 212 Z",
+    fill: "#717890"
+  }), React.createElement("path", {
+    d: "M218 152 L302 152 L302 178 L218 178 Z",
+    fill: SC.roof
+  }), React.createElement("path", {
+    d: "M180 118 L218 152 M340 118 L302 152 M180 212 L218 178 M340 212 L302 178 M218 165 H302",
+    stroke: "rgba(255,255,255,.25)",
+    strokeWidth: "1"
+  }), React.createElement("rect", {
+    x: "196",
+    y: "130",
+    width: "10",
+    height: "10",
+    fill: "#9b5b45",
+    stroke: SC.line,
+    strokeWidth: ".6"
+  }), React.createElement("rect", {
+    x: "244",
+    y: "206",
+    width: "32",
+    height: "12",
+    rx: "2",
+    fill: "#efe9dd",
+    stroke: SC.line,
+    strokeWidth: ".6"
+  }), [[118, 212, 10], [158, 238, 9], [362, 238, 9], [438, 252, 7], [100, 262, 8], [334, 96, 7], [150, 112, 8]].map(([x, y, r], i) => React.createElement(TreeTop, {
+    key: i,
+    x: x,
+    y: y,
+    r: r,
+    c: i % 2 ? '#3f9b3b' : '#47a242'
+  })));
+}
+const HOUSE_ITEMS = [['Private Beach', [0, 0, 520, 42], 1, () => React.createElement("g", null, React.createElement("rect", {
+  width: "520",
+  height: "42",
+  fill: SC.sand
+}), React.createElement("path", {
+  d: "M0 0 H520 V14 Q490 20 460 14 T400 14 T340 14 T280 14 T220 14 T160 14 T100 14 T40 14 T0 14 Z",
+  fill: SC.water2
+}), React.createElement("path", {
+  d: "M0 0 H520 V8 Q490 13 460 8 T400 8 T340 8 T280 8 T220 8 T160 8 T100 8 T40 8 T0 8 Z",
+  fill: SC.water
+}), React.createElement("path", {
+  d: "M10 15 Q40 21 70 15 M130 15 Q160 21 190 15 M300 15 Q330 21 360 15 M430 15 Q460 21 490 15",
+  stroke: "#fff",
+  strokeWidth: "1.5",
+  fill: "none",
+  opacity: ".8"
+}), [[60, 30, '#ff5d5d'], [180, 28, '#ffd84d'], [380, 30, '#52c6ef']].map(([x, y, c], i) => React.createElement("g", {
+  key: i
+}, React.createElement("rect", {
+  x: x + 6,
+  y: y - 3,
+  width: "14",
+  height: "7",
+  rx: "2",
+  fill: "#fff",
+  stroke: SC.line,
+  strokeWidth: ".5"
+}), React.createElement("circle", {
+  cx: x + 2,
+  cy: y + 2,
+  r: "9",
+  fill: SC.shadow
+}), React.createElement("circle", {
+  cx: x,
+  cy: y,
+  r: "9",
+  fill: c,
+  stroke: SC.line,
+  strokeWidth: ".6"
+}), React.createElement("path", {
+  d: 'M' + (x - 9) + ' ' + y + ' H' + (x + 9) + ' M' + x + ' ' + (y - 9) + ' V' + (y + 9),
+  stroke: "#fff",
+  strokeWidth: "1.4"
+}))), React.createElement(TreeTop, {
+  x: 470,
+  y: 28,
+  r: 9,
+  c: "#4aa84a"
+}), React.createElement(TreeTop, {
+  x: 270,
+  y: 30,
+  r: 7,
+  c: "#4aa84a"
+}))], ['Guest House', [16, 50, 92, 62], 2, () => React.createElement("g", null, React.createElement("rect", {
+  x: "26",
+  y: "58",
+  width: "72",
+  height: "46",
+  rx: "2",
+  fill: SC.shadow
+}), React.createElement("rect", {
+  x: "22",
+  y: "54",
+  width: "72",
+  height: "46",
+  rx: "2",
+  fill: "#c96c4f",
+  stroke: SC.line,
+  strokeWidth: ".8"
+}), React.createElement("path", {
+  d: "M22 77 H94",
+  stroke: "#a9563e",
+  strokeWidth: "2"
+}), React.createElement("path", {
+  d: "M22 54 H94 V77 H22 Z",
+  fill: "#d97c5e"
+}), Array.from({
+  length: 6
+}, (_, i) => React.createElement("path", {
+  key: i,
+  d: 'M' + (22 + i * 12) + ' 54 V100',
+  stroke: "rgba(0,0,0,.08)",
+  strokeWidth: "1"
+})), React.createElement("rect", {
+  x: "76",
+  y: "58",
+  width: "8",
+  height: "8",
+  fill: "#7d4434"
+}), React.createElement("rect", {
+  x: "44",
+  y: "100",
+  width: "18",
+  height: "8",
+  rx: "1",
+  fill: SC.path
+}))], ['Outdoor Kitchen', [120, 56, 54, 48], 3, () => React.createElement("g", null, React.createElement(ShRect, {
+  x: 124,
+  y: 60,
+  w: 44,
+  h: 14
+}), React.createElement(ShRect, {
+  x: 124,
+  y: 60,
+  w: 14,
+  h: 38
+}), React.createElement("path", {
+  d: "M124 60 H168 V74 H138 V98 H124 Z",
+  fill: "#9aa1ab",
+  stroke: SC.line,
+  strokeWidth: ".8"
+}), React.createElement("rect", {
+  x: "142",
+  y: "63",
+  width: "18",
+  height: "8",
+  rx: "1",
+  fill: "#2b2f36"
+}), [0, 1, 2, 3, 4].map(i => React.createElement("path", {
+  key: i,
+  d: 'M' + (144 + i * 3.4) + ' 63 V71',
+  stroke: "#7a7f88",
+  strokeWidth: ".8"
+})), React.createElement("rect", {
+  x: "127",
+  y: "78",
+  width: "8",
+  height: "10",
+  rx: "2",
+  fill: "#cfe9f6",
+  stroke: "#7a8a95",
+  strokeWidth: ".6"
+}), [[150, 86], [161, 86], [150, 96]].map(([x, y], i) => React.createElement("g", {
+  key: i
+}, React.createElement("circle", {
+  cx: x + 1.5,
+  cy: y + 2,
+  r: "4",
+  fill: SC.shadow
+}), React.createElement("circle", {
+  cx: x,
+  cy: y,
+  r: "4",
+  fill: SC.wood,
+  stroke: SC.line,
+  strokeWidth: ".6"
+}))))], ['Infinity Pool', [188, 50, 142, 54], 3, () => React.createElement("g", null, React.createElement("rect", {
+  x: "190",
+  y: "54",
+  width: "136",
+  height: "44",
+  rx: "3",
+  fill: "#e9e4da"
+}), React.createElement("rect", {
+  x: "194",
+  y: "58",
+  width: "128",
+  height: "36",
+  rx: "2",
+  fill: SC.water
+}), React.createElement("rect", {
+  x: "194",
+  y: "58",
+  width: "128",
+  height: "6",
+  fill: SC.water2
+}), React.createElement("path", {
+  d: "M200 74 Q210 70 220 74 T240 74 M250 84 Q260 80 270 84 T290 84 M280 70 Q290 66 300 70",
+  stroke: "#fff",
+  strokeWidth: "1.2",
+  fill: "none",
+  opacity: ".8"
+}), React.createElement("path", {
+  d: "M194 58 H322",
+  stroke: "#cfeefa",
+  strokeWidth: "1.5"
+}), [[204, 102], [236, 102], [268, 102]].map(([x, y], i) => React.createElement("g", {
+  key: i
+}, React.createElement("rect", {
+  x: x + 2,
+  y: y - 1,
+  width: "22",
+  height: "7",
+  rx: "2",
+  fill: SC.shadow
+}), React.createElement("rect", {
+  x: x,
+  y: y - 3,
+  width: "22",
+  height: "7",
+  rx: "2",
+  fill: "#fff",
+  stroke: SC.line,
+  strokeWidth: ".5"
+}), React.createElement("rect", {
+  x: x,
+  y: y - 3,
+  width: "7",
+  height: "7",
+  rx: "2",
+  fill: "#ffd84d"
+}))))], ['Waterslide', [166, 46, 28, 66], 4, () => React.createElement("g", null, React.createElement("rect", {
+  x: "170",
+  y: "98",
+  width: "20",
+  height: "12",
+  rx: "3",
+  fill: SC.water,
+  stroke: "#e9e4da",
+  strokeWidth: "2"
+}), React.createElement(ShRect, {
+  x: 168,
+  y: 48,
+  w: 16,
+  h: 16
+}), React.createElement("rect", {
+  x: "168",
+  y: "48",
+  width: "16",
+  height: "16",
+  rx: "2",
+  fill: "#f2f2f2",
+  stroke: SC.line,
+  strokeWidth: ".8"
+}), React.createElement("path", {
+  d: "M176 56 C196 60 160 72 178 80 C196 88 168 94 180 104",
+  fill: "none",
+  stroke: "#ffcf3a",
+  strokeWidth: "7",
+  strokeLinecap: "round"
+}), React.createElement("path", {
+  d: "M176 56 C196 60 160 72 178 80 C196 88 168 94 180 104",
+  fill: "none",
+  stroke: "#ff9f1a",
+  strokeWidth: "2",
+  strokeLinecap: "round",
+  opacity: ".7"
+}))], ['Hot Tub', [336, 54, 42, 42], 4, () => React.createElement("g", null, React.createElement(ShCircle, {
+  cx: 357,
+  cy: 75,
+  r: 18
+}), React.createElement("circle", {
+  cx: "357",
+  cy: "75",
+  r: "18",
+  fill: "#c99a6a",
+  stroke: SC.line,
+  strokeWidth: ".8"
+}), React.createElement("circle", {
+  cx: "357",
+  cy: "75",
+  r: "13",
+  fill: "#63d3f3"
+}), [[351, 70], [362, 72], [355, 80], [364, 80], [348, 78]].map(([x, y], i) => React.createElement("circle", {
+  key: i,
+  cx: x,
+  cy: y,
+  r: "1.8",
+  fill: "#fff",
+  opacity: ".85"
+})))], ['Fire Pit', [384, 54, 48, 48], 4, () => React.createElement("g", null, [[-14, -10], [14, -10], [-14, 12], [14, 12]].map(([a, b], i) => React.createElement("g", {
+  key: i
+}, React.createElement("rect", {
+  x: 408 + a - 5 + 2,
+  y: 78 + b - 5 + 2,
+  width: "10",
+  height: "10",
+  rx: "2",
+  fill: SC.shadow
+}), React.createElement("rect", {
+  x: 408 + a - 5,
+  y: 78 + b - 5,
+  width: "10",
+  height: "10",
+  rx: "2",
+  fill: "#d9a066",
+  stroke: SC.line,
+  strokeWidth: ".6"
+}))), React.createElement(ShCircle, {
+  cx: 408,
+  cy: 78,
+  r: 9
+}), React.createElement("circle", {
+  cx: "408",
+  cy: "78",
+  r: "9",
+  fill: "#8a837a",
+  stroke: SC.line,
+  strokeWidth: ".8"
+}), React.createElement("circle", {
+  cx: "408",
+  cy: "78",
+  r: "6",
+  fill: "#ff7a1a"
+}), React.createElement("circle", {
+  cx: "408",
+  cy: "78",
+  r: "3.5",
+  fill: "#ffd23f"
+}))], ['Helipad', [436, 38, 80, 80], 5, () => React.createElement("g", null, React.createElement(ShCircle, {
+  cx: 475,
+  cy: 78,
+  r: 32
+}), React.createElement("circle", {
+  cx: "475",
+  cy: "78",
+  r: "32",
+  fill: "#5b5f68",
+  stroke: SC.line,
+  strokeWidth: "1"
+}), React.createElement("circle", {
+  cx: "475",
+  cy: "78",
+  r: "27",
+  fill: "none",
+  stroke: "#ffd23f",
+  strokeWidth: "2"
+}), React.createElement("path", {
+  d: "M465 66 V90 M485 66 V90 M465 78 H485",
+  stroke: "#fff",
+  strokeWidth: "3"
+}), React.createElement("g", {
+  transform: "rotate(-25 475 78)"
+}, React.createElement("ellipse", {
+  cx: "478",
+  cy: "82",
+  rx: "7",
+  ry: "11",
+  fill: SC.shadow
+}), React.createElement("rect", {
+  x: "473.5",
+  y: "84",
+  width: "3",
+  height: "20",
+  rx: "1.5",
+  fill: "#d4d8de",
+  stroke: SC.line,
+  strokeWidth: ".5"
+}), React.createElement("ellipse", {
+  cx: "475",
+  cy: "78",
+  rx: "7",
+  ry: "11",
+  fill: "#f4f6f8",
+  stroke: SC.line,
+  strokeWidth: ".7"
+}), React.createElement("ellipse", {
+  cx: "475",
+  cy: "72",
+  rx: "5",
+  ry: "4.5",
+  fill: "#2a3b4d"
+}), React.createElement("path", {
+  d: "M451 74 L499 82 M471 54 L479 102",
+  stroke: "#2a2a2f",
+  strokeWidth: "2",
+  strokeLinecap: "round"
+}), React.createElement("circle", {
+  cx: "475",
+  cy: "78",
+  r: "2",
+  fill: "#2a2a2f"
+})))], ['Rooftop Terrace', [226, 132, 68, 50], 6, () => React.createElement("g", null, React.createElement("rect", {
+  x: "230",
+  y: "138",
+  width: "60",
+  height: "40",
+  rx: "2",
+  fill: SC.shadow
+}), React.createElement("rect", {
+  x: "228",
+  y: "134",
+  width: "64",
+  height: "44",
+  rx: "2",
+  fill: "#c89a68",
+  stroke: SC.line,
+  strokeWidth: ".8"
+}), Array.from({
+  length: 8
+}, (_, i) => React.createElement("path", {
+  key: i,
+  d: 'M228 ' + (139 + i * 5) + ' H292',
+  stroke: "rgba(0,0,0,.12)",
+  strokeWidth: ".8"
+})), React.createElement("rect", {
+  x: "228",
+  y: "134",
+  width: "64",
+  height: "44",
+  rx: "2",
+  fill: "none",
+  stroke: "#e9eef2",
+  strokeWidth: "2"
+}), [[245, 150, '#ff6b6b'], [276, 162, '#52c6ef']].map(([x, y, c], i) => React.createElement("g", {
+  key: i
+}, React.createElement("circle", {
+  cx: x + 2,
+  cy: y + 2,
+  r: "8",
+  fill: SC.shadow
+}), React.createElement("circle", {
+  cx: x,
+  cy: y,
+  r: "8",
+  fill: c,
+  stroke: SC.line,
+  strokeWidth: ".5"
+}), React.createElement("circle", {
+  cx: x,
+  cy: y,
+  r: "1.5",
+  fill: "#fff"
+}))), [[234, 172], [286, 140]].map(([x, y], i) => React.createElement("circle", {
+  key: i,
+  cx: x,
+  cy: y,
+  r: "3.5",
+  fill: "#3d9a3a"
+})))], ['10-Car Garage', [94, 120, 80, 66], 3, () => React.createElement("g", null, React.createElement("rect", {
+  x: "102",
+  y: "128",
+  width: "70",
+  height: "56",
+  rx: "2",
+  fill: SC.shadow
+}), React.createElement("rect", {
+  x: "98",
+  y: "124",
+  width: "70",
+  height: "56",
+  rx: "2",
+  fill: "#a3a8b4",
+  stroke: SC.line,
+  strokeWidth: ".8"
+}), React.createElement("rect", {
+  x: "102",
+  y: "128",
+  width: "62",
+  height: "48",
+  rx: "1",
+  fill: "#b3b8c3"
+}), [0, 1, 2].map(i => React.createElement("rect", {
+  key: i,
+  x: 108 + i * 18,
+  y: "134",
+  width: "12",
+  height: "7",
+  rx: "1",
+  fill: "#cfe6f2",
+  opacity: ".85"
+})), [0, 1, 2, 3, 4].map(i => React.createElement("rect", {
+  key: i,
+  x: 166,
+  y: 128 + i * 10,
+  width: "4",
+  height: "8",
+  fill: "#5e636e"
+})), React.createElement("rect", {
+  x: "166",
+  y: "124",
+  width: "6",
+  height: "56",
+  fill: "none"
+}))], ['Treehouse', [16, 118, 76, 72], 3, () => React.createElement("g", null, React.createElement(TreeTop, {
+  x: 52,
+  y: 154,
+  r: 30,
+  c: "#36913a"
+}), React.createElement("rect", {
+  x: "44",
+  y: "134",
+  width: "22",
+  height: "20",
+  rx: "1",
+  fill: SC.shadow,
+  transform: "translate(2 2)"
+}), React.createElement("rect", {
+  x: "40",
+  y: "132",
+  width: "24",
+  height: "22",
+  rx: "1",
+  fill: SC.wood,
+  stroke: SC.line,
+  strokeWidth: ".8"
+}), React.createElement("path", {
+  d: "M40 132 L52 140 L64 132 M40 154 L52 146 L64 154",
+  stroke: SC.wood2,
+  strokeWidth: "1.5",
+  fill: "none"
+}), React.createElement("path", {
+  d: "M64 150 L80 176",
+  stroke: "#e7d2a3",
+  strokeWidth: "2",
+  strokeDasharray: "2 2"
+}))], ['Home Cinema', [348, 120, 50, 44], 4, () => React.createElement(GlassPavilion, {
+  x: 350,
+  y: 122,
+  w: 46,
+  h: 40,
+  tint: "#2d2842"
+}, React.createElement("rect", {
+  x: "356",
+  y: "127",
+  width: "34",
+  height: "6",
+  rx: "1",
+  fill: "#e8f2ff"
+}), [0, 1, 2].map(r => [0, 1, 2, 3].map(c => React.createElement("rect", {
+  key: r + '-' + c,
+  x: 357 + c * 8,
+  y: 138 + r * 7,
+  width: "6",
+  height: "5",
+  rx: "1.5",
+  fill: "#d33a4a"
+}))))], ['Home Gym', [402, 120, 50, 44], 4, () => React.createElement(GlassPavilion, {
+  x: 404,
+  y: 122,
+  w: 46,
+  h: 40,
+  tint: "#dfe7ee"
+}, React.createElement("rect", {
+  x: "410",
+  y: "128",
+  width: "9",
+  height: "22",
+  rx: "2",
+  fill: "#3a3f48"
+}), React.createElement("rect", {
+  x: "411.5",
+  y: "131",
+  width: "6",
+  height: "15",
+  fill: "#5b6270"
+}), React.createElement("path", {
+  d: "M426 134 H444 M426 142 H444 M426 150 H444",
+  stroke: "#3a3f48",
+  strokeWidth: "2"
+}), [134, 142, 150].map(y => React.createElement("g", {
+  key: y
+}, React.createElement("circle", {
+  cx: "426",
+  cy: y,
+  r: "2.6",
+  fill: "#22252b"
+}), React.createElement("circle", {
+  cx: "444",
+  cy: y,
+  r: "2.6",
+  fill: "#22252b"
+}))), React.createElement("rect", {
+  x: "410",
+  y: "152",
+  width: "14",
+  height: "5",
+  rx: "1",
+  fill: "#e2463b"
+}))], ['Gaming Room', [348, 168, 50, 44], 4, () => React.createElement(GlassPavilion, {
+  x: 350,
+  y: 170,
+  w: 46,
+  h: 40,
+  tint: "#3a2a63"
+}, React.createElement("rect", {
+  x: "356",
+  y: "175",
+  width: "34",
+  height: "9",
+  rx: "1",
+  fill: "#57e6ff"
+}), React.createElement("rect", {
+  x: "356",
+  y: "175",
+  width: "34",
+  height: "9",
+  rx: "1",
+  fill: "none",
+  stroke: "#c04dff",
+  strokeWidth: "1.2"
+}), React.createElement("rect", {
+  x: "358",
+  y: "194",
+  width: "30",
+  height: "9",
+  rx: "3",
+  fill: "#7d55d9"
+}), React.createElement("path", {
+  d: "M368 188 h4 m-2 -2 v4 M378 188 h1 M381 188 h1",
+  stroke: "#fff",
+  strokeWidth: "1.2"
+}))], ['Music Studio', [402, 168, 50, 44], 4, () => React.createElement(GlassPavilion, {
+  x: 404,
+  y: 170,
+  w: 46,
+  h: 40,
+  tint: "#2b2f3a"
+}, React.createElement("rect", {
+  x: "410",
+  y: "176",
+  width: "34",
+  height: "10",
+  rx: "1",
+  fill: "#f4f4f4"
+}), Array.from({
+  length: 6
+}, (_, i) => React.createElement("rect", {
+  key: i,
+  x: 412 + i * 5.4,
+  y: "176",
+  width: "2.6",
+  height: "6",
+  fill: "#1c1c1f"
+})), React.createElement("circle", {
+  cx: "414",
+  cy: "198",
+  r: "4.5",
+  fill: "#1c1c1f",
+  stroke: "#888",
+  strokeWidth: ".8"
+}), React.createElement("circle", {
+  cx: "440",
+  cy: "198",
+  r: "4.5",
+  fill: "#1c1c1f",
+  stroke: "#888",
+  strokeWidth: ".8"
+}), React.createElement("circle", {
+  cx: "414",
+  cy: "198",
+  r: "1.6",
+  fill: "#888"
+}), React.createElement("circle", {
+  cx: "440",
+  cy: "198",
+  r: "1.6",
+  fill: "#888"
+}), React.createElement("path", {
+  d: "M422 200 Q427 190 432 200",
+  stroke: "#ffd23f",
+  strokeWidth: "1.5",
+  fill: "none"
+}))], ['Tennis Court', [454, 120, 62, 128], 3, () => React.createElement("g", null, React.createElement(ShRect, {
+  x: 456,
+  y: 122,
+  w: 58,
+  h: 122
+}), React.createElement("rect", {
+  x: "456",
+  y: "122",
+  width: "58",
+  height: "122",
+  rx: "2",
+  fill: "#3f7fb8",
+  stroke: SC.line,
+  strokeWidth: ".8"
+}), React.createElement("rect", {
+  x: "464",
+  y: "134",
+  width: "42",
+  height: "98",
+  fill: "#2f9e6b"
+}), React.createElement("g", {
+  stroke: "#fff",
+  strokeWidth: "1.2",
+  fill: "none"
+}, React.createElement("rect", {
+  x: "464",
+  y: "134",
+  width: "42",
+  height: "98"
+}), React.createElement("path", {
+  d: "M469 134 V232 M501 134 V232 M469 160 H501 M469 206 H501 M485 160 V206"
+})), React.createElement("path", {
+  d: "M460 183 H510",
+  stroke: "#e8e8e8",
+  strokeWidth: "2.4"
+}), React.createElement("path", {
+  d: "M460 183 H510",
+  stroke: "#555",
+  strokeWidth: ".6",
+  strokeDasharray: "1.5 1.5"
+}), React.createElement("circle", {
+  cx: "492",
+  cy: "170",
+  r: "1.8",
+  fill: "#e6ff4a"
+}))], ['Hedge Maze', [14, 192, 80, 74], 3, () => React.createElement("g", null, React.createElement(ShRect, {
+  x: 18,
+  y: 196,
+  w: 70,
+  h: 64
+}), React.createElement("rect", {
+  x: "18",
+  y: "196",
+  width: "70",
+  height: "64",
+  rx: "2",
+  fill: "#bfe08f"
+}), React.createElement("g", {
+  stroke: SC.hedge,
+  strokeWidth: "5",
+  strokeLinecap: "round",
+  fill: "none"
+}, React.createElement("path", {
+  d: "M20 198 H86 V258 H20 V214"
+}), React.createElement("path", {
+  d: "M32 210 H74 V246 H44 V222 H62 V234"
+}), React.createElement("path", {
+  d: "M32 210 V246 M74 226 H86"
+})), React.createElement("circle", {
+  cx: "53",
+  cy: "228",
+  r: "3",
+  fill: "#ffd84d"
+}))], ['Football Pitch', [16, 274, 168, 100], 3, () => React.createElement("g", null, React.createElement(ShRect, {
+  x: 20,
+  y: 278,
+  w: 160,
+  h: 92
+}), React.createElement("rect", {
+  x: "20",
+  y: "278",
+  width: "160",
+  height: "92",
+  rx: "2",
+  fill: "#3fa14a"
+}), Array.from({
+  length: 8
+}, (_, i) => React.createElement("rect", {
+  key: i,
+  x: 20 + i * 20,
+  y: "278",
+  width: "10",
+  height: "92",
+  fill: "#48ad52"
+})), React.createElement("g", {
+  stroke: "#fff",
+  strokeWidth: "1.4",
+  fill: "none"
+}, React.createElement("rect", {
+  x: "26",
+  y: "284",
+  width: "148",
+  height: "80"
+}), React.createElement("path", {
+  d: "M100 284 V364"
+}), React.createElement("circle", {
+  cx: "100",
+  cy: "324",
+  r: "12"
+}), React.createElement("rect", {
+  x: "26",
+  y: "306",
+  width: "18",
+  height: "36"
+}), React.createElement("rect", {
+  x: "156",
+  y: "306",
+  width: "18",
+  height: "36"
+})), React.createElement("rect", {
+  x: "21",
+  y: "316",
+  width: "5",
+  height: "16",
+  fill: "#fff",
+  opacity: ".9"
+}), React.createElement("rect", {
+  x: "174",
+  y: "316",
+  width: "5",
+  height: "16",
+  fill: "#fff",
+  opacity: ".9"
+}), React.createElement("circle", {
+  cx: "112",
+  cy: "330",
+  r: "2.4",
+  fill: "#fff",
+  stroke: "#222",
+  strokeWidth: ".6"
+}))], ['Fountain', [238, 236, 44, 44], 5, () => React.createElement("g", null, React.createElement(ShCircle, {
+  cx: 260,
+  cy: 258,
+  r: 17
+}), React.createElement("circle", {
+  cx: "260",
+  cy: "258",
+  r: "17",
+  fill: "#d8d3ca",
+  stroke: SC.line,
+  strokeWidth: ".8"
+}), React.createElement("circle", {
+  cx: "260",
+  cy: "258",
+  r: "13",
+  fill: SC.water
+}), React.createElement("circle", {
+  cx: "260",
+  cy: "258",
+  r: "6",
+  fill: "#e9e4da",
+  stroke: SC.line,
+  strokeWidth: ".5"
+}), React.createElement("circle", {
+  cx: "260",
+  cy: "258",
+  r: "3",
+  fill: "#bdf0ff"
+}), [0, 60, 120, 180, 240, 300].map(a => React.createElement("circle", {
+  key: a,
+  cx: 260 + 9.5 * Math.cos(a * Math.PI / 180),
+  cy: 258 + 9.5 * Math.sin(a * Math.PI / 180),
+  r: "1.2",
+  fill: "#fff"
+})))], ['Supercar', [198, 284, 30, 52], 5, () => React.createElement(CarTop, {
+  x: 213,
+  y: 309,
+  w: 22,
+  h: 44,
+  c: "#e2252b",
+  low: true
+})], ['Luxury SUV', [290, 282, 34, 56], 5, () => React.createElement(CarTop, {
+  x: 307,
+  y: 309,
+  w: 25,
+  h: 48,
+  c: "#22262e",
+  suv: true
+})], ['Security Gate', [214, 352, 92, 28], 6, () => React.createElement("g", null, React.createElement("rect", {
+  x: "226",
+  y: "362",
+  width: "12",
+  height: "12",
+  fill: SC.shadow
+}), React.createElement("rect", {
+  x: "222",
+  y: "358",
+  width: "14",
+  height: "14",
+  rx: "1",
+  fill: "#efe9dd",
+  stroke: SC.line,
+  strokeWidth: ".8"
+}), React.createElement("rect", {
+  x: "284",
+  y: "358",
+  width: "14",
+  height: "14",
+  rx: "1",
+  fill: "#efe9dd",
+  stroke: SC.line,
+  strokeWidth: ".8"
+}), React.createElement("path", {
+  d: "M236 364 H284",
+  stroke: "#2a2a2f",
+  strokeWidth: "3"
+}), Array.from({
+  length: 9
+}, (_, i) => React.createElement("circle", {
+  key: i,
+  cx: 240 + i * 5,
+  cy: "364",
+  r: "1.2",
+  fill: "#d4af37"
+})), React.createElement("rect", {
+  x: "300",
+  y: "354",
+  width: "10",
+  height: "10",
+  rx: "1",
+  fill: "#5b6270",
+  stroke: SC.line,
+  strokeWidth: ".6"
+}), React.createElement("circle", {
+  cx: "229",
+  cy: "365",
+  r: "2",
+  fill: "#ffd23f"
+}), React.createElement("circle", {
+  cx: "291",
+  cy: "365",
+  r: "2",
+  fill: "#ffd23f"
+}))], ['Basketball Court', [340, 256, 94, 64], 3, () => React.createElement("g", null, React.createElement(ShRect, {
+  x: 342,
+  y: 258,
+  w: 90,
+  h: 60
+}), React.createElement("rect", {
+  x: "342",
+  y: "258",
+  width: "90",
+  height: "60",
+  rx: "2",
+  fill: "#e08a3c",
+  stroke: SC.line,
+  strokeWidth: ".8"
+}), React.createElement("g", {
+  stroke: "#fff",
+  strokeWidth: "1.2",
+  fill: "none"
+}, React.createElement("rect", {
+  x: "346",
+  y: "262",
+  width: "82",
+  height: "52"
+}), React.createElement("path", {
+  d: "M387 262 V314"
+}), React.createElement("circle", {
+  cx: "387",
+  cy: "288",
+  r: "7"
+}), React.createElement("rect", {
+  x: "346",
+  y: "279",
+  width: "14",
+  height: "18"
+}), React.createElement("rect", {
+  x: "414",
+  y: "279",
+  width: "14",
+  height: "18"
+}), React.createElement("path", {
+  d: "M346 270 Q372 288 346 306 M428 270 Q402 288 428 306"
+})), React.createElement("circle", {
+  cx: "350",
+  cy: "288",
+  r: "2.5",
+  fill: "none",
+  stroke: "#ff5a1f",
+  strokeWidth: "1.4"
+}), React.createElement("circle", {
+  cx: "424",
+  cy: "288",
+  r: "2.5",
+  fill: "none",
+  stroke: "#ff5a1f",
+  strokeWidth: "1.4"
+}), React.createElement("circle", {
+  cx: "395",
+  cy: "300",
+  r: "2.6",
+  fill: "#ff7b29",
+  stroke: "#3a1a08",
+  strokeWidth: ".6"
+}))], ['Mini Golf', [444, 260, 72, 114], 3, () => React.createElement("g", null, React.createElement(ShRect, {
+  x: 446,
+  y: 262,
+  w: 66,
+  h: 108,
+  r: 6
+}), React.createElement("rect", {
+  x: "446",
+  y: "262",
+  width: "66",
+  height: "108",
+  rx: "6",
+  fill: "#bfe08f"
+}), React.createElement("path", {
+  d: "M458 274 H500 V300 H462 V326 H500 V356",
+  fill: "none",
+  stroke: "#2fb35a",
+  strokeWidth: "12",
+  strokeLinejoin: "round"
+}), React.createElement("path", {
+  d: "M458 274 H500 V300 H462 V326 H500 V356",
+  fill: "none",
+  stroke: "#7d5b3a",
+  strokeWidth: "14",
+  strokeLinejoin: "round",
+  opacity: ".25",
+  transform: "translate(0 1)"
+}), React.createElement("ellipse", {
+  cx: "480",
+  cy: "313",
+  rx: "9",
+  ry: "5",
+  fill: SC.water
+}), React.createElement("circle", {
+  cx: "500",
+  cy: "356",
+  r: "2.4",
+  fill: "#111"
+}), React.createElement("path", {
+  d: "M500 356 V342",
+  stroke: "#eee",
+  strokeWidth: "1"
+}), React.createElement("path", {
+  d: "M500 342 L507 345 L500 348 Z",
+  fill: SC.red
+}), React.createElement("circle", {
+  cx: "460",
+  cy: "274",
+  r: "2",
+  fill: "#fff",
+  stroke: "#999",
+  strokeWidth: ".5"
+}))]];
+const HOUSE_SCENE = {
+  id: 'house',
+  title: 'Dream House',
+  view: [520, 380],
+  mode: 'fixed',
+  cardBg: SC.grass,
+  Background: HouseBg,
+  list: HOUSE_ITEMS,
+  spare: [[140, 232], [330, 236], [430, 248], [110, 100], [150, 200], [192, 236]],
+  generic: item => ({
+    box: [-16, -26, 32, 38],
+    draw: ({
+      item: it
+    }) => React.createElement(SceneSign, {
+      item: it
+    })
+  })
+};
+const SKIN = '#efe3d6',
+  SKIN2 = '#dfcdbb';
+function OutfitBg() {
+  return React.createElement("g", null, React.createElement("rect", {
+    width: "240",
+    height: "420",
+    fill: "#ece4f4"
+  }), React.createElement("rect", {
+    y: "330",
+    width: "240",
+    height: "90",
+    fill: "#cfb08c"
+  }), Array.from({
+    length: 6
+  }, (_, i) => React.createElement("path", {
+    key: i,
+    d: 'M0 ' + (340 + i * 15) + ' H240',
+    stroke: "rgba(0,0,0,.08)",
+    strokeWidth: "1"
+  })), React.createElement("ellipse", {
+    cx: "120",
+    cy: "200",
+    rx: "92",
+    ry: "190",
+    fill: "#f7f2fb"
+  }), React.createElement("rect", {
+    x: "10",
+    y: "60",
+    width: "40",
+    height: "190",
+    rx: "20",
+    fill: "#d9b860"
+  }), React.createElement("rect", {
+    x: "14",
+    y: "64",
+    width: "32",
+    height: "182",
+    rx: "16",
+    fill: "#cfe3ef"
+  }), React.createElement("path", {
+    d: "M20 90 L36 74 M20 112 L40 92",
+    stroke: "#fff",
+    strokeWidth: "3",
+    opacity: ".7"
+  }), React.createElement("rect", {
+    x: "198",
+    y: "300",
+    width: "26",
+    height: "32",
+    rx: "3",
+    fill: "#c96c4f"
+  }), [[204, 292, -20], [218, 290, 20], [211, 280, 0]].map(([x, y, r], i) => React.createElement("ellipse", {
+    key: i,
+    cx: x,
+    cy: y,
+    rx: "6",
+    ry: "14",
+    fill: "#3d9b3b",
+    transform: 'rotate(' + r + ' ' + x + ' ' + y + ')'
+  })), React.createElement("ellipse", {
+    cx: "120",
+    cy: "404",
+    rx: "56",
+    ry: "11",
+    fill: "#5b4b80"
+  }), React.createElement("ellipse", {
+    cx: "120",
+    cy: "401",
+    rx: "52",
+    ry: "9",
+    fill: "#7a68a6"
+  }), React.createElement("g", {
+    stroke: "rgba(0,0,0,.12)",
+    strokeWidth: ".8"
+  }, React.createElement("path", {
+    d: "M90 220 L119 220 L118 300 L114 384 L100 384 L94 300 Z",
+    fill: SKIN
+  }), React.createElement("path", {
+    d: "M150 220 L121 220 L122 300 L126 384 L140 384 L146 300 Z",
+    fill: SKIN
+  }), React.createElement("path", {
+    d: "M98 382 L114 382 L116 393 L90 395 Q87 389 98 382 Z",
+    fill: SKIN2
+  }), React.createElement("path", {
+    d: "M142 382 L126 382 L124 393 L150 395 Q153 389 142 382 Z",
+    fill: SKIN2
+  }), React.createElement("path", {
+    d: "M84 92 Q70 96 68 110 L60 204 Q60 210 66 210 L72 210 Q76 210 76 204 L86 122 Z",
+    fill: SKIN
+  }), React.createElement("path", {
+    d: "M156 92 Q170 96 172 110 L180 204 Q180 210 174 210 L168 210 Q164 210 164 204 L154 122 Z",
+    fill: SKIN
+  }), React.createElement("ellipse", {
+    cx: "68",
+    cy: "219",
+    rx: "6",
+    ry: "9",
+    fill: SKIN2
+  }), React.createElement("ellipse", {
+    cx: "172",
+    cy: "219",
+    rx: "6",
+    ry: "9",
+    fill: SKIN2
+  }), React.createElement("path", {
+    d: "M90 86 Q120 80 150 86 Q162 90 164 104 L154 150 L150 190 Q152 206 152 222 L88 222 Q88 206 90 190 L86 150 L76 104 Q78 90 90 86 Z",
+    fill: SKIN
+  }), React.createElement("path", {
+    d: "M112 64 L128 64 L130 88 L110 88 Z",
+    fill: SKIN2
+  }), React.createElement("ellipse", {
+    cx: "120",
+    cy: "46",
+    rx: "18",
+    ry: "22",
+    fill: SKIN
+  })), React.createElement("path", {
+    d: "M104 150 Q120 158 136 150",
+    stroke: SKIN2,
+    strokeWidth: "1.5",
+    fill: "none"
+  }), React.createElement("ellipse", {
+    cx: "113",
+    cy: "38",
+    rx: "5",
+    ry: "7",
+    fill: "rgba(255,255,255,.4)"
+  }));
+}
+const TOP_BODY = 'M89 84 Q100 80 108 82 Q120 92 132 82 Q140 80 151 84 Q164 89 166 104 L156 150 L153 226 L87 226 L84 150 L74 104 Q76 89 89 84 Z';
+const SLEEVE_SHORT = 'M88 85 Q70 89 66 106 L62 138 L82 142 L88 118 Z';
+const SLEEVE_LONG = 'M88 85 Q70 89 66 106 L57 206 L77 210 L88 120 Z';
+const JACKET_PANEL = 'M90 80 Q102 78 110 84 L113 232 L83 234 L81 150 L71 104 Q73 86 90 80 Z';
+const JACKET_SLEEVE = 'M86 82 Q66 86 63 106 L54 208 L78 214 L89 122 Z';
+const PANTS = 'M88 206 L152 206 L152 222 L150 300 L146 384 L124 384 L121 240 L119 240 L116 384 L94 384 L90 300 L88 222 Z';
+const SHORTS = 'M88 206 L152 206 L153 222 L155 292 L124 294 L121 242 L119 242 L116 294 L85 292 L87 222 Z';
+const SHOE = 'M92 379 L116 379 L118 391 Q118 398 112 398 L86 398 Q81 398 83 391 Q86 383 92 379 Z';
+const both = (d, props) => React.createElement(React.Fragment, null, React.createElement("path", _extends({
+  d: d
+}, props)), React.createElement(MirrorX, {
+  cx: 120
+}, React.createElement("path", _extends({
+  d: d
+}, props))));
+const ln = {
+  stroke: 'rgba(0,0,0,.28)',
+  strokeWidth: 0.9
+};
+function Top({
+  c,
+  long,
+  children,
+  collar
+}) {
+  return React.createElement("g", null, both(long ? SLEEVE_LONG : SLEEVE_SHORT, {
+    fill: c,
+    ...ln
+  }), React.createElement("path", _extends({
+    d: TOP_BODY,
+    fill: c
+  }, ln)), long && both('M58 196 L78 200 L77 210 L57 206 Z', {
+    fill: 'rgba(0,0,0,.12)'
+  }), !collar && React.createElement("path", {
+    d: "M108 82 Q120 92 132 82",
+    fill: "none",
+    stroke: "rgba(0,0,0,.25)",
+    strokeWidth: "2"
+  }), React.createElement("path", {
+    d: "M92 96 Q96 140 92 220",
+    stroke: "rgba(255,255,255,.18)",
+    strokeWidth: "4",
+    fill: "none"
+  }), children);
+}
+function Jacket({
+  c,
+  sleeve,
+  children,
+  hem,
+  cuff
+}) {
+  return React.createElement("g", null, both(JACKET_SLEEVE, {
+    fill: sleeve || c,
+    ...ln
+  }), both(JACKET_PANEL, {
+    fill: c,
+    ...ln
+  }), hem && both('M83 224 L113 224 L113 232 L83 234 Z', {
+    fill: hem
+  }), cuff && both('M55 200 L78 205 L78 214 L54 208 Z', {
+    fill: cuff
+  }), children);
+}
+function Pants({
+  c,
+  children,
+  shorts
+}) {
+  return React.createElement("g", null, React.createElement("path", _extends({
+    d: shorts ? SHORTS : PANTS,
+    fill: c
+  }, ln)), React.createElement("rect", {
+    x: "88",
+    y: "206",
+    width: "64",
+    height: "8",
+    fill: "rgba(0,0,0,.12)"
+  }), children);
+}
+const Shoes = ({
+  c,
+  sole = '#f4f4f4',
+  children
+}) => React.createElement("g", null, both(SHOE, {
+  fill: c,
+  ...ln
+}), both('M82 393 L118 393 Q118 398 112 398 L86 398 Q81 398 82 393 Z', {
+  fill: sole
+}), children);
+const OUTFIT_ITEMS = [['Baseball Cap', [86, 14, 68, 46], 9, () => React.createElement("g", null, React.createElement("path", _extends({
+  d: "M101 44 Q101 23 120 23 Q139 23 139 44 Z",
+  fill: "#d6332c"
+}, ln)), React.createElement("path", {
+  d: "M120 23 V44 M108 26 Q112 34 110 44 M132 26 Q128 34 130 44",
+  stroke: "rgba(0,0,0,.15)",
+  fill: "none"
+}), React.createElement("path", _extends({
+  d: "M98 43 Q120 53 142 43 Q141 50 120 57 Q99 50 98 43 Z",
+  fill: "#b8241e"
+}, ln)), React.createElement("circle", {
+  cx: "120",
+  cy: "23",
+  r: "2.4",
+  fill: "#b8241e"
+})), 'Hat'], ['Beanie', [90, 10, 60, 44], 9, () => React.createElement("g", null, React.createElement("circle", _extends({
+  cx: "120",
+  cy: "19",
+  r: "6",
+  fill: "#f3e3b5"
+}, ln)), React.createElement("path", _extends({
+  d: "M100 46 Q99 22 120 22 Q141 22 140 46 Z",
+  fill: "#e3a52a"
+}, ln)), [106, 113, 120, 127, 134].map(x => React.createElement("path", {
+  key: x,
+  d: 'M' + x + ' 26 V38',
+  stroke: "rgba(0,0,0,.12)"
+})), React.createElement("rect", _extends({
+  x: "99",
+  y: "37",
+  width: "42",
+  height: "10",
+  rx: "3",
+  fill: "#c98a16"
+}, ln))), 'Hat'], ['Bucket Hat', [86, 18, 68, 40], 9, () => React.createElement("g", null, React.createElement("path", _extends({
+  d: "M104 41 Q104 24 120 24 Q136 24 136 41 Z",
+  fill: "#cdb489"
+}, ln)), React.createElement("path", _extends({
+  d: "M98 39 L142 39 L149 51 Q120 56 91 51 Z",
+  fill: "#bca274"
+}, ln)), React.createElement("path", {
+  d: "M104 38 H136",
+  stroke: "#8a7350",
+  strokeWidth: "2"
+})), 'Hat'], ['Fedora', [86, 16, 68, 34], 9, () => React.createElement("g", null, React.createElement("ellipse", _extends({
+  cx: "120",
+  cy: "39",
+  rx: "29",
+  ry: "5",
+  fill: "#4a4c54"
+}, ln)), React.createElement("path", _extends({
+  d: "M104 38 Q105 22 114 24 Q120 29 126 24 Q135 22 136 38 Z",
+  fill: "#5b5e68"
+}, ln)), React.createElement("rect", {
+  x: "104",
+  y: "33",
+  width: "32",
+  height: "5",
+  fill: "#1f2026"
+})), 'Hat'], ['Cowboy Hat', [80, 12, 80, 40], 9, () => React.createElement("g", null, React.createElement("path", _extends({
+  d: "M106 36 Q104 17 114 20 Q120 27 126 20 Q136 17 134 36 Z",
+  fill: "#a8743f"
+}, ln)), React.createElement("rect", {
+  x: "105",
+  y: "31",
+  width: "30",
+  height: "4",
+  fill: "#5a3a1c"
+}), React.createElement("path", _extends({
+  d: "M82 28 Q90 40 120 40 Q150 40 158 28 Q160 41 141 45 Q120 49 99 45 Q80 41 82 28 Z",
+  fill: "#94632f"
+}, ln))), 'Hat'], ['Plain T-Shirt', [60, 74, 120, 158], 3, () => React.createElement(Top, {
+  c: "#f6f6f4"
+}), 'Top'], ['Graphic T-Shirt', [60, 74, 120, 158], 3, () => React.createElement(Top, {
+  c: "#22232a"
+}, React.createElement("path", {
+  d: "M120 120 L127 136 L144 138 L131 149 L135 166 L120 157 L105 166 L109 149 L96 138 L113 136 Z",
+  fill: "#ff5d8f"
+}), React.createElement("path", {
+  d: "M120 128 L124 138 L134 139 L126 146 L129 156 L120 151 L111 156 L114 146 L106 139 L116 138 Z",
+  fill: "#ffd23f"
+})), 'Top'], ['Hoodie', [52, 62, 136, 172], 3, () => React.createElement("g", null, React.createElement("path", _extends({
+  d: "M100 70 Q120 60 140 70 L144 92 Q120 100 96 92 Z",
+  fill: "#7b8190"
+}, ln)), React.createElement(Top, {
+  c: "#8c93a3",
+  long: true,
+  collar: true
+}, React.createElement("path", {
+  d: "M100 176 H140 L144 206 H96 Z",
+  fill: "rgba(0,0,0,.12)"
+}), React.createElement("path", {
+  d: "M114 90 V122 M126 90 V122",
+  stroke: "#eee",
+  strokeWidth: "1.6"
+}), React.createElement("circle", {
+  cx: "114",
+  cy: "123",
+  r: "1.6",
+  fill: "#eee"
+}), React.createElement("circle", {
+  cx: "126",
+  cy: "123",
+  r: "1.6",
+  fill: "#eee"
+}), React.createElement("rect", {
+  x: "87",
+  y: "214",
+  width: "66",
+  height: "12",
+  fill: "rgba(0,0,0,.14)"
+}))), 'Top'], ['Sweater', [56, 74, 128, 162], 3, () => React.createElement(Top, {
+  c: "#e9d7b0",
+  long: true
+}, Array.from({
+  length: 9
+}, (_, i) => React.createElement("path", {
+  key: i,
+  d: 'M' + (92 + i * 7) + ' 100 V214',
+  stroke: "rgba(0,0,0,.06)",
+  strokeWidth: "2"
+})), React.createElement("rect", {
+  x: "87",
+  y: "214",
+  width: "66",
+  height: "12",
+  fill: "rgba(0,0,0,.1)"
+}), React.createElement("path", {
+  d: "M96 140 H144",
+  stroke: "#b5462f",
+  strokeWidth: "5",
+  opacity: ".75"
+}), React.createElement("path", {
+  d: "M96 150 H144",
+  stroke: "#2f5d8a",
+  strokeWidth: "3",
+  opacity: ".75"
+})), 'Top'], ['Button-Up Shirt', [56, 74, 128, 162], 3, () => React.createElement(Top, {
+  c: "#a9c8ee",
+  long: true,
+  collar: true
+}, React.createElement("path", _extends({
+  d: "M106 80 L120 96 L134 80 L130 76 L120 88 L110 76 Z",
+  fill: "#c3dbf6"
+}, ln)), React.createElement("path", {
+  d: "M120 96 V226",
+  stroke: "rgba(0,0,0,.2)",
+  strokeWidth: "1"
+}), [108, 128, 148, 168, 188, 208].map(y => React.createElement("circle", {
+  key: y,
+  cx: "122.5",
+  cy: y,
+  r: "1.6",
+  fill: "#fff",
+  stroke: "rgba(0,0,0,.25)",
+  strokeWidth: ".4"
+})), React.createElement("rect", _extends({
+  x: "96",
+  y: "112",
+  width: "14",
+  height: "12",
+  fill: "rgba(0,0,0,.06)"
+}, ln))), 'Top'], ['Denim Jacket', [48, 74, 144, 166], 5, () => React.createElement(Jacket, {
+  c: "#4f7dbb",
+  cuff: "#45709f",
+  hem: "#45709f"
+}, both('M88 112 H106 V128 H88 Z', {
+  fill: 'none',
+  stroke: '#d9b98a',
+  strokeWidth: 1,
+  strokeDasharray: '2 1.5'
+}), both('M96 84 L110 84 L110 112 L102 104 Z', {
+  fill: '#5d8ac6',
+  ...ln
+}), both('M112 90 V230', {
+  stroke: '#d9b98a',
+  strokeWidth: 1,
+  strokeDasharray: '2 2'
+})), 'Jacket'], ['Bomber Jacket', [48, 74, 144, 166], 5, () => React.createElement(Jacket, {
+  c: "#5f6b3d",
+  cuff: "#3b4226",
+  hem: "#3b4226"
+}, both('M100 80 Q110 80 114 86 L112 96 Q104 92 98 88 Z', {
+  fill: '#3b4226'
+}), both('M112 100 L112 226', {
+  stroke: '#e8742c',
+  strokeWidth: 2
+}), both('M60 120 L74 118 L74 130 L60 132 Z', {
+  fill: '#8a9563'
+})), 'Jacket'], ['Leather Jacket', [48, 74, 144, 166], 5, () => React.createElement(Jacket, {
+  c: "#232327",
+  hem: "#16161a"
+}, both('M92 82 L112 92 L106 132 L94 112 Z', {
+  fill: '#33333a',
+  ...ln
+}), both('M112 96 V228', {
+  stroke: '#c9ccd2',
+  strokeWidth: 1.2
+}), both('M90 168 L104 164', {
+  stroke: '#c9ccd2',
+  strokeWidth: 1.2
+}), both('M70 100 Q76 140 74 200', {
+  stroke: 'rgba(255,255,255,.15)',
+  strokeWidth: 3,
+  fill: 'none'
+})), 'Jacket'], ['Puffer Jacket', [44, 70, 152, 172], 5, () => React.createElement("g", null, both('M86 80 Q62 84 58 106 L48 208 L80 216 L91 122 Z', {
+  fill: '#e2552f',
+  ...ln
+}), both('M92 76 Q104 74 112 82 L114 236 L78 238 L76 150 L65 104 Q68 84 92 76 Z', {
+  fill: '#ec6438',
+  ...ln
+}), both('M66 112 Q90 118 114 112 M64 136 Q90 142 114 136 M66 160 Q90 166 114 160 M70 184 Q90 190 114 184 M74 208 Q92 214 114 208', {
+  stroke: 'rgba(0,0,0,.22)',
+  strokeWidth: 1.4,
+  fill: 'none'
+}), both('M54 130 L82 134 M51 158 L84 162 M49 184 L84 188', {
+  stroke: 'rgba(0,0,0,.2)',
+  strokeWidth: 1.2
+}), both('M100 74 Q110 72 116 76 L114 92 Q106 88 98 86 Z', {
+  fill: '#c9461f'
+})), 'Jacket'], ['Varsity Jacket', [48, 74, 144, 166], 5, () => React.createElement(Jacket, {
+  c: "#b3263a",
+  sleeve: "#efe3c8",
+  cuff: "#b3263a",
+  hem: "#b3263a"
+}, both('M83 222 H113 M83 227 H113 M55 202 L78 207', {
+  stroke: '#efe3c8',
+  strokeWidth: 1.6
+}), [110, 132, 154, 176, 198].map(y => React.createElement("circle", {
+  key: y,
+  cx: "109",
+  cy: y,
+  r: "1.8",
+  fill: "#efe3c8"
+})), React.createElement("path", {
+  d: "M95 118 L98 125 L106 126 L100 131 L102 139 L95 135 L88 139 L90 131 L84 126 L92 125 Z",
+  fill: "#efe3c8",
+  stroke: "#8a1c2c",
+  strokeWidth: ".6"
+})), 'Jacket'], ['Jeans', [82, 200, 76, 190], 2, () => React.createElement(Pants, {
+  c: "#3e62a0"
+}, React.createElement("path", {
+  d: "M120 214 V240",
+  stroke: "#d9b98a",
+  strokeWidth: "1",
+  strokeDasharray: "2 1.5"
+}), React.createElement("path", {
+  d: "M92 216 Q100 226 108 216 M132 216 Q140 226 148 216",
+  stroke: "#d9b98a",
+  strokeWidth: "1",
+  fill: "none"
+}), React.createElement("path", {
+  d: "M104 260 V370 M136 260 V370",
+  stroke: "rgba(255,255,255,.12)",
+  strokeWidth: "5"
+})), 'Bottoms'], ['Cargo Pants', [82, 200, 76, 190], 2, () => React.createElement(Pants, {
+  c: "#8a7f55"
+}, both('M88 262 H102 L101 290 H89 Z', {
+  fill: '#7a704a',
+  ...ln
+}), both('M88 268 H102', {
+  stroke: 'rgba(0,0,0,.25)'
+}), React.createElement("path", {
+  d: "M95 372 H115 M125 372 H145",
+  stroke: "rgba(0,0,0,.2)",
+  strokeWidth: "2"
+})), 'Bottoms'], ['Sweatpants', [82, 200, 76, 190], 2, () => React.createElement(Pants, {
+  c: "#a2a7b0"
+}, React.createElement("path", {
+  d: "M118 212 l-4 14 M122 212 l4 14",
+  stroke: "#eee",
+  strokeWidth: "1.2"
+}), React.createElement("path", {
+  d: "M95 370 L115 370 L116 384 L94 384 Z M125 370 L145 370 L146 384 L124 384 Z",
+  fill: "#8c919a"
+})), 'Bottoms'], ['Shorts', [80, 200, 80, 98], 2, () => React.createElement(Pants, {
+  c: "#c9a978",
+  shorts: true
+}, React.createElement("path", {
+  d: "M88 286 L116 288 M124 288 L153 286",
+  stroke: "rgba(0,0,0,.18)",
+  strokeWidth: "2"
+})), 'Bottoms'], ['Tailored Trousers', [82, 200, 76, 190], 2, () => React.createElement(Pants, {
+  c: "#3a3c45"
+}, React.createElement("path", {
+  d: "M105 220 V382 M135 220 V382",
+  stroke: "rgba(255,255,255,.18)",
+  strokeWidth: "1"
+}), React.createElement("rect", {
+  x: "88",
+  y: "206",
+  width: "64",
+  height: "6",
+  fill: "#1f2026"
+}), React.createElement("rect", {
+  x: "116",
+  y: "206",
+  width: "8",
+  height: "6",
+  fill: "#c9b37a"
+})), 'Bottoms'], ['Sneakers', [78, 372, 84, 30], 4, () => React.createElement(Shoes, {
+  c: "#fafafa"
+}, React.createElement(React.Fragment, null, both('M92 386 Q102 382 112 388', {
+  stroke: '#2fb35a',
+  strokeWidth: 2.4,
+  fill: 'none'
+}))), 'Shoes'], ['High-Top Sneakers', [78, 352, 84, 50], 4, () => React.createElement("g", null, both('M95 360 L117 360 L118 391 L86 391 Q86 380 94 376 Z', {
+  fill: '#d6332c',
+  ...ln
+}), React.createElement(Shoes, {
+  c: "#d6332c"
+}, both('M98 366 H114 M98 372 H114', {
+  stroke: '#fff',
+  strokeWidth: 1.2
+}), both('M92 384 Q100 380 110 386', {
+  stroke: '#fff',
+  strokeWidth: 2,
+  fill: 'none'
+}))), 'Shoes'], ['Boots', [78, 340, 84, 62], 4, () => React.createElement("g", null, both('M95 346 L117 346 L118 391 L86 391 Q86 378 94 372 Z', {
+  fill: '#8a5a2e',
+  ...ln
+}), React.createElement(Shoes, {
+  c: "#7a4d24",
+  sole: "#3a2614"
+}, both('M95 352 H117', {
+  stroke: '#5a3818',
+  strokeWidth: 2
+}))), 'Shoes'], ['Loafers', [78, 376, 84, 26], 4, () => React.createElement("g", null, both('M90 384 L116 384 L118 393 Q117 398 112 398 L88 398 Q83 397 85 391 Z', {
+  fill: '#4a2c1a',
+  ...ln
+}), both('M95 387 H111', {
+  stroke: '#c9a46a',
+  strokeWidth: 1.6
+}), both('M84 395 H118', {
+  stroke: '#2a180c',
+  strokeWidth: 2
+})), 'Shoes'], ['Sandals', [78, 376, 84, 26], 4, () => React.createElement("g", null, both('M84 395 L119 395 L119 398 L84 398 Z', {
+  fill: '#7a5233'
+}), both('M93 384 L114 390 M100 382 L101 395', {
+  stroke: '#c9822e',
+  strokeWidth: 2.6
+})), 'Shoes'], ['Sunglasses', [98, 34, 44, 22], 10, () => React.createElement("g", null, React.createElement("rect", {
+  x: "103",
+  y: "41",
+  width: "15",
+  height: "9",
+  rx: "4",
+  fill: "#15161b"
+}), React.createElement("rect", {
+  x: "122",
+  y: "41",
+  width: "15",
+  height: "9",
+  rx: "4",
+  fill: "#15161b"
+}), React.createElement("path", {
+  d: "M118 44 Q120 42 122 44 M103 44 L100 42 M137 44 L140 42",
+  stroke: "#15161b",
+  strokeWidth: "1.5",
+  fill: "none"
+}), React.createElement("path", {
+  d: "M106 43 L110 43",
+  stroke: "#fff",
+  strokeWidth: "1",
+  opacity: ".7"
+})), 'Accessory'], ['Necklace', [102, 80, 36, 40], 4, () => React.createElement("g", null, React.createElement("path", {
+  d: "M108 84 Q120 112 132 84",
+  stroke: "#e8c04a",
+  strokeWidth: "1.8",
+  fill: "none"
+}), React.createElement("path", {
+  d: "M108 84 Q120 112 132 84",
+  stroke: "#a8862a",
+  strokeWidth: ".6",
+  strokeDasharray: "1 1.4",
+  fill: "none"
+}), React.createElement("circle", {
+  cx: "120",
+  cy: "106",
+  r: "3.6",
+  fill: "#e8c04a",
+  stroke: "#a8862a",
+  strokeWidth: ".6"
+})), 'Accessory'], ['Watch', [162, 190, 26, 26], 8, () => React.createElement("g", null, React.createElement("rect", {
+  x: "165",
+  y: "198",
+  width: "17",
+  height: "8",
+  rx: "2",
+  fill: "#2b2e35",
+  transform: "rotate(6 173 202)"
+}), React.createElement("circle", {
+  cx: "173.5",
+  cy: "202",
+  r: "5.4",
+  fill: "#d9b860",
+  stroke: "#7a6320",
+  strokeWidth: ".8"
+}), React.createElement("circle", {
+  cx: "173.5",
+  cy: "202",
+  r: "3.8",
+  fill: "#14243a"
+}), React.createElement("path", {
+  d: "M173.5 202 V199.5 M173.5 202 L175.5 203",
+  stroke: "#fff",
+  strokeWidth: ".7"
+})), 'Accessory'], ['Crossbody Bag', [86, 86, 90, 136], 7, () => React.createElement("g", null, React.createElement("path", {
+  d: "M94 88 L152 196",
+  stroke: "#5a3a1c",
+  strokeWidth: "3.2"
+}), React.createElement("rect", _extends({
+  x: "139",
+  y: "188",
+  width: "32",
+  height: "28",
+  rx: "4",
+  fill: "#b8814a"
+}, ln)), React.createElement("path", _extends({
+  d: "M139 196 Q155 206 171 196 V192 Q171 188 167 188 H143 Q139 188 139 192 Z",
+  fill: "#9a6838"
+}, ln)), React.createElement("circle", {
+  cx: "155",
+  cy: "201",
+  r: "1.8",
+  fill: "#e8c04a"
+})), 'Accessory'], ['Scarf', [96, 66, 48, 92], 7, () => React.createElement("g", null, React.createElement("path", _extends({
+  d: "M104 72 Q120 82 136 72 L138 92 Q120 102 102 92 Z",
+  fill: "#c4372f"
+}, ln)), React.createElement("path", _extends({
+  d: "M124 88 L138 154 L124 156 L116 94 Z",
+  fill: "#c4372f"
+}, ln)), React.createElement("path", {
+  d: "M106 78 Q120 88 134 78 M104 86 Q120 96 136 86 M120 104 L126 156 M128 98 L134 154",
+  stroke: "#2f6a3a",
+  strokeWidth: "1.6",
+  fill: "none",
+  opacity: ".8"
+}), React.createElement("path", {
+  d: "M124 156 l1 5 M129 155 l1 5 M134 154 l1 5",
+  stroke: "#c4372f",
+  strokeWidth: "1.2"
+})), 'Accessory']];
+const OUTFIT_CATS = ['Hat', 'Top', 'Jacket', 'Bottoms', 'Shoes', 'Accessory'];
+const outfitCat = s => {
+  const k = sceneKey(s);
+  return OUTFIT_CATS.find(c => sceneKey(c) === k || c === 'Bottoms' && k === 'bottom' || c === 'Accessory' && k === 'accessories' || c === 'Shoes' && k === 'shoe' || c === 'Hat' && k === 'hats') || null;
+};
+function outfitGeneric(item, slot) {
+  const cat = outfitCat(slot) || outfitCat(item.pos) || 'Accessory';
+  const hues = ['#e2463b', '#2f6fd0', '#3fb57a', '#f2a65a', '#8a5cd6', '#e86fa3', '#2b2e35', '#d9b860'];
+  const c = hues[hashStr(item.name || 'x') % hues.length];
+  const map = {
+    Hat: {
+      z: 9,
+      box: [86, 14, 68, 46],
+      draw: () => React.createElement("g", null, React.createElement("path", _extends({
+        d: "M101 44 Q101 23 120 23 Q139 23 139 44 Z",
+        fill: c
+      }, ln)), React.createElement("path", _extends({
+        d: "M98 43 Q120 53 142 43 Q141 50 120 57 Q99 50 98 43 Z",
+        fill: c
+      }, ln)))
+    },
+    Top: {
+      z: 3,
+      box: [60, 74, 120, 158],
+      draw: () => React.createElement(Top, {
+        c: c
+      })
+    },
+    Jacket: {
+      z: 5,
+      box: [48, 74, 144, 166],
+      draw: () => React.createElement(Jacket, {
+        c: c
+      })
+    },
+    Bottoms: {
+      z: 2,
+      box: [82, 200, 76, 190],
+      draw: () => React.createElement(Pants, {
+        c: c
+      })
+    },
+    Shoes: {
+      z: 4,
+      box: [78, 372, 84, 30],
+      draw: () => React.createElement(Shoes, {
+        c: c
+      })
+    },
+    Accessory: {
+      z: 8,
+      box: [102, 80, 36, 40],
+      draw: () => React.createElement("g", null, React.createElement("path", {
+        d: "M108 84 Q120 112 132 84",
+        stroke: c,
+        strokeWidth: "2.4",
+        fill: "none"
+      }), React.createElement("circle", {
+        cx: "120",
+        cy: "106",
+        r: "4",
+        fill: c
+      }))
+    }
+  };
+  return {
+    absolute: true,
+    ...map[cat]
+  };
+}
+const OUTFIT_SCENE = {
+  id: 'outfit',
+  title: 'Outfit',
+  view: [240, 420],
+  mode: 'fixed',
+  cardBg: '#ece4f4',
+  Background: OutfitBg,
+  list: OUTFIT_ITEMS,
+  generic: outfitGeneric,
+  spare: [[120, 300]]
+};
+function TrayBg() {
+  return React.createElement("g", null, React.createElement("rect", {
+    width: "480",
+    height: "120",
+    fill: "#fbecd7"
+  }), Array.from({
+    length: 12
+  }, (_, i) => React.createElement("rect", {
+    key: i,
+    x: i * 40,
+    y: "0",
+    width: "20",
+    height: "120",
+    fill: "#f7e2c6"
+  })), React.createElement("rect", {
+    y: "84",
+    width: "480",
+    height: "10",
+    fill: "#d9483b"
+  }), React.createElement("rect", {
+    y: "112",
+    width: "480",
+    height: "188",
+    fill: "#b07a4c"
+  }), Array.from({
+    length: 7
+  }, (_, i) => React.createElement("path", {
+    key: i,
+    d: 'M0 ' + (126 + i * 26) + ' H480',
+    stroke: "rgba(0,0,0,.08)",
+    strokeWidth: "2"
+  })), React.createElement("path", {
+    d: "M58 98 L422 98 L456 290 L24 290 Z",
+    fill: "rgba(0,0,0,.25)",
+    transform: "translate(4 6)"
+  }), React.createElement("path", {
+    d: "M58 98 L422 98 L456 290 L24 290 Z",
+    fill: "#cf3b2f"
+  }), React.createElement("path", {
+    d: "M72 108 L408 108 L436 278 L44 278 Z",
+    fill: "#b83226"
+  }), React.createElement("path", {
+    d: "M80 112 L400 112 L424 272 L56 272 Z",
+    fill: "#fff7e6"
+  }), Array.from({
+    length: 6
+  }, (_, r) => Array.from({
+    length: 9
+  }, (_, c) => React.createElement("circle", {
+    key: r + '-' + c,
+    cx: 96 + c * 37 + r % 2 * 18 - r * 3,
+    cy: 128 + r * 27,
+    r: "3",
+    fill: "#f3d9a8"
+  }))), React.createElement("rect", {
+    x: "436",
+    y: "200",
+    width: "34",
+    height: "46",
+    rx: "3",
+    fill: "#fff",
+    transform: "rotate(8 453 223)"
+  }), React.createElement("path", {
+    d: "M8 230 L40 214",
+    stroke: "#fff",
+    strokeWidth: "4",
+    strokeLinecap: "round"
+  }));
+}
+const base = (w = 46) => React.createElement("ellipse", {
+  cx: "0",
+  cy: "1",
+  rx: w,
+  ry: "6",
+  fill: "rgba(0,0,0,.18)"
+});
+const fl = {
+  stroke: 'rgba(0,0,0,.3)',
+  strokeWidth: 0.9
+};
+function Stack({
+  layers,
+  w = 42
+}) {
+  let y = 0;
+  const out = [];
+  layers.forEach(([kind, c], i) => {
+    const k = i;
+    if (kind === 'bun') {
+      out.push(React.createElement("path", _extends({
+        key: k,
+        d: 'M' + -w + ' ' + y + ' L' + w + ' ' + y + ' Q' + (w + 2) + ' ' + (y - 11) + ' ' + (w - 6) + ' ' + (y - 11) + ' L' + (-w + 6) + ' ' + (y - 11) + ' Q' + (-w - 2) + ' ' + (y - 11) + ' ' + -w + ' ' + y + ' Z',
+        fill: c || '#e0a456'
+      }, fl)));
+      y -= 11;
+    } else if (kind === 'mid') {
+      out.push(React.createElement("rect", _extends({
+        key: k,
+        x: -w + 1,
+        y: y - 8,
+        width: 2 * w - 2,
+        height: "8",
+        rx: "4",
+        fill: c || '#e0a456'
+      }, fl)));
+      y -= 8;
+    } else if (kind === 'patty') {
+      out.push(React.createElement("g", {
+        key: k
+      }, React.createElement("rect", _extends({
+        x: -w - 3,
+        y: y - 10,
+        width: 2 * w + 6,
+        height: "10",
+        rx: "5",
+        fill: c || '#6b3a1e'
+      }, fl)), [-30, -14, 4, 22].map(x => React.createElement("circle", {
+        key: x,
+        cx: x,
+        cy: y - 5,
+        r: "1.2",
+        fill: "rgba(0,0,0,.3)"
+      }))));
+      y -= 10;
+    } else if (kind === 'cheese') {
+      out.push(React.createElement("path", {
+        key: k,
+        d: 'M' + (-w - 2) + ' ' + y + ' H' + (w + 2) + ' V' + (y - 4) + ' H' + (-w - 2) + ' Z M' + (-w + 10) + ' ' + y + ' l5 7 l5 -7 M' + (w - 22) + ' ' + y + ' l4 6 l4 -6',
+        fill: "#ffc531"
+      }));
+      y -= 4;
+    } else if (kind === 'lettuce') {
+      out.push(React.createElement("path", {
+        key: k,
+        d: 'M' + (-w - 4) + ' ' + y + ' Q' + -w / 2 + ' ' + (y - 9) + ' 0 ' + (y - 2) + ' Q' + w / 2 + ' ' + (y - 9) + ' ' + (w + 4) + ' ' + y + ' Z',
+        fill: "#5fbf3a"
+      }));
+      y -= 4;
+    } else if (kind === 'tomato') {
+      out.push(React.createElement("g", {
+        key: k
+      }, React.createElement("rect", {
+        x: -w + 4,
+        y: y - 5,
+        width: w - 6,
+        height: "5",
+        rx: "2",
+        fill: "#e8402f"
+      }), React.createElement("rect", {
+        x: "3",
+        y: y - 5,
+        width: w - 6,
+        height: "5",
+        rx: "2",
+        fill: "#e8402f"
+      })));
+      y -= 5;
+    } else if (kind === 'onion') {
+      out.push(React.createElement("path", {
+        key: k,
+        d: 'M' + (-w + 6) + ' ' + (y - 1) + ' h22 M' + 4 + ' ' + (y - 2) + ' h24',
+        stroke: "#f4e9ff",
+        strokeWidth: "2.4"
+      }));
+      y -= 2;
+    } else if (kind === 'bacon') {
+      out.push(React.createElement("path", {
+        key: k,
+        d: 'M' + (-w - 8) + ' ' + y + ' Q' + -w / 2 + ' ' + (y - 6) + ' 0 ' + y + ' T' + (w + 8) + ' ' + y,
+        stroke: "#a33a24",
+        strokeWidth: "4",
+        fill: "none",
+        strokeLinecap: "round"
+      }));
+      y -= 4;
+    } else if (kind === 'chicken') {
+      out.push(React.createElement("g", {
+        key: k
+      }, React.createElement("path", _extends({
+        d: 'M' + (-w - 8) + ' ' + y + ' Q' + (-w - 10) + ' ' + (y - 9) + ' ' + (-w + 2) + ' ' + (y - 15) + ' Q0 ' + (y - 19) + ' ' + (w - 2) + ' ' + (y - 15) + ' Q' + (w + 12) + ' ' + (y - 8) + ' ' + (w + 8) + ' ' + y + ' Z',
+        fill: c || '#d98a2b'
+      }, fl)), [-28, -12, 6, 22, 34].map((x, j) => React.createElement("circle", {
+        key: x,
+        cx: x,
+        cy: y - 7 - j % 2 * 4,
+        r: "2",
+        fill: "rgba(255,255,255,.2)"
+      }))));
+      y -= 13;
+    } else if (kind === 'pickles') {
+      out.push(React.createElement("g", {
+        key: k
+      }, [-16, 10].map(x => React.createElement("ellipse", {
+        key: x,
+        cx: x,
+        cy: y - 1,
+        rx: "9",
+        ry: "2.6",
+        fill: "#7cae3a",
+        stroke: "#4f7a1f",
+        strokeWidth: ".6"
+      }))));
+      y -= 2;
+    } else if (kind === 'top') {
+      out.push(React.createElement("g", {
+        key: k
+      }, React.createElement("path", _extends({
+        d: 'M' + -w + ' ' + y + ' Q' + -w + ' ' + (y - 30) + ' 0 ' + (y - 32) + ' Q' + w + ' ' + (y - 30) + ' ' + w + ' ' + y + ' Z',
+        fill: c && c !== 'plain' ? c : '#e0a456'
+      }, fl)), React.createElement("path", {
+        d: 'M' + (-w + 10) + ' ' + (y - 16) + ' Q' + (-w + 16) + ' ' + (y - 26) + ' -6 ' + (y - 27),
+        stroke: "rgba(255,255,255,.35)",
+        strokeWidth: "3",
+        fill: "none"
+      }), c !== 'plain' && [[-22, -20], [-8, -26], [8, -24], [22, -18], [0, -14], [-16, -10], [16, -10]].map(([a, b], j) => React.createElement("ellipse", {
+        key: j,
+        cx: a,
+        cy: y + b,
+        rx: "1.8",
+        ry: "1",
+        fill: "#fff7dc"
+      }))));
+      y -= 32;
+    }
+  });
+  return React.createElement("g", null, base(w + 8), out);
+}
+const Carton = ({
+  c = '#d6332c',
+  fries = '#f7c53b',
+  fleck,
+  w = 26,
+  h = 40,
+  children
+}) => React.createElement("g", null, base(w + 6), Array.from({
+  length: 9
+}, (_, i) => React.createElement("rect", {
+  key: i,
+  x: -w + 4 + i * (2 * w - 10) / 8,
+  y: -h - 16 + i % 3 * 4,
+  width: "5",
+  height: "30",
+  rx: "1.5",
+  fill: fries,
+  stroke: "#c9922a",
+  strokeWidth: ".5",
+  transform: 'rotate(' + (i - 4) * 3 + ' ' + (-w + 6 + i * 5) + ' ' + -h + ')'
+})), fleck && Array.from({
+  length: 10
+}, (_, i) => React.createElement("circle", {
+  key: i,
+  cx: -w + 6 + i * 7 % (2 * w - 8),
+  cy: -h - 12 + i % 4 * 4,
+  r: "1.1",
+  fill: fleck
+})), React.createElement("path", _extends({
+  d: 'M' + -w + ' ' + -h + ' L' + w + ' ' + -h + ' L' + (w - 6) + ' 0 L' + (-w + 6) + ' 0 Z',
+  fill: c
+}, fl)), React.createElement("path", {
+  d: 'M' + -w + ' ' + -h + ' Q0 ' + (-h + 10) + ' ' + w + ' ' + -h,
+  fill: "none",
+  stroke: "rgba(0,0,0,.2)",
+  strokeWidth: "1.5"
+}), children);
+const Cup = ({
+  w = 22,
+  h = 74,
+  c = '#fff',
+  liquid,
+  clear,
+  lid = '#f4f4f4',
+  dome,
+  straw = '#e2463b',
+  children
+}) => React.createElement("g", null, base(w + 4), React.createElement("path", _extends({
+  d: 'M' + -w + ' ' + -h + ' L' + w + ' ' + -h + ' L' + (w - 5) + ' 0 L' + (-w + 5) + ' 0 Z',
+  fill: clear ? 'rgba(220,240,255,.55)' : c
+}, fl)), clear && liquid && React.createElement("path", {
+  d: 'M' + (-w + 1) + ' ' + (-h + 8) + ' L' + (w - 1) + ' ' + (-h + 8) + ' L' + (w - 5.5) + ' -1 L' + (-w + 5.5) + ' -1 Z',
+  fill: liquid
+}), children, clear && React.createElement("path", {
+  d: 'M' + (-w + 5) + ' ' + (-h + 10) + ' L' + (-w + 9) + ' -6',
+  stroke: "rgba(255,255,255,.7)",
+  strokeWidth: "2.5"
+}), dome ? React.createElement("path", _extends({
+  d: 'M' + (-w - 1) + ' ' + -h + ' Q' + -w + ' ' + (-h - 22) + ' 0 ' + (-h - 22) + ' Q' + w + ' ' + (-h - 22) + ' ' + (w + 1) + ' ' + -h + ' Z',
+  fill: "rgba(240,250,255,.6)"
+}, fl)) : React.createElement("rect", _extends({
+  x: -w - 2,
+  y: -h - 5,
+  width: 2 * w + 4,
+  height: "6",
+  rx: "2",
+  fill: lid
+}, fl)), straw && React.createElement("rect", {
+  x: "4",
+  y: -h - (dome ? 44 : 30),
+  width: "5",
+  height: dome ? 40 : 28,
+  rx: "1.5",
+  fill: straw,
+  transform: 'rotate(10 6 ' + -h + ')'
+}));
+const Bowl = ({
+  w = 44,
+  c = '#222',
+  children
+}) => React.createElement("g", null, base(w + 4), children, React.createElement("path", _extends({
+  d: 'M' + -w + ' -26 Q' + -w + ' 0 0 0 Q' + w + ' 0 ' + w + ' -26 Z',
+  fill: c
+}, fl)), React.createElement("path", {
+  d: 'M' + (-w + 6) + ' -20 Q' + (-w + 8) + ' -6 -10 -4',
+  stroke: "rgba(255,255,255,.18)",
+  strokeWidth: "3",
+  fill: "none"
+}));
+const Mound = ({
+  w = 44,
+  parts
+}) => React.createElement("g", null, React.createElement("path", _extends({
+  d: 'M' + -w + ' -26 Q' + -w + ' -50 0 -52 Q' + w + ' -50 ' + w + ' -26 Z',
+  fill: "#f6f0e2"
+}, fl)), parts);
+const TRAY_ITEMS = [['Big Mac', [-52, -84, 104, 90], 1, () => React.createElement(Stack, {
+  layers: [['bun'], ['patty'], ['cheese'], ['lettuce'], ['mid'], ['patty'], ['onion'], ['lettuce'], ['top']]
+}), 'Main'], ['Whopper', [-58, -66, 116, 72], 1, () => React.createElement(Stack, {
+  w: 48,
+  layers: [['bun'], ['patty', '#5e3218'], ['tomato'], ['onion'], ['lettuce'], ['top']]
+}), 'Main'], ['Baconator', [-58, -74, 116, 80], 1, () => React.createElement(Stack, {
+  layers: [['bun'], ['patty'], ['cheese'], ['bacon'], ['patty'], ['cheese'], ['bacon'], ['top', 'plain']]
+}), 'Main'], ['Crunchwrap Supreme', [-52, -46, 104, 52], 1, () => React.createElement("g", null, base(46), React.createElement("path", _extends({
+  d: "M-44 -6 L-24 -36 L24 -36 L44 -6 L24 4 L-24 4 Z",
+  fill: "#e8bd6a"
+}, fl)), React.createElement("path", {
+  d: "M-24 -36 L0 -14 L24 -36 M-44 -6 L0 -14 L44 -6 M0 -14 L-24 4 M0 -14 L24 4",
+  stroke: "#c6913e",
+  strokeWidth: "1.4",
+  fill: "none"
+}), [[-20, -24], [12, -26], [-8, -6], [22, -10]].map(([x, y], i) => React.createElement("path", {
+  key: i,
+  d: 'M' + x + ' ' + y + ' l8 -3',
+  stroke: "#8a5a22",
+  strokeWidth: "2",
+  strokeLinecap: "round"
+}))), 'Main'], ['Chicken Sandwich', [-56, -66, 112, 72], 1, () => React.createElement(Stack, {
+  layers: [['bun', '#d99a48'], ['chicken'], ['pickles'], ['top', 'plain']]
+}), 'Main'], ['Chick-fil-A Sandwich', [-56, -66, 112, 72], 1, () => React.createElement(Stack, {
+  layers: [['bun', '#e7b46a'], ['chicken', '#e3a243'], ['pickles'], ['top', '#e7b46a']]
+}), 'Main'], ['Double-Double', [-52, -74, 104, 80], 1, () => React.createElement("g", null, React.createElement(Stack, {
+  layers: [['bun'], ['patty'], ['cheese'], ['patty'], ['cheese'], ['tomato'], ['lettuce'], ['top', 'plain']]
+}), React.createElement("path", {
+  d: "M-44 0 L-44 -26 L44 -26 L44 0 Z",
+  fill: "rgba(255,255,255,.88)",
+  stroke: "#d6332c",
+  strokeWidth: "1"
+}), React.createElement("path", {
+  d: "M-44 -18 Q0 -12 44 -18",
+  stroke: "#d6332c",
+  strokeWidth: "2",
+  fill: "none"
+})), 'Main'], ['Teen Burger', [-52, -70, 104, 76], 1, () => React.createElement(Stack, {
+  layers: [['bun'], ['patty'], ['cheese'], ['bacon'], ['tomato'], ['lettuce'], ['top']]
+}), 'Main'], ['Burrito Bowl', [-50, -58, 100, 64], 1, () => React.createElement(Bowl, {
+  c: "#2a2a2f"
+}, React.createElement(Mound, {
+  parts: React.createElement("g", null, [[-30, -34], [-22, -40], [-14, -34], [-26, -30], [-18, -46]].map(([x, y], i) => React.createElement("ellipse", {
+    key: i,
+    cx: x,
+    cy: y,
+    rx: "3.2",
+    ry: "2.2",
+    fill: "#4a2f28"
+  })), React.createElement("path", {
+    d: "M-4 -48 Q14 -50 26 -40 L22 -28 L-4 -28 Z",
+    fill: "#e8402f"
+  }), React.createElement("ellipse", {
+    cx: "30",
+    cy: "-34",
+    rx: "11",
+    ry: "7",
+    fill: "#7ac143"
+  }), React.createElement("path", {
+    d: "M-6 -50 Q4 -56 12 -50",
+    stroke: "#ffd23f",
+    strokeWidth: "4",
+    strokeLinecap: "round"
+  }))
+})), 'Main'], ['Zinger', [-56, -70, 112, 76], 1, () => React.createElement("g", null, React.createElement(Stack, {
+  layers: [['bun'], ['lettuce'], ['chicken', '#c96a22'], ['top']]
+}), [[-30, -22], [-12, -26], [10, -24], [30, -20], [-22, -18]].map(([x, y], i) => React.createElement("circle", {
+  key: i,
+  cx: x,
+  cy: y,
+  r: "1.3",
+  fill: "#c0261b"
+}))), 'Main'], ['Italian B.M.T.', [-58, -40, 116, 46], 1, () => React.createElement("g", null, base(54), React.createElement("path", _extends({
+  d: "M-52 -2 Q-56 -14 -46 -14 H46 Q56 -14 52 -2 Z",
+  fill: "#d9a35c"
+}, fl)), [-40, -24, -8, 8, 24, 40].map(x => React.createElement("circle", {
+  key: x,
+  cx: x,
+  cy: -16,
+  r: "7",
+  fill: x % 16 ? '#c0392b' : '#b03a48',
+  stroke: "#7a1f1a",
+  strokeWidth: ".6"
+})), React.createElement("path", {
+  d: "M-50 -18 Q-25 -26 0 -18 T50 -18",
+  stroke: "#5fbf3a",
+  strokeWidth: "4",
+  fill: "none"
+}), React.createElement("path", _extends({
+  d: "M-50 -20 Q-54 -36 -40 -38 H40 Q54 -36 50 -20 Z",
+  fill: "#e3b06a"
+}, fl)), [-34, -14, 6, 26].map(x => React.createElement("path", {
+  key: x,
+  d: 'M' + x + ' -34 l10 4',
+  stroke: "#c58a3e",
+  strokeWidth: "1.5"
+}))), 'Main'], ['Fries', [-34, -76, 68, 82], 2, () => React.createElement(Carton, null), 'Side'], ['Cajun Fries', [-34, -76, 68, 82], 2, () => React.createElement(Carton, {
+  c: "#f07a1f",
+  fleck: "#b8261b"
+}, React.createElement("path", {
+  d: "M-14 -24 h28",
+  stroke: "#fff",
+  strokeWidth: "3"
+})), 'Side'], ['Waffle Fries', [-38, -66, 76, 72], 2, () => React.createElement("g", null, base(32), [[-18, -46], [0, -52], [18, -46], [-8, -40], [10, -38]].map(([x, y], i) => React.createElement("g", {
+  key: i
+}, React.createElement("circle", {
+  cx: x,
+  cy: y,
+  r: "11",
+  fill: "#f2bf4a",
+  stroke: "#c9922a",
+  strokeWidth: ".7"
+}), React.createElement("path", {
+  d: 'M' + (x - 7) + ' ' + (y - 4) + ' h14 M' + (x - 7) + ' ' + (y + 3) + ' h14 M' + (x - 4) + ' ' + (y - 8) + ' v15 M' + (x + 4) + ' ' + (y - 8) + ' v15',
+  stroke: "#d9a033",
+  strokeWidth: "1"
+}))), React.createElement("path", _extends({
+  d: "M-30 -36 L30 -36 L26 0 L-26 0 Z",
+  fill: "#c8102e"
+}, fl)), React.createElement("path", {
+  d: "M-30 -36 L30 -36",
+  stroke: "#fff",
+  strokeWidth: "3"
+})), 'Side'], ['Poutine', [-44, -60, 88, 66], 2, () => React.createElement(Bowl, {
+  w: 38,
+  c: "#f4f1ea"
+}, Array.from({
+  length: 8
+}, (_, i) => React.createElement("rect", {
+  key: i,
+  x: -30 + i * 8,
+  y: -48 + i % 2 * 5,
+  width: "5",
+  height: "24",
+  rx: "1.5",
+  fill: "#f2c14e",
+  transform: 'rotate(' + (i * 17 - 60) + ' ' + (-28 + i * 8) + ' -36)'
+})), React.createElement("path", {
+  d: "M-30 -32 Q-10 -46 10 -36 Q24 -44 32 -30 Q20 -24 0 -26 Q-20 -22 -30 -32 Z",
+  fill: "#7a4a24",
+  opacity: ".92"
+}), [[-16, -38], [6, -40], [20, -34], [-4, -30]].map(([x, y], i) => React.createElement("rect", {
+  key: i,
+  x: x,
+  y: y,
+  width: "7",
+  height: "5",
+  rx: "2",
+  fill: "#fbf6e8"
+}))), 'Side'], ['Onion Rings', [-40, -50, 80, 56], 2, () => React.createElement("g", null, base(36), React.createElement("rect", {
+  x: "-36",
+  y: "-6",
+  width: "72",
+  height: "6",
+  rx: "2",
+  fill: "#fff",
+  stroke: "#ddd"
+}), [[-14, -12], [14, -12], [0, -30]].map(([x, y], i) => React.createElement("g", {
+  key: i
+}, React.createElement("ellipse", _extends({
+  cx: x,
+  cy: y,
+  rx: "16",
+  ry: "10",
+  fill: "#e3a243"
+}, fl)), React.createElement("ellipse", {
+  cx: x,
+  cy: y,
+  rx: "8",
+  ry: "4.5",
+  fill: "#fff7e6"
+})))), 'Side'], ['Chicken McNuggets', [-40, -56, 80, 62], 2, () => React.createElement("g", null, base(36), React.createElement("path", _extends({
+  d: "M-32 -30 L-26 -50 L26 -50 L32 -30 Z",
+  fill: "#c8102e"
+}, fl)), [[-18, -34], [0, -36], [18, -34], [-8, -26], [10, -26], [-22, -24]].map(([x, y], i) => React.createElement("path", _extends({
+  key: i,
+  d: 'M' + (x - 8) + ' ' + y + ' Q' + (x - 9) + ' ' + (y - 8) + ' ' + x + ' ' + (y - 8) + ' Q' + (x + 9) + ' ' + (y - 6) + ' ' + (x + 7) + ' ' + (y + 2) + ' Q' + x + ' ' + (y + 6) + ' ' + (x - 8) + ' ' + y + ' Z',
+  fill: "#e3a243"
+}, fl))), React.createElement("path", _extends({
+  d: "M-32 -30 L32 -30 L28 0 L-28 0 Z",
+  fill: "#ffc531"
+}, fl))), 'Side'], ['Hash Brown', [-34, -48, 68, 54], 2, () => React.createElement("g", null, base(30), React.createElement("rect", _extends({
+  x: "-26",
+  y: "-44",
+  width: "52",
+  height: "30",
+  rx: "14",
+  fill: "#e3a243"
+}, fl)), [[-14, -32], [0, -36], [12, -28], [-4, -24]].map(([x, y], i) => React.createElement("path", {
+  key: i,
+  d: 'M' + x + ' ' + y + ' l6 2',
+  stroke: "#b97a2a",
+  strokeWidth: "1.4"
+})), React.createElement("path", {
+  d: "M-30 -22 L30 -22 L26 0 L-26 0 Z",
+  fill: "#fff",
+  stroke: "#d6332c",
+  strokeWidth: "1.2"
+}), React.createElement("path", {
+  d: "M-26 -12 H26",
+  stroke: "#ffc531",
+  strokeWidth: "2"
+})), 'Side'], ['Nacho Fries', [-40, -76, 80, 82], 2, () => React.createElement("g", null, React.createElement("g", {
+  transform: "translate(-8 0)"
+}, React.createElement(Carton, {
+  c: "#6a2c91",
+  fleck: "#d9481e",
+  w: 22,
+  h: 36
+})), React.createElement("g", {
+  transform: "translate(26 0)"
+}, base(12), React.createElement("path", _extends({
+  d: "M-11 -14 L11 -14 L9 0 L-9 0 Z",
+  fill: "#fff"
+}, fl)), React.createElement("ellipse", {
+  cx: "0",
+  cy: "-14",
+  rx: "11",
+  ry: "4",
+  fill: "#ffb627"
+}))), 'Side'], ['Iced Capp', [-28, -108, 56, 114], 3, () => React.createElement(Cup, {
+  clear: true,
+  liquid: "#c99a6a",
+  dome: true,
+  straw: "#2a7a3a"
+}, React.createElement("path", {
+  d: "M-18 -60 h36",
+  stroke: "rgba(255,255,255,.45)",
+  strokeWidth: "2"
+})), 'Drink'], ['Root Beer', [-34, -86, 68, 92], 3, () => React.createElement("g", null, base(28), React.createElement("path", {
+  d: "M20 -58 Q38 -56 36 -36 Q34 -18 20 -18",
+  stroke: "rgba(220,240,255,.8)",
+  strokeWidth: "6",
+  fill: "none"
+}), React.createElement("rect", _extends({
+  x: "-22",
+  y: "-70",
+  width: "44",
+  height: "70",
+  rx: "5",
+  fill: "rgba(220,240,255,.55)"
+}, fl)), React.createElement("rect", {
+  x: "-19",
+  y: "-60",
+  width: "38",
+  height: "57",
+  rx: "3",
+  fill: "#5a2d14"
+}), React.createElement("path", {
+  d: "M-24 -68 Q-18 -80 -6 -74 Q2 -84 12 -74 Q24 -80 24 -66 Q16 -60 0 -62 Q-16 -60 -24 -68 Z",
+  fill: "#f4ead6"
+}), React.createElement("path", {
+  d: "M-15 -52 V-10",
+  stroke: "rgba(255,255,255,.5)",
+  strokeWidth: "3"
+})), 'Drink'], ['Baja Blast', [-28, -108, 56, 114], 3, () => React.createElement(Cup, {
+  clear: true,
+  liquid: "#2ec4c0",
+  straw: "#6a2c91"
+}, [[-8, -50], [6, -40], [-4, -28]].map(([x, y], i) => React.createElement("rect", {
+  key: i,
+  x: x,
+  y: y,
+  width: "9",
+  height: "9",
+  rx: "2",
+  fill: "rgba(255,255,255,.5)",
+  transform: 'rotate(' + i * 20 + ' ' + x + ' ' + y + ')'
+}))), 'Drink'], ['Double-Double Coffee', [-28, -82, 56, 88], 3, () => React.createElement(Cup, {
+  w: 20,
+  h: 62,
+  c: "#fbfaf6",
+  lid: "#e9e4da",
+  straw: null
+}, React.createElement("path", {
+  d: "M-17 -42 L17 -42 L15.5 -22 L-15.5 -22 Z",
+  fill: "#c8102e"
+}), React.createElement("path", {
+  d: "M-6 -66 q6 -6 12 0",
+  stroke: "#bbb",
+  strokeWidth: "1.5",
+  fill: "none"
+})), 'Drink'], ['Frosted Lemonade', [-28, -108, 56, 114], 3, () => React.createElement(Cup, {
+  clear: true,
+  liquid: "#fff2a8",
+  dome: true,
+  straw: "#e2463b"
+}, React.createElement("circle", {
+  cx: "-6",
+  cy: "-40",
+  r: "7",
+  fill: "#ffe14a",
+  stroke: "#e6b800",
+  strokeWidth: ".6"
+}), React.createElement("path", {
+  d: "M-13 -40 h14 M-6 -47 v14",
+  stroke: "#fff7c2",
+  strokeWidth: ".8"
+})), 'Drink'], ['McFlurry', [-30, -76, 60, 82], 4, () => React.createElement("g", null, React.createElement(Cup, {
+  w: 20,
+  h: 50,
+  c: "#fbfaf6",
+  straw: null,
+  lid: "#fbfaf6"
+}, React.createElement("path", {
+  d: "M-17 -34 Q0 -26 17 -34",
+  stroke: "#3b6fd0",
+  strokeWidth: "3",
+  fill: "none"
+})), React.createElement("path", _extends({
+  d: "M-20 -55 Q-14 -72 0 -70 Q14 -74 20 -55 Z",
+  fill: "#fffaf0"
+}, fl)), [[-10, -60], [4, -64], [12, -58], [-2, -58]].map(([x, y], i) => React.createElement("rect", {
+  key: i,
+  x: x,
+  y: y,
+  width: "4",
+  height: "3",
+  fill: "#2b1d16"
+})), React.createElement("rect", {
+  x: "6",
+  y: "-82",
+  width: "4",
+  height: "26",
+  rx: "2",
+  fill: "#d9d9d9",
+  transform: "rotate(16 8 -60)"
+})), 'Dessert'], ['Frosty', [-30, -76, 60, 82], 4, () => React.createElement("g", null, React.createElement(Cup, {
+  w: 20,
+  h: 52,
+  c: "#d6332c",
+  straw: null,
+  lid: "#d6332c"
+}, React.createElement("path", {
+  d: "M-17 -34 Q0 -28 17 -34",
+  stroke: "#fff",
+  strokeWidth: "3",
+  fill: "none"
+})), React.createElement("path", _extends({
+  d: "M-19 -57 Q-10 -70 0 -66 Q10 -72 19 -57 Z",
+  fill: "#7a4a2c"
+}, fl)), React.createElement("rect", {
+  x: "-12",
+  y: "-80",
+  width: "4",
+  height: "26",
+  rx: "2",
+  fill: "#f4f4f4",
+  transform: "rotate(-14 -10 -60)"
+})), 'Dessert'], ['Timbits', [-36, -46, 72, 52], 4, () => React.createElement("g", null, base(32), React.createElement("path", _extends({
+  d: "M-30 -24 L-24 -40 L24 -40 L30 -24 Z",
+  fill: "#8a5a33"
+}, fl)), [[-16, -30, '#a0622d'], [-2, -32, '#f2d6a2'], [12, -30, '#5a3418'], [-8, -24, '#e86fa3'], [6, -24, '#d9a35c'], [20, -24, '#f7f2e8']].map(([x, y, c], i) => React.createElement("circle", _extends({
+  key: i,
+  cx: x,
+  cy: y,
+  r: "7",
+  fill: c
+}, fl))), React.createElement("path", _extends({
+  d: "M-30 -22 L30 -22 L26 0 L-26 0 Z",
+  fill: "#f4ead6"
+}, fl)), React.createElement("path", {
+  d: "M-26 -12 H26",
+  stroke: "#c8102e",
+  strokeWidth: "3"
+})), 'Dessert'], ['Blizzard', [-30, -80, 60, 86], 4, () => React.createElement("g", null, React.createElement(Cup, {
+  w: 20,
+  h: 56,
+  c: "#fbfaf6",
+  straw: null,
+  lid: "#fbfaf6"
+}, React.createElement("path", {
+  d: "M-17 -40 H17 M-16 -32 H16",
+  stroke: "#c8102e",
+  strokeWidth: "3"
+})), React.createElement("path", _extends({
+  d: "M-20 -61 Q-12 -76 0 -72 Q14 -78 20 -61 Z",
+  fill: "#fff6e6"
+}, fl)), [[-10, -66, '#2b1d16'], [2, -70, '#d9a35c'], [10, -64, '#2b1d16'], [-2, -63, '#e86fa3']].map(([x, y, c], i) => React.createElement("rect", {
+  key: i,
+  x: x,
+  y: y,
+  width: "5",
+  height: "4",
+  rx: "1",
+  fill: c
+})), React.createElement("rect", {
+  x: "8",
+  y: "-88",
+  width: "4",
+  height: "26",
+  rx: "2",
+  fill: "#e2463b",
+  transform: "rotate(14 10 -64)"
+})), 'Dessert'], ['Baked Apple Pie', [-36, -34, 72, 40], 4, () => React.createElement("g", null, base(32), React.createElement("rect", _extends({
+  x: "-30",
+  y: "-24",
+  width: "60",
+  height: "22",
+  rx: "8",
+  fill: "#d99a48"
+}, fl)), [-16, -4, 8, 20].map(x => React.createElement("path", {
+  key: x,
+  d: 'M' + x + ' -18 l-5 10',
+  stroke: "#8a4a1c",
+  strokeWidth: "2",
+  strokeLinecap: "round"
+})), React.createElement("path", {
+  d: "M-24 -20 Q0 -26 24 -20",
+  stroke: "rgba(255,255,255,.35)",
+  strokeWidth: "2",
+  fill: "none"
+})), 'Dessert'], ['Cinnabon Delights', [-36, -38, 72, 44], 4, () => React.createElement("g", null, base(32), [[-18, -12], [0, -14], [18, -12], [-8, -24], [10, -24]].map(([x, y], i) => React.createElement("g", {
+  key: i
+}, React.createElement("circle", _extends({
+  cx: x,
+  cy: y,
+  r: "9",
+  fill: "#c98a4b"
+}, fl)), React.createElement("circle", {
+  cx: x - 2,
+  cy: y - 2,
+  r: "3",
+  fill: "rgba(255,255,255,.55)"
+}))), React.createElement("g", {
+  transform: "translate(26 -2)"
+}, React.createElement("rect", _extends({
+  x: "-7",
+  y: "-10",
+  width: "14",
+  height: "10",
+  rx: "2",
+  fill: "#fff"
+}, fl)), React.createElement("ellipse", {
+  cx: "0",
+  cy: "-10",
+  rx: "7",
+  ry: "2.5",
+  fill: "#fffaf0"
+}))), 'Dessert']];
+const TRAY_CATS = {
+  main: 'Main',
+  mains: 'Main',
+  side: 'Side',
+  sides: 'Side',
+  drink: 'Drink',
+  drinks: 'Drink',
+  dessert: 'Dessert',
+  desserts: 'Dessert'
+};
+function trayGeneric(item, cat) {
+  const k = TRAY_CATS[sceneKey(cat)] || 'Side';
+  if (k === 'Main') return {
+    box: [-52, -64, 104, 70],
+    draw: () => React.createElement(Stack, {
+      layers: [['bun'], ['patty'], ['cheese'], ['lettuce'], ['top']]
+    })
+  };
+  if (k === 'Drink') return {
+    box: [-28, -88, 56, 94],
+    draw: () => React.createElement(Cup, null)
+  };
+  if (k === 'Dessert') return {
+    box: [-30, -72, 60, 78],
+    draw: () => React.createElement("g", null, React.createElement(Cup, {
+      w: 20,
+      h: 50,
+      straw: null
+    }), React.createElement("path", _extends({
+      d: "M-20 -55 Q0 -76 20 -55 Z",
+      fill: "#fffaf0"
+    }, fl)))
+  };
+  return {
+    box: [-34, -76, 68, 82],
+    draw: () => React.createElement(Carton, null)
+  };
+}
+const TRAY_SCENE = {
+  id: 'tray',
+  title: 'Meal',
+  view: [480, 300],
+  mode: 'slot',
+  cardBg: '#fff7e6',
+  Background: TrayBg,
+  list: TRAY_ITEMS,
+  generic: trayGeneric,
+  catOf: s => TRAY_CATS[sceneKey(s)] || null,
+  spots: {
+    Drink: [[396, 168], [330, 158]],
+    Dessert: [[118, 166], [190, 160]],
+    Main: [[148, 250], [284, 250]],
+    Side: [[396, 260], [228, 166]],
+    extra: [[256, 162], [60, 262], [440, 160]]
+  }
+};
+const sceneKey = s => String(s || '').toLowerCase().replace(/&/g, 'and').replace(/[^a-z0-9]+/g, '');
+const SCENES = (() => {
+  const all = {
+    house: HOUSE_SCENE,
+    backyard: BACKYARD_SCENE,
+    outfit: OUTFIT_SCENE,
+    tray: TRAY_SCENE
+  };
+  Object.values(all).forEach(s => {
+    s.index = {};
+    s.list.forEach(([name, box, z, draw, cat]) => {
+      s.index[sceneKey(name)] = {
+        name,
+        box,
+        z,
+        draw,
+        cat
+      };
+    });
+  });
+  return all;
+})();
+const sceneOf = topic => topic && topic.scene && SCENES[topic.scene] || null;
+const sceneHasArt = (topic, item) => {
+  const s = sceneOf(topic);
+  return !!(s && item && s.index[sceneKey(item.name)]);
+};
+function placeScene(scene, entries) {
+  const out = [];
+  const used = {};
+  let spare = 0;
+  entries.forEach(({
+    item,
+    slot
+  }, i) => {
+    const id = item.id || item.name + i;
+    const def = scene.index[sceneKey(item.name)];
+    if (scene.mode === 'fixed') {
+      if (def) {
+        out.push({
+          id,
+          item,
+          z: def.z,
+          box: def.box,
+          draw: def.draw
+        });
+        return;
+      }
+      const g = scene.generic(item, slot);
+      if (g.absolute) {
+        out.push({
+          id,
+          item,
+          z: g.z,
+          box: g.box,
+          draw: g.draw
+        });
+        return;
+      }
+      const at = scene.spare[spare++ % scene.spare.length];
+      out.push({
+        id,
+        item,
+        z: 50 + at[1] / 100,
+        at,
+        box: g.box,
+        draw: g.draw
+      });
+      return;
+    }
+    const cat = def && def.cat || scene.catOf(slot) || scene.catOf(item.pos) || 'extra';
+    const list = scene.spots[cat] || [];
+    const n = used[cat] || 0;
+    used[cat] = n + 1;
+    const at = list[n] || scene.spots.extra[spare++ % scene.spots.extra.length];
+    const g = def ? null : scene.generic(item, cat);
+    out.push({
+      id,
+      item,
+      z: 10 + at[1] / 100,
+      at,
+      box: def ? def.box : g.box,
+      draw: def ? def.draw : g.draw
+    });
+  });
+  return out.sort((a, b) => a.z - b.z);
+}
+const placedBox = p => p.at ? [p.at[0] + p.box[0], p.at[1] + p.box[1], p.box[2], p.box[3]] : p.box;
+function SceneCanvas({
+  scene,
+  placed,
+  highlight,
+  label,
+  className,
+  viewBox,
+  fill
+}) {
+  const [w, h] = scene.view;
+  const Bg = scene.Background;
+  const Fg = scene.Foreground;
+  return React.createElement("svg", {
+    className: 'scene' + (h > w ? ' tall' : '') + (className ? ' ' + className : ''),
+    viewBox: viewBox || '0 0 ' + w + ' ' + h,
+    role: "img",
+    "aria-label": label,
+    preserveAspectRatio: fill ? 'xMidYMid slice' : 'xMidYMid meet'
+  }, React.createElement(Bg, null), placed.map(p => {
+    const D = p.draw;
+    const b = placedBox(p);
+    const isNew = highlight && p.id === highlight;
+    const body = React.createElement("g", {
+      className: isNew ? 'sc-new' : undefined,
+      style: isNew ? {
+        transformOrigin: b[0] + b[2] / 2 + 'px ' + (b[1] + b[3] / 2) + 'px'
+      } : undefined
+    }, React.createElement(D, {
+      item: p.item
+    }));
+    return React.createElement("g", {
+      key: p.id,
+      "data-item": p.item.name
+    }, p.at ? React.createElement("g", {
+      transform: 'translate(' + p.at[0] + ' ' + p.at[1] + ')'
+    }, body) : body, isNew && React.createElement("ellipse", {
+      className: "sc-glow",
+      cx: b[0] + b[2] / 2,
+      cy: b[1] + b[3] / 2,
+      rx: b[2] / 2 + 6,
+      ry: b[3] / 2 + 6
+    }));
+  }), Fg && React.createElement(Fg, null));
+}
+function SceneView({
+  d,
+  m,
+  highlight,
+  className
+}) {
+  const scene = sceneOf(d.topic);
+  if (!scene) return null;
+  const entries = m.team.map((t, k) => t && d.items[t.itemId] ? {
+    item: {
+      ...d.items[t.itemId],
+      id: t.itemId
+    },
+    slot: d.rules.slots[k]
+  } : null).filter(Boolean);
+  const placed = placeScene(scene, entries);
+  const label = m.name + '’s ' + scene.title.toLowerCase() + (entries.length ? ': ' + entries.map(e => e.item.name).join(', ') : ' (empty so far)');
+  return React.createElement(SceneCanvas, {
+    scene: scene,
+    placed: placed,
+    highlight: highlight,
+    label: label,
+    className: className
+  });
+}
+function SceneArt({
+  topic,
+  item,
+  size,
+  box: boxStyle
+}) {
+  const scene = sceneOf(topic);
+  const placed = placeScene(scene, [{
+    item: {
+      ...item,
+      id: item.id || 'x'
+    },
+    slot: item.pos
+  }]);
+  const b = placedBox(placed[0]);
+  const vb = [b[0] - 5, b[1] - 5, b[2] + 10, b[3] + 10].map(v => Math.round(v * 10) / 10).join(' ');
+  return React.createElement("span", {
+    style: {
+      ...boxStyle,
+      display: 'block',
+      background: scene.cardBg
+    }
+  }, React.createElement(SceneCanvas, {
+    scene: scene,
+    placed: placed,
+    viewBox: vb,
+    label: item.name,
+    className: "scene-art",
+    fill: true
+  }));
 }
 const BOT_TYPES = {
   spender: {
@@ -9689,6 +14076,7 @@ function packTopic(t, withPhotos) {
     kl: t.kitLabel || '',
     ph: !!t.photos,
     f: t.folder || '',
+    sc: t.scene || '',
     i: t.items.map(it => {
       const r = [it.name, it.pos || '', it.desc || '', it.emoji || '', it.imageUrl || '', it.wiki || '', it.kit || null, it.photosOff ? 1 : 0];
       if (withPhotos && it.photo) r.push(it.photo);
@@ -9745,7 +14133,10 @@ function unpackTopic(o) {
       emoji: clip(o.e, 12) || '🎲',
       slots,
       layout: o.l === 'pitch' ? 'pitch' : 'list',
-      art: o.a === 'kit' ? 'kit' : 'emoji',
+      art: o.a === 'kit' ? 'kit' : o.a === 'scene' && SCENES[o.sc] ? 'scene' : 'emoji',
+      ...(typeof o.sc === 'string' && SCENES[o.sc] ? {
+        scene: o.sc
+      } : {}),
       kitShape: o.ks === 'tank' ? 'tank' : '',
       kitLabel: o.kl === 'initials' ? 'initials' : '',
       photos: !!o.ph,
@@ -10368,6 +14759,12 @@ function ArtFallback({
   size,
   box
 }) {
+  if (sceneOf(topic)) return React.createElement(SceneArt, {
+    topic: topic,
+    item: item,
+    size: size,
+    box: box
+  });
   if (artOf(topic) === 'kit') {
     const [c1, c2] = kitColors(item);
     const ink = Math.abs(lum(c1) - lum(c2)) < 0.3 ? onColor(c1) : c2;
@@ -10616,7 +15013,10 @@ function createDraft(topic, managers, rules, extra) {
       art: artOf(topic),
       kitShape: topic.kitShape || '',
       kitLabel: topic.kitLabel || '',
-      photos: !!topic.photos
+      photos: !!topic.photos,
+      ...(topic.scene ? {
+        scene: topic.scene
+      } : {})
     },
     rules: {
       ...rules
@@ -11158,6 +15558,30 @@ function MChip({
     style: mStyle(m)
   }, React.createElement("b", null, m.emoji), m.name);
 }
+function TeamView({
+  d,
+  m,
+  highlight
+}) {
+  if (d.topic.layout === 'pitch') return React.createElement(Pitch, {
+    d: d,
+    m: m
+  });
+  if (sceneOf(d.topic)) return React.createElement("div", {
+    className: "stack-sm"
+  }, React.createElement(SceneView, {
+    d: d,
+    m: m,
+    highlight: highlight
+  }), React.createElement(TeamList, {
+    d: d,
+    m: m
+  }));
+  return React.createElement(TeamList, {
+    d: d,
+    m: m
+  });
+}
 function TeamList({
   d,
   m
@@ -11261,7 +15685,7 @@ function TeamsSheet({
       fontSize: 22,
       color: 'var(--gold)'
     }
-  }, money(m.budget), " left")), React.createElement(TeamList, {
+  }, money(m.budget), " left")), React.createElement(TeamView, {
     d: d,
     m: m
   }), React.createElement(TeamRatingPanel, {
@@ -14528,6 +18952,9 @@ function Auction({
       color: leader.color,
       price,
       item: real.name,
+      mid: winnerId,
+      itemId: real.id,
+      scene: !!sceneOf(d.topic),
       mystery: !!real.mystery,
       rarity: (d.rarity || {})[real.id] || null,
       doubled: !!d.bid.double
@@ -14591,7 +19018,10 @@ function Auction({
         color: m.color,
         price: d.rules.minBid,
         item: real.name,
-        mystery: !!real.mystery
+        mystery: !!real.mystery,
+        mid: m.id,
+        itemId: real.id,
+        scene: !!sceneOf(d.topic)
       });
     } else {
       const c = skipCfg(d);
@@ -15857,10 +20287,7 @@ function TeamCard({
     className: "num"
   }, money(m.budget)))), React.createElement("div", {
     className: "tb"
-  }, d.topic.layout === 'pitch' ? React.createElement(Pitch, {
-    d: d,
-    m: m
-  }) : React.createElement(TeamList, {
+  }, React.createElement(TeamView, {
     d: d,
     m: m
   }), React.createElement(TeamRatingPanel, {
@@ -16821,12 +21248,21 @@ function PastList({
 }
 function Flash({
   f,
-  onDone
+  onDone,
+  d
 }) {
   useEffect(() => {
-    const t = setTimeout(onDone, ms(f.kind === 'skip' ? f.note ? 1700 : 1100 : f.kind === 'dodge' ? 2200 : f.mystery || f.rarity === 'legendary' ? 2600 : 1800));
+    const t = setTimeout(onDone, ms(f.kind === 'skip' ? f.note ? 1700 : 1100 : f.kind === 'dodge' ? 2200 : f.scene || f.mystery || f.rarity === 'legendary' ? 2600 : 1800));
     return () => clearTimeout(t);
   }, [f]);
+  const build = f.scene && d && sceneOf(d.topic) && d.managers.find(x => x.id === f.mid);
+  const buildView = build ? React.createElement("div", {
+    className: "flashscene"
+  }, React.createElement(SceneView, {
+    d: d,
+    m: build,
+    highlight: f.itemId
+  })) : null;
   return React.createElement("div", {
     className: "flash",
     onClick: onDone,
@@ -16859,7 +21295,7 @@ function Flash({
     className: "it"
   }, f.item, " ", f.rarity && f.rarity !== 'common' ? React.createElement(RarityTag, {
     r: f.rarity
-  }) : null)), f.kind === 'card' && React.createElement("div", {
+  }) : null), buildView), f.kind === 'card' && React.createElement("div", {
     className: "inner"
   }, React.createElement("div", {
     className: "big",
@@ -16928,7 +21364,7 @@ function Flash({
     }
   }, "\u2753 The mystery item was\u2026"), React.createElement("div", {
     className: "it"
-  }, "takes ", f.item)), f.kind === 'free' && React.createElement("div", {
+  }, "takes ", f.item), buildView), f.kind === 'free' && React.createElement("div", {
     className: "inner"
   }, React.createElement("div", {
     className: "big",
@@ -16994,6 +21430,7 @@ function migrateSettings(st) {
   }
   return x;
 }
+const OLD_HOUSE_NAMES = ['Infinity Pool', 'Home Cinema', 'Gaming Room', 'Indoor Basketball Court', 'Home Gym', 'Rooftop Terrace', 'Walk-in Closet', 'Secret Room', 'Slide Between Floors', '10-Car Garage', "Chef's Kitchen", 'Library', 'Aquarium Wall', 'Bowling Alley', 'Sauna', 'Hot Tub', 'Treehouse', 'Music Studio', 'Mini Golf', 'Football Pitch', 'Bubble Tea Bar', 'Arcade', 'Panic Room', 'Helipad', 'Ice Cream Machine', 'Smart Home', 'Glass Elevator', 'Ocean View', 'Fireplace', 'Quiet Room'].sort().join('|');
 function migrateTopics(stored) {
   const starters = starterTopics();
   const allIds = starters.map(s => s.id);
@@ -17009,6 +21446,18 @@ function migrateTopics(stored) {
       art: artOf(t),
       folder: folderOf(t)
     };
+    if (s.scene && !t.scene) {
+      if (t.id === 't-house') {
+        const names = t.items.map(i => i.name).sort().join('|');
+        return names === OLD_HOUSE_NAMES ? {
+          ...s
+        } : t;
+      }
+      t = {
+        ...t,
+        scene: s.scene
+      };
+    }
     const byId = {};
     s.items.forEach(i => {
       byId[i.id] = i;
@@ -18795,6 +23244,7 @@ function App() {
     }
   }, view, flash && React.createElement(Flash, {
     f: flash,
+    d: draft,
     onDone: () => setFlash(null)
   }), importing !== null && React.createElement(ImportTopicSheet, {
     topics: topics,
@@ -18974,6 +23424,15 @@ if (window.__DN_TEST__) window.__DN = {
     ownerInfo,
     migrateSettings,
     rulesLines
+  },
+  scenes: {
+    SCENES,
+    sceneOf,
+    placeScene,
+    sceneKey,
+    SceneCanvas,
+    SceneView,
+    sceneHasArt
   },
   skips: {
     SKIP_DEFAULTS,
@@ -22262,6 +26721,7 @@ function RoomGame({
     onThisScreen: () => setTvView(true)
   }, view), flash && React.createElement(Flash, {
     f: flash,
+    d: d,
     onDone: () => setFlash(null)
   }), tv && React.createElement(TvExit, null), !tv && isHost && tvView && React.createElement(TvExit, {
     onExit: () => setTvView(false)
@@ -22691,6 +27151,7 @@ function TvGame({
     className: "tvmode"
   }, view, flash && React.createElement(Flash, {
     f: flash,
+    d: d,
     onDone: () => setFlash(null)
   })));
 }

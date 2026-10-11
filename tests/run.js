@@ -987,6 +987,7 @@ async function tap(w, el) { el.dispatchEvent(new w.MouseEvent('pointerdown', { b
 
   await require('./topics.js')({ ok, boot, btn, click, sleep });
   await require('./skips.js')({ ok, boot, btn, click, sleep });
+  await require('./scenes.js')({ ok, boot, btn, click, sleep });
 
   if (!process.env.SKIP_ONLINE) await require('./online.js')({ ok, boot, btn, click, sleep });
 
