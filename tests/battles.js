@@ -71,6 +71,19 @@ module.exports = async function battleTests({ ok, boot, btn, click, sleep }) {
     ok(midOk && /Survival summary/.test(Z.d.body.textContent) && /Most useful/.test(Z.d.body.textContent), 'the survival screen shows each day’s event and what it needs, then a summary with each team’s most useful item');
     Z.w.close();
   }
+  {
+    // Step 5: superpower missions.
+    const S = DN.simStats; const pd = fill(T('t-pow'), 2, 'ms1'); const [PA, PB] = pd.managers;
+    const ms = S.simulateFor(pd, PA, PB, 'ms');
+    ok(ms.v === 'mission' && !ms.silly && ms.missions.length === 5 && ms.missions.every((m) => m.stages.length === 3 && m.stages.every((x) => x.res.every((r) => r.text && !/\{p\}/.test(r.text)))) && ms.score[0] + ms.score[1] === 5, 'superpowers take on 5 missions of 3 stages each, and every stage says what happened (' + ms.score.join('–') + ')');
+    ok(JSON.stringify(ms) === JSON.stringify(S.simulateFor(pd, PA, PB, 'ms')), 'a recorded mission run replays exactly');
+    const mk = (tid, names) => ({ name: 'T', team: names.map((n) => ({ itemId: T(tid).items.find((i) => i.name === n).id, price: 1 })) });
+    const dd = (tid) => ({ seed: 's', topic: T(tid), items: Object.fromEntries(T(tid).items.map((i) => [i.id, i])), rules: { slots: T(tid).slots } });
+    let g = 0; for (let k = 0; k < 200; k++) if (S.simulateFor(dd('t-pow'), mk('t-pow', ['Teleportation', 'Super Strength', 'Super Intelligence']), mk('t-pow', ['Night Vision', 'Breathe Underwater', 'Photographic Memory']), 'g' + k).winner === 0) g++;
+    ok(g > 160 && g < 200, 'strong powers usually beat weak ones, but upsets happen (' + Math.round(g / 2) + '%)');
+    const wd = fill(T('t-worstpowers'), 2, 'wp'); const wm = S.simulateFor(wd, ...wd.managers, 'w');
+    ok(wm.v === 'mission' && wm.silly && wm.missions.every((m) => m.stages.some((x) => x.stat === 'C')), 'Worst Superpowers get silly everyday missions with a Chaos stage');
+  }
   const rt = DN.share.unpackTopic(DN.share.packTopic(T('t-zomb'), false));
   ok(rt.ok && rt.topic.battle === 'survival' && F.hasBattle(rt.topic), 'shared and copied topics keep their battle style');
   // Screen: play a battle through the UI at instant speed.

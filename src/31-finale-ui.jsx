@@ -186,6 +186,7 @@ function MatchPlayer({ d, A, B, match, speed, commentary, onDone, label }) {
 }
 
 function MatchSummary({ d, A, B, match }) {
+  if (match.v === 'mission') return <MissionSummary d={d} A={A} B={B} match={match} />;
   if (match.v === 'survival') return <SurvivalSummary d={d} A={A} B={B} match={match} />;
   if (match.v === 'arena') return <ArenaSummary d={d} A={A} B={B} match={match} />;
   if (match.v === 'battle') return <BattleSummary d={d} A={A} B={B} match={match} />;
@@ -750,4 +751,4 @@ function PitchMatch({ d, A, B, match, speed, commentary, onDone, label }) {
   );
 }
 // Old saved matches (before the pitch) keep their text-only replay.
-function MatchView(props) { return props.match && props.match.v === 'survival' ? <SurvivalView {...props} /> : props.match && props.match.v === 'arena' ? <ArenaView {...props} /> : props.match && props.match.v === 'battle' ? <BattleView {...props} /> : props.match && props.match.v === 2 ? <PitchMatch {...props} /> : <MatchPlayer {...props} />; }
+function MatchView(props) { return props.match && props.match.v === 'mission' ? <MissionView {...props} /> : props.match && props.match.v === 'survival' ? <SurvivalView {...props} /> : props.match && props.match.v === 'arena' ? <ArenaView {...props} /> : props.match && props.match.v === 'battle' ? <BattleView {...props} /> : props.match && props.match.v === 2 ? <PitchMatch {...props} /> : <MatchPlayer {...props} />; }

@@ -1,4 +1,4 @@
-/* Draft Night 2e1878a9af — built from src/styles.css */
+/* Draft Night 34be851c93 — built from src/styles.css */
 /* Layout: one phone-width column, a stage-lit backdrop, the auction screen as a full-height console with a sticky gavel bar. */
 :root{
   --ink:#0f0c21; --stage:#19153a; --panel:#221d47; --panel2:#2c2659; --line:#3d3672;
@@ -665,12 +665,12 @@ html[data-motion="reduce"] *,html[data-motion="reduce"] *::before,html[data-moti
 .svscene.night.zomb{background:radial-gradient(circle at 80% 15%,#e8e4c0 0 10px,transparent 11px),linear-gradient(180deg,#0f1630,#232046)}
 .svscene.day.island{background:linear-gradient(180deg,#7fd3ff 0%,#bdeaff 55%,#f5d58a 56%,#e8c06a 100%)}
 .svscene.night.island{background:radial-gradient(circle at 80% 15%,#fff7c8 0 10px,transparent 11px),linear-gradient(180deg,#0b1b3a 0%,#173a6a 55%,#3a3a2a 56%,#2a2a1c 100%)}
-.svscene .sv-emoji{display:block;font-size:46px;line-height:1}
+.svscene .sv-emoji,.msscene .sv-emoji{display:block;font-size:46px;line-height:1}
 .svscene.anim .sv-emoji{animation:apopc .5s cubic-bezier(.2,.8,.2,1.4)}
 @keyframes apopc{from{transform:scale(.4);opacity:0}to{transform:scale(1);opacity:1}}
-.svscene .sv-when{margin:6px 0 0;color:#fff;text-shadow:0 1px 2px #000}
-.svscene .sv-title{margin:2px 0;color:#fff;font-size:22px;text-shadow:0 1px 3px #000}
-.svscene .sv-need{margin:0;color:#fff;text-shadow:0 1px 2px #000;font-weight:700}
+.svscene .sv-when,.msscene .sv-when{margin:6px 0 0;color:#fff;text-shadow:0 1px 2px #000}
+.svscene .sv-title,.msscene .sv-title{margin:2px 0;color:#fff;font-size:22px;text-shadow:0 1px 3px #000}
+.svscene .sv-need,.msscene .sv-need{margin:0;color:#fff;text-shadow:0 1px 2px #000;font-weight:700}
 .svscene.day.island .sv-when,.svscene.day.island .sv-title,.svscene.day.island .sv-need{color:#14213d;text-shadow:none}
 .camps{display:grid;grid-template-columns:1fr 1fr;gap:8px}
 .camp{background:var(--panel);border:2px solid var(--c,var(--line));border-radius:14px;padding:8px;display:flex;flex-direction:column;gap:6px;min-width:0;transition:background .3s}
@@ -681,3 +681,17 @@ html[data-motion="reduce"] *,html[data-motion="reduce"] *::before,html[data-moti
 .camp-out{display:flex;gap:8px;align-items:flex-start}
 .camp-none{font-size:30px}
 .camp-text{margin:0;overflow-wrap:anywhere}
+
+/* Superpower missions */
+.msscene{position:relative;border-radius:18px;padding:14px 14px 12px;border:2px solid var(--line);text-align:center;overflow:hidden;background:linear-gradient(180deg,#1d2b64 0%,#3a2b6e 60%,#16122e 61%,#0f0c21 100%)}
+.msscene::after{content:'';position:absolute;left:0;right:0;bottom:0;height:38%;background:repeating-linear-gradient(90deg,#16122e 0 18px,#221d47 18px 22px,#16122e 22px 34px,#2c2659 34px 38px);opacity:.7;pointer-events:none}
+.msscene>*{position:relative;z-index:1}
+.msscene.silly{background:linear-gradient(180deg,#ffd27a,#ff9fb3)}
+.msscene.silly::after{display:none}
+.msscene.silly .sv-when,.msscene.silly .sv-title,.msscene.silly .sv-need{color:#2a1530;text-shadow:none}
+.msscene.anim .sv-emoji{animation:apopc .5s cubic-bezier(.2,.8,.2,1.4)}
+.mstage{display:flex;flex-direction:column;gap:6px}
+.mstage-h{margin:0}
+.mcell{display:flex;gap:8px;align-items:flex-start;background:var(--panel);border:2px solid var(--c,var(--line));border-radius:14px;padding:8px;min-width:0}
+.mcell.ok{background:#1d3a2c}.mcell.bad{background:#3a1d26}
+.mc-p{display:block;font-size:13px;overflow-wrap:anywhere}

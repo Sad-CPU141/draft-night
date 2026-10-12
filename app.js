@@ -1,4 +1,4 @@
-/* Draft Night 2e1878a9af — built from src/ by build.js. Edit src/, not this file. */
+/* Draft Night 34be851c93 — built from src/ by build.js. Edit src/, not this file. */
 "use strict";
 (function(){
 function _extends() { return _extends = Object.assign ? Object.assign.bind() : function (n) { for (var e = 1; e < arguments.length; e++) { var t = arguments[e]; for (var r in t) ({}).hasOwnProperty.call(t, r) && (n[r] = t[r]); } return n; }, _extends.apply(null, arguments); }
@@ -23270,6 +23270,7 @@ function simulateFor(d, A, B, key) {
   const k = battleKindId(d.topic);
   if (k === 'fight') return simulateArena(d, A, B, key);
   if (k === 'survival') return simulateSurvival(d, A, B, key);
+  if (k === 'powers' || k === 'weird') return simulateMissions(d, A, B, key);
   return simulateBattle(d, A, B, key);
 }
 function simWhy(w, mt) {
@@ -23279,6 +23280,7 @@ function simWhy(w, mt) {
     const f = mt.final[mt.winner];
     return w.name + (f.rescued ? ' got rescued' : ' survived ' + ws + ' day' + (ws === 1 ? '' : 's')) + (ws !== ls ? ' (the others lasted ' + ls + ')' : mt.how === 'rescue' ? ', and got rescued first' : mt.how === 'shape' ? ', level on days but in better shape' : ' and won the last night') + '.';
   }
+  if (mt.v === 'mission') return w.name + ' won ' + mt.score[mt.winner] + ' of ' + mt.missions.length + ' missions.';
   return w.name + ' won the ' + (BATTLE_KINDS[mt.kind] || BATTLE_KINDS.fight).name.toLowerCase() + ' ' + mt.score[mt.winner] + '–' + mt.score[1 - mt.winner] + (mt.sudden ? ' in sudden death' : '') + '.';
 }
 const isSimResult = mt => !!mt && (mt.v === 'battle' || mt.v === 'arena' || mt.v === 'survival' || mt.v === 'mission' || mt.v === 'show');
@@ -24291,6 +24293,220 @@ function goldenBoot(d) {
     player: top[0].slice(top[0].indexOf('|') + 1),
     goals: top[1]
   } : null;
+}
+const MISSION_STATS = {
+  A: {
+    k: 0,
+    name: 'Attack',
+    emoji: '👊'
+  },
+  D: {
+    k: 1,
+    name: 'Defence',
+    emoji: '🛡️'
+  },
+  M: {
+    k: 2,
+    name: 'Movement',
+    emoji: '💨'
+  },
+  U: {
+    k: 3,
+    name: 'Utility',
+    emoji: '🧰'
+  },
+  B: {
+    k: 4,
+    name: 'Brains',
+    emoji: '🧠'
+  },
+  C: {
+    k: 5,
+    name: 'Chaos',
+    emoji: '🎲'
+  }
+};
+const HERO_MISSIONS = [{
+  emoji: '🏦',
+  title: 'Bank robbery in progress',
+  stages: ['M', 'A', 'B'],
+  steps: ['Get there before they escape', 'Stop the robbers', 'Find where they hid the money']
+}, {
+  emoji: '🔥',
+  title: 'Skyscraper on fire',
+  stages: ['M', 'D', 'U'],
+  steps: ['Reach the top floor', 'Shield people from the flames', 'Put the fire out']
+}, {
+  emoji: '🦹',
+  title: 'Supervillain attacks the city',
+  stages: ['A', 'D', 'B'],
+  steps: ['Fight the villain', 'Protect the crowd', 'Outsmart the evil plan']
+}, {
+  emoji: '🌋',
+  title: 'Volcano erupts near a town',
+  stages: ['U', 'D', 'M'],
+  steps: ['Stop the lava flow', 'Protect the houses', 'Get everyone out']
+}, {
+  emoji: '💻',
+  title: 'Hackers steal the city’s power grid',
+  stages: ['B', 'U', 'M'],
+  steps: ['Trace the hackers', 'Get the lights back on', 'Catch them before they flee']
+}, {
+  emoji: '🚆',
+  title: 'Runaway train',
+  stages: ['M', 'A', 'U'],
+  steps: ['Catch up with the train', 'Stop it by force', 'Fix the brakes']
+}, {
+  emoji: '🛸',
+  title: 'Alien invasion',
+  stages: ['A', 'B', 'D'],
+  steps: ['Fight off the first wave', 'Find the mothership’s weak spot', 'Protect the city']
+}, {
+  emoji: '🌊',
+  title: 'Tsunami heading for the coast',
+  stages: ['D', 'M', 'U'],
+  steps: ['Hold back the wave', 'Evacuate the beach', 'Rebuild the sea wall']
+}, {
+  emoji: '🏫',
+  title: 'Hostages at the stadium',
+  stages: ['B', 'M', 'D'],
+  steps: ['Work out where they are', 'Get in unseen', 'Shield the hostages']
+}];
+const SILLY_MISSIONS = [{
+  emoji: '🍕',
+  title: 'Get the last slice of pizza',
+  stages: ['M', 'C', 'U'],
+  steps: ['Beat everyone to the kitchen', 'Distract your cousin', 'Grab it without dropping it']
+}, {
+  emoji: '📺',
+  title: 'Find the TV remote',
+  stages: ['B', 'U', 'C'],
+  steps: ['Think where you last had it', 'Search the sofa', 'Hope for a miracle']
+}, {
+  emoji: '🚌',
+  title: 'Catch the bus',
+  stages: ['M', 'C', 'B'],
+  steps: ['Run for it', 'Get the driver to wait', 'Find your bus pass']
+}, {
+  emoji: '🎤',
+  title: 'Win the school talent show',
+  stages: ['C', 'U', 'A'],
+  steps: ['Wow the crowd', 'Pull off the big trick', 'Finish strong']
+}, {
+  emoji: '🍽️',
+  title: 'Survive a family dinner',
+  stages: ['D', 'B', 'C'],
+  steps: ['Dodge awkward questions', 'Change the subject', 'Escape before dessert']
+}, {
+  emoji: '🐈',
+  title: 'Get the cat down from a tree',
+  stages: ['M', 'U', 'C'],
+  steps: ['Climb up', 'Convince the cat', 'Get down in one piece']
+}, {
+  emoji: '📚',
+  title: 'Pass the surprise exam',
+  stages: ['B', 'C', 'U'],
+  steps: ['Remember anything at all', 'Guess well', 'Finish before the bell']
+}, {
+  emoji: '🛒',
+  title: 'Do the weekly shop in 10 minutes',
+  stages: ['M', 'B', 'C'],
+  steps: ['Sprint the aisles', 'Remember the list', 'Survive the self-checkout']
+}];
+const STAGE_LINES = {
+  M: ['{p} gets there in seconds.', '{p} is too slow.'],
+  A: ['{p} takes them down!', '{p} can’t stop them.'],
+  D: ['{p} keeps everyone safe.', '{p} can’t protect everyone.'],
+  U: ['{p} has exactly the right trick.', '{p} isn’t much use here.'],
+  B: ['{p} figures it out.', '{p} misses the clue.'],
+  C: ['{p}… somehow works?!', '{p} makes it worse.']
+};
+const SILLY_WIN = ['{p}… somehow works?!', 'Against all odds, {p} does the job.', '{p} is useless, but it still counts!'];
+const SILLY_LOSE = ['{p} does absolutely nothing.', '{p} makes everything worse.', 'Everyone stares at {p}. Awkward.'];
+function missionPowers(d, team, topic) {
+  return team.team.filter(Boolean).map(x => d.items[x.itemId]).filter(Boolean).map(item => {
+    const s = itemStats(topic, item);
+    return {
+      name: item.name,
+      itemId: item.id,
+      v: s ? s.vals : [5, 5, 5, 5, 5, 5]
+    };
+  });
+}
+function simulateMissions(d, A, B, key) {
+  const rng = seeded(d.seed, 'missions', key);
+  const silly = battleKindId(d.topic) === 'weird';
+  const pool = (silly ? SILLY_MISSIONS : HERO_MISSIONS).slice().sort(() => rng() - 0.5).slice(0, 5);
+  const teams = [A, B].map(t => missionPowers(d, t, d.topic));
+  const missions = [];
+  const score = [0, 0];
+  pool.forEach(m => {
+    const used = [new Set(), new Set()];
+    const passed = [0, 0];
+    const margin = [0, 0];
+    const stages = m.stages.map((stat, si) => {
+      const k = MISSION_STATS[stat].k;
+      const res = [0, 1].map(s => {
+        const ps = teams[s].filter(p => !used[s].has(p.name));
+        const p = (ps.length ? ps : teams[s]).slice().sort((x, y) => (y.v[k] || 0) - (x.v[k] || 0))[0];
+        if (!p) return {
+          ok: false,
+          power: null,
+          text: 'Nobody to send.'
+        };
+        used[s].add(p.name);
+        const val = p.v[k] || 1;
+        const diff = silly ? 3.5 + rng() * 3 : 4.5 + rng() * 4;
+        let roll = val + (rng() - 0.5) * 7.5;
+        let ok = roll >= diff;
+        let chaos = false;
+        if (silly && rng() < (p.v[5] || 1) * 0.05) {
+          ok = !ok;
+          chaos = true;
+        }
+        if (ok) {
+          passed[s]++;
+          margin[s] += roll - diff;
+        }
+        const tpl = silly ? ok ? pickOf(rng, SILLY_WIN) : pickOf(rng, SILLY_LOSE) : STAGE_LINES[stat][ok ? 0 : 1];
+        return {
+          ok,
+          power: p.name,
+          itemId: p.itemId,
+          chaos,
+          text: (chaos ? '🎲 CHAOS! ' : '') + tpl.replace('{p}', p.name)
+        };
+      });
+      return {
+        stat,
+        step: m.steps[si],
+        res
+      };
+    });
+    const w = passed[0] !== passed[1] ? passed[0] > passed[1] ? 0 : 1 : margin[0] !== margin[1] ? margin[0] > margin[1] ? 0 : 1 : rng() < 0.5 ? 0 : 1;
+    score[w]++;
+    missions.push({
+      emoji: m.emoji,
+      title: m.title,
+      stages,
+      passed,
+      w,
+      score: [...score],
+      close: passed[0] === passed[1]
+    });
+  });
+  return {
+    v: 'mission',
+    kind: silly ? 'weird' : 'powers',
+    silly,
+    missions,
+    score,
+    winner: score[0] > score[1] ? 0 : 1,
+    sudden: false,
+    et: false,
+    pens: null,
+    events: []
+  };
 }
 const SHARE_PREFIX = 'DN1.';
 const SHARE_PREFIX_RAW = 'DN0.';
@@ -34107,7 +34323,8 @@ if (window.__DN_TEST__) window.__DN = {
     simulateArena,
     simulateFor,
     simulateSurvival,
-    SURVIVAL_EVENTS
+    SURVIVAL_EVENTS,
+    simulateMissions
   },
   finale: {
     simulateBattle,
@@ -35315,6 +35532,12 @@ function MatchSummary({
   B,
   match
 }) {
+  if (match.v === 'mission') return React.createElement(MissionSummary, {
+    d: d,
+    A: A,
+    B: B,
+    match: match
+  });
   if (match.v === 'survival') return React.createElement(SurvivalSummary, {
     d: d,
     A: A,
@@ -36770,7 +36993,210 @@ function PitchMatch({
   }));
 }
 function MatchView(props) {
-  return props.match && props.match.v === 'survival' ? React.createElement(SurvivalView, props) : props.match && props.match.v === 'arena' ? React.createElement(ArenaView, props) : props.match && props.match.v === 'battle' ? React.createElement(BattleView, props) : props.match && props.match.v === 2 ? React.createElement(PitchMatch, props) : React.createElement(MatchPlayer, props);
+  return props.match && props.match.v === 'mission' ? React.createElement(MissionView, props) : props.match && props.match.v === 'survival' ? React.createElement(SurvivalView, props) : props.match && props.match.v === 'arena' ? React.createElement(ArenaView, props) : props.match && props.match.v === 'battle' ? React.createElement(BattleView, props) : props.match && props.match.v === 2 ? React.createElement(PitchMatch, props) : React.createElement(MatchPlayer, props);
+}
+function MissionCell({
+  d,
+  team,
+  r,
+  show
+}) {
+  const item = r && r.itemId ? d.items[r.itemId] : null;
+  return React.createElement("div", {
+    className: 'mcell' + (show ? r.ok ? ' ok' : ' bad' : ''),
+    style: mStyle(team)
+  }, item ? React.createElement(ItemArt, {
+    item: item,
+    topic: d.topic,
+    size: 40,
+    radius: 10
+  }) : React.createElement("span", {
+    className: "camp-none"
+  }, "\uD83D\uDE45"), React.createElement("div", {
+    className: "grow",
+    style: {
+      minWidth: 0
+    }
+  }, React.createElement("b", {
+    className: "mc-p"
+  }, r ? r.power || 'Nobody' : ''), React.createElement("p", {
+    className: "small camp-text"
+  }, show ? (r.ok ? '✅ ' : '❌ ') + r.text : '…')));
+}
+function MissionView({
+  d,
+  A,
+  B,
+  match,
+  speed,
+  onDone,
+  label
+}) {
+  const instant = speed === 'instant';
+  const M = match.missions;
+  const [mi, setMi] = useState(instant ? M.length : 0);
+  const [st, setSt] = useState(0);
+  const fast = speed === 'fast';
+  const done = mi >= M.length;
+  const fired = useRef(false);
+  const feedRef = useRef(null);
+  useEffect(() => {
+    if (done) {
+      if (!fired.current) {
+        fired.current = true;
+        if (!instant) audio.play('whistle');
+        onDone && onDone();
+      }
+      return undefined;
+    }
+    const m = M[mi];
+    const n = m.stages.length;
+    const t = setTimeout(() => {
+      if (st <= n) {
+        const nx = st + 1;
+        setSt(nx);
+        if (nx <= n) {
+          const s = m.stages[nx - 1];
+          audio.play(s.res.some(x => x.chaos) ? 'big' : 'bid');
+        } else audio.play(m.close ? 'cheer' : 'gavel');
+      } else {
+        setMi(mi + 1);
+        setSt(0);
+      }
+    }, ms(st === 0 ? fast ? 800 : 1600 : st <= n ? fast ? 1000 : 2100 : fast ? 1100 : 2200));
+    return () => clearTimeout(t);
+  }, [mi, st, done]);
+  useEffect(() => {
+    const f = feedRef.current;
+    if (f) f.scrollTop = f.scrollHeight;
+  }, [mi]);
+  const m = done ? null : M[mi];
+  const n = m ? m.stages.length : 0;
+  const score = m && st > n ? m.score : mi ? M[mi - 1].score : [0, 0];
+  const anim = !reducedMotion();
+  return React.createElement("div", {
+    className: "matchview missionview"
+  }, React.createElement("div", {
+    className: "scoreboard"
+  }, React.createElement("div", {
+    className: "sb-team"
+  }, React.createElement(Badge, {
+    m: A
+  }), React.createElement("span", {
+    className: "sb-n"
+  }, A.name)), React.createElement("div", {
+    className: "sb-mid"
+  }, React.createElement("span", {
+    className: "sb-score num",
+    "aria-live": "polite"
+  }, (done ? match.score : score)[0], "\u2013", (done ? match.score : score)[1]), React.createElement("span", {
+    className: "sb-clock num"
+  }, done ? 'Missions won' : 'Mission ' + (mi + 1) + ' of ' + M.length)), React.createElement("div", {
+    className: "sb-team"
+  }, React.createElement(Badge, {
+    m: B
+  }), React.createElement("span", {
+    className: "sb-n"
+  }, B.name))), m && React.createElement("div", {
+    className: 'msscene' + (match.silly ? ' silly' : '') + (anim ? ' anim' : ''),
+    key: mi
+  }, React.createElement("span", {
+    className: "sv-emoji",
+    "aria-hidden": "true"
+  }, m.emoji), React.createElement("p", {
+    className: "eyebrow sv-when"
+  }, match.silly ? '🤡 Everyday mission ' : '🚨 Mission ', mi + 1), React.createElement("h3", {
+    className: "sv-title"
+  }, m.title), React.createElement("p", {
+    className: "small sv-need"
+  }, m.stages.map(s => MISSION_STATS[s.stat].emoji + ' ' + MISSION_STATS[s.stat].name).join(' → '))), m && m.stages.slice(0, Math.min(st, n)).map((s, k) => React.createElement("div", {
+    key: k,
+    className: "mstage"
+  }, React.createElement("p", {
+    className: "mstage-h small"
+  }, React.createElement("b", null, k + 1, ". ", s.step), " ", React.createElement("span", {
+    className: "muted"
+  }, "\xB7 ", MISSION_STATS[s.stat].emoji, " ", MISSION_STATS[s.stat].name)), React.createElement("div", {
+    className: "camps"
+  }, React.createElement(MissionCell, {
+    d: d,
+    team: A,
+    r: s.res[0],
+    show: true
+  }), React.createElement(MissionCell, {
+    d: d,
+    team: B,
+    r: s.res[1],
+    show: true
+  })))), m && st > n && React.createElement("p", {
+    className: "duel-line"
+  }, (m.w === 0 ? A : B).name, " win the mission", m.close ? ' — by a whisker!' : '!', " (", m.passed[m.w], " of ", n, " stages vs ", m.passed[1 - m.w], ")"), mi > 0 && React.createElement("div", {
+    className: "mfeed",
+    ref: feedRef
+  }, M.slice(0, mi).map((x, k) => React.createElement("p", {
+    key: k,
+    className: "mev"
+  }, React.createElement("span", {
+    className: "mm num"
+  }, "M", k + 1), React.createElement("span", null, x.emoji, " ", React.createElement("b", null, x.title), " \u2192 ", (x.w === 0 ? A : B).name, " (", x.passed[0], "\u2013", x.passed[1], " stages)")))), !done && React.createElement("button", {
+    type: "button",
+    className: "btn btn-ghost btn-sm",
+    onClick: () => {
+      setMi(M.length);
+      setSt(0);
+    }
+  }, "Skip to the end"), done && React.createElement(MissionSummary, {
+    d: d,
+    A: A,
+    B: B,
+    match: match
+  }));
+}
+function MissionSummary({
+  d,
+  A,
+  B,
+  match
+}) {
+  const W = match.winner === 0 ? A : B;
+  const mvp = s => {
+    const c = {};
+    match.missions.forEach(m => m.stages.forEach(x => {
+      const r = x.res[s];
+      if (r.ok && r.power) c[r.power] = (c[r.power] || 0) + 1;
+    }));
+    const top = Object.entries(c).sort((a, b) => b[1] - a[1])[0];
+    return top ? top[0] + ' (' + top[1] + ' stages)' : 'nobody';
+  };
+  return React.createElement("div", {
+    className: "board msummary"
+  }, React.createElement("h3", null, match.silly ? '🤡' : '💥', " Mission summary"), React.createElement("p", {
+    className: "small",
+    style: {
+      margin: 0
+    }
+  }, React.createElement("b", null, A.name, " ", match.score[0], "\u2013", match.score[1], " ", B.name), " on missions"), match.missions.map((m, k) => React.createElement("p", {
+    key: k,
+    className: "small",
+    style: {
+      margin: 0
+    }
+  }, m.emoji, " ", m.title, ": ", React.createElement("b", null, (m.w === 0 ? A : B).name), " (", m.passed[0], "\u2013", m.passed[1], ")")), React.createElement("p", {
+    className: "small",
+    style: {
+      margin: 0
+    }
+  }, "\u2B50 MVP power: ", A.name, " \u2014 ", mvp(0), " \xB7 ", B.name, " \u2014 ", mvp(1)), React.createElement("p", {
+    className: "small",
+    style: {
+      margin: 0
+    }
+  }, "\uD83C\uDFC5 ", W.name, " win"), React.createElement("p", {
+    className: "hint",
+    style: {
+      margin: 0
+    }
+  }, "Each stage tests one stat (Draft Night\u2019s estimates) plus luck", match.silly ? ', and the Chaos stat can flip a result' : '', ". Just for fun."));
 }
 const NEED_LABEL = need => need.split('').map(t => SURVIVAL_TAGS[t] ? SURVIVAL_TAGS[t][1] + ' ' + SURVIVAL_TAGS[t][0] : '').filter(Boolean).join(' · ');
 function SurvivalCamp({
