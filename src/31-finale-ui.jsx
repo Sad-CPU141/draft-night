@@ -3,18 +3,18 @@
    these components only show state and call those functions.
    ============================================================ */
 
-const EST_LABEL = 'Estimated game rating · not an official EA Sports FC / FIFA rating';
+const EST_LABEL = 'Estimated by Draft Night · not official EA Sports FC / FIFA numbers';
 const ATTR_NAMES = { PAC: 'Pace', SHO: 'Shooting', PAS: 'Passing', DRI: 'Dribbling', DEF: 'Defending', PHY: 'Physical' };
 // The app's Motion setting wins; "Match my device" follows the phone's reduce-motion setting.
 const reducedMotion = () => { const m = document.documentElement.getAttribute('data-motion'); if (m === 'reduce') return true; if (m === 'full') return false; return !!(window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches); };
 
-// Full rating card for one player: overall, role and six attributes.
-function RatingCard({ item }) {
-  const r = playerRating(item);
+// Full player card: the Now or Prime number, role and six attributes.
+function RatingCard({ item, topic }) {
+  const r = playerRating(item); const era = eraWord(topic);
   return (
     <div className="ratingcard">
       <div className="rc-top">
-        <span className="rc-ovr num">{r.ovr}</span>
+        <span className="rc-ovr num"><small className="rc-era">{era}</small>{r.ovr}</span>
         <span className="rc-role">{r.role}</span>
         <span className="rc-name">{item.name}</span>
       </div>
@@ -27,27 +27,28 @@ function RatingCard({ item }) {
           </div>
         ))}
       </div>
-      <p className="hint" style={{ margin: 0 }}>{r.estimated ? EST_LABEL + '. Worked out from the card’s position and accolades; the same player always gets the same numbers.' : 'Overall set by the topic (manual override). Attributes are estimated from it.'}</p>
+      <p className="hint" style={{ margin: 0 }}>{(era === 'Now' ? 'Now: how good they are today. ' : 'Prime: how good they were at their peak. ') + (r.estimated ? EST_LABEL + '. Worked out from the card’s position and accolades; the same player always gets the same numbers.' : 'Number set by the topic (manual override). Attributes are estimated from it.')}</p>
     </div>
   );
 }
-// Small chip on the auction card; tap for the full rating card.
-function RatingChip({ item }) {
+// Small chip on the auction card ("Prime 91"); tap for the full card.
+function RatingChip({ item, topic }) {
   const [open, setOpen] = useState(false);
-  const r = playerRating(item);
+  if (!numbersShown()) return null;
+  const r = playerRating(item); const era = eraWord(topic);
   return (
     <>
-      <button type="button" className="ratingchip" onClick={() => setOpen(true)} aria-label={'Rating ' + r.ovr + (r.estimated ? ', estimated' : '') + '. Show details'}>
-        <b className="num">{r.ovr}</b>{r.estimated ? ' est.' : ''}
+      <button type="button" className="ratingchip" onClick={() => setOpen(true)} aria-label={era + ' ' + r.ovr + (r.estimated ? ', estimated' : '') + '. Show details'}>
+        {era} <b className="num">{r.ovr}</b>{r.estimated ? ' est.' : ''}
       </button>
-      {open && <Sheet center onClose={() => setOpen(false)}><RatingCard item={item} /><button className="btn btn-ghost" onClick={() => setOpen(false)}>Close</button></Sheet>}
+      {open && <Sheet center onClose={() => setOpen(false)}><RatingCard item={item} topic={topic} /><button className="btn btn-ghost" onClick={() => setOpen(false)}>Close</button></Sheet>}
     </>
   );
 }
 
-// Team rating with the full working shown.
+// Team strength (from the players' Now or Prime numbers) with the full working shown.
 function TeamRatingPanel({ d, m }) {
-  if (!isFootball(d.topic)) return null;
+  if (!isFootball(d.topic) || !numbersShown()) return null;
   const tr = teamRating(d, m);
   const players = [...tr.players].sort((a, b) => b.r.ovr - a.r.ovr);
   const weights = players.map((_, i) => Math.pow(0.92, i));
@@ -55,7 +56,7 @@ function TeamRatingPanel({ d, m }) {
     <details className="teamrating">
       <summary>
         <span className="tr-num num">{tr.rating}</span>
-        <span className="tr-lbl">Team rating{tr.provisional ? ' · provisional' : ''}</span>
+        <span className="tr-lbl">Team strength · {eraWord(d.topic)}{tr.provisional ? ' · provisional' : ''}</span>
         <span className="tr-more">How? ▾</span>
       </summary>
       <div className="tr-body">
@@ -67,7 +68,7 @@ function TeamRatingPanel({ d, m }) {
         <p className="small" style={{ margin: 0 }}>Squad average <b className="num">{tr.base}</b>{tr.coverage ? <> · coverage <b className="num">{tr.coverage}</b></> : null}{tr.chem ? <> · chemistry <b className="num">+{tr.chem}</b></> : null} = <b className="num">{tr.rating}</b></p>
         {tr.reasons.map((x) => <p key={x} className="hint" style={{ margin: 0 }}>• {x}</p>)}
         {tr.provisional && <p className="hint" style={{ margin: 0 }}>Provisional: {tr.players.length < d.rules.slots.length ? 'the squad isn’t full' : 'there’s no goalkeeper'}, so matches use a simplified line-up.</p>}
-        <p className="hint" style={{ margin: 0 }}>Player ratings are estimated game ratings, not official ones.</p>
+        <p className="hint" style={{ margin: 0 }}>Each player’s {eraWord(d.topic)} number is a Draft Night estimate, not an official one.</p>
       </div>
     </details>
   );
@@ -200,7 +201,7 @@ function MatchSummary({ d, A, B, match }) {
       </div>}
       {match.notes.map((n) => <p key={n} className="hint" style={{ margin: 0 }}>ℹ️ {n}</p>)}
       {incomplete.map((t) => <p key={t.id} className="hint" style={{ margin: 0 }}>ℹ️ {t.name}’s squad is incomplete, so empty slots count as weak players (simplified simulation).</p>)}
-      <p className="hint" style={{ margin: 0 }}>A game simulation from the drafted squads and estimated ratings. It doesn’t predict real results.</p>
+      <p className="hint" style={{ margin: 0 }}>A game simulation from the drafted squads and their estimated {eraWord(d.topic)} numbers. It doesn’t predict real results.</p>
     </div>
   );
 }
@@ -240,7 +241,7 @@ function MatchVote({ d, r, i, onChange, onCount, nv, act }) {
           const own = !canVoteFor(v, t.id);
           return (
             <button key={t.id} className="votebtn" style={{ ...mStyle(t), alignItems: 'stretch', textAlign: 'left' }} disabled={own} aria-pressed={choice === t.id} onClick={() => setChoice(t.id)}>
-              <span>{t.emoji} {t.name}{own ? ' · your team' : ''}{isFootball(d.topic) ? <small> · rating {teamRating(d, t).rating}</small> : null}</span>
+              <span>{t.emoji} {t.name}{own ? ' · your team' : ''}{isFootball(d.topic) && numbersShown() ? <small> · {eraWord(d.topic)} strength {teamRating(d, t).rating}</small> : null}</span>
               <span className="teamtxt">{t.team.filter(Boolean).map((x) => d.items[x.itemId].name).join(', ')}</span>
             </button>
           );
@@ -322,7 +323,7 @@ function Finale({ d, onChange, onClose, onChampion }) {
         {nx ? <>
           <h2 className="display" style={{ fontSize: 30 }}>{roundName(R, nx.r)}{nx.r === R - 1 ? ' 🏆' : ''}</h2>
           <div className="vsrow">
-            {[nx.m.a, nx.m.b].map((id, k) => { const t = teamOf(d, id); return <React.Fragment key={id}>{k === 1 && <span className="vs">VS</span>}<div className="vsteam"><Badge m={t} size={52} /><b>{t.name}</b>{isFootball(d.topic) && <span className="small num">Rating {teamRating(d, t).rating}{teamRating(d, t).provisional ? ' (prov.)' : ''}</span>}</div></React.Fragment>; })}
+            {[nx.m.a, nx.m.b].map((id, k) => { const t = teamOf(d, id); return <React.Fragment key={id}>{k === 1 && <span className="vs">VS</span>}<div className="vsteam"><Badge m={t} size={52} /><b>{t.name}</b>{isFootball(d.topic) && numbersShown() && <span className="small num">{eraWord(d.topic)} strength {teamRating(d, t).rating}{teamRating(d, t).provisional ? ' (prov.)' : ''}</span>}</div></React.Fragment>; })}
           </div>
           {host ? <button className="btn btn-gold" onClick={begin}>{needsVote(mode) ? (mode === 'combined' ? 'Vote, then kick off' : 'Vote on this matchup') : 'Kick off'}</button> : waiting}
         </> : fin.champion ? <>
@@ -425,8 +426,8 @@ function FriendlySheet({ d, onClose }) {
         <MatchView key={game.k} d={d} A={game.A} B={game.B} match={game.match} speed={cfg.speed} commentary={cfg.commentary} label={'friendly' + game.k} />
         <div className="row"><button className="btn grow" onClick={play}>Rematch</button><button className="btn btn-ghost grow" onClick={() => setGame(null)}>Pick teams</button></div>
       </> : <>
-        <div className="field"><label htmlFor="fr-a">Home</label><select id="fr-a" className="input" value={a} onChange={(e) => setA(e.target.value)}>{teams.map((t) => <option key={t.id} value={t.id} disabled={t.id === b}>{t.emoji} {t.name} · {teamRating(d, t).rating}</option>)}</select></div>
-        <div className="field"><label htmlFor="fr-b">Away</label><select id="fr-b" className="input" value={b} onChange={(e) => setB(e.target.value)}>{teams.map((t) => <option key={t.id} value={t.id} disabled={t.id === a}>{t.emoji} {t.name} · {teamRating(d, t).rating}</option>)}</select></div>
+        <div className="field"><label htmlFor="fr-a">Home</label><select id="fr-a" className="input" value={a} onChange={(e) => setA(e.target.value)}>{teams.map((t) => <option key={t.id} value={t.id} disabled={t.id === b}>{t.emoji} {t.name}{numbersShown() ? ' · ' + teamRating(d, t).rating : ''}</option>)}</select></div>
+        <div className="field"><label htmlFor="fr-b">Away</label><select id="fr-b" className="input" value={b} onChange={(e) => setB(e.target.value)}>{teams.map((t) => <option key={t.id} value={t.id} disabled={t.id === a}>{t.emoji} {t.name}{numbersShown() ? ' · ' + teamRating(d, t).rating : ''}</option>)}</select></div>
         <button className="btn btn-gold" disabled={!a || !b || a === b} onClick={play}>Kick off</button>
         <p className="hint">Friendlies can end in a draw. Each kick-off is a new random game.</p>
       </>}
@@ -451,14 +452,14 @@ function FinaleResults({ d, onOpen }) {
         <div className="display">{champ.emoji} {champ.name}</div>
         {champ.members && <p className="small" style={{ margin: 0, fontWeight: 700 }}>{champ.members.map((p) => p.name).join(' · ')}</p>}
         <p className="small" style={{ margin: '6px 0 0', fontWeight: 700 }}>
-          {ru ? 'Beat ' + ru.name + ' in the final' + (sc ? ' ' + sc[0] + '–' + sc[1] + (final.match.pens ? ' (pens)' : final.match.et ? ' (AET)' : '') : '') : 'Walked through'}{tr ? ' · team rating ' + tr.rating : ''}
+          {ru ? 'Beat ' + ru.name + ' in the final' + (sc ? ' ' + sc[0] + '–' + sc[1] + (final.match.pens ? ' (pens)' : final.match.et ? ' (AET)' : '') : '') : 'Walked through'}{tr && numbersShown() ? ' · ' + eraWord(d.topic) + ' strength ' + tr.rating : ''}
         </p>
         {d.mode === 'solo' && champ.human && <p className="small" style={{ margin: '4px 0 0', fontWeight: 700 }}>You beat the bots!</p>}
       </div>
       <div className="board"><h3>🧠 Why they won</h3><p className="small" style={{ margin: 0 }}>{championStory(d)}</p></div>
       <div className="board"><h3>🗂️ Bracket</h3><BracketView d={d} onOpen={onOpen} /><p className="hint" style={{ margin: 0 }}>Tap a decided matchup to see how it went.</p></div>
       <div className="board"><h3>📊 Final standings</h3>
-        {finaleStandings(d).map((s) => <div key={s.team.id} className={'brow' + (s.label === 'Champion' ? ' hl' : '')} style={mStyle(s.team)}><span className="bn">{s.team.emoji} {s.team.name}</span><span className="small" style={{ fontWeight: 700 }}>{s.label}</span>{isFootball(d.topic) && <span className="bw num" style={{ fontSize: 18 }}>{teamRating(d, s.team).rating}</span>}</div>)}
+        {finaleStandings(d).map((s) => <div key={s.team.id} className={'brow' + (s.label === 'Champion' ? ' hl' : '')} style={mStyle(s.team)}><span className="bn">{s.team.emoji} {s.team.name}</span><span className="small" style={{ fontWeight: 700 }}>{s.label}</span>{isFootball(d.topic) && numbersShown() && <span className="bw num" style={{ fontSize: 18 }}>{teamRating(d, s.team).rating}</span>}</div>)}
       </div>
     </>
   );

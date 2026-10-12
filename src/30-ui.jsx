@@ -695,9 +695,9 @@ function ItemEditor({ item, slots, topic, onSave, onDelete, onClose }) {
       </div>
       {isFootball(topic) && (
         <div className="field">
-          <label htmlFor="it-rating">Rating override (1–99)</label>
+          <label htmlFor="it-rating">Now / Prime number override (1–99)</label>
           <input id="it-rating" className="input" type="number" inputMode="numeric" min={1} max={99} value={f.rating == null ? '' : f.rating} placeholder={'Estimated: ' + playerRating({ ...f, rating: null }).ovr} onChange={(e) => { const v = e.target.value; setF((x) => { const n = { ...x }; if (v === '') delete n.rating; else n.rating = clamp(Math.round(+v) || 1, 1, 99); return n; }); }} />
-          <p className="hint">Leave empty to use Draft Night’s estimated game rating. This isn’t an official EA Sports FC rating either way.</p>
+          <p className="hint">Leave empty to use Draft Night’s estimate. Topics about current players show it as “Now”, legends as “Prime”. It isn’t an official EA Sports FC number either way.</p>
         </div>
       )}
       <div className="field"><label htmlFor="it-desc">Short description</label><input id="it-desc" className="input" value={f.desc} onChange={(e) => setF({ ...f, desc: e.target.value })} placeholder="Club, era, stat…" /></div>
@@ -799,6 +799,7 @@ function TopicEditor({ topic, folders, onChange, onBack, onDuplicate, onDelete }
           {!slotsParsed.length && <p className="warn">Add at least one slot.</p>}
         </div>
         <div className="field"><span className="label">Results layout</span><Seg label="Layout" value={topic.layout || 'list'} options={[['pitch', 'Pitch'], ['list', 'List']]} onChange={(v) => set({ layout: v })} /></div>
+        {topic.layout === 'pitch' && <div className="field"><span className="label">Player numbers are</span><Seg label="Player numbers are" value={eraOf(topic)} options={[['now', 'Now (as they are today)'], ['prime', 'Prime (at their peak)']]} onChange={(v) => set({ era: v })} /></div>}
         <div className="field"><span className="label">Item pictures</span><Seg label="Item pictures" value={artOf(topic)} options={[['kit', 'Jerseys'], ['emoji', 'Emoji tiles']]} onChange={(v) => set({ art: v })} />
           <p className="hint">{artOf(topic) === 'kit' ? 'Jersey colours come from the country or club in each description.' : 'Each item shows its own emoji, or the topic emoji.'} Uploaded photos and image links always come first.</p></div>
         <Toggle on={!!topic.photos} onChange={(v) => { set({ photos: v }); if (v) wiki.prefetch(topic.items.map((i) => wikiTitleFor(i, { ...topic, photos: true })).filter(Boolean)); }}
@@ -1288,8 +1289,8 @@ function SetupRules({ topic, managers, rules, setRules, onBack, onStart, startLa
             <Seg label="Forced pick style" value={sk.style} options={[['next', 'Next item'], ['choose3', 'Choose from 3'], ['auctioneer', 'Auctioneer’s choice'], ['random', 'Random']]} onChange={(v) => setSk({ style: v })} />
             <p className="hint">{{ next: 'They’re on the hook for the next item handed to them.', choose3: 'They choose one of 3 random items they can take (fewer if fewer are left). If the clock runs out, one is picked for them.', auctioneer: 'The game chooses the item using the rule below.', random: 'A random item they can take.' }[sk.style]} It still goes to auction: anyone can outbid them.</p>
             {sk.style === 'choose3' && <div className="field"><span className="label">Time to choose</span><Seg label="Choose time" value={sk.pickSecs} options={[[15, '15s'], [20, '20s'], [30, '30s'], [60, '60s']]} onChange={(v) => setSk({ pickSecs: v })} /><p className="hint">Also the fallback if that player disconnects.</p></div>}
-            {sk.style === 'auctioneer' && <div className="field"><span className="label">Auctioneer picks</span><Seg label="Auctioneer preference" value={sk.pref} options={[['rating', 'Highest rated'], ['random', 'Random']]} onChange={(v) => setSk({ pref: v })} />
-              <p className="hint">Highest rated only works on the 3 football topics (estimated ratings). Other topics have no reliable ratings, so it picks at random. There’s no “best value” option because no topic has real value data.</p></div>}
+            {sk.style === 'auctioneer' && <div className="field"><span className="label">Auctioneer picks</span><Seg label="Auctioneer preference" value={sk.pref} options={[['rating', 'Best Now/Prime number'], ['random', 'Random']]} onChange={(v) => setSk({ pref: v })} />
+              <p className="hint">Best number only works on the 3 football topics (estimated Now/Prime numbers). Other topics have no reliable numbers, so it picks at random. There’s no “best value” option because no topic has real value data.</p></div>}
           </>}
         </div>
         <RuleSection id="rs-debt" emoji="💳" title="Skip Debt" on={sk.debt.on && !sk.nmd} onToggle={(v) => setSk({ debt: { ...sk.debt, on: v }, ...(v ? { nmd: false } : {}) })} summary={sk.debt.on && !sk.nmd ? { each: 'Each forced pick repays 1', two: '2 forced picks repay 1', end: 'Never repaid' }[sk.debt.clear] : 'Off'}>
@@ -1340,12 +1341,12 @@ function SetupRules({ topic, managers, rules, setRules, onBack, onStart, startLa
           {!foot && (fin.mode === 'sim' || fin.mode === 'combined') && <p className="warn">Matches only work for the football topics (Premier League Legends, Current Footballers, Football GOATs). For this topic the bracket uses votes instead.</p>}
         </div>
         {fin.mode === 'combined' && <div className="field"><span className="label">Weighting</span><Seg label="Weighting" value={fin.weight} options={[[50, '50/50'], [60, '60/40'], [70, '70/30']]} onChange={(v) => setF({ weight: v })} /><p className="hint">Match performance / votes. Goals become a 0–100% share so a 6–5 thriller doesn’t swamp the votes.</p></div>}
-        {(fin.mode === 'bracket' || fin.mode === 'combined') && <div className="field"><span className="label">If a vote is tied</span><Seg label="Tiebreaker" value={fin.tiebreak} options={[['rating', 'Higher-rated team'], ['revote', 'Vote again once']]} onChange={(v) => setF({ tiebreak: v })} />{fin.mode === 'combined' && <p className="hint">In Combined, a dead-level total is settled by the match (extra time or penalties).</p>}</div>}
+        {(fin.mode === 'bracket' || fin.mode === 'combined') && <div className="field"><span className="label">If a vote is tied</span><Seg label="Tiebreaker" value={fin.tiebreak} options={[['rating', 'Stronger team (Now/Prime)'], ['revote', 'Vote again once']]} onChange={(v) => setF({ tiebreak: v })} />{fin.mode === 'combined' && <p className="hint">In Combined, a dead-level total is settled by the match (extra time or penalties).</p>}</div>}
         {(fin.mode === 'sim' || fin.mode === 'combined') && <>
           <div className="field"><span className="label">Match speed</span><Seg label="Match speed" value={fin.speed} options={[['instant', 'Instant'], ['fast', 'Fast'], ['normal', 'Normal']]} onChange={(v) => setF({ speed: v })} /><p className="hint">How fast matches start playing. Everyone can still pause, change speed or skip while watching.</p></div>
           <Toggle on={fin.commentary} onChange={(v) => setF({ commentary: v })} title="Match commentary" sub="Show the running commentary feed (goals and cards always show)." />
           <Toggle on={!!fin.home} onChange={(v) => setF({ home: v })} title="Home advantage" sub="The higher seed plays at home: a small boost to its expected goals (+0.15). Off by default." />
-          <p className="hint">Knockout matches that end level go to extra time, then penalties. Player ratings are estimated game ratings, not official EA Sports FC ratings.</p>
+          <p className="hint">Knockout matches that end level go to extra time, then penalties. Player numbers are Draft Night estimates (Now for current players, Prime for legends), not official EA Sports FC numbers.</p>
         </>}
       </div>}
 
@@ -1483,7 +1484,7 @@ function ItemCard({ item: real, d }) {
         <div className={'face itemcard' + (rar ? ' r-' + rar : '')}>
           <div className="ph"><ItemArt item={item} topic={d.topic} size={104} radius={16} /></div>
           <div className="info">
-            <span className="row" style={{ gap: 6, flexWrap: 'wrap' }}>{item.pos && <span className="pos">{item.pos}</span>}<RarityTag r={rar} />{isFootball(d.topic) && <RatingChip item={item} />}</span>
+            <span className="row" style={{ gap: 6, flexWrap: 'wrap' }}>{item.pos && <span className="pos">{item.pos}</span>}<RarityTag r={rar} />{isFootball(d.topic) && <RatingChip item={item} topic={d.topic} />}</span>
             <div className="nm">{item.name}</div>
             {item.desc && <div className="ds">{item.desc}</div>}
             <div className="fits">{inTemplate ? 'Fills a ' + item.pos + ' slot' + (hasFlex ? ' or FLEX' : '') : 'Fills any open slot'}</div>
@@ -2412,7 +2413,7 @@ function ExportCard({ d, kind, showShame }) {
           <span className="exlabel">{winners.length > 1 ? 'JOINT CHAMPIONS' : 'CHAMPION'}</span>
           <span className="exname">{winners.map((x) => x.emoji + ' ' + x.name).join(' & ')}</span>
           {w.members && <span className="exmem">{w.members.map((p) => p.name).join(' · ')}</span>}
-          <span className="exvotes">{d.finale && d.finale.champion ? (needsMatch(d.finale.mode) ? 'Won the knockout' : 'Won the bracket') + (isFootball(d.topic) ? ' · rating ' + teamRating(d, w).rating : '') : counts[w.id] + ' vote' + (counts[w.id] === 1 ? '' : 's')} · {money(d.rules.budget - w.budget)} spent · {money(w.budget)} left</span>
+          <span className="exvotes">{d.finale && d.finale.champion ? (needsMatch(d.finale.mode) ? 'Won the knockout' : 'Won the bracket') + (isFootball(d.topic) && numbersShown() ? ' · ' + eraWord(d.topic) + ' strength ' + teamRating(d, w).rating : '') : counts[w.id] + ' vote' + (counts[w.id] === 1 ? '' : 's')} · {money(d.rules.budget - w.budget)} spent · {money(w.budget)} left</span>
         </div>
         <div className="exroster">
           {d.rules.slots.map((sl, i) => { const t = w.team[i]; const it = t && d.items[t.itemId]; const r = t && rarityOf(d, t.itemId); return (
@@ -2433,7 +2434,7 @@ function ExportCard({ d, kind, showShame }) {
       {head}
       <div className="board">
         <h3>🏆 Final standings</h3>
-        {finaleStandings(d).map((s, i) => <div key={s.team.id} className="brow" style={mStyle(s.team)}><span className="rk num">{i + 1}</span><span className="bn">{s.team.emoji} {s.team.name}</span><span className="bw" style={{ fontSize: 15 }}>{s.label}{isFootball(d.topic) ? ' · ' + teamRating(d, s.team).rating : ''}</span></div>)}
+        {finaleStandings(d).map((s, i) => <div key={s.team.id} className="brow" style={mStyle(s.team)}><span className="rk num">{i + 1}</span><span className="bn">{s.team.emoji} {s.team.name}</span><span className="bw" style={{ fontSize: 15 }}>{s.label}{isFootball(d.topic) && numbersShown() ? ' · ' + teamRating(d, s.team).rating : ''}</span></div>)}
       </div>
       {awards.length > 0 && <div className="board"><h3>🎖️ Awards</h3>{awards.map((a, i) => <p key={a.id + i} className="award"><b>{a.emoji} {a.title}: {a.team}</b><br /><span className="small">{a.why}</span></p>)}</div>}
       {shame.length > 0 && <div className="board"><h3>🙈 Hall of Shame</h3>{shame.map((a) => <p key={a.id} className="award"><b>{a.emoji} {a.title}: {a.team}</b><br /><span className="small">{a.item} for {money(a.price)}. {a.why}</span></p>)}</div>}
@@ -2771,7 +2772,7 @@ function migrateTopics(stored) {
       t = { ...t, extrasV: s.extrasV, items: [...t.items, ...s.items.filter((i) => /-e\d+$/.test(i.id) && !ids.has(i.id) && !names.has(i.name.toLowerCase()))] };
     }
     const byId = {}; s.items.forEach((i) => { byId[i.id] = i; });
-    return { ...t, art: t.art || s.art, folder: t.folder || s.folder, kitShape: t.kitShape || s.kitShape, kitLabel: t.kitLabel || s.kitLabel, photos: t.photos === undefined ? s.photos : t.photos,
+    return { ...t, era: t.era || s.era, art: t.art || s.art, folder: t.folder || s.folder, kitShape: t.kitShape || s.kitShape, kitLabel: t.kitLabel || s.kitLabel, photos: t.photos === undefined ? s.photos : t.photos,
       items: t.items.map((i) => (byId[i.id] && !i.emoji && byId[i.id].emoji ? { ...i, emoji: byId[i.id].emoji } : i)) };
   });
   starters.forEach((s) => { if (!seen.includes(s.id) && !out.some((t) => t.id === s.id)) out.push(s); });
@@ -2913,7 +2914,7 @@ function ProfileView({ past, settings, setSettings, pkey, onBack }) {
         <Stat k="Trades done" v={r.trades} d={r.topCard ? 'Favourite card: ' + CARD_INFO[r.topCard].name : null} />
         {r.titles > 0 && <Stat k="Finale titles" v={r.titles} d="brackets & knockouts won" />}
         {r.matches > 0 && <Stat k="Match record" v={r.matchWins + '–' + (r.matches - r.matchWins)} d={r.goals + ' goal' + (r.goals === 1 ? '' : 's') + ' scored'} />}
-        {r.topRating && <Stat k="Best team rating" v={r.topRating.rating} d={r.topRating.team + ' · ' + r.topRating.topic} />}
+        {r.topRating && <Stat k="Strongest football team" v={r.topRating.rating} d={r.topRating.team + ' · ' + r.topRating.topic} />}
       </div>
       <div className="board">
         <h3>❤️ Favourite picks</h3>
@@ -3081,6 +3082,9 @@ function SettingsScreen({ onBack, state, onRestore, settings, setSettings, ruleP
         <h3>📺 TV display</h3>
         <Seg label="TV text size" value={settings.tvZoom || 1} options={[[1, 'Normal'], [1.25, 'Large'], [1.5, 'Extra large']]} onChange={(v) => setS({ tvZoom: v })} />
         <p className="hint" style={{ margin: 0 }}>How big everything looks when this device shows the TV view.</p>
+        <h3>⚽ Player numbers</h3>
+        <Seg label="Player numbers" value={settings.numbers === 'off' ? 'off' : 'on'} options={[['on', 'Show Now / Prime'], ['off', 'Hide']]} onChange={(v) => setS({ numbers: v })} />
+        <p className="hint" style={{ margin: 0 }}>On football topics each player shows one estimated number, labelled <b>Now</b> (current players, as they are today) or <b>Prime</b> (legends, at their peak). Hiding them doesn’t change how matches play.</p>
       </section>}
 
       {tab === 'online' && <section className="card stack" role="tabpanel">
@@ -3194,6 +3198,8 @@ function App() {
   useEffect(() => { if (!tvTab) audio.setQuiet(tvWindows > 0); }, [tvWindows]);
   const localNet = { local: true, role: 'host', display: localTv ? 'tv' : 'controls', live: {}, publishLive: (o) => { liveRef.current = { ...liveRef.current, ...o }; if (chan) chan.postMessage({ type: 'live', live: liveRef.current }); } };
   useEffect(() => { persist(K.settings, settings); }, [settings]);
+  // Set during render (not in an effect) so the very next render already shows or hides player numbers.
+  if (typeof document !== 'undefined') document.documentElement.setAttribute('data-numbers', settings.numbers === 'off' ? 'off' : 'on');
   // Start fetching photos for a draft's items so reveals are instant.
   useEffect(() => { if (draft && draft.topic && draft.topic.photos) wiki.prefetch([...draft.queue, ...draft.leftover].map((id) => wikiTitleFor(draft.items[id], draft.topic)).filter(Boolean)); }, [draft && draft.id]);
   useEffect(() => { persist(K.topics, topics); }, [topics]);
@@ -3384,7 +3390,7 @@ class Boundary extends React.Component {
   }
 }
 
-if (window.__DN_TEST__) window.__DN = { finale: { buildBracket, advanceBracket, nextMatchup, matchVoters, canVoteFor, decideMatchup, simulateMatch, playerRating, teamRating, matchupVoteBot, finaleMode, isFootball, startFinale, castMatchVote, botMatchVotes, playMatchup, resolveMatchup, getMatchup, needsVote, needsMatch, votingDone, finaleStandings, finaleRecord, championStory, goldenBoot, matchVoteProblem, roundName, FINALE_DEFAULTS, validRating, matchScript, revealedEvents, matchFrame, lineupOf, expectedGoals, strength2, squad }, audio, AUDIO_DEFAULTS, share: { encodeTopic, decodeShared, packTopic, unpackTopic, topicCode, shareLink, MAX_LINK }, stats: { careerStats, computeAwards, computeShame, hallOfShame, humanPlayers }, bots: { makeBots, nextBotAction, botDecision, botFreePickChoice, botVote, teamScore, voteChoices, itemFame, seeded, BOT_LEVELS, BOT_TYPES, botCardPlay, botVeto, botNominate, botTradeDecision, botTradeOffer }, twists: { twistRules, TWIST_DEFAULTS, playCard, answerCard, cardProblem, doubleProblem, nominate, currentNominator, nominationPool, botActors, botAdvisers, participants, visibleItem, isHidden, rarityOf, frozenNow, proposeTrade, acceptTrade, rejectTrade, cancelTrade, closeTrades, tradeProblem, openTrades, hasCard }, auction: { withdraw, isOut, auctionEnd, owesBid, withdrawProblem, outIds, owing, botPassers, botForcedBid, runAction, ownerInfo, migrateSettings, rulesLines }, scenes: { SCENES, sceneOf, placeScene, sceneKey, SceneCanvas, SceneView, sceneHasArt }, skips: { SKIP_DEFAULTS, skipCfg, skipRulesOn, presenter, skipVerdict, eligibleFor, endgameNow, endgameSoon, chooseForced, autoChooseForced, presenterLine, botSkipSave, botForcedChoice, unsoldOutcome, skipChip }, topicsLib: { maxPlayersFor, POPULARITY, popScore, byPopularity, folderOrder, favouritesOrder, prefsOf, isBuiltIn, folderOf, folderList, matchTopic, toggleIn }, DEFAULT_SOLO, isFlex, canBid, createDraft, placeBid, sell, skipItem, undo, freePick, currentPicker, canTake, nextAmount, isDraftOver, draftStats, winsBoard, tally, starterTopics, migrateTopics, validateBackup, makeBackup, wikiTitleFor, PHOTO_TOPICS, store, wiki, DEFAULT_RULES, COLORS, emptyCount, assignSlot, maxBid };
+if (window.__DN_TEST__) window.__DN = { finale: { eraOf, eraWord, buildBracket, advanceBracket, nextMatchup, matchVoters, canVoteFor, decideMatchup, simulateMatch, playerRating, teamRating, matchupVoteBot, finaleMode, isFootball, startFinale, castMatchVote, botMatchVotes, playMatchup, resolveMatchup, getMatchup, needsVote, needsMatch, votingDone, finaleStandings, finaleRecord, championStory, goldenBoot, matchVoteProblem, roundName, FINALE_DEFAULTS, validRating, matchScript, revealedEvents, matchFrame, lineupOf, expectedGoals, strength2, squad }, audio, AUDIO_DEFAULTS, share: { encodeTopic, decodeShared, packTopic, unpackTopic, topicCode, shareLink, MAX_LINK }, stats: { careerStats, computeAwards, computeShame, hallOfShame, humanPlayers }, bots: { makeBots, nextBotAction, botDecision, botFreePickChoice, botVote, teamScore, voteChoices, itemFame, seeded, BOT_LEVELS, BOT_TYPES, botCardPlay, botVeto, botNominate, botTradeDecision, botTradeOffer }, twists: { twistRules, TWIST_DEFAULTS, playCard, answerCard, cardProblem, doubleProblem, nominate, currentNominator, nominationPool, botActors, botAdvisers, participants, visibleItem, isHidden, rarityOf, frozenNow, proposeTrade, acceptTrade, rejectTrade, cancelTrade, closeTrades, tradeProblem, openTrades, hasCard }, auction: { withdraw, isOut, auctionEnd, owesBid, withdrawProblem, outIds, owing, botPassers, botForcedBid, runAction, ownerInfo, migrateSettings, rulesLines }, scenes: { SCENES, sceneOf, placeScene, sceneKey, SceneCanvas, SceneView, sceneHasArt }, skips: { SKIP_DEFAULTS, skipCfg, skipRulesOn, presenter, skipVerdict, eligibleFor, endgameNow, endgameSoon, chooseForced, autoChooseForced, presenterLine, botSkipSave, botForcedChoice, unsoldOutcome, skipChip }, topicsLib: { maxPlayersFor, POPULARITY, popScore, byPopularity, folderOrder, favouritesOrder, prefsOf, isBuiltIn, folderOf, folderList, matchTopic, toggleIn }, DEFAULT_SOLO, isFlex, canBid, createDraft, placeBid, sell, skipItem, undo, freePick, currentPicker, canTake, nextAmount, isDraftOver, draftStats, winsBoard, tally, starterTopics, migrateTopics, validateBackup, makeBackup, wikiTitleFor, PHOTO_TOPICS, store, wiki, DEFAULT_RULES, COLORS, emptyCount, assignSlot, maxBid };
 store.init().finally(() => {
   ReactDOM.createRoot(document.getElementById('root')).render(<Boundary><App /></Boundary>);
 });

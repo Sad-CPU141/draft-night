@@ -245,7 +245,7 @@ function skipRulesLines(rules) {
   if (!c.on && !c.endgame.on) return [['🔁', 'Skip limits: off (anyone can let items go unsold)']];
   if (c.on) {
     L.push(['🔁', 'Skip limit: ' + (c.max < 0 ? 'unlimited' : c.max) + ' per manager' + (c.nmd ? ' · No More Dodging: then you must take your next item' : c.debt.on ? ' · then Skip Debt (' + { each: 'each forced pick repays 1', two: 'every 2 forced picks repay 1', end: 'never repaid' }[c.debt.clear] + ')' : ' · then ' + { must: 'must take the next item', final: 'one final chance, then must take', escalate: 'escalating: 2 last-ditch skips with a forced pick between', none: 'no forced picks (unbid items go to the back)' }[c.runOut])]);
-    if (rules.order !== 'nominate') L.push(['🎯', 'Forced pick style: ' + { next: 'the next item', choose3: 'choose from 3 (' + c.pickSecs + 's)', auctioneer: 'auctioneer’s choice (' + (c.pref === 'rating' ? 'highest rated on football topics, random otherwise' : 'random') + ')', random: 'random eligible item' }[c.style]]);
+    if (rules.order !== 'nominate') L.push(['🎯', 'Forced pick style: ' + { next: 'the next item', choose3: 'choose from 3 (' + c.pickSecs + 's)', auctioneer: 'auctioneer’s choice (' + (c.pref === 'rating' ? 'best Now/Prime number on football topics, random otherwise' : 'random') + ')', random: 'random eligible item' }[c.style]]);
   } else L.push(['🔁', 'Skip limit: off']);
   if (c.endgame.on) L.push(['⏳', 'Endgame Anti-Dodging: last ' + c.endgame.at + ' items · ' + c.endgame.allow + ' skip' + (c.endgame.allow === 1 ? '' : 's') + ' allowed' + (c.endgame.style === 'pressure' ? ' · warnings 3 items before' : '')]);
   return L;

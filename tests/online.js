@@ -273,7 +273,7 @@ module.exports = async function onlineTests({ ok, boot, btn, click, sleep }) {
         const f = p.d.querySelector('.finale');
         if (host && !s.finale && fbtn(p, 'Start the finale')) { await click(p.w, fbtn(p, 'Start the finale')); continue; }
         if (f) {
-          const vb = [...f.querySelectorAll('.votebtn')].find((x) => !x.disabled && !/your team/.test(x.textContent) && /rating/.test(x.textContent));
+          const vb = [...f.querySelectorAll('.votebtn')].find((x) => !x.disabled && !/your team/.test(x.textContent) && /strength/.test(x.textContent));
           if (vb) { await click(p.w, vb); const li = [...f.querySelectorAll('button')].find((x) => /Lock in/.test(x.textContent) && !x.disabled); if (li) await click(p.w, li); const okb = [...f.querySelectorAll('button')].find((x) => /^OK$/.test(x.textContent.trim())); if (okb) await click(p.w, okb); continue; }
           if (host) { const nb = [...f.querySelectorAll('button')].find((x) => !x.disabled && /Vote on this matchup|Count the votes|Back to the bracket|Reveal the champion/.test(x.textContent)); if (nb) { await click(p.w, nb); continue; } }
         }

@@ -1,4 +1,4 @@
-/* Draft Night 897dc86fdf — built from src/ by build.js. Edit src/, not this file. */
+/* Draft Night c73d8f9f49 — built from src/ by build.js. Edit src/, not this file. */
 "use strict";
 (function(){
 function _extends() { return _extends = Object.assign ? Object.assign.bind() : function (n) { for (var e = 1; e < arguments.length; e++) { var t = arguments[e]; for (var r in t) ({}).hasOwnProperty.call(t, r) && (n[r] = t[r]); } return n; }, _extends.apply(null, arguments); }
@@ -616,6 +616,11 @@ function folderList(topics, includeDefaults) {
     return (ia < 0 ? 99 : ia) - (ib < 0 ? 99 : ib) || a.localeCompare(b);
   });
 }
+const STARTER_ERA = {
+  't-cf': 'now',
+  't-pl': 'prime',
+  't-goat': 'prime'
+};
 function starterTopics() {
   const v3 = [...sportsTopicsV3(), ...foodTopicsV3(), ...entTopicsV3(), ...travelTopicsV3(), ...animalTopicsV3(), ...styleTopicsV3(), ...funTopicsV3()];
   return [...baseTopics(), ...evenMoreTopics(), ...funTopics()].map(t => ({
@@ -625,7 +630,10 @@ function starterTopics() {
   })).concat(v3.map(t => ({
     ...t,
     builtin: true
-  }))).map(withExtras);
+  }))).map(withExtras).map(t => STARTER_ERA[t.id] ? {
+    ...t,
+    era: STARTER_ERA[t.id]
+  } : t);
 }
 const EXTRAS_V = 2;
 function extraItemsFor(id) {
@@ -20355,7 +20363,7 @@ function skipRulesLines(rules) {
     if (rules.order !== 'nominate') L.push(['🎯', 'Forced pick style: ' + {
       next: 'the next item',
       choose3: 'choose from 3 (' + c.pickSecs + 's)',
-      auctioneer: 'auctioneer’s choice (' + (c.pref === 'rating' ? 'highest rated on football topics, random otherwise' : 'random') + ')',
+      auctioneer: 'auctioneer’s choice (' + (c.pref === 'rating' ? 'best Now/Prime number on football topics, random otherwise' : 'random') + ')',
       random: 'random eligible item'
     }[c.style]]);
   } else L.push(['🔁', 'Skip limit: off']);
@@ -21235,6 +21243,12 @@ const ROLE_SHAPE = {
   }
 };
 const roleOf = (item, slot) => ROW_OF[norm(item && item.pos)] || ROW_OF[norm(slot)] || 'MID';
+function eraOf(topic) {
+  if (topic && (topic.era === 'now' || topic.era === 'prime')) return topic.era;
+  return topic && /\b(current|now|today|this season|20[2-3]\d)\b/i.test(topic.name || '') ? 'now' : 'prime';
+}
+const eraWord = topic => eraOf(topic) === 'now' ? 'Now' : 'Prime';
+const numbersShown = () => typeof document === 'undefined' || document.documentElement.getAttribute('data-numbers') !== 'off';
 const validRating = v => v != null && v !== '' && !isNaN(+v) && +v >= 1 && +v <= 99;
 function playerRating(item) {
   const fixed = validRating(item.rating);
@@ -22072,7 +22086,7 @@ function championStory(d) {
     const tr = teamRating(d, champ);
     const all = d.managers.filter(m => m.team.some(Boolean)).map(m => teamRating(d, m).rating).sort((a, b) => b - a);
     const pos = all.indexOf(tr.rating) + 1;
-    bits.push('Team rating ' + tr.rating + (pos === 1 ? ', the highest in the draft.' : ', ranked ' + pos + ' of ' + all.length + (pos > 1 ? ' — an upset run.' : '.')));
+    if (numbersShown()) bits.push('Team strength (' + eraWord(d.topic) + ') ' + tr.rating + (pos === 1 ? ', the strongest in the draft.' : ', ranked ' + pos + ' of ' + all.length + (pos > 1 ? ' — an upset run.' : '.')));
   }
   const fin = games[games.length - 1].m;
   if (fin.why) bits.push('Final: ' + fin.why);
@@ -22132,6 +22146,9 @@ function packTopic(t, withPhotos) {
     ph: !!t.photos,
     f: t.folder || '',
     sc: t.scene || '',
+    ...(t.era ? {
+      er: t.era
+    } : {}),
     i: t.items.map(it => {
       const r = [it.name, it.pos || '', it.desc || '', it.emoji || '', it.imageUrl || '', it.wiki || '', it.kit || null, it.photosOff ? 1 : 0];
       if (withPhotos && it.photo) r.push(it.photo);
@@ -22191,6 +22208,9 @@ function unpackTopic(o) {
       art: o.a === 'kit' ? 'kit' : o.a === 'scene' && SCENES[o.sc] ? 'scene' : 'emoji',
       ...(typeof o.sc === 'string' && SCENES[o.sc] ? {
         scene: o.sc
+      } : {}),
+      ...(o.er === 'now' || o.er === 'prime' ? {
+        era: o.er
       } : {}),
       kitShape: o.ks === 'tank' ? 'tank' : '',
       kitLabel: o.kl === 'initials' ? 'initials' : '',
@@ -24171,7 +24191,7 @@ function ItemEditor({
     className: "field"
   }, React.createElement("label", {
     htmlFor: "it-rating"
-  }, "Rating override (1\u201399)"), React.createElement("input", {
+  }, "Now / Prime number override (1\u201399)"), React.createElement("input", {
     id: "it-rating",
     className: "input",
     type: "number",
@@ -24195,7 +24215,7 @@ function ItemEditor({
     }
   }), React.createElement("p", {
     className: "hint"
-  }, "Leave empty to use Draft Night\u2019s estimated game rating. This isn\u2019t an official EA Sports FC rating either way.")), React.createElement("div", {
+  }, "Leave empty to use Draft Night\u2019s estimate. Topics about current players show it as \u201CNow\u201D, legends as \u201CPrime\u201D. It isn\u2019t an official EA Sports FC number either way.")), React.createElement("div", {
     className: "field"
   }, React.createElement("label", {
     htmlFor: "it-desc"
@@ -24576,6 +24596,17 @@ function TopicEditor({
     options: [['pitch', 'Pitch'], ['list', 'List']],
     onChange: v => set({
       layout: v
+    })
+  })), topic.layout === 'pitch' && React.createElement("div", {
+    className: "field"
+  }, React.createElement("span", {
+    className: "label"
+  }, "Player numbers are"), React.createElement(Seg, {
+    label: "Player numbers are",
+    value: eraOf(topic),
+    options: [['now', 'Now (as they are today)'], ['prime', 'Prime (at their peak)']],
+    onChange: v => set({
+      era: v
     })
   })), React.createElement("div", {
     className: "field"
@@ -26077,13 +26108,13 @@ function SetupRules({
   }, "Auctioneer picks"), React.createElement(Seg, {
     label: "Auctioneer preference",
     value: sk.pref,
-    options: [['rating', 'Highest rated'], ['random', 'Random']],
+    options: [['rating', 'Best Now/Prime number'], ['random', 'Random']],
     onChange: v => setSk({
       pref: v
     })
   }), React.createElement("p", {
     className: "hint"
-  }, "Highest rated only works on the 3 football topics (estimated ratings). Other topics have no reliable ratings, so it picks at random. There\u2019s no \u201Cbest value\u201D option because no topic has real value data.")))), React.createElement(RuleSection, {
+  }, "Best number only works on the 3 football topics (estimated Now/Prime numbers). Other topics have no reliable numbers, so it picks at random. There\u2019s no \u201Cbest value\u201D option because no topic has real value data.")))), React.createElement(RuleSection, {
     id: "rs-debt",
     emoji: "\uD83D\uDCB3",
     title: "Skip Debt",
@@ -26319,7 +26350,7 @@ function SetupRules({
   }, "If a vote is tied"), React.createElement(Seg, {
     label: "Tiebreaker",
     value: fin.tiebreak,
-    options: [['rating', 'Higher-rated team'], ['revote', 'Vote again once']],
+    options: [['rating', 'Stronger team (Now/Prime)'], ['revote', 'Vote again once']],
     onChange: v => setF({
       tiebreak: v
     })
@@ -26354,7 +26385,7 @@ function SetupRules({
     sub: "The higher seed plays at home: a small boost to its expected goals (+0.15). Off by default."
   }), React.createElement("p", {
     className: "hint"
-  }, "Knockout matches that end level go to extra time, then penalties. Player ratings are estimated game ratings, not official EA Sports FC ratings."))), tab === 'review' && React.createElement("div", {
+  }, "Knockout matches that end level go to extra time, then penalties. Player numbers are Draft Night estimates (Now for current players, Prime for legends), not official EA Sports FC numbers."))), tab === 'review' && React.createElement("div", {
     className: "stack",
     role: "tabpanel"
   }, React.createElement("p", {
@@ -26689,7 +26720,8 @@ function ItemCard({
   }, item.pos), React.createElement(RarityTag, {
     r: rar
   }), isFootball(d.topic) && React.createElement(RatingChip, {
-    item: item
+    item: item,
+    topic: d.topic
   })), React.createElement("div", {
     className: "nm"
   }, item.name), item.desc && React.createElement("div", {
@@ -28619,7 +28651,7 @@ function ExportCard({
       className: "exmem"
     }, w.members.map(p => p.name).join(' · ')), React.createElement("span", {
       className: "exvotes"
-    }, d.finale && d.finale.champion ? (needsMatch(d.finale.mode) ? 'Won the knockout' : 'Won the bracket') + (isFootball(d.topic) ? ' · rating ' + teamRating(d, w).rating : '') : counts[w.id] + ' vote' + (counts[w.id] === 1 ? '' : 's'), " \xB7 ", money(d.rules.budget - w.budget), " spent \xB7 ", money(w.budget), " left")), React.createElement("div", {
+    }, d.finale && d.finale.champion ? (needsMatch(d.finale.mode) ? 'Won the knockout' : 'Won the bracket') + (isFootball(d.topic) && numbersShown() ? ' · ' + eraWord(d.topic) + ' strength ' + teamRating(d, w).rating : '') : counts[w.id] + ' vote' + (counts[w.id] === 1 ? '' : 's'), " \xB7 ", money(d.rules.budget - w.budget), " spent \xB7 ", money(w.budget), " left")), React.createElement("div", {
       className: "exroster"
     }, d.rules.slots.map((sl, i) => {
       const t = w.team[i];
@@ -28665,7 +28697,7 @@ function ExportCard({
     style: {
       fontSize: 15
     }
-  }, s.label, isFootball(d.topic) ? ' · ' + teamRating(d, s.team).rating : '')))), awards.length > 0 && React.createElement("div", {
+  }, s.label, isFootball(d.topic) && numbersShown() ? ' · ' + teamRating(d, s.team).rating : '')))), awards.length > 0 && React.createElement("div", {
     className: "board"
   }, React.createElement("h3", null, "\uD83C\uDF96\uFE0F Awards"), awards.map((a, i) => React.createElement("p", {
     key: a.id + i,
@@ -29528,6 +29560,7 @@ function migrateTopics(stored) {
     });
     return {
       ...t,
+      era: t.era || s.era,
       art: t.art || s.art,
       folder: t.folder || s.folder,
       kitShape: t.kitShape || s.kitShape,
@@ -29944,7 +29977,7 @@ function ProfileView({
     v: r.matchWins + '–' + (r.matches - r.matchWins),
     d: r.goals + ' goal' + (r.goals === 1 ? '' : 's') + ' scored'
   }), r.topRating && React.createElement(Stat, {
-    k: "Best team rating",
+    k: "Strongest football team",
     v: r.topRating.rating,
     d: r.topRating.team + ' · ' + r.topRating.topic
   })), React.createElement("div", {
@@ -30421,7 +30454,19 @@ function SettingsScreen({
     style: {
       margin: 0
     }
-  }, "How big everything looks when this device shows the TV view.")), tab === 'online' && React.createElement("section", {
+  }, "How big everything looks when this device shows the TV view."), React.createElement("h3", null, "\u26BD Player numbers"), React.createElement(Seg, {
+    label: "Player numbers",
+    value: settings.numbers === 'off' ? 'off' : 'on',
+    options: [['on', 'Show Now / Prime'], ['off', 'Hide']],
+    onChange: v => setS({
+      numbers: v
+    })
+  }), React.createElement("p", {
+    className: "hint",
+    style: {
+      margin: 0
+    }
+  }, "On football topics each player shows one estimated number, labelled ", React.createElement("b", null, "Now"), " (current players, as they are today) or ", React.createElement("b", null, "Prime"), " (legends, at their peak). Hiding them doesn\u2019t change how matches play.")), tab === 'online' && React.createElement("section", {
     className: "card stack",
     role: "tabpanel"
   }, React.createElement("h3", null, "\uD83C\uDF10 Online"), React.createElement("p", {
@@ -30692,6 +30737,7 @@ function App() {
   useEffect(() => {
     persist(K.settings, settings);
   }, [settings]);
+  if (typeof document !== 'undefined') document.documentElement.setAttribute('data-numbers', settings.numbers === 'off' ? 'off' : 'on');
   useEffect(() => {
     if (draft && draft.topic && draft.topic.photos) wiki.prefetch([...draft.queue, ...draft.leftover].map(id => wikiTitleFor(draft.items[id], draft.topic)).filter(Boolean));
   }, [draft && draft.id]);
@@ -31375,6 +31421,8 @@ class Boundary extends React.Component {
 }
 if (window.__DN_TEST__) window.__DN = {
   finale: {
+    eraOf,
+    eraWord,
     buildBracket,
     advanceBracket,
     nextMatchup,
@@ -31562,7 +31610,7 @@ if (window.__DN_TEST__) window.__DN = {
 store.init().finally(() => {
   ReactDOM.createRoot(document.getElementById('root')).render(React.createElement(Boundary, null, React.createElement(App, null)));
 });
-const EST_LABEL = 'Estimated game rating · not an official EA Sports FC / FIFA rating';
+const EST_LABEL = 'Estimated by Draft Night · not official EA Sports FC / FIFA numbers';
 const ATTR_NAMES = {
   PAC: 'Pace',
   SHO: 'Shooting',
@@ -31578,16 +31626,20 @@ const reducedMotion = () => {
   return !!(window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches);
 };
 function RatingCard({
-  item
+  item,
+  topic
 }) {
   const r = playerRating(item);
+  const era = eraWord(topic);
   return React.createElement("div", {
     className: "ratingcard"
   }, React.createElement("div", {
     className: "rc-top"
   }, React.createElement("span", {
     className: "rc-ovr num"
-  }, r.ovr), React.createElement("span", {
+  }, React.createElement("small", {
+    className: "rc-era"
+  }, era), r.ovr), React.createElement("span", {
     className: "rc-role"
   }, r.role), React.createElement("span", {
     className: "rc-name"
@@ -31612,25 +31664,29 @@ function RatingCard({
     style: {
       margin: 0
     }
-  }, r.estimated ? EST_LABEL + '. Worked out from the card’s position and accolades; the same player always gets the same numbers.' : 'Overall set by the topic (manual override). Attributes are estimated from it.'));
+  }, (era === 'Now' ? 'Now: how good they are today. ' : 'Prime: how good they were at their peak. ') + (r.estimated ? EST_LABEL + '. Worked out from the card’s position and accolades; the same player always gets the same numbers.' : 'Number set by the topic (manual override). Attributes are estimated from it.')));
 }
 function RatingChip({
-  item
+  item,
+  topic
 }) {
   const [open, setOpen] = useState(false);
+  if (!numbersShown()) return null;
   const r = playerRating(item);
+  const era = eraWord(topic);
   return React.createElement(React.Fragment, null, React.createElement("button", {
     type: "button",
     className: "ratingchip",
     onClick: () => setOpen(true),
-    "aria-label": 'Rating ' + r.ovr + (r.estimated ? ', estimated' : '') + '. Show details'
-  }, React.createElement("b", {
+    "aria-label": era + ' ' + r.ovr + (r.estimated ? ', estimated' : '') + '. Show details'
+  }, era, " ", React.createElement("b", {
     className: "num"
   }, r.ovr), r.estimated ? ' est.' : ''), open && React.createElement(Sheet, {
     center: true,
     onClose: () => setOpen(false)
   }, React.createElement(RatingCard, {
-    item: item
+    item: item,
+    topic: topic
   }), React.createElement("button", {
     className: "btn btn-ghost",
     onClick: () => setOpen(false)
@@ -31640,7 +31696,7 @@ function TeamRatingPanel({
   d,
   m
 }) {
-  if (!isFootball(d.topic)) return null;
+  if (!isFootball(d.topic) || !numbersShown()) return null;
   const tr = teamRating(d, m);
   const players = [...tr.players].sort((a, b) => b.r.ovr - a.r.ovr);
   const weights = players.map((_, i) => Math.pow(0.92, i));
@@ -31650,7 +31706,7 @@ function TeamRatingPanel({
     className: "tr-num num"
   }, tr.rating), React.createElement("span", {
     className: "tr-lbl"
-  }, "Team rating", tr.provisional ? ' · provisional' : ''), React.createElement("span", {
+  }, "Team strength \xB7 ", eraWord(d.topic), tr.provisional ? ' · provisional' : ''), React.createElement("span", {
     className: "tr-more"
   }, "How? \u25BE")), React.createElement("div", {
     className: "tr-body"
@@ -31702,7 +31758,7 @@ function TeamRatingPanel({
     style: {
       margin: 0
     }
-  }, "Player ratings are estimated game ratings, not official ones.")));
+  }, "Each player\u2019s ", eraWord(d.topic), " number is a Draft Night estimate, not an official one.")));
 }
 function Badge({
   m,
@@ -31979,7 +32035,7 @@ function MatchSummary({
     style: {
       margin: 0
     }
-  }, "A game simulation from the drafted squads and estimated ratings. It doesn\u2019t predict real results."));
+  }, "A game simulation from the drafted squads and their estimated ", eraWord(d.topic), " numbers. It doesn\u2019t predict real results."));
 }
 function MatchVote({
   d,
@@ -32073,7 +32129,7 @@ function MatchVote({
         disabled: own,
         "aria-pressed": choice === t.id,
         onClick: () => setChoice(t.id)
-      }, React.createElement("span", null, t.emoji, " ", t.name, own ? ' · your team' : '', isFootball(d.topic) ? React.createElement("small", null, " \xB7 rating ", teamRating(d, t).rating) : null), React.createElement("span", {
+      }, React.createElement("span", null, t.emoji, " ", t.name, own ? ' · your team' : '', isFootball(d.topic) && numbersShown() ? React.createElement("small", null, " \xB7 ", eraWord(d.topic), " strength ", teamRating(d, t).rating) : null), React.createElement("span", {
         className: "teamtxt"
       }, t.team.filter(Boolean).map(x => d.items[x.itemId].name).join(', ')));
     }), React.createElement("div", {
@@ -32287,9 +32343,9 @@ function Finale({
     }, React.createElement(Badge, {
       m: t,
       size: 52
-    }), React.createElement("b", null, t.name), isFootball(d.topic) && React.createElement("span", {
+    }), React.createElement("b", null, t.name), isFootball(d.topic) && numbersShown() && React.createElement("span", {
       className: "small num"
-    }, "Rating ", teamRating(d, t).rating, teamRating(d, t).provisional ? ' (prov.)' : '')));
+    }, eraWord(d.topic), " strength ", teamRating(d, t).rating, teamRating(d, t).provisional ? ' (prov.)' : '')));
   })), host ? React.createElement("button", {
     className: "btn btn-gold",
     onClick: begin
@@ -32569,7 +32625,7 @@ function FriendlySheet({
     key: t.id,
     value: t.id,
     disabled: t.id === b
-  }, t.emoji, " ", t.name, " \xB7 ", teamRating(d, t).rating)))), React.createElement("div", {
+  }, t.emoji, " ", t.name, numbersShown() ? ' · ' + teamRating(d, t).rating : '')))), React.createElement("div", {
     className: "field"
   }, React.createElement("label", {
     htmlFor: "fr-b"
@@ -32582,7 +32638,7 @@ function FriendlySheet({
     key: t.id,
     value: t.id,
     disabled: t.id === a
-  }, t.emoji, " ", t.name, " \xB7 ", teamRating(d, t).rating)))), React.createElement("button", {
+  }, t.emoji, " ", t.name, numbersShown() ? ' · ' + teamRating(d, t).rating : '')))), React.createElement("button", {
     className: "btn btn-gold",
     disabled: !a || !b || a === b,
     onClick: play
@@ -32626,7 +32682,7 @@ function FinaleResults({
       margin: '6px 0 0',
       fontWeight: 700
     }
-  }, ru ? 'Beat ' + ru.name + ' in the final' + (sc ? ' ' + sc[0] + '–' + sc[1] + (final.match.pens ? ' (pens)' : final.match.et ? ' (AET)' : '') : '') : 'Walked through', tr ? ' · team rating ' + tr.rating : ''), d.mode === 'solo' && champ.human && React.createElement("p", {
+  }, ru ? 'Beat ' + ru.name + ' in the final' + (sc ? ' ' + sc[0] + '–' + sc[1] + (final.match.pens ? ' (pens)' : final.match.et ? ' (AET)' : '') : '') : 'Walked through', tr && numbersShown() ? ' · ' + eraWord(d.topic) + ' strength ' + tr.rating : ''), d.mode === 'solo' && champ.human && React.createElement("p", {
     className: "small",
     style: {
       margin: '4px 0 0',
@@ -32662,7 +32718,7 @@ function FinaleResults({
     style: {
       fontWeight: 700
     }
-  }, s.label), isFootball(d.topic) && React.createElement("span", {
+  }, s.label), isFootball(d.topic) && numbersShown() && React.createElement("span", {
     className: "bw num",
     style: {
       fontSize: 18

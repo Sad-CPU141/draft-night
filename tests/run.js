@@ -883,7 +883,17 @@ async function tap(w, el) { el.dispatchEvent(new w.MouseEvent('pointerdown', { b
     const { w, d } = await boot({ idb: false, storage: { dn_current_v1: JSON.stringify(draft) }, speed: 0.02 });
     await click(w, btn(d, 'Resume draft'));
     ok(/Start the finale/.test(d.body.textContent) && !/Start the secret vote/.test(d.body.textContent), 'Results offers the finale instead of the group vote');
-    ok(!!d.querySelector('.teamrating') && /Team rating/.test(d.body.textContent), 'team cards show the team rating with a breakdown');
+    ok(!!d.querySelector('.teamrating') && /Team strength · (Now|Prime)/.test(d.body.textContent), 'team cards show the team strength (Now or Prime) with a breakdown');
+    ok(!/\brating\b/i.test(d.body.textContent), 'the word “rating” never appears on screen (players are labelled Now or Prime)');
+    {
+      const off = await boot({ idb: false, storage: { dn_current_v1: JSON.stringify(draft), dn_settings_v1: JSON.stringify({ numbers: 'off' }) } });
+      await click(off.w, btn(off.d, 'Resume draft'));
+      ok(!off.d.querySelector('.teamrating') && !off.d.querySelector('.ratingchip'), 'Settings → Display → Player numbers: Hide removes the numbers');
+      const F = off.DN.finale; const st = off.DN.starterTopics(); const T = (id) => st.find((t) => t.id === id);
+      ok(F.eraWord(T('t-cf')) === 'Now' && F.eraWord(T('t-goat')) === 'Prime' && F.eraWord(T('t-pl')) === 'Prime', 'Current Footballers show Now; GOATs and Premier League Legends show Prime');
+      const rt = off.DN.share.unpackTopic(off.DN.share.packTopic(T('t-cf'), false));
+      ok(rt.ok && rt.topic.era === 'now', 'a shared copy keeps its Now/Prime label');
+    }
     await click(w, btn(d, 'Start the finale'));
     ok(!!d.querySelector('.finale .bracket') && /Semi-finals|Final/.test(d.body.textContent), 'the finale shows a bracket with round names');
     let rounds = 0;
@@ -976,7 +986,7 @@ async function tap(w, el) { el.dispatchEvent(new w.MouseEvent('pointerdown', { b
     let g4 = 0;
     while (g4++ < 6 && fb(b4.d, 'Vote on this matchup')) {
       await click(b4.w, fb(b4.d, 'Vote on this matchup'));
-      const pick = [...b4.d.querySelectorAll('.finale .votebtn')].find((o) => !o.disabled && /rating/.test(o.textContent));
+      const pick = [...b4.d.querySelectorAll('.finale .votebtn')].find((o) => !o.disabled && /strength/.test(o.textContent));
       if (pick) { await click(b4.w, pick); await click(b4.w, fb(b4.d, 'Lock in')); await click(b4.w, fb(b4.d, 'Count the votes')); }
       else await click(b4.w, fb(b4.d, 'Count'));
       await click(b4.w, fb(b4.d, 'Back to the bracket') || fb(b4.d, 'Reveal the champion')); await sleep(50);

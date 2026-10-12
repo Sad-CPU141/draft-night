@@ -33,6 +33,14 @@ const ROLE_SHAPE = {
 };
 const roleOf = (item, slot) => ROW_OF[norm(item && item.pos)] || ROW_OF[norm(slot)] || 'MID';
 
+// "Now" (as they play today) or "Prime" (at their peak) — every player number says which.
+function eraOf(topic) {
+  if (topic && (topic.era === 'now' || topic.era === 'prime')) return topic.era;
+  return topic && /\b(current|now|today|this season|20[2-3]\d)\b/i.test(topic.name || '') ? 'now' : 'prime';
+}
+const eraWord = (topic) => (eraOf(topic) === 'now' ? 'Now' : 'Prime');
+// Display setting (Settings → Display): hide the numbers without changing how matches play.
+const numbersShown = () => typeof document === 'undefined' || document.documentElement.getAttribute('data-numbers') !== 'off';
 const validRating = (v) => v != null && v !== '' && !isNaN(+v) && +v >= 1 && +v <= 99;
 function playerRating(item) {
   const fixed = validRating(item.rating);
@@ -442,7 +450,7 @@ function championStory(d) {
     const tr = teamRating(d, champ);
     const all = d.managers.filter((m) => m.team.some(Boolean)).map((m) => teamRating(d, m).rating).sort((a, b) => b - a);
     const pos = all.indexOf(tr.rating) + 1;
-    bits.push('Team rating ' + tr.rating + (pos === 1 ? ', the highest in the draft.' : ', ranked ' + pos + ' of ' + all.length + (pos > 1 ? ' — an upset run.' : '.')));
+    if (numbersShown()) bits.push('Team strength (' + eraWord(d.topic) + ') ' + tr.rating + (pos === 1 ? ', the strongest in the draft.' : ', ranked ' + pos + ' of ' + all.length + (pos > 1 ? ' — an upset run.' : '.')));
   }
   const fin = games[games.length - 1].m; if (fin.why) bits.push('Final: ' + fin.why);
   return bits.join(' ');
