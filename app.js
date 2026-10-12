@@ -1,4 +1,4 @@
-/* Draft Night 5d2a4f8ba6 — built from src/ by build.js. Edit src/, not this file. */
+/* Draft Night 9a406c02c3 — built from src/ by build.js. Edit src/, not this file. */
 "use strict";
 (function(){
 function _extends() { return _extends = Object.assign ? Object.assign.bind() : function (n) { for (var e = 1; e < arguments.length; e++) { var t = arguments[e]; for (var r in t) ({}).hasOwnProperty.call(t, r) && (n[r] = t[r]); } return n; }, _extends.apply(null, arguments); }
@@ -6530,6 +6530,2242 @@ function toggleIn(list, id) {
   if (s.has(id)) s.delete(id);else s.add(id);
   return [...s];
 }
+const EXTRA_ENT = {
+  't-rap': `
+Lauryn Hill
+Ice Cube
+Missy Elliott
+Busta Rhymes
+OutKast
+André 3000
+Kid Cudi
+Childish Gambino
+Chance the Rapper
+Mac Miller
+Logic
+Lil Uzi Vert
+Young Thug
+Gunna
+Lil Durk
+NBA YoungBoy
+Rod Wave
+DaBaby
+Roddy Ricch
+Jack Harlow
+Doja Cat
+Latto
+GloRilla
+Ice Spice
+Doechii
+Don Toliver
+Lil Nas X
+Gucci Mane
+T.I.
+Ludacris
+Pusha T
+Nipsey Hussle
+XXXTentacion
+Lil Peep
+Wiz Khalifa
+Big Sean
+Meek Mill
+Rick Ross
+DMX
+LL Cool J
+Run-DMC
+Rakim
+Ghostface Killah
+Method Man
+Wu-Tang Clan
+Little Simz
+Skepta
+J Hus
+Aitch
+Headie One
+Burna Boy
+Tory Lanez
+Lil Tecca
+Baby Keem
+Denzel Curry
+A Boogie wit da Hoodie
+Polo G`,
+  't-game': `
+Super Mario 64
+Super Mario Bros.
+The Legend of Zelda: Ocarina of Time
+Tears of the Kingdom
+Pokémon Gold and Silver
+Pac-Man
+Street Fighter II
+Mortal Kombat
+Doom
+Half-Life 2
+Portal 2
+BioShock
+Mass Effect 2
+Uncharted 2
+Metal Gear Solid
+Final Fantasy VII
+Kingdom Hearts
+Resident Evil 4
+Silent Hill 2
+Dark Souls
+Bloodborne
+Sekiro
+Ghost of Tsushima
+Horizon Zero Dawn
+Assassin's Creed II
+Batman: Arkham City
+Grand Theft Auto: San Andreas
+Grand Theft Auto: Vice City
+Fallout: New Vegas
+Baldur's Gate 3
+Cyberpunk 2077
+Stardew Valley
+Terraria
+Celeste
+Hades
+Undertale
+Cuphead
+Fall Guys
+Genshin Impact
+Counter-Strike 2
+Dota 2
+World of Warcraft
+StarCraft
+Diablo II
+The Sims
+SimCity
+Guitar Hero
+Just Dance
+FIFA 12
+Pro Evolution Soccer 6
+Tony Hawk's Pro Skater 2
+Crash Bandicoot
+Spyro the Dragon
+Sonic the Hedgehog 2
+Kirby's Return to Dream Land
+Splatoon 3
+Monster Hunter: World
+It Takes Two`,
+  't-app': `
+Facebook
+Messenger
+Telegram
+Signal
+LinkedIn
+Tumblr
+Twitch Mobile
+Kick
+Zoom
+Microsoft Teams
+Slack
+Gmail
+Google Drive
+Google Photos
+Google Docs
+Chrome
+Safari
+Apple Wallet
+Apple Pay
+PayPal
+Venmo
+Cash App
+Revolut
+Klarna
+Shopify
+Etsy
+eBay
+Temu
+Shein
+Vinted
+Depop
+StockX
+Skip the Dishes
+Instacart
+Lyft
+Waze
+Citymapper
+Strava
+MyFitnessPal
+Calm
+Headspace
+Notion
+ChatGPT
+Claude
+CapCut
+Canva
+Lightroom
+VSCO
+Tinder
+Hinge
+Uber One
+Audible
+Kindle
+Wattpad
+Muslim Pro
+Weather
+Camera
+Clock
+Find My
+Pokémon GO
+Candy Crush
+Subway Surfers
+Brawl Stars
+Clash Royale`,
+  't-toon': `
+Teenage Mutant Ninja Turtles
+Transformers
+He-Man
+ThunderCats
+X-Men: The Animated Series
+Batman: The Animated Series
+Spider-Man: The Animated Series
+Animaniacs
+Pinky and the Brain
+Rocko's Modern Life
+CatDog
+The Wild Thornberrys
+Doug
+Rugrats in Paris
+Danny Phantom
+Invader Zim
+Samurai Jack
+Justice League
+Static Shock
+Sonic X
+Beyblade
+Digimon
+Sailor Moon
+Bakugan
+Totally Spies!
+Martin Mystery
+Code Lyoko
+The Magic School Bus
+Franklin
+Caillou
+Dora the Explorer
+Blue's Clues
+Bob the Builder
+Thomas & Friends
+Peppa Pig
+Bluey
+PAW Patrol
+The Loud House
+Gravity Falls
+Star vs. the Forces of Evil
+Steven Universe
+Chowder
+The Marvelous Misadventures of Flapjack
+Camp Lazlo
+Foster's Home for Imaginary Friends`,
+  't-anim': `
+Inside Out 2
+Toy Story 3
+Toy Story 2
+Finding Dory
+Monsters University
+Coco
+Soul
+Luca
+Turning Red
+Elemental
+Onward
+Brave
+A Bug's Life
+Wreck-It Ralph
+Bolt
+The Princess and the Frog
+Beauty and the Beast
+The Little Mermaid
+Mulan
+Hercules
+Tarzan
+Lilo & Stitch
+Pocahontas
+Bambi
+Dumbo
+Pinocchio
+Snow White and the Seven Dwarfs
+Cinderella
+The Jungle Book
+101 Dalmatians
+Howl's Moving Castle
+Princess Mononoke
+My Neighbor Totoro
+Ponyo
+Kiki's Delivery Service
+The Boy and the Heron
+Akira
+Coraline
+The Nightmare Before Christmas
+Corpse Bride
+Fantastic Mr. Fox
+Wallace & Gromit: The Curse of the Were-Rabbit
+Chicken Run
+Rio
+Hotel Transylvania
+The Mitchells vs. the Machines
+Across the Spider-Verse
+The Super Mario Bros. Movie
+Minions
+The Wild Robot
+Flow
+KPop Demon Hunters`,
+  't-singers': `
+Janet Jackson
+Madonna
+Tina Turner
+Diana Ross
+Lionel Richie
+Marvin Gaye
+Sam Cooke
+Ray Charles
+Otis Redding
+Etta James
+Nina Simone
+Elton John
+David Bowie
+George Michael
+Phil Collins
+Sting
+Jon Bon Jovi
+Bruce Springsteen
+Bob Dylan
+Johnny Cash
+Dolly Parton
+Garth Brooks
+Morgan Wallen
+Chris Stapleton
+Luke Combs
+Zach Bryan
+Post Malone
+Chappell Roan
+Doja Cat
+Tate McRae
+Charli XCX
+Raye
+Hozier
+Lewis Capaldi
+Sam Smith
+Calvin Harris
+Rauw Alejandro
+Karol G
+J Balvin
+Daddy Yankee
+Enrique Iglesias
+Ricky Martin
+Marc Anthony
+Rosalía
+Burna Boy
+Wizkid
+Tems
+Rema
+Arijit Singh
+A. R. Rahman
+Atif Aslam
+Nusrat Fateh Ali Khan
+Kadim Al Sahir
+Nancy Ajram
+Elissa
+Rashed Al-Majed
+Mohammed Assaf
+Tamer Hosny
+Majid Al Mohandis`,
+  't-bands': `
+The Who
+The Doors
+The Eagles
+Aerosmith
+Kiss
+Van Halen
+Def Leppard
+Iron Maiden
+Black Sabbath
+The Clash
+Sex Pistols
+The Police
+Dire Straits
+Journey
+Toto
+Earth, Wind & Fire
+The Jackson 5
+New Edition
+Boyz II Men
+TLC
+NSYNC
+Take That
+Westlife
+Little Mix
+Fifth Harmony
+Jonas Brothers
+5 Seconds of Summer
+The 1975
+Tame Impala
+Muse
+Blur
+The Strokes
+Kings of Leon
+OneRepublic
+The Chainsmokers
+Stray Kids
+Seventeen
+TWICE
+NewJeans
+EXO
+Big Bang
+Måneskin`,
+  't-actors': `
+Harrison Ford
+Arnold Schwarzenegger
+Sylvester Stallone
+Bruce Willis
+Mel Gibson
+Russell Crowe
+Liam Neeson
+George Clooney
+Jamie Foxx
+Jake Gyllenhaal
+Benedict Cumberbatch
+Tom Hardy
+Michael Fassbender
+Daniel Craig
+Pierce Brosnan
+Sean Connery
+Clint Eastwood
+Jack Nicholson
+Marlon Brando
+Paul Newman
+James Dean
+Humphrey Bogart
+Charlie Chaplin
+Daniel Day-Lewis
+Gary Oldman
+Mark Wahlberg
+Jonah Hill
+Seth Rogen
+Steve Carell
+Will Ferrell
+Ben Stiller
+Owen Wilson
+Paul Rudd
+Chris Pratt
+Mark Ruffalo
+Jeremy Renner
+Andrew Garfield
+Tobey Maguire
+Austin Butler
+Jacob Elordi
+Glen Powell
+Barry Keoghan
+Paul Mescal
+Dev Patel
+Mahershala Ali
+Daniel Kaluuya
+Chadwick Boseman
+Sidney Poitier
+Forest Whitaker
+Oscar Isaac
+Javier Bardem
+Antonio Banderas
+Salman Khan
+Aamir Khan
+Amitabh Bachchan
+Hrithik Roshan
+Ranveer Singh`,
+  't-actresses': `
+Jessica Chastain
+Amy Adams
+Rachel McAdams
+Reese Witherspoon
+Jennifer Lopez
+Cameron Diaz
+Drew Barrymore
+Gwyneth Paltrow
+Kate Hudson
+Emma Thompson
+Helen Mirren
+Judi Dench
+Maggie Smith
+Kristen Stewart
+Dakota Johnson
+Elle Fanning
+Dakota Fanning
+Hailee Steinfeld
+Rachel Zegler
+Brie Larson
+Elizabeth Olsen
+Tessa Thompson
+Regina King
+Octavia Spencer
+Taraji P. Henson
+Gabrielle Union
+Zoë Kravitz
+Rebecca Ferguson
+Vanessa Kirby
+Lily James
+Daisy Ridley
+Ana de Armas
+Penélope Cruz
+Salma Hayek
+Sofía Vergara
+Eva Mendes
+Grace Kelly
+Elizabeth Taylor
+Ingrid Bergman
+Sophia Loren
+Ayo Edebiri
+Jodie Comer
+Mia Goth
+Aishwarya Rai
+Alia Bhatt
+Kareena Kapoor
+Katrina Kaif`,
+  't-franchise': `
+The Avengers
+Spider-Man
+Batman
+Superman
+The Twilight Saga
+The Maze Runner
+Divergent
+Men in Black
+Ghostbusters
+Jaws
+Predator
+Die Hard
+Lethal Weapon
+Rambo
+Mad Max
+Creed
+Karate Kid
+Godzilla
+King Kong
+The Mummy
+Night at the Museum
+Home Alone
+Paddington
+Madagascar
+How to Train Your Dragon
+Frozen
+Cars
+Minions
+The Lego Movie
+Hotel Transylvania
+Spider-Verse
+Bad Boys
+Rush Hour
+Ocean's
+Kingsman
+Now You See Me
+Scream
+Halloween
+Saw
+Final Destination
+The Purge
+Insidious`,
+  't-tvshows': `
+Friends
+The Office
+Grey's Anatomy
+Prison Break
+24
+Heroes
+Supernatural
+The Vampire Diaries
+Gossip Girl
+The O.C.
+Riverdale
+Outer Banks
+The Umbrella Academy
+Lucifer
+Vikings
+The Witcher
+Rings of Power
+Fallout
+Reacher
+Jack Ryan
+The Night Agent
+Bridgerton
+Emily in Paris
+Ginny & Georgia
+Never Have I Ever
+Sex Education
+Top Boy
+Line of Duty
+Doctor Who
+Downton Abbey
+Mad Men
+The X-Files
+Twin Peaks
+Westworld
+True Detective
+Fargo
+Mindhunter
+Chernobyl
+Band of Brothers
+The Pacific
+Boardwalk Empire
+Daredevil
+Loki
+WandaVision
+Andor
+Invincible
+Blue Eye Samurai
+Adolescence
+The White Lotus
+The Penguin`,
+  't-sitcoms': `
+I Love Lucy
+The Golden Girls
+Full House
+Fresh Off the Boat
+Black-ish
+Everybody Hates Chris
+Martin
+Living Single
+My Wife and Kids
+The Bernie Mac Show
+George Lopez
+Kenan & Kel
+iCarly
+Drake & Josh
+Hannah Montana
+The Suite Life of Zack & Cody
+That's So Raven
+Wizards of Waverly Place
+Lizzie McGuire
+Boy Meets World
+Saved by the Bell
+Family Matters
+Silicon Valley
+Veep
+30 Rock
+Superstore
+The Good Place
+What We Do in the Shadows
+Peep Show
+Derry Girls
+Ghosts
+Rick and Morty
+South Park
+Bob's Burgers
+King of the Hill
+Futurama
+American Dad!`,
+  't-anime': `
+Dragon Ball
+Dragon Ball Super
+Naruto Shippuden
+Boruto
+Fairy Tail
+Fire Force
+Soul Eater
+Hellsing
+Trigun
+Akame ga Kill!
+Parasyte
+Erased
+Your Lie in April
+Toradora!
+Kaguya-sama: Love Is War
+Horimiya
+Fruits Basket
+Ouran High School Host Club
+Clannad
+Violet Evergarden
+Made in Abyss
+Dororo
+The Promised Neverland
+Re:Zero
+That Time I Got Reincarnated as a Slime
+Overlord
+Konosuba
+No Game No Life
+Kill la Kill
+Gurren Lagann
+Mobile Suit Gundam
+Ghost in the Shell
+Samurai Champloo
+Berserk
+Inuyasha
+Yu Yu Hakusho
+Slam Dunk
+Kuroko's Basketball
+Hajime no Ippo
+Captain Tsubasa
+Initial D
+Beyblade
+Cyberpunk: Edgerunners
+Dandadan
+Kaiju No. 8
+Oshi no Ko
+Sakamoto Days
+The Apothecary Diaries`,
+  't-animechars': `
+Gohan
+Piccolo
+Frieza
+Cell
+Majin Buu
+Trunks
+Hinata Hyuga
+Sakura Haruno
+Gaara
+Jiraiya
+Madara Uchiha
+Minato Namikaze
+Pain
+Sanji
+Nami
+Boa Hancock
+Trafalgar Law
+Portgas D. Ace
+Shanks
+Whitebeard
+Armin Arlert
+Reiner Braun
+Megumi Fushiguro
+Nobara Kugisaki
+Inosuke Hashibira
+Zenitsu Agatsuma
+Rengoku
+Muzan Kibutsuji
+Aizen
+Byakuya Kuchiki
+Hisoka
+Kurapika
+Meruem
+Genos
+Alphonse Elric
+Roy Mustang
+Shoto Todoroki
+Katsuki Bakugo
+Power
+Makima
+Reigen Arataka
+Mob
+Thorfinn
+Okabe Rintarou
+Yor Forger
+Loid Forger
+Rimuru Tempest
+Vash the Stampede
+Guts
+Inuyasha||||Inuyasha (character)`,
+  't-heroes': `
+Robin
+Nightwing
+Batgirl
+Supergirl
+Martian Manhunter
+Blue Beetle
+Captain Atom
+Hawkman
+Black Canary
+Booster Gold
+Plastic Man
+Swamp Thing
+Spawn
+Hellboy
+Miles Morales
+Spider-Gwen
+Venom||||Venom (character)
+Punisher
+Ghost Rider
+Blade
+Cyclops
+Jean Grey
+Rogue
+Gambit
+Beast
+Iceman
+Nightcrawler
+Colossus
+Shang-Chi
+Captain Britain
+She-Hulk
+War Machine
+Falcon
+Winter Soldier
+Nick Fury
+Black Bolt
+Mister Fantastic
+Invisible Woman
+Human Torch
+The Thing
+Nova
+Iron Fist
+Luke Cage
+Jessica Jones
+Omni-Man
+Squirrel Girl`,
+  't-villains': `
+Sinestro
+Black Adam
+Reverse-Flash
+Zod
+Doomsday
+Ra's al Ghul
+Mr. Freeze
+Hush
+Black Manta
+Cheetah
+Sandman
+Electro
+Vulture
+Rhino
+Kraven the Hunter
+Carnage
+Juggernaut
+Sabretooth
+Mister Sinister
+Dormammu
+Baron Zemo
+Abomination
+M.O.D.O.K.
+Taskmaster
+Bullseye
+Ronan the Accuser
+Ego
+Annihilus
+Gorr the God Butcher
+Knull
+Bizarro
+Mongul
+Amanda Waller`,
+  't-pixar': `
+Hamm
+Slinky Dog
+Mr. Potato Head
+Bo Peep
+Lotso
+Forky
+Ken
+Aliens||||Aliens (Toy Story)
+Sally Carrera
+Doc Hudson
+Luigi
+Guido
+Marlin
+Crush
+Bruce
+Gill
+Randall
+Roz
+Celia
+Syndrome
+Violet Parr
+Jack-Jack
+Linguini
+Colette
+Anton Ego
+Kevin
+Disgust
+Fear
+Ennui
+Envy
+Embarrassment
+Riley
+Joe Gardner
+22
+Alberto
+Giulia
+Dante
+Mama Imelda
+Abuelita
+Wade Ripple
+Ian Lightfoot
+Barley Lightfoot
+Flik
+Hopper
+Heimlich
+Dot
+Queen Elinor`,
+  't-disney': `
+Pluto
+Daisy Duck
+Chip 'n' Dale
+Scrooge McDuck
+Mufasa
+Nala
+Rafiki
+Zazu
+Kristoff
+Sven
+Hans
+Pua
+Heihei
+Te Kā
+Sebastian
+Flounder
+Prince Eric
+Beast
+Gaston
+Lumière
+Cogsworth
+Iago
+Abu
+Mushu
+Shan Yu
+Flynn Rider
+Pascal
+Mother Gothel
+Prince Naveen
+Dr. Facilier
+Ray||||Ray (The Princess and the Frog)
+Meg
+Hades
+Pegasus
+Tinker Bell
+Peter Pan
+Cruella de Vil
+Bambi
+Thumper
+Dumbo
+Pinocchio
+Jiminy Cricket
+Bruno Madrigal
+Isabela Madrigal
+Wreck-It Ralph||||Wreck-It Ralph (character)
+Vanellope von Schweetz
+Baymax
+Hiro Hamada
+Raya
+Sisu
+Asha`,
+  't-streaming': `
+Prime Video
+BritBox
+BBC iPlayer
+ITVX
+Channel 4
+Sky Go
+Now TV
+Canal+
+Mubi
+Criterion Channel
+Shudder
+AMC+
+Starz
+Showtime
+BET+
+Discovery+
+Fubo
+Sling TV
+YouTube TV
+Pluto TV
+Roku Channel
+Plex
+Funimation
+HIDIVE
+JioHotstar
+Netflix Games
+Amazon Luna
+Xbox Cloud Gaming
+PlayStation Plus
+Apple Arcade
+Audible
+Pandora
+iHeartRadio
+Boomplay
+NetEase Cloud Music
+Starzplay
+TOD
+Weyyak`,
+  't-youtubers': `
+Sidemen
+Chunkz
+Yung Filly
+Harry Pinero
+Niko Omilana
+Sharky
+Calfreezy
+JiDion
+Unspeakable
+Preston
+Linus Tech Tips
+Unbox Therapy
+Veritasium
+Vsauce
+Kurzgesagt
+CGP Grey
+Tom Scott
+Smarter Every Day
+Mrwhosetheboss
+Captain Sparklez
+DanTDM
+Stampy
+SSSniperWolf
+Lele Pons
+Liza Koshy
+David Dobrik
+Zach King
+Brent Rivera
+Alan Becker
+Jacksfilms
+Drew Gooden
+Danny Gonzalez
+Kurtis Conner
+Cody Ko
+Noel Miller
+Good Mythical Morning
+Hot Ones
+Joe Weller
+Deji
+ChrisMD
+Theo Baker
+Max Fosh
+WillNE
+Mike Majlak
+Typical Gamer
+Faze Rug
+Yes Theory
+Michelle Khare
+Safiya Nygaard
+Philip DeFranco
+Kallmekris
+Sorted Food`,
+  't-streamers': `
+Sketch
+Cinna
+Emiru
+QTCinderella
+Amouranth
+Myth
+Tfue
+Clix
+Bugha
+Mongraal
+Benjyfishy
+Aceu
+TenZ
+Tarik
+Gaules
+Rubius
+TheGrefg
+AuronPlay
+Kameto
+Squeezie
+Zackrawrr
+Moistcr1tikal
+Pokelawls
+Nmplol
+Erobb221
+Agent 00
+Plaqueboymax
+Lacy
+Stableronaldo
+Marlon
+Silky
+Jasontheween
+Sommerset
+Tubbo
+Ranboo
+Wilbur Soot
+Quackity
+Philza
+GeorgeNotFound
+Sapnap
+BadBoyHalo`,
+  't-consoles': `
+Nintendo Virtual Boy
+Neo Geo
+TurboGrafx-16
+Sega Saturn
+Sega Master System
+Sega Game Gear
+Atari Lynx
+Atari Jaguar
+ColecoVision
+Intellivision
+Magnavox Odyssey
+3DO
+Game Boy Color
+Game Boy Pocket
+Nintendo DSi
+New Nintendo 3DS
+Nintendo 2DS
+Game & Watch
+PlayStation 3
+PlayStation 5 Pro
+PlayStation 4 Pro
+PS One
+Xbox One X
+Xbox Series S
+Nintendo Switch Lite
+Nintendo Switch OLED
+Sega CD
+Sega 32X
+N-Gage
+Ouya
+Google Stadia
+Oculus Quest 2
+Apple Vision Pro
+ROG Ally
+Analogue Pocket
+Evercade
+SNES Classic`,
+  't-gamechars': `
+Wario
+Waluigi
+Daisy
+Toad
+Rosalina
+Diddy Kong
+King K. Rool
+Ganondorf
+Sheik
+Fox McCloud
+Falco Lombardi
+Captain Falcon
+Ness
+Marth
+Ike
+Sephiroth
+Tifa Lockhart
+Aerith Gainsborough
+Lightning
+Noctis Lucis Caelum
+Sora
+Riku
+Tails
+Knuckles
+Shadow the Hedgehog
+Amy Rose
+Dr. Eggman
+Ratchet
+Sly Cooper
+Marcus Fenix
+Gordon Freeman
+Alyx Vance
+GLaDOS
+Chell
+Commander Shepard
+Isaac Clarke
+Max Payne
+Niko Bellic
+Tommy Vercetti
+John Marston
+Jill Valentine
+Chris Redfield
+Claire Redfield
+Ada Wong
+Big Boss
+Raiden
+Dante
+Bayonetta
+Sub-Zero
+Liu Kang
+Chun-Li
+Ken Masters
+Jin Kazama
+Kazuya Mishima
+Sackboy
+Rayman
+Ori
+The Knight
+Madeline
+Shovel Knight
+Isabelle
+Tom Nook
+Inkling`,
+  't-pokemon': `
+Raichu
+Pichu
+Charmeleon
+Ivysaur
+Wartortle
+Butterfree
+Pidgeot
+Arcanine
+Ninetales
+Vulpix
+Growlithe
+Poliwrath
+Golem
+Onix
+Steelix
+Scyther
+Scizor
+Jolteon
+Flareon
+Vaporeon
+Espeon
+Leafeon
+Glaceon
+Aerodactyl
+Kabutops
+Togepi
+Togekiss
+Marill
+Ampharos
+Heracross
+Houndoom
+Celebi
+Ho-Oh
+Entei
+Suicune
+Raikou
+Sceptile
+Swampert
+Salamence
+Metagross
+Latias
+Latios
+Kyogre
+Groudon
+Jirachi
+Infernape
+Torterra
+Empoleon
+Darkrai
+Dialga
+Palkia
+Giratina
+Zoroark
+Hydreigon
+Volcarona
+Reshiram
+Zekrom
+Aegislash
+Rowlet
+Decidueye
+Incineroar
+Lycanroc
+Toxapex
+Corviknight
+Cinderace
+Zacian
+Zamazenta
+Sprigatito
+Koraidon
+Miraidon`,
+  't-horror': `
+Carrie
+The Omen
+Poltergeist
+The Evil Dead
+Evil Dead II
+An American Werewolf in London
+Candyman
+The Silence of the Lambs
+Se7en
+The Others
+The Sixth Sense
+Final Destination
+The Grudge
+Dawn of the Dead
+Shaun of the Dead
+The Descent
+REC
+Let the Right One In
+The Orphanage
+The Witch
+It Follows
+Don't Breathe
+Split
+Nope
+Pearl
+X
+Longlegs
+Terrifier
+Weapons
+Nosferatu
+The Substance
+Late Night with the Devil
+The Conjuring 2`,
+  't-scifi': `
+Star Trek
+Return of the Jedi
+Rogue One
+The Fifth Element
+Total Recall
+RoboCop
+Predator
+The Abyss
+Contact
+Gattaca
+The Truman Show
+Children of Men
+Looper
+Moon
+Her
+Elysium
+Pacific Rim
+Oblivion
+Prometheus
+Alien: Romulus
+Annihilation
+Ad Astra
+Tron: Legacy
+War of the Worlds
+I, Robot
+Cloverfield
+Super 8
+Source Code
+Snowpiercer
+Mad Max: Fury Road
+The Day the Earth Stood Still
+Planet of the Apes
+Dawn of the Planet of the Apes
+Godzilla Minus One
+The Creator
+Mickey 17`
+};
+const EXTRA_FOOD = {
+  't-snk': `
+Funyuns|Salty|Onion rings, sort of|🧅
+Sun Chips|Salty|Wavy multigrain|🌾
+Cheez-It|Salty|Square cheese crackers|🧀
+Goldfish|Salty|Smiling crackers|🐟
+Bugles|Salty|Corn cones|🌽
+Fritos|Salty|Corn chips|🌽
+Kettle Chips|Salty|Extra crunchy|🥔
+Tostitos|Salty|With salsa|🌮
+Salted Peanuts|Salty|Ballpark classic|🥜
+Beef Jerky|Salty|Chewy and salty|🥩
+Combos|Salty|Pretzel with cheese inside|🥨
+Chex Mix|Salty|A bit of everything|🥣
+Pita Chips|Salty|Toasted pita|🫓
+Seaweed Snacks|Salty|Crispy nori|🌿
+Wasabi Peas|Salty|Spicy crunch|🟢
+Corn Nuts|Salty|Crunchy corn|🌽
+Milky Way|Sweet|Nougat and caramel|🍫
+Butterfinger|Sweet|Crispy peanut butter|🍫
+Toblerone|Sweet|Triangle chocolate|🔺
+Hershey's Kisses|Sweet|Little drops|🍫
+Rolo|Sweet|Caramel cups|🍫
+Kinder Surprise|Sweet|Chocolate egg with a toy|🥚
+Maltesers|Sweet|Malt balls|🍫
+Smarties Cookies|Sweet|Cookie with Smarties|🍪
+Jolly Ranchers|Sweet|Hard candy|🍬
+Starburst|Sweet|Fruit chews|🍬
+Airheads|Sweet|Taffy strips|🍬
+Warheads|Sweet|Extreme sour|😖
+Gummy Worms|Sweet|Sour worms|🪱
+Nerds|Sweet|Tiny crunchy candy|🍬
+Laffy Taffy|Sweet|Stretchy taffy|🍬
+Swedish Fish|Sweet|Red fish gummies|🐟
+Mike and Ike|Sweet|Fruit chews|🍬
+Jelly Belly|Sweet|Gourmet jelly beans|🫘
+Rice Krispies Treats|Sweet|Marshmallow squares|🍘
+Pop-Tarts|Sweet|Frosted pastry|🍓
+Chips Ahoy!|Sweet|Chocolate chip cookies|🍪
+Nutella & Go|Sweet|Breadsticks and Nutella|🥖
+Cadbury Mini Eggs|Sweet|Easter favourite|🥚
+Peeps|Sweet|Marshmallow chicks|🐥
+Cotton Candy|Sweet|Spun sugar|☁️
+Lollipop|Sweet|On a stick|🍭`,
+  't-dish': `
+Beef Wellington|Main|Pastry-wrapped beef|🥩
+Peking Duck|Main|Crispy duck pancakes|🦆
+Bibimbap|Main|Mixed rice bowl|🍚
+Lasagne|Main|Layers of pasta|🍝
+Spaghetti Carbonara|Main|Egg, cheese and pepper|🍝
+Mansaf|Main|Lamb with jameed sauce|🍖
+Moussaka|Main|Aubergine bake|🍆
+Goulash|Main|Hungarian stew|🍲
+Fish and Chips|Main|British classic|🐟
+Jerk Chicken|Main|Jamaican spice|🍗
+Feijoada|Main|Brazilian bean stew|🍲
+Bobotie|Main|South African bake|🥘
+Doro Wat|Main|Ethiopian chicken stew|🍗
+Laksa|Main|Spicy noodle soup|🍜
+Nasi Goreng|Main|Indonesian fried rice|🍳
+Rendang|Main|Slow-cooked beef|🥩
+Chicken Adobo|Main|Filipino classic|🍗
+Ceviche|Main|Citrus-cured fish|🐟
+Tagine|Main|Moroccan stew|🍲
+Couscous|Main|North African staple|🥘
+Bulgogi|Main|Korean marinated beef|🥩
+Tonkatsu|Main|Breaded pork cutlet|🍱
+Pierogi|Side|Polish dumplings|🥟
+Edamame|Side|Salted soybeans|🫛
+Tabbouleh|Side|Parsley salad|🥗
+Spring Rolls|Side|Crispy rolls|🥢
+Gyoza|Side|Pan-fried dumplings|🥟
+Patatas Bravas|Side|Spicy potatoes|🥔
+Elote|Side|Mexican street corn|🌽
+Garlic Bread|Side|Buttery and garlicky|🥖
+Arancini|Side|Fried risotto balls|🍙
+Fattoush|Side|Crispy pita salad|🥗
+Tostones|Side|Fried plantains|🍌
+Mashed Potatoes|Side|Creamy and buttery|🥔
+Gelato|Dessert|Italian ice cream|🍨
+Cheesecake|Dessert|New York style|🍰
+Macarons|Dessert|French almond cookies|🍪
+Brigadeiro|Dessert|Brazilian chocolate balls|🍫
+Halva|Dessert|Sesame sweet|🍬
+Basbousa|Dessert|Semolina cake|🍰
+Mango Sticky Rice|Dessert|Thai favourite|🥭
+Black Forest Cake|Dessert|Chocolate and cherry|🍒
+Pavlova|Dessert|Meringue and fruit|🍓
+Kulfi|Dessert|Indian ice cream|🍦`,
+  't-drink': `
+Cappuccino|Hot|Foamy coffee|☕
+Latte|Hot|Milky coffee|☕
+Green Tea|Hot|Light and fresh|🍵
+English Breakfast Tea|Hot|With milk|🫖
+Mint Tea|Hot|Moroccan style|🌿
+Hot Apple Cider|Hot|Autumn favourite|🍎
+Masala Chai|Hot|Spiced tea|🫖
+Saudi Coffee|Hot|With dates|☕
+Sahlab|Hot|Warm milk pudding drink|🥛
+Golden Milk|Hot|Turmeric latte|🥛
+Espresso|Hot|Short and strong|☕
+Mocha|Hot|Coffee and chocolate|☕
+Iced Tea|Cold|Sweet tea|🧊
+Lemonade|Cold|Fresh squeezed|🍋
+Milkshake|Cold|Thick and creamy|🥤
+Frappuccino|Cold|Blended coffee|🥤
+Slurpee|Cold|Frozen and bright|🧊
+Apple Juice|Cold|Cloudy or clear|🧃
+Watermelon Juice|Cold|Summer in a cup|🍉
+Horchata|Cold|Cinnamon rice milk|🥛
+Ayran|Cold|Salty yogurt drink|🥛
+Sugarcane Juice|Cold|Freshly pressed|🎋
+Tamarind Juice|Cold|Sweet and sour|🥤
+Cold Brew|Cold|Smooth coffee|🧊
+Laban|Cold|Gulf yogurt drink|🥛
+Rooh Afza|Cold|Rose syrup drink|🌹
+7 Up|Fizzy|Lemon-lime|🥤
+Ginger Ale|Fizzy|Gentle fizz|🫚
+Monster Energy|Fizzy|Energy drink|⚡
+Prime Hydration|Fizzy|Influencer drink|🧃
+Fanta Grape|Fizzy|Purple fizz|🍇
+Orange Crush|Fizzy|Orange soda|🍊
+Pepsi Max|Fizzy|Zero sugar|🥤
+Coke Zero|Fizzy|Zero sugar|🥤
+Sparkling Water|Fizzy|Plain bubbles|💧
+Barbican|Fizzy|Malt drink|🍺
+Irn-Bru|Fizzy|Scotland's other drink|🧡
+Kombucha|Fizzy|Fermented tea|🍵`,
+  't-fruit': `
+Mangosteen
+Durian
+Jackfruit
+Persimmon
+Apricot
+Nectarine
+Grapefruit
+Lime
+Clementine
+Tangerine
+Cranberry
+Gooseberry
+Star Fruit
+Rambutan
+Longan
+Kumquat
+Quince
+Cantaloupe
+Honeydew Melon
+Blood Orange
+Red Grapes
+Prickly Pear
+Custard Apple
+Sapodilla
+Loquat
+Mulberry
+Elderberry
+Tamarind
+Plantain
+Jujube
+Pomelo
+Ackee
+Yuzu
+Feijoa`,
+  't-bfast': `
+Eggs and Toast
+Scrambled Eggs
+Omelette
+Bacon and Eggs
+English Muffin
+Granola Bars
+Breakfast Tacos
+Huevos Rancheros
+Biscuits and Gravy
+Chocolate Croissant
+Bagel with Lox
+Açaí Bowl
+Overnight Oats
+Kaya Toast
+Turkish Breakfast
+Full Irish
+Dutch Baby
+Menemen
+Idli Sambar
+Poha
+Pastelito
+Muesli`,
+  't-dess': `
+Tiramisu
+Panna Cotta
+Crème Brûlée
+Profiteroles
+Éclair
+Mille-feuille
+Carrot Cake
+Victoria Sponge
+Lemon Tart
+Pecan Pie
+Pumpkin Pie
+Bread Pudding
+Rice Pudding
+Ice Cream Cake
+S'mores
+Blondie
+Snickerdoodle
+Whoopie Pie
+Mochi Ice Cream
+Halo-halo
+Bingsu
+Basbousa
+Umm Ali
+Luqaimat
+Jalebi
+Kheer
+Brigadeiro
+Alfajores
+Flan
+Baklava Cheesecake
+Chocolate Fondue
+Frozen Yogurt
+Sorbet
+Affogato`,
+  't-pizza': `
+Beef Bacon
+Smoked Turkey
+Meatballs
+Beef Salami
+Chicken Shawarma
+Arugula
+Ricotta
+Goat Cheese
+Caramelized Onions
+Roasted Red Peppers
+Pesto
+Buffalo Chicken
+Tandoori Chicken
+Olives
+Zucchini
+Eggplant
+Broccoli
+Tuna
+Truffle Oil
+Chorizo`,
+  't-ffchains': `
+Carl's Jr.
+Hardee's
+Culver's
+Zaxby's
+Bojangles
+Church's Texas Chicken
+Little Caesars
+Papa John's
+Jimmy John's
+Jersey Mike's
+Firehouse Subs
+Panera Bread
+Qdoba
+Del Taco
+El Pollo Loco
+Steak 'n Shake
+White Castle
+Checkers
+Long John Silvers
+Krystal
+Mos Burger
+Lotteria
+Hungry Jack's
+Red Rooster
+Pret A Manger
+Quick
+Herfy
+Kudu
+Shawarmer
+Osmow's
+Pizza Pizza
+Swiss Chalet
+Freshii
+Booster Juice`,
+  't-icecream': `
+French Vanilla
+Double Chocolate
+Chocolate Chip
+Mint
+Blueberry
+Cherry Garcia
+Peach
+Lemon
+Raspberry Sorbet
+Maple Walnut
+Caramel Swirl
+Chocolate Fudge Brownie
+Toffee Crunch
+Banana
+Pineapple
+Lavender
+Saffron Pistachio
+Rose
+Green Tea Red Bean
+Spumoni`,
+  't-chocbars': `
+Snickers Peanut Butter
+KitKat Chunky
+Lindt Excellence
+Ferrero Rocher
+Godiva
+Ritter Sport
+Tony's Chocolonely
+Hershey's Cookies 'n' Creme
+Heath Bar
+PayDay
+Almond Joy
+Mounds
+100 Grand
+Whatchamacallit
+Take 5
+Krackel
+Crunch
+Coffee Crisp Mocha
+Smarties Bar
+Mint Aero
+Turkish Delight Bar
+Fry's Chocolate Cream
+Boost
+Topic
+Star Bar
+Ripple
+Time Out
+Freddo
+Cherry Ripe
+Violet Crumble
+Moro
+Kinder Chocolate
+Patchi`,
+  't-crisps': `
+Lay's Salt & Vinegar
+Lay's Dill Pickle
+Ruffles All Dressed
+Doritos Cool Ranch
+Doritos Sweet Chili
+Cheetos Puffs
+Takis Blue Heat
+Pringles BBQ
+Kettle Sea Salt
+Cape Cod
+Utz
+Herr's
+Zapp's
+Lay's Flamin' Hot
+Sensations
+McCoy's
+Discos
+Skips
+Space Raiders
+Tayto
+Twisties
+Burger Rings
+Calbee
+Jagabee
+Lay's Magic Masala
+Bingo Mad Angles
+Pringles Pizza
+Munchos
+Cheez Doodles
+Pirate's Booty
+Ruffles Cheddar & Sour Cream
+Doritos Dinamita
+Lay's Poppables
+Takis Fuego
+Pringles Wavy
+Tyrrells
+Walkers Prawn Cocktail
+Smiths Chicken`,
+  't-cereal': `
+Honey Bunches of Oats
+Kellogg's Krave
+Cinnamon Life
+Life
+Corn Chex
+Wheaties
+Total
+Grape-Nuts
+All-Bran
+Fruit & Fibre
+Crunchy Nut Clusters
+Oreo O's
+Cookie Crunch
+Cocoa Krispies
+Frosted Cheerios
+Multigrain Cheerios
+Golden Nuggets
+Honey Smacks
+Krave Double Chocolate
+Cracklin' Oat Bran
+Quaker Oatmeal Squares
+Cinnamon Chex
+Peanut Butter Crunch
+Waffle Crisp
+French Toast Crunch
+Boo Berry
+Franken Berry
+Alpha-Bits
+Honeycomb
+Cocoa Pebbles
+Froot Loops Marshmallow
+Nesquik Cereal
+Coco Rocks
+Cheerios Protein
+Muesli
+Raisin Bran Crunch`,
+  't-street': `
+Kebab Roll
+Bao Bun
+Dumplings
+Banh Xeo
+Roti Canai
+Hainanese Chicken Rice
+Kati Roll
+Vada Pav
+Pav Bhaji
+Chaat
+Mandazi
+Suya
+Bunny Chow Quarter
+Halo-halo
+Isaw
+Balut
+Okonomiyaki
+Yakitori
+Taiyaki
+Hotteok
+Kimbap
+Jian Bing
+Stinky Tofu
+Egg Waffle
+Tamales
+Esquites
+Tlayuda
+Churro Ice Cream Sandwich
+Pretzel Dog
+Philly Cheesesteak
+Lobster Roll
+Bratwurst
+Fried Calamari
+Pizza al Taglio`,
+  't-mideast': `
+Shawarma
+Falafel
+Mezze Platter
+Kofta Kebab
+Lamb Ouzi
+Mujaddara
+Sfeeha
+Fatayer
+Za'atar Manakish
+Knafeh Nabulsieh
+Halawet el Jibn
+Atayef
+Mahalabia
+Arabic Coffee
+Karak Chai
+Mint Lemonade
+Tamarind Juice
+Lentil Soup
+Freekeh
+Maqluba Chicken
+Shish Kebab
+Mixed Grill
+Hummus Beiruti
+Muttabal
+Batata Harra
+Arayes
+Kibbeh Nayyeh
+Sumac Chicken
+Qatayef
+Ka'ak
+Zaatar Croissant
+Jallab
+Shish Barak
+Kebab Halabi`,
+  't-saudi': `
+Saleeg Chicken
+Kabsa Lamb
+Mandi Chicken
+Hashi
+Kabsa Camel
+Shakshuka
+Aseeda
+Marasee
+Mugalgal
+Muttabaq Sweet
+Samboosa Cheese
+Kunafa
+Basbousa
+Ma'amoul
+Laban
+Jallab
+Sobia
+Arabic Coffee with Dates
+Saudi Champagne
+Khubz
+Tamees with Ful
+Shawarma Arabi
+Broasted Chicken
+Kibda
+Mandi Rice
+Madghout
+Rubyan Kabsa
+Thareed
+Mandi Lamb
+Kabsa Chicken`,
+  't-turkish': `
+Kuzu Tandır
+Hünkar Beğendi
+Testi Kebab
+Ali Nazik
+Beyti Kebab
+Şiş Kebap
+Tantuni
+Kısır
+Mercimek Köftesi
+Sigara Böreği
+Su Böreği
+Poğaça
+Açma
+Katmer
+Baklava with Ice Cream
+Dondurma
+Lokma
+Revani
+Kazandibi
+Aşure
+Salep
+Boza
+Şalgam
+Sucuk
+Pastırma
+Kaşar Cheese
+Beyaz Peynir
+Kumru
+Hamsi Tava
+Zeytinyağlı Fasulye
+Etli Ekmek
+Kebab Plate
+Turkish Breakfast
+Pide with Egg`,
+  't-japanese': `
+Chirashi
+Nigiri
+Temaki
+Uramaki
+Ebi Fry
+Chicken Katsu Curry
+Kare Raisu
+Tsukemen
+Tantanmen
+Hiyashi Chuka
+Agedashi Tofu
+Chawanmushi
+Kushikatsu
+Monjayaki
+Okonomiyaki Hiroshima Style
+Teriyaki Chicken
+Saba Shioyaki
+Nikujaga
+Tendon
+Kaisendon
+Ochazuke
+Natto
+Takoyaki with Mayo
+Melon Pan
+Castella
+Daifuku
+Warabi Mochi
+Kakigori
+Anpan
+Japanese Cheesecake
+Matcha Parfait
+Kit Kat Matcha
+Ramune
+Calpis`,
+  't-korean': `
+Jajangmyeon
+Samgak Gimbap
+Odeng
+Sundae
+Dakkochi
+Gamjatang
+Haemul Pajeon
+Doenjang Jjigae
+Galbi-jjim
+Haemul-jjim
+Dak-galbi
+Yangnyeom Chicken
+Cheese Corn
+Rabokki
+Kimchi Fried Rice
+Kongguksu
+Mul-naengmyeon
+Bibim-naengmyeon
+Gyeranjjim
+Banchan
+Kimchi Pancake
+Dakgangjeong
+Tteokgalbi
+Ssiat Hotteok
+Yakgwa
+Injeolmi
+Patbingsu
+Banana Milk
+Sikhye
+Yuja Tea
+Strawberry Milk
+Corn Dog
+Egg Bread
+Tornado Potato
+Hotdog Kimbap
+Korean BBQ Ribs
+Army Stew
+Gyeran-mari`,
+  't-italian': `
+Fettuccine Alfredo
+Penne alla Vodka
+Spaghetti alle Vongole
+Linguine al Pesto
+Orecchiette
+Pappardelle al Ragù
+Bucatini
+Gnocchi Sorrentina
+Pizza Napoletana
+Pizza al Taglio
+Supplì
+Pasta alla Norma
+Pizza Fritta
+Carpaccio
+Vitello Tonnato
+Bistecca alla Fiorentina
+Chicken Parmigiana
+Eggplant Parmigiana
+Ribollita
+Pasta e Fagioli
+Insalata Caprese
+Piadina
+Panzerotti
+Grissini
+Zabaglione
+Sfogliatella
+Cassata
+Torta Caprese
+Semifreddo
+Granita
+Pistachio Gelato
+Affogato
+Espresso
+Amaretti`,
+  't-mexican': `
+Tacos de Suadero
+Tacos de Lengua
+Fish Tacos
+Chimichanga
+Fajitas
+Carne Asada
+Pollo Asado
+Chile Relleno
+Tortilla Soup
+Sopa de Lima
+Queso Fundido
+Enfrijoladas
+Tamal Oaxaqueño
+Mole Negro
+Pambazo
+Molletes
+Esquites
+Mangonada
+Paleta
+Agua de Jamaica
+Tepache
+Champurrado
+Atole
+Pan de Muerto
+Bunuelos
+Flan Napolitano
+Arroz con Leche
+Capirotada
+Tacos Dorados
+Huaraches
+Memelas
+Carne en su Jugo
+Machaca
+Chilorio`,
+  't-indian': `
+Paneer Tikka
+Kadai Chicken
+Chicken 65
+Hyderabadi Biryani
+Mutton Curry
+Fish Curry
+Prawn Masala
+Baingan Bharta
+Bhindi Masala
+Aloo Paratha
+Kulcha
+Puri Bhaji
+Upma
+Uttapam
+Medu Vada
+Sambar
+Rasam
+Pongal
+Appam
+Kerala Parotta
+Misal Pav
+Dabeli
+Kachori
+Bhel Puri
+Sev Puri
+Dahi Puri
+Momos
+Thali
+Rasmalai
+Kaju Katli
+Ladoo
+Barfi
+Payasam
+Falooda`,
+  't-chinese': `
+Cantonese Roast Duck
+Char Siu Bao
+Cheung Fun
+Lo Mai Gai
+Turnip Cake
+Egg Fried Rice
+Yangzhou Fried Rice
+Shrimp Dumplings
+Chicken Bao
+Sichuan Hot Pot
+Fish-Fragrant Aubergine
+Gong Bao Prawns
+Chongqing Chicken
+Boiled Fish
+Cumin Lamb
+Beef and Broccoli
+Sesame Chicken
+Lemon Chicken
+Crispy Chilli Beef
+Salt and Pepper Squid
+Hot and Sour Soup
+Egg Drop Soup
+Biang Biang Noodles
+Zhajiangmian
+Rou Jia Mo
+Liangpi
+Sheng Jian Bao
+Egg Roll
+Sesame Balls
+Red Bean Bun
+Egg Waffle
+Almond Tofu
+Dragon's Beard Candy
+Bubble Milk Tea`,
+  't-sauces': `
+Ponzu
+Oyster Sauce
+Fish Sauce
+Sambal Oelek
+Gochugaru Paste
+Zhug
+Toum
+Amba
+Muhammara
+Romesco
+Salsa Verde
+Mole Sauce
+Chipotle Mayo
+Sriracha Mayo
+Big Mac Sauce
+Chick-fil-A Sauce
+Raising Cane's Sauce
+Thousand Island
+Blue Cheese Dressing
+Caesar Dressing
+Balsamic Glaze
+Hollandaise
+Béarnaise
+Alfredo Sauce
+Marinara
+Vodka Sauce
+Curry Sauce
+Satay Sauce
+Plum Sauce
+Duck Sauce
+Cocktail Sauce
+Horseradish
+Apple Sauce
+Cranberry Sauce`,
+  't-coffee': `
+Long Black
+Lungo
+Doppio
+Red Eye
+Breve
+Café Bombón
+Café Cubano
+Cortadito
+Piccolo
+Gibraltar
+Café Mocha White
+Iced Latte
+Iced Americano
+Iced Caramel Latte
+Shaken Espresso
+Brown Sugar Oat Shaken Espresso
+Iced Mocha
+Matcha Espresso Fusion
+Pistachio Latte
+Salted Caramel Mocha
+Peppermint Mocha
+Gingerbread Latte
+Hazelnut Latte
+Vanilla Latte
+Honey Oat Latte
+Egg Coffee
+Yuanyang
+Kopi
+Qahwa
+Café Frappé
+Freddo Espresso
+Freddo Cappuccino
+Espresso Tonic
+Mazagran
+Bulletproof Coffee
+Mushroom Coffee
+Cold Foam Cold Brew`,
+  't-boba': `
+Tiger Milk Tea
+Lavender Milk Tea
+Earl Grey Milk Tea
+Hong Kong Milk Tea
+Pandan Milk Tea
+Strawberry Matcha
+Mango Pomelo Sago
+Dirty Brown Sugar
+Crème Brûlée Milk Tea
+Oreo Milk Tea
+Avocado Smoothie
+Watermelon Slush
+Kiwi Green Tea
+Lemon Black Tea
+Yakult Green Tea
+Rose Lychee
+Osmanthus Oolong
+Black Sesame Milk Tea
+Red Bean Milk Tea
+Coconut Mango
+Banana Milk Tea
+Honey Lemon Aloe`,
+  't-bakery': `
+Croissant aux Amandes
+Pain aux Raisins
+Morning Bun
+Kouign-Amann
+Cream Puff
+Profiterole
+Mille-feuille
+Fruit Tart
+Lemon Bar
+Blondie
+Brownie
+Cupcake
+Cookie
+Biscotti
+Shortbread
+Pretzel
+Ciabatta
+Focaccia
+Pita
+Naan
+Bao
+Melon Pan
+Pandesal
+Pão de Queijo
+Medialuna
+Kanelbulle
+Semla
+Stollen
+Panettone
+Hot Cross Bun
+Chelsea Bun
+Eccles Cake
+Bakewell Tart
+Butter Tart
+Beaver Tail
+Date Square
+Palmier`,
+  't-noodles': `
+Nissin Cup Noodles Seafood
+Maruchan Instant Lunch
+Indomie Ayam Bawang
+Indomie Rendang
+Shin Ramyun Black
+Buldak Carbonara
+Buldak 2x Spicy
+Neoguri Seafood
+Ansungtangmyun
+Kokomen
+Paldo Kokomen
+MyKuali White Curry
+Ibumie
+Mama Tom Yum
+Yum Yum
+Nissin Raoh
+Ichiran Instant Ramen
+Myojo Ippeichan Yakisoba
+Nongshim Bowl Noodle
+Lucky Me Pancit Canton
+Sapporo Ichiban Miso
+Top Ramen Chicken
+Maggi Masala
+Knorr Chicken Noodle`,
+  't-cheese': `
+Asiago
+Fontina
+Taleggio
+Pecorino Sardo
+Grana Padano
+Scamorza
+Stracciatella
+Burrata Pugliese
+Cotija
+Queso Fresco
+Oaxaca Cheese
+Swiss Cheese
+American Cheese
+Colby
+Pepper Jack
+Muenster
+Limburger
+Jarlsberg
+Gjetost
+Wensleydale
+Red Leicester
+Double Gloucester
+Cornish Yarg
+Port Salut
+Reblochon
+Munster
+Époisses
+Boursin
+Labneh
+Nabulsi
+Kashkaval
+Sirene
+Leyden
+Shropshire Blue`
+};
 const EXTRA_SPORTS = {
   't-pl': `
 Ederson|GK|Man City · 2017–25||Ederson (footballer, born 1993)
@@ -8099,7 +10335,7 @@ Italy v Germany||World Cup classics
 Sporting v Porto||Portuguese rivalry
 Croatian Eternal Derby||Dinamo Zagreb v Hajduk Split||||Eternal derby (Croatia)`
 };
-const EXTRA_ITEMS = Object.assign({}, EXTRA_SPORTS, EXTRA_SPORTS2);
+const EXTRA_ITEMS = Object.assign({}, EXTRA_SPORTS, EXTRA_SPORTS2, EXTRA_FOOD, EXTRA_ENT);
 const PHOTO_TOPICS = {
   't-pl': {
     'Tony Adams': 'Tony Adams (footballer)'
