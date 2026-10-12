@@ -332,7 +332,7 @@ function decideMatchup(d, m, mode, fin) {
   const mt = m.match;
   if (mode === 'sim') {
     const w = mt.winner === 0 ? A : B;
-    if (isSimResult(mt)) return { winner: w.id, why: w.name + ' won the ' + ((BATTLE_KINDS[mt.kind] || BATTLE_KINDS.fight).name).toLowerCase() + ' ' + mt.score[mt.winner] + '–' + mt.score[1 - mt.winner] + (mt.sudden ? ' in sudden death' : '') + '.' };
+    if (isSimResult(mt)) return { winner: w.id, why: simWhy(w, mt) };
     if (mt.pens) return { winner: w.id, why: 'It finished ' + mt.score[0] + '–' + mt.score[1] + ' after extra time; ' + w.name + ' won ' + Math.max(...mt.pens) + '–' + Math.min(...mt.pens) + ' on penalties.' };
     return { winner: w.id, why: w.name + ' won ' + mt.score[mt.winner] + '–' + mt.score[1 - mt.winner] + (mt.et ? ' after extra time' : '') + '.' };
   }

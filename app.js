@@ -1,4 +1,4 @@
-/* Draft Night 593dcc75c8 — built from src/ by build.js. Edit src/, not this file. */
+/* Draft Night 2e1878a9af — built from src/ by build.js. Edit src/, not this file. */
 "use strict";
 (function(){
 function _extends() { return _extends = Object.assign ? Object.assign.bind() : function (n) { for (var e = 1; e < arguments.length; e++) { var t = arguments[e]; for (var r in t) ({}).hasOwnProperty.call(t, r) && (n[r] = t[r]); } return n; }, _extends.apply(null, arguments); }
@@ -23269,7 +23269,17 @@ const hasBattle = topic => !!battleKindId(topic);
 function simulateFor(d, A, B, key) {
   const k = battleKindId(d.topic);
   if (k === 'fight') return simulateArena(d, A, B, key);
+  if (k === 'survival') return simulateSurvival(d, A, B, key);
   return simulateBattle(d, A, B, key);
+}
+function simWhy(w, mt) {
+  if (mt.v === 'survival') {
+    const ws = mt.score[mt.winner],
+      ls = mt.score[1 - mt.winner];
+    const f = mt.final[mt.winner];
+    return w.name + (f.rescued ? ' got rescued' : ' survived ' + ws + ' day' + (ws === 1 ? '' : 's')) + (ws !== ls ? ' (the others lasted ' + ls + ')' : mt.how === 'rescue' ? ', and got rescued first' : mt.how === 'shape' ? ', level on days but in better shape' : ' and won the last night') + '.';
+  }
+  return w.name + ' won the ' + (BATTLE_KINDS[mt.kind] || BATTLE_KINDS.fight).name.toLowerCase() + ' ' + mt.score[mt.winner] + '–' + mt.score[1 - mt.winner] + (mt.sudden ? ' in sudden death' : '') + '.';
 }
 const isSimResult = mt => !!mt && (mt.v === 'battle' || mt.v === 'arena' || mt.v === 'survival' || mt.v === 'mission' || mt.v === 'show');
 function battleDuel(rng, kind, a, b, maxP) {
@@ -24030,7 +24040,7 @@ function decideMatchup(d, m, mode, fin) {
     const w = mt.winner === 0 ? A : B;
     if (isSimResult(mt)) return {
       winner: w.id,
-      why: w.name + ' won the ' + (BATTLE_KINDS[mt.kind] || BATTLE_KINDS.fight).name.toLowerCase() + ' ' + mt.score[mt.winner] + '–' + mt.score[1 - mt.winner] + (mt.sudden ? ' in sudden death' : '') + '.'
+      why: simWhy(w, mt)
     };
     if (mt.pens) return {
       winner: w.id,
@@ -24812,6 +24822,360 @@ function hallOfShame(past, settings) {
   const since = settings && settings.statsResetAt || 0;
   return past.filter(d => finished(d) && (d.createdAt || 0) >= since).flatMap(computeShame).sort((a, b) => b.price - a.price).slice(0, 12);
 }
+const SURVIVAL_EVENTS = {
+  zomb: [{
+    id: 'horde',
+    emoji: '🧟',
+    title: 'A horde hits the gate',
+    need: 'WL',
+    hurt: 26,
+    night: true,
+    win: '{i} holds the line. Not one gets in!',
+    lose: 'Nothing to fight with — they barely escape out the back.'
+  }, {
+    id: 'shop',
+    emoji: '🛒',
+    title: 'Supply run to the supermarket',
+    need: 'TW',
+    hurt: 14,
+    gain: 'food',
+    win: '{i} gets them in and out with bags of food.',
+    lose: 'Too slow — they run home empty-handed.'
+  }, {
+    id: 'bite',
+    emoji: '🩸',
+    title: 'Someone gets scratched',
+    need: 'M',
+    hurt: 24,
+    win: '{i} patches it up fast. Close one.',
+    lose: 'No medical kit. It’s getting worse…'
+  }, {
+    id: 'cold',
+    emoji: '🥶',
+    title: 'Freezing night',
+    need: 'SL',
+    hurt: 16,
+    night: true,
+    win: '{i} keeps everyone warm.',
+    lose: 'Nobody sleeps. Everyone’s shivering.'
+  }, {
+    id: 'lock',
+    emoji: '🚪',
+    title: 'A locked pharmacy',
+    need: 'U',
+    hurt: 8,
+    gain: 'med',
+    win: '{i} gets the door open — medicine!',
+    lose: 'They can’t get in. Walk away.'
+  }, {
+    id: 'radio',
+    emoji: '📻',
+    title: 'A faint radio signal',
+    need: 'N',
+    rescue: true,
+    win: '{i} picks it up — there’s a safe zone!',
+    lose: 'Just static. No way to answer.'
+  }, {
+    id: 'dark',
+    emoji: '🌑',
+    title: 'Power cut in the hideout',
+    need: 'L',
+    hurt: 14,
+    night: true,
+    win: '{i} lights the way.',
+    lose: 'Pitch black. Every noise is terrifying.'
+  }, {
+    id: 'bridge',
+    emoji: '🌉',
+    title: 'The bridge is blocked',
+    need: 'TU',
+    hurt: 12,
+    win: '{i} gets them across.',
+    lose: 'They lose a day going the long way round.'
+  }, {
+    id: 'mood',
+    emoji: '😩',
+    title: 'Everyone’s losing hope',
+    need: 'O',
+    hurt: 12,
+    win: '{i} lifts everyone’s spirits.',
+    lose: 'Arguments break out. Morale is low.'
+  }, {
+    id: 'rain',
+    emoji: '⛈️',
+    title: 'Storm floods the street',
+    need: 'S',
+    hurt: 12,
+    win: '{i} keeps them dry.',
+    lose: 'Soaked through. Supplies ruined.'
+  }, {
+    id: 'thirst',
+    emoji: '💧',
+    title: 'The taps run dry',
+    need: 'H',
+    hurt: 22,
+    win: '{i} keeps them going.',
+    lose: 'No clean water. This is bad.'
+  }, {
+    id: 'heli',
+    emoji: '🚁',
+    title: 'A helicopter flies over',
+    need: 'NL',
+    rescue: true,
+    win: '{i} gets its attention — it circles back!',
+    lose: 'It doesn’t see them. Gone.'
+  }],
+  island: [{
+    id: 'storm',
+    emoji: '⛈️',
+    title: 'A tropical storm',
+    need: 'S',
+    hurt: 22,
+    night: true,
+    win: '{i} keeps them sheltered.',
+    lose: 'The storm rips everything apart.'
+  }, {
+    id: 'fish',
+    emoji: '🐟',
+    title: 'Time to find food',
+    need: 'F',
+    hurt: 16,
+    gain: 'food',
+    win: '{i} — dinner sorted!',
+    lose: 'Nothing to eat today.'
+  }, {
+    id: 'dry',
+    emoji: '☀️',
+    title: 'No rain for days',
+    need: 'H',
+    hurt: 24,
+    win: '{i} keeps them drinking.',
+    lose: 'Thirst is setting in.'
+  }, {
+    id: 'cut',
+    emoji: '🩸',
+    title: 'A nasty cut on the reef',
+    need: 'M',
+    hurt: 20,
+    win: '{i} stops it getting infected.',
+    lose: 'It’s swelling up…'
+  }, {
+    id: 'sun',
+    emoji: '🥵',
+    title: 'Scorching sun',
+    need: 'SM',
+    hurt: 14,
+    win: '{i} saves them from burning.',
+    lose: 'Sunburn everywhere. Ouch.'
+  }, {
+    id: 'ship',
+    emoji: '🚢',
+    title: 'A ship on the horizon!',
+    need: 'N',
+    rescue: true,
+    win: '{i} — they’ve been spotted!',
+    lose: 'No way to signal. It sails away.'
+  }, {
+    id: 'fire',
+    emoji: '🔥',
+    title: 'The fire goes out',
+    need: 'L',
+    hurt: 14,
+    night: true,
+    win: '{i} gets it going again.',
+    lose: 'Cold, dark and raw food tonight.'
+  }, {
+    id: 'raft',
+    emoji: '🛶',
+    title: 'Explore the next island',
+    need: 'TU',
+    hurt: 8,
+    gain: 'food',
+    win: '{i} gets them there — fresh fruit!',
+    lose: 'They can’t make the crossing.'
+  }, {
+    id: 'bored',
+    emoji: '😩',
+    title: 'Day 5 of nothing',
+    need: 'O',
+    hurt: 12,
+    win: '{i} keeps everyone sane.',
+    lose: 'Talking to coconuts now.'
+  }, {
+    id: 'crab',
+    emoji: '🦀',
+    title: 'Coconut crabs raid the camp',
+    need: 'W',
+    hurt: 12,
+    night: true,
+    win: '{i} chases them off.',
+    lose: 'They take half the food.'
+  }, {
+    id: 'mozzie',
+    emoji: '🦟',
+    title: 'Mosquito swarm',
+    need: 'MS',
+    hurt: 12,
+    night: true,
+    win: '{i} — no bites tonight.',
+    lose: 'Bitten all night long.'
+  }, {
+    id: 'plane',
+    emoji: '✈️',
+    title: 'A plane flies over',
+    need: 'NL',
+    rescue: true,
+    win: '{i} — the plane dips its wings!',
+    lose: 'Too far away to notice them.'
+  }]
+};
+const SURVIVAL_DAYS = 10;
+const survivalSet = topic => topic && (topic.id === 't-island' || /island/i.test(topic.name || '')) ? 'island' : 'zomb';
+function survivalKit(d, team, topic) {
+  return team.team.filter(Boolean).map(x => d.items[x.itemId]).filter(Boolean).map(item => {
+    const s = itemStats(topic, item) || {
+      vals: [5],
+      tags: 'O'
+    };
+    return {
+      name: item.name,
+      itemId: item.id,
+      use: s.vals[0],
+      tags: s.tags || ''
+    };
+  });
+}
+function bestFor(kit, need, used) {
+  let best = null,
+    bs = 0;
+  kit.forEach(k => {
+    const hit = need.split('').reduce((n, t, i) => n + (k.tags.includes(t) ? i === 0 ? 1 : 0.7 : 0), 0);
+    if (!hit) return;
+    const sc = k.use * hit - (used[k.name] || 0) * 1.2;
+    if (sc > bs) {
+      bs = sc;
+      best = k;
+    }
+  });
+  return best;
+}
+function simulateSurvival(d, A, B, key) {
+  const rng = seeded(d.seed, 'survive', key);
+  const set = survivalSet(d.topic);
+  const pool = SURVIVAL_EVENTS[set];
+  const kits = [A, B].map(t => survivalKit(d, t, d.topic));
+  const tagSum = (kit, t) => kit.filter(k => k.tags.includes(t)).reduce((n, k) => n + k.use, 0);
+  const st = kits.map(kit => ({
+    cond: 100,
+    food: 1 + Math.min(6, Math.round(tagSum(kit, 'F') / 4)),
+    water: 1 + Math.min(6, Math.round(tagSum(kit, 'H') / 4)),
+    signals: 0,
+    out: 0,
+    rescued: 0,
+    used: {}
+  }));
+  const days = [];
+  const order = pool.slice().sort(() => rng() - 0.5);
+  for (let i = 0; i < SURVIVAL_DAYS; i++) days.push(order[i % order.length]);
+  const log = [];
+  for (let day = 1; day <= SURVIVAL_DAYS; day++) {
+    const evd = days[day - 1];
+    const res = [0, 1].map(s => {
+      const T = st[s];
+      if (T.out || T.rescued) return null;
+      const notes = [];
+      if (T.food > 0) T.food--;else {
+        T.cond -= 5;
+        notes.push('hungry');
+      }
+      if (T.water > 0) T.water--;else {
+        T.cond -= 7;
+        notes.push('thirsty');
+      }
+      const item = bestFor(kits[s], evd.need, T.used);
+      const chance = item ? clamp(0.28 + item.use * 0.075 - (T.used[item.name] || 0) * 0.06, 0.15, 0.95) : 0.1;
+      const ok = rng() < chance;
+      if (item) T.used[item.name] = (T.used[item.name] || 0) + 1;
+      let text = ok ? item ? evd.win.replace('{i}', item.name) : 'Nothing in the kit for this, but they get lucky and pull through.' : evd.lose;
+      if (ok && evd.gain === 'food') T.food += 2;
+      if (ok && evd.gain === 'med') T.cond = Math.min(100, T.cond + 12);
+      if (!ok && evd.hurt) T.cond -= Math.round(evd.hurt * (0.6 + rng() * 0.4));
+      if (evd.rescue && ok) {
+        T.signals++;
+        if (T.signals >= 2 || day >= 6 && rng() < 0.35) {
+          T.rescued = day;
+          text += ' 🎉 RESCUED!';
+        } else text += ' They’ve been seen — help might come.';
+      }
+      if (T.cond <= 0 && !T.rescued) {
+        T.out = day;
+        text += ' 💀 They don’t make it.';
+      }
+      return {
+        ok,
+        item: item ? item.name : null,
+        itemId: item ? item.itemId : null,
+        text,
+        notes,
+        cond: Math.max(0, T.cond),
+        food: T.food,
+        water: T.water,
+        out: !!T.out,
+        rescued: !!T.rescued
+      };
+    });
+    log.push({
+      day,
+      ev: {
+        id: evd.id,
+        emoji: evd.emoji,
+        title: evd.title,
+        night: !!evd.night,
+        need: evd.need
+      },
+      res
+    });
+    if (st.every(T => T.out || T.rescued)) break;
+  }
+  const daysOf = T => T.rescued ? SURVIVAL_DAYS : T.out ? T.out - 1 : SURVIVAL_DAYS;
+  const score = st.map(daysOf);
+  let winner, how;
+  if (score[0] !== score[1]) {
+    winner = score[0] > score[1] ? 0 : 1;
+    how = 'days';
+  } else if (!!st[0].rescued !== !!st[1].rescued) {
+    winner = st[0].rescued ? 0 : 1;
+    how = 'rescue';
+  } else if (st[0].rescued && st[1].rescued && st[0].rescued !== st[1].rescued) {
+    winner = st[0].rescued < st[1].rescued ? 0 : 1;
+    how = 'rescue';
+  } else if (Math.abs(st[0].cond - st[1].cond) >= 1) {
+    winner = st[0].cond > st[1].cond ? 0 : 1;
+    how = 'shape';
+  } else {
+    winner = rng() < 0.5 ? 0 : 1;
+    how = 'lastnight';
+  }
+  return {
+    v: 'survival',
+    kind: 'survival',
+    set,
+    log,
+    score,
+    winner,
+    how,
+    final: st.map(T => ({
+      cond: Math.max(0, T.cond),
+      rescued: T.rescued,
+      out: T.out
+    })),
+    sudden: how === 'lastnight',
+    et: false,
+    pens: null,
+    events: []
+  };
+}
+const moodOf = c => c >= 75 ? '😀' : c >= 50 ? '😐' : c >= 25 ? '😟' : c > 0 ? '🤕' : '💀';
 const KITS = {
   'brazil': ['#FFDC02', '#1B7A3E'],
   'italy': ['#1F4FA8', '#ffffff'],
@@ -33741,7 +34105,9 @@ if (window.__DN_TEST__) window.__DN = {
     arenaFighter,
     turfFit,
     simulateArena,
-    simulateFor
+    simulateFor,
+    simulateSurvival,
+    SURVIVAL_EVENTS
   },
   finale: {
     simulateBattle,
@@ -34949,6 +35315,12 @@ function MatchSummary({
   B,
   match
 }) {
+  if (match.v === 'survival') return React.createElement(SurvivalSummary, {
+    d: d,
+    A: A,
+    B: B,
+    match: match
+  });
   if (match.v === 'arena') return React.createElement(ArenaSummary, {
     d: d,
     A: A,
@@ -36398,7 +36770,231 @@ function PitchMatch({
   }));
 }
 function MatchView(props) {
-  return props.match && props.match.v === 'arena' ? React.createElement(ArenaView, props) : props.match && props.match.v === 'battle' ? React.createElement(BattleView, props) : props.match && props.match.v === 2 ? React.createElement(PitchMatch, props) : React.createElement(MatchPlayer, props);
+  return props.match && props.match.v === 'survival' ? React.createElement(SurvivalView, props) : props.match && props.match.v === 'arena' ? React.createElement(ArenaView, props) : props.match && props.match.v === 'battle' ? React.createElement(BattleView, props) : props.match && props.match.v === 2 ? React.createElement(PitchMatch, props) : React.createElement(MatchPlayer, props);
+}
+const NEED_LABEL = need => need.split('').map(t => SURVIVAL_TAGS[t] ? SURVIVAL_TAGS[t][1] + ' ' + SURVIVAL_TAGS[t][0] : '').filter(Boolean).join(' · ');
+function SurvivalCamp({
+  d,
+  team,
+  res,
+  prev,
+  show,
+  set
+}) {
+  const now = show && res ? res : prev;
+  const food = now ? now.food : null,
+    water = now ? now.water : null;
+  const gone = prev && (prev.out || prev.rescued);
+  const item = res && res.itemId ? d.items[res.itemId] : null;
+  return React.createElement("div", {
+    className: 'camp' + (show && res ? res.ok ? ' ok' : ' bad' : '') + (gone ? ' gone' : ''),
+    style: mStyle(team)
+  }, React.createElement("div", {
+    className: "camp-head"
+  }, React.createElement(Badge, {
+    m: team,
+    size: 30
+  }), React.createElement("b", {
+    className: "grow"
+  }, team.name), React.createElement("span", {
+    className: "camp-mood",
+    "aria-label": "How they\u2019re doing"
+  }, gone ? prev.rescued ? '🚁' : '💀' : moodOf(now ? now.cond : 100))), React.createElement("div", {
+    className: "camp-sup small"
+  }, food != null && React.createElement("span", null, "\uD83C\uDF72 ", food, "d"), water != null && React.createElement("span", null, "\uD83D\uDCA7 ", water, "d")), gone ? React.createElement("p", {
+    className: "small camp-text"
+  }, prev.rescued ? 'Rescued — safe and sound!' : 'Out of the game.') : show && res ? React.createElement("div", {
+    className: "camp-out"
+  }, item ? React.createElement(ItemArt, {
+    item: item,
+    topic: d.topic,
+    size: 44,
+    radius: 10
+  }) : React.createElement("span", {
+    className: "camp-none"
+  }, set === 'island' ? '🏝️' : '🧟'), React.createElement("p", {
+    className: "small camp-text"
+  }, React.createElement("b", null, res.ok ? '✅ ' : '❌ '), res.text, res.notes.length ? React.createElement("small", {
+    className: "muted"
+  }, " \xB7 ", res.notes.join(', ')) : null)) : React.createElement("p", {
+    className: "small muted camp-text"
+  }, "\u2026"));
+}
+function SurvivalView({
+  d,
+  A,
+  B,
+  match,
+  speed,
+  onDone,
+  label
+}) {
+  const instant = speed === 'instant';
+  const L = match.log;
+  const [i, setI] = useState(instant ? L.length : 0);
+  const [step, setStep] = useState(0);
+  const fast = speed === 'fast';
+  const done = i >= L.length;
+  const fired = useRef(false);
+  const feedRef = useRef(null);
+  useEffect(() => {
+    if (done) {
+      if (!fired.current) {
+        fired.current = true;
+        if (!instant) audio.play('whistle');
+        onDone && onDone();
+      }
+      return undefined;
+    }
+    const day = L[i];
+    const t = setTimeout(() => {
+      if (step < 2) {
+        const nx = step + 1;
+        setStep(nx);
+        const r = day.res[nx - 1];
+        if (r) audio.play(r.rescued ? 'fanfare' : r.out ? 'buzzer' : r.ok ? 'bid' : 'card');
+      } else {
+        setI(i + 1);
+        setStep(0);
+      }
+    }, ms(step === 0 ? fast ? 700 : 1500 : step === 1 ? fast ? 700 : 1500 : fast ? 1000 : 2000));
+    return () => clearTimeout(t);
+  }, [i, step, done]);
+  useEffect(() => {
+    const f = feedRef.current;
+    if (f) f.scrollTop = f.scrollHeight;
+  }, [i]);
+  const day = done ? null : L[i];
+  const prevRes = s => {
+    for (let k = (done ? L.length : i) - 1; k >= 0; k--) if (L[k].res[s]) return L[k].res[s];
+    return null;
+  };
+  const shownScore = done ? match.score : [0, 1].map(s => {
+    const p = prevRes(s);
+    return p && p.out ? Math.max(0, L.findIndex(x => x.res[s] === p)) : p && p.rescued ? SURVIVAL_DAYS : i;
+  });
+  const anim = !reducedMotion();
+  return React.createElement("div", {
+    className: "matchview survivalview"
+  }, React.createElement("div", {
+    className: "scoreboard"
+  }, React.createElement("div", {
+    className: "sb-team"
+  }, React.createElement(Badge, {
+    m: A
+  }), React.createElement("span", {
+    className: "sb-n"
+  }, A.name)), React.createElement("div", {
+    className: "sb-mid"
+  }, React.createElement("span", {
+    className: "sb-score num",
+    "aria-live": "polite"
+  }, shownScore[0], "\u2013", shownScore[1]), React.createElement("span", {
+    className: "sb-clock num"
+  }, done ? 'Days survived' : 'Day ' + day.day + ' of ' + SURVIVAL_DAYS)), React.createElement("div", {
+    className: "sb-team"
+  }, React.createElement(Badge, {
+    m: B
+  }), React.createElement("span", {
+    className: "sb-n"
+  }, B.name))), day && React.createElement("div", {
+    className: 'svscene ' + (day.ev.night ? 'night' : 'day') + ' ' + match.set + (anim ? ' anim' : ''),
+    key: i
+  }, React.createElement("span", {
+    className: "sv-emoji",
+    "aria-hidden": "true"
+  }, day.ev.emoji), React.createElement("p", {
+    className: "eyebrow sv-when"
+  }, day.ev.night ? '🌙 Night ' : '☀️ Day ', day.day), React.createElement("h3", {
+    className: "sv-title"
+  }, day.ev.title), React.createElement("p", {
+    className: "small sv-need"
+  }, "Needs: ", NEED_LABEL(day.ev.need))), day && React.createElement("div", {
+    className: "camps"
+  }, React.createElement(SurvivalCamp, {
+    d: d,
+    team: A,
+    res: day.res[0],
+    prev: prevRes(0),
+    show: step >= 1,
+    set: match.set
+  }), React.createElement(SurvivalCamp, {
+    d: d,
+    team: B,
+    res: day.res[1],
+    prev: prevRes(1),
+    show: step >= 2,
+    set: match.set
+  })), i > 0 && React.createElement("div", {
+    className: "mfeed",
+    ref: feedRef
+  }, L.slice(0, i).map(x => React.createElement("p", {
+    key: x.day,
+    className: "mev"
+  }, React.createElement("span", {
+    className: "mm num"
+  }, "D", x.day), React.createElement("span", null, x.ev.emoji, " ", React.createElement("b", null, x.ev.title, "."), " ", x.res.map((r, s) => r ? (s === 0 ? A : B).name + (r.ok ? ' ✅' : ' ❌') + (r.item ? ' (' + r.item + ')' : '') + (r.rescued ? ' 🚁' : r.out ? ' 💀' : '') : null).filter(Boolean).join(' · '))))), !done && React.createElement("button", {
+    type: "button",
+    className: "btn btn-ghost btn-sm",
+    onClick: () => {
+      setI(L.length);
+      setStep(0);
+    }
+  }, "Skip to the end"), done && React.createElement(SurvivalSummary, {
+    d: d,
+    A: A,
+    B: B,
+    match: match
+  }));
+}
+function SurvivalSummary({
+  d,
+  A,
+  B,
+  match
+}) {
+  const W = match.winner === 0 ? A : B;
+  const line = (t, s) => {
+    const f = match.final[s];
+    return t.name + ': ' + (f.rescued ? 'rescued on day ' + f.rescued : f.out ? 'lasted ' + match.score[s] + ' day' + (match.score[s] === 1 ? '' : 's') : 'survived all ' + SURVIVAL_DAYS + ' days') + ' ' + moodOf(f.rescued ? 100 : f.cond);
+  };
+  const mvp = s => {
+    const c = {};
+    match.log.forEach(x => {
+      const r = x.res[s];
+      if (r && r.ok && r.item) c[r.item] = (c[r.item] || 0) + 1;
+    });
+    const top = Object.entries(c).sort((a, b) => b[1] - a[1])[0];
+    return top ? top[0] + ' (' + top[1] + '×)' : 'nothing';
+  };
+  return React.createElement("div", {
+    className: "board msummary"
+  }, React.createElement("h3", null, match.set === 'island' ? '🏝️' : '🧟', " Survival summary"), React.createElement("p", {
+    className: "small",
+    style: {
+      margin: 0
+    }
+  }, line(A, 0)), React.createElement("p", {
+    className: "small",
+    style: {
+      margin: 0
+    }
+  }, line(B, 1)), React.createElement("p", {
+    className: "small",
+    style: {
+      margin: 0
+    }
+  }, "\u2B50 Most useful: ", A.name, " \u2014 ", mvp(0), " \xB7 ", B.name, " \u2014 ", mvp(1)), React.createElement("p", {
+    className: "small",
+    style: {
+      margin: 0
+    }
+  }, "\uD83C\uDFC5 ", W.name, " win", match.how === 'rescue' ? ' (got rescued first)' : match.how === 'shape' ? ' (same number of days, but in better shape)' : match.how === 'lastnight' ? ' (dead level, so one last night decided it)' : ''), React.createElement("p", {
+    className: "hint",
+    style: {
+      margin: 0
+    }
+  }, "Both teams face the same days. Each event needs certain kit; the best matching item\u2019s usefulness (a Draft Night estimate) sets the odds. Just for fun."));
 }
 const FB_CONFIG = {
   apiKey: 'AIzaSyCjw0jMkbljpMKol013HCe_l_h8nzNLtCY',
