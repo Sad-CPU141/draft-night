@@ -16,7 +16,8 @@ function onColor(hex) {
 }
 const mStyle = (m) => ({ '--c': m.color, '--on': onColor(m.color) });
 
-const COLORS = ['#ff4f64', '#3d8bff', '#ffc83d', '#2fd17c', '#a46bff', '#ff8a3a', '#ff5cbc', '#22cfd6'];
+const COLORS = ['#ff4f64', '#3d8bff', '#ffc83d', '#2fd17c', '#a46bff', '#ff8a3a', '#ff5cbc', '#22cfd6', '#b8e05a', '#7b8cff', '#ff9fb2', '#c79a5b', '#5be0b8', '#e05bff', '#9aa4b8', '#ffe066'];
+const MAX_MANAGERS = 16;
 const EMOJIS = ['😎', '🦁', '🐺', '🔥', '👑', '🦅', '🐐', '⚡', '🎯', '🧠', '🦈', '🐉', '🍀', '🚀', '💎', '🤠'];
 
 function resizeImage(file, size = 240) {

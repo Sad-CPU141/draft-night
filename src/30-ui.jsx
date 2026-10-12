@@ -615,7 +615,7 @@ function TopicsList({ topics, onBack, onOpen, onCreate, onDuplicate, onDelete, f
         <div key={t.id} className="card stack-sm" style={{ padding: 12 }}>
           <button className="tcard" style={{ border: 0, padding: 0, background: 'none' }} onClick={() => onOpen(t.id)}>
             <span className="em">{t.emoji || '🎲'}</span>
-            <span className="meta"><span className="name">{t.name}{!isBuiltIn(t) && <span className="yours">Yours</span>}</span><span className="sub">{t.items.length} items · {t.slots.join(', ')}</span></span>
+            <span className="meta"><span className="name">{t.name}{!isBuiltIn(t) && <span className="yours">Yours</span>}</span><span className="sub">{t.items.length} items · {t.slots.join(', ')}{maxPlayersFor(t) < MAX_MANAGERS ? ' · 👥 best for up to ' + Math.max(2, maxPlayersFor(t)) : ''}</span></span>
             <span className="muted" style={{ fontSize: 22 }}>›</span>
           </button>
           <div className="row">
@@ -889,7 +889,7 @@ function SoloSetup({ cfg, setCfg, topic, rules, onBack, onPickTopic, onRules, on
             <div className="field"><label htmlFor="solo-tname">Your team name</label><input id="solo-tname" className="input" maxLength={20} value={T.name} onChange={(e) => setT({ name: e.target.value })} /></div>
             <p className="hint">{T.count === 2 ? T.size + 'v' + T.size : T.count + ' teams of ' + T.size}. Bots on your team advise you; you make the bids. Other teams are all bots and bid together.</p>
           </>
-        ) : <div className="field"><label htmlFor="solo-bots">Bots</label><Stepper id="solo-bots" value={cfg.bots} min={1} max={7} onChange={(v) => setCfg({ ...cfg, bots: v })} /></div>}
+        ) : <div className="field"><label htmlFor="solo-bots">Bots</label><Stepper id="solo-bots" value={cfg.bots} min={1} max={MAX_MANAGERS - 1} onChange={(v) => setCfg({ ...cfg, bots: v })} /></div>}
         <div className="field"><span className="label">Difficulty</span><Seg label="Difficulty" value={cfg.level} options={[['easy', 'Easy'], ['medium', 'Medium'], ['hard', 'Hard']]} onChange={(v) => setCfg({ ...cfg, level: v })} />
           <p className="hint">{cfg.level === 'easy' ? 'Bots make mistakes, waste money and miss bargains.' : cfg.level === 'medium' ? 'Bots play sensibly and avoid most silly bidding wars.' : 'Bots budget carefully, read the table and plan for the endgame. No cheating.'}</p></div>
         <div className="field"><span className="label">Bid clock</span><Seg label="Bid clock" value={cfg.clock} options={[[6, '6s'], [8, '8s'], [12, '12s']]} onChange={(v) => setCfg({ ...cfg, clock: v })} /></div>
@@ -1023,7 +1023,7 @@ function SetupManagersSolo({ managers, setManagers, onBack, onNext, teamCfg, set
           </div>
         ))}
       </div>
-      <button className="btn" onClick={add} disabled={managers.length >= 8}>+ Add manager {managers.length >= 8 ? '(max 8)' : ''}</button>
+      <button className="btn" onClick={add} disabled={managers.length >= MAX_MANAGERS}>+ Add manager {managers.length >= MAX_MANAGERS ? '(max ' + MAX_MANAGERS + ')' : ''}</button>
       {!valid && <p className="hint">Every manager needs a name.</p>}
       <button className="btn btn-gold" disabled={!valid} onClick={onNext}>Next: pick a topic</button>
     </div>
@@ -1145,7 +1145,7 @@ function SetupTopic({ topics, onBack, onPick, onTopics, folder, setFolder, prefs
       <FolderBrowser topics={topics} q={q} folder={folder} setFolder={setFolder} prefs={prefs} setPrefs={setPrefs} view={view} setView={setView} onRandom={random} renderTopic={(t) => (
         <button key={t.id} className="tcard" onClick={() => onPick(t.id)} disabled={!t.items.length || !t.slots.length} style={{ opacity: t.items.length ? 1 : 0.4 }}>
           <span className="em">{t.emoji || '🎲'}</span>
-          <span className="meta"><span className="name">{t.name}{!isBuiltIn(t) && <span className="yours">Yours</span>}</span><span className="sub">{t.items.length} items · {t.slots.length} slots</span></span>
+          <span className="meta"><span className="name">{t.name}{!isBuiltIn(t) && <span className="yours">Yours</span>}</span><span className="sub">{t.items.length} items · {t.slots.length} slots{maxPlayersFor(t) < MAX_MANAGERS ? ' · 👥 up to ' + Math.max(2, maxPlayersFor(t)) + ' players' : ''}</span></span>
           <span className="muted" style={{ fontSize: 22 }}>›</span>
         </button>
       )} />
@@ -2765,6 +2765,11 @@ function migrateTopics(stored) {
       if (t.id === 't-house') { const names = t.items.map((i) => i.name).sort().join('|'); return names === OLD_HOUSE_NAMES ? { ...s } : t; }
       t = { ...t, scene: s.scene };
     }
+    // New extra items for big groups are added to saved copies once (never removing anything).
+    if ((s.extrasV || 0) > (t.extrasV || 0)) {
+      const ids = new Set(t.items.map((i) => i.id)); const names = new Set(t.items.map((i) => i.name.toLowerCase()));
+      t = { ...t, extrasV: s.extrasV, items: [...t.items, ...s.items.filter((i) => /-e\d+$/.test(i.id) && !ids.has(i.id) && !names.has(i.name.toLowerCase()))] };
+    }
     const byId = {}; s.items.forEach((i) => { byId[i.id] = i; });
     return { ...t, art: t.art || s.art, folder: t.folder || s.folder, kitShape: t.kitShape || s.kitShape, kitLabel: t.kitLabel || s.kitLabel, photos: t.photos === undefined ? s.photos : t.photos,
       items: t.items.map((i) => (byId[i.id] && !i.emoji && byId[i.id].emoji ? { ...i, emoji: byId[i.id].emoji } : i)) };
@@ -3379,7 +3384,7 @@ class Boundary extends React.Component {
   }
 }
 
-if (window.__DN_TEST__) window.__DN = { finale: { buildBracket, advanceBracket, nextMatchup, matchVoters, canVoteFor, decideMatchup, simulateMatch, playerRating, teamRating, matchupVoteBot, finaleMode, isFootball, startFinale, castMatchVote, botMatchVotes, playMatchup, resolveMatchup, getMatchup, needsVote, needsMatch, votingDone, finaleStandings, finaleRecord, championStory, goldenBoot, matchVoteProblem, roundName, FINALE_DEFAULTS, validRating, matchScript, revealedEvents, matchFrame, lineupOf, expectedGoals, strength2, squad }, audio, AUDIO_DEFAULTS, share: { encodeTopic, decodeShared, packTopic, unpackTopic, topicCode, shareLink, MAX_LINK }, stats: { careerStats, computeAwards, computeShame, hallOfShame, humanPlayers }, bots: { makeBots, nextBotAction, botDecision, botFreePickChoice, botVote, teamScore, voteChoices, itemFame, seeded, BOT_LEVELS, BOT_TYPES, botCardPlay, botVeto, botNominate, botTradeDecision, botTradeOffer }, twists: { twistRules, TWIST_DEFAULTS, playCard, answerCard, cardProblem, doubleProblem, nominate, currentNominator, nominationPool, botActors, botAdvisers, participants, visibleItem, isHidden, rarityOf, frozenNow, proposeTrade, acceptTrade, rejectTrade, cancelTrade, closeTrades, tradeProblem, openTrades, hasCard }, auction: { withdraw, isOut, auctionEnd, owesBid, withdrawProblem, outIds, owing, botPassers, botForcedBid, runAction, ownerInfo, migrateSettings, rulesLines }, scenes: { SCENES, sceneOf, placeScene, sceneKey, SceneCanvas, SceneView, sceneHasArt }, skips: { SKIP_DEFAULTS, skipCfg, skipRulesOn, presenter, skipVerdict, eligibleFor, endgameNow, endgameSoon, chooseForced, autoChooseForced, presenterLine, botSkipSave, botForcedChoice, unsoldOutcome, skipChip }, topicsLib: { POPULARITY, popScore, byPopularity, folderOrder, favouritesOrder, prefsOf, isBuiltIn, folderOf, folderList, matchTopic, toggleIn }, DEFAULT_SOLO, isFlex, canBid, createDraft, placeBid, sell, skipItem, undo, freePick, currentPicker, canTake, nextAmount, isDraftOver, draftStats, winsBoard, tally, starterTopics, migrateTopics, validateBackup, makeBackup, wikiTitleFor, PHOTO_TOPICS, store, wiki, DEFAULT_RULES, COLORS, emptyCount, assignSlot, maxBid };
+if (window.__DN_TEST__) window.__DN = { finale: { buildBracket, advanceBracket, nextMatchup, matchVoters, canVoteFor, decideMatchup, simulateMatch, playerRating, teamRating, matchupVoteBot, finaleMode, isFootball, startFinale, castMatchVote, botMatchVotes, playMatchup, resolveMatchup, getMatchup, needsVote, needsMatch, votingDone, finaleStandings, finaleRecord, championStory, goldenBoot, matchVoteProblem, roundName, FINALE_DEFAULTS, validRating, matchScript, revealedEvents, matchFrame, lineupOf, expectedGoals, strength2, squad }, audio, AUDIO_DEFAULTS, share: { encodeTopic, decodeShared, packTopic, unpackTopic, topicCode, shareLink, MAX_LINK }, stats: { careerStats, computeAwards, computeShame, hallOfShame, humanPlayers }, bots: { makeBots, nextBotAction, botDecision, botFreePickChoice, botVote, teamScore, voteChoices, itemFame, seeded, BOT_LEVELS, BOT_TYPES, botCardPlay, botVeto, botNominate, botTradeDecision, botTradeOffer }, twists: { twistRules, TWIST_DEFAULTS, playCard, answerCard, cardProblem, doubleProblem, nominate, currentNominator, nominationPool, botActors, botAdvisers, participants, visibleItem, isHidden, rarityOf, frozenNow, proposeTrade, acceptTrade, rejectTrade, cancelTrade, closeTrades, tradeProblem, openTrades, hasCard }, auction: { withdraw, isOut, auctionEnd, owesBid, withdrawProblem, outIds, owing, botPassers, botForcedBid, runAction, ownerInfo, migrateSettings, rulesLines }, scenes: { SCENES, sceneOf, placeScene, sceneKey, SceneCanvas, SceneView, sceneHasArt }, skips: { SKIP_DEFAULTS, skipCfg, skipRulesOn, presenter, skipVerdict, eligibleFor, endgameNow, endgameSoon, chooseForced, autoChooseForced, presenterLine, botSkipSave, botForcedChoice, unsoldOutcome, skipChip }, topicsLib: { maxPlayersFor, POPULARITY, popScore, byPopularity, folderOrder, favouritesOrder, prefsOf, isBuiltIn, folderOf, folderList, matchTopic, toggleIn }, DEFAULT_SOLO, isFlex, canBid, createDraft, placeBid, sell, skipItem, undo, freePick, currentPicker, canTake, nextAmount, isDraftOver, draftStats, winsBoard, tally, starterTopics, migrateTopics, validateBackup, makeBackup, wikiTitleFor, PHOTO_TOPICS, store, wiki, DEFAULT_RULES, COLORS, emptyCount, assignSlot, maxBid };
 store.init().finally(() => {
   ReactDOM.createRoot(document.getElementById('root')).render(<Boundary><App /></Boundary>);
 });

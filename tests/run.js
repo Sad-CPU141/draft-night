@@ -116,14 +116,16 @@ async function tap(w, el) { el.dispatchEvent(new w.MouseEvent('pointerdown', { b
     ok(DN.wikiTitleFor(cf.items.find((i) => i.name === 'Kylian Mbappé'), cf) === 'Kylian Mbappé', 'default page name is the item name');
     ok(DN.wikiTitleFor(pow.items[0], pow) === null, 'abstract topics (Superpowers) never look up photos');
     ok(DN.wikiTitleFor({ ...cf.items[0], photosOff: true }, cf) === null, 'per-item “no photo” switch respected');
-    DN.wiki.prefetch(cf.items.map((i) => DN.wikiTitleFor(i, cf)).concat(['Dave (rapper)', 'Nobody Here']));
-    await sleep(120);
-    ok(calls === 1, 'a whole topic is fetched in one batched request (' + calls + ')');
+    const titles = cf.items.map((i) => DN.wikiTitleFor(i, cf)).concat(['Dave (rapper)', 'Nobody Here']);
+    const batches = Math.ceil(new Set(titles).size / 50);
+    DN.wiki.prefetch(titles);
+    await sleep(200);
+    ok(calls === batches, 'a whole topic is fetched in batches of 50 titles (' + titles.length + ' titles → ' + calls + ' requests)');
     ok(DN.wiki.peek('Alisson Becker') === 'https://upload.wikimedia.org/alisson.jpg', 'redirects followed to the right photo');
     ok(DN.wiki.peek('Dave (rapper)') === null, 'disambiguation pages give no photo (falls back)');
     ok(DN.wiki.peek('Nobody Here') === null, 'missing pages give no photo (falls back)');
-    DN.wiki.prefetch(['Alisson Becker']); await sleep(500);
-    ok(calls === 1, 'cached lookups are not fetched again');
+    const before = calls; DN.wiki.prefetch(['Alisson Becker']); await sleep(500);
+    ok(calls === before, 'cached lookups are not fetched again');
     ok(!!w.localStorage.getItem('dn_wiki_cache_v1'), 'lookup cache saved for next visit');
   }
 

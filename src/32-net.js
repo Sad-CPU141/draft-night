@@ -27,7 +27,7 @@ const FB_CONFIG = {
 };
 const FB_VER = '10.14.1';
 const ROOM_ALPHA = 'ABCDEFGHJKMNPQRSTUVWXYZ23456789';
-const ONLINE = { maxTeams: 8, maxTeamSize: 4, maxPeople: 16, coverAfter: 60000, hostGrace: 8000, clocks: [6, 10, 15, 20], clock: 10 };
+const ONLINE = { maxTeams: 16, maxTeamSize: 4, maxPeople: 32, coverAfter: 60000, hostGrace: 8000, clocks: [6, 10, 15, 20], clock: 10 };
 const LAST_ROOM = 'dn_last_room';
 
 function loadScript(src) {

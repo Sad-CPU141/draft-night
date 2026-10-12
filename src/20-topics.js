@@ -28,7 +28,36 @@ function folderList(topics, includeDefaults) {
 function starterTopics() {
   const v3 = [...sportsTopicsV3(), ...foodTopicsV3(), ...entTopicsV3(), ...travelTopicsV3(), ...animalTopicsV3(), ...styleTopicsV3(), ...funTopicsV3()];
   return [...baseTopics(), ...evenMoreTopics(), ...funTopics()].map((t) => ({ ...t, folder: STARTER_FOLDER[t.id] || 'My Topics', photos: Object.prototype.hasOwnProperty.call(PHOTO_TOPICS, t.id) }))
-    .concat(v3.map((t) => ({ ...t, builtin: true })));
+    .concat(v3.map((t) => ({ ...t, builtin: true }))).map(withExtras);
+}
+/* ---------- extra items for big groups (up to 16 players) ----------
+   23-extra-*.js files add items to built-in topics without touching the originals.
+   Line format: Name | position | short description | emoji | Wikipedia page (optional).
+   Extra items get stable ids "<topic>-e<n>" and are skipped if the name already exists. */
+const EXTRAS_V = 1;
+function extraItemsFor(id) {
+  const src = (typeof EXTRA_ITEMS !== 'undefined' && EXTRA_ITEMS[id]) || '';
+  return src.trim() ? src.trim().split('\n').map((line, i) => { const [n, p, d, e, w] = line.split('|').map((x) => (x || '').trim()); const it = { id: id + '-e' + i, name: n, pos: p, desc: d, emoji: e, photo: '' }; if (w) it.wiki = w; return it; }) : [];
+}
+function withExtras(t) {
+  const extra = extraItemsFor(t.id); if (!extra.length) return t;
+  const have = new Set(t.items.map((i) => i.name.toLowerCase()));
+  // Expanded topics that look up photos in sentence case ("Snow leopard") keep doing so for extras.
+  const sentence = t.v3 && t.photos && t.items.filter((i) => i.wiki && i.wiki !== i.name && i.wiki.toLowerCase() === i.name.toLowerCase()).length > t.items.length / 3;
+  if (sentence) extra.forEach((i) => { if (!i.wiki) i.wiki = i.name.charAt(0) + i.name.slice(1).toLowerCase(); });
+  return { ...t, items: [...t.items, ...extra.filter((i) => !have.has(i.name.toLowerCase()) && have.add(i.name.toLowerCase()))], extrasV: EXTRAS_V };
+}
+// How many players a topic can fully fill (every team gets every slot), position-aware.
+function maxPlayersFor(t) {
+  if (!t || !t.slots || !t.slots.length) return 0;
+  const by = {}; let flexSlots = 0;
+  t.slots.forEach((s) => { if (isFlex(s)) flexSlots++; else by[norm(s)] = (by[norm(s)] || 0) + 1; });
+  const counts = {}; let free = 0;
+  t.items.forEach((it) => { const p = norm(it.pos); if (p && by[p]) counts[p] = (counts[p] || 0) + 1; else free++; });
+  let n = Math.floor(t.items.length / t.slots.length);
+  // When every item has a position, each position must also have enough items of its own.
+  if (!free) Object.keys(by).forEach((p) => { n = Math.min(n, Math.floor(((counts[p] || 0)) / by[p])); });
+  return n;
 }
 // Built-in topics have ids from this library; anything else is the user's own (created or imported).
 const isBuiltIn = (t) => !!t && (Object.prototype.hasOwnProperty.call(STARTER_FOLDER, t.id) || !!t.v3 || !!t.builtin);
