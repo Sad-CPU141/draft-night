@@ -830,7 +830,7 @@ async function tap(w, el) { el.dispatchEvent(new w.MouseEvent('pointerdown', { b
     };
     const t1 = tieRun('rating'); const m1 = F.getMatchup(t1.d, t1.r, t1.i);
     const ra = F.teamRating(t1.d, t1.d.managers.find((x) => x.id === m1.a)).rating, rb = F.teamRating(t1.d, t1.d.managers.find((x) => x.id === m1.b)).rating;
-    ok(m1.winner && (ra === rb || m1.winner === (ra > rb ? m1.a : m1.b)) && /higher-rated/.test(m1.why), 'tied vote → the higher-rated team goes through (' + ra + ' v ' + rb + ')');
+    ok(m1.winner && (ra === rb || m1.winner === (ra > rb ? m1.a : m1.b)) && /stronger team/.test(m1.why), 'tied vote → the stronger team goes through (' + ra + ' v ' + rb + ')');
     const t2 = tieRun('revote'); const m2 = F.getMatchup(t2.d, t2.r, t2.i);
     ok(!m2.winner && m2.revoted && !Object.keys(m2.votes).length, 'tied vote with “vote again” clears the votes for one revote');
     let d2 = t2.d; const v2 = F.matchVoters(d2, m2); d2 = F.castMatchVote(d2, t2.r, t2.i, v2[0].id, m2.a); d2 = F.castMatchVote(d2, t2.r, t2.i, v2[1].id, m2.b); d2 = F.resolveMatchup(d2, t2.r, t2.i);
@@ -1000,6 +1000,7 @@ async function tap(w, el) { el.dispatchEvent(new w.MouseEvent('pointerdown', { b
   await require('./topics.js')({ ok, boot, btn, click, sleep });
   await require('./skips.js')({ ok, boot, btn, click, sleep });
   await require('./scenes.js')({ ok, boot, btn, click, sleep });
+  await require('./battles.js')({ ok, boot, btn, click, sleep });
 
   if (!process.env.SKIP_ONLINE) await require('./online.js')({ ok, boot, btn, click, sleep });
 

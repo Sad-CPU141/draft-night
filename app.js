@@ -1,4 +1,4 @@
-/* Draft Night c73d8f9f49 — built from src/ by build.js. Edit src/, not this file. */
+/* Draft Night a83da5e5c1 — built from src/ by build.js. Edit src/, not this file. */
 "use strict";
 (function(){
 function _extends() { return _extends = Object.assign ? Object.assign.bind() : function (n) { for (var e = 1; e < arguments.length; e++) { var t = arguments[e]; for (var r in t) ({}).hasOwnProperty.call(t, r) && (n[r] = t[r]); } return n; }, _extends.apply(null, arguments); }
@@ -621,6 +621,34 @@ const STARTER_ERA = {
   't-pl': 'prime',
   't-goat': 'prime'
 };
+const STARTER_BATTLE = {
+  't-ani': 'fight',
+  't-cats': 'fight',
+  't-sharks': 'fight',
+  't-raptors': 'fight',
+  't-reptiles': 'fight',
+  't-snakes': 'fight',
+  't-dinos': 'fight',
+  't-prehistmammals': 'fight',
+  't-myth': 'fight',
+  't-safari': 'fight',
+  't-arctic': 'fight',
+  't-primates': 'fight',
+  't-deepsea': 'fight',
+  't-extinct': 'fight',
+  't-insects': 'fight',
+  't-aussie': 'fight',
+  't-whales': 'fight',
+  't-pow': 'powers',
+  't-powercombos': 'powers',
+  't-worstpowers': 'weird',
+  't-zomb': 'survival',
+  't-island': 'survival',
+  't-cute': 'cute',
+  't-pet': 'cute',
+  't-dogbreeds': 'cute',
+  't-catbreeds': 'cute'
+};
 function starterTopics() {
   const v3 = [...sportsTopicsV3(), ...foodTopicsV3(), ...entTopicsV3(), ...travelTopicsV3(), ...animalTopicsV3(), ...styleTopicsV3(), ...funTopicsV3()];
   return [...baseTopics(), ...evenMoreTopics(), ...funTopics()].map(t => ({
@@ -633,6 +661,9 @@ function starterTopics() {
   }))).map(withExtras).map(t => STARTER_ERA[t.id] ? {
     ...t,
     era: STARTER_ERA[t.id]
+  } : STARTER_BATTLE[t.id] ? {
+    ...t,
+    battle: STARTER_BATTLE[t.id]
   } : t);
 }
 const EXTRAS_V = 2;
@@ -21206,6 +21237,161 @@ const callLine = (k, vars) => {
   const l = ls[Math.floor(Math.random() * ls.length)];
   return l.replace(/\{(\w+)\}/g, (_, v) => vars && vars[v] != null ? vars[v] : '');
 };
+const BATTLE_KINDS = {
+  fight: {
+    name: 'Battle',
+    start: 'Start the battle',
+    emoji: '⚔️',
+    round: 'Round',
+    win: ['{w} overpowers {l}!', '{w} pins {l} down!', '{l} never saw {w} coming.', '{w} outlasts {l} in a long scrap.', '{w} sends {l} running!', 'A brutal clash — {w} comes out on top.'],
+    upset: ['UPSET! {w} somehow beats {l}!', 'Nobody expected that: {w} takes down {l}!'],
+    noshow: ['{w} wins by walkover — nobody turned up to face it.']
+  },
+  powers: {
+    name: 'Power Clash',
+    start: 'Start the clash',
+    emoji: '💥',
+    round: 'Clash',
+    win: ['{w} cancels out {l}!', '{w} is just too much for {l}.', '{l} fizzles out against {w}.', '{w} lands the knockout blow!', 'Sparks fly — {w} wins the clash.'],
+    upset: ['WHAT?! {w} beats {l}!', 'Plot twist: {w} outsmarts {l}!'],
+    noshow: ['{w} wins unopposed.']
+  },
+  weird: {
+    name: 'Useless Power Showdown',
+    start: 'Start the showdown',
+    emoji: '🤡',
+    round: 'Showdown',
+    win: ['{w} is slightly less useless than {l}.', '{l} trips over itself; {w} wins by default-ish.', 'The crowd groans… {w} edges it.', '{w} somehow helps. {l} does not.'],
+    upset: ['Against all logic, {w} wins!', 'Chaos! {w} beats {l}!'],
+    noshow: ['{w} wins because nobody else showed up.']
+  },
+  survival: {
+    name: 'Survival Showdown',
+    start: 'Start the showdown',
+    emoji: '🧟',
+    round: 'Night',
+    win: ['{w} keeps the team alive. {l} doesn’t help.', '{w} saves the night; {l} gets left behind.', 'When it mattered, {w} beat {l}.', '{w} gets them through. {l} breaks.'],
+    upset: ['Who knew? {w} beats {l} when it counts!', 'Surprise hero: {w}!'],
+    noshow: ['{w} wins the night — the other team had nothing.']
+  },
+  cute: {
+    name: 'Cuteness Contest',
+    start: 'Start the contest',
+    emoji: '🥰',
+    round: 'Round',
+    win: ['The crowd melts for {w}!', '{w} wins the aww-off against {l}.', '{l} is adorable, but {w} is MORE adorable.', 'Tiny paws, big win: {w}!'],
+    upset: ['Underdog cuteness! {w} steals it from {l}!', 'Nobody saw that coming: {w} wins the crowd!'],
+    noshow: ['{w} wins with no competition.']
+  }
+};
+const battleKindId = topic => {
+  if (!topic || topic.layout === 'pitch') return null;
+  const k = topic.battle || STARTER_BATTLE[topic.id];
+  return BATTLE_KINDS[k] ? k : null;
+};
+const battleKind = topic => {
+  const k = battleKindId(topic);
+  return k ? BATTLE_KINDS[k] : null;
+};
+const hasBattle = topic => !!battleKindId(topic);
+function battleDuel(rng, kind, a, b, maxP) {
+  const fill = (lines, w, l) => lines[Math.floor(rng() * lines.length)].replace('{w}', w).replace('{l}', l);
+  if (!a || !b) {
+    const w = a ? 0 : 1;
+    const x = a || b;
+    return {
+      w,
+      edge: null,
+      upset: false,
+      line: fill(kind.noshow, x.item.name, '')
+    };
+  }
+  const edge = clamp(0.5 + 0.35 * (a.price - b.price) / Math.max(1, maxP), 0.22, 0.78);
+  const w = rng() < edge ? 0 : 1;
+  const upset = w === 0 && edge < 0.45 || w === 1 && edge > 0.55;
+  const W = w === 0 ? a : b,
+    L = w === 0 ? b : a;
+  return {
+    w,
+    edge,
+    upset,
+    line: fill(upset ? kind.upset : kind.win, W.item.name, L.item.name)
+  };
+}
+function simulateBattle(d, A, B, key) {
+  const kindId = battleKindId(d.topic) || 'fight';
+  const kind = BATTLE_KINDS[kindId];
+  const rng = seeded(d.seed, 'battle', key);
+  const slots = d.rules.slots;
+  const entry = (t, k) => {
+    const x = t.team[k];
+    const item = x && d.items[x.itemId];
+    return item ? {
+      item,
+      price: x.price || 0
+    } : null;
+  };
+  const maxP = Math.max(1, ...[A, B].flatMap(t => t.team.filter(Boolean).map(x => x.price || 0)));
+  const duels = [];
+  const score = [0, 0];
+  const view = e => e ? {
+    name: e.item.name,
+    emoji: e.item.emoji || '',
+    price: e.price,
+    itemId: e.item.id
+  } : null;
+  slots.forEach((slot, k) => {
+    const a = entry(A, k),
+      b = entry(B, k);
+    if (!a && !b) return;
+    const r = battleDuel(rng, kind, a, b, maxP);
+    score[r.w]++;
+    duels.push({
+      slot,
+      a: view(a),
+      b: view(b),
+      w: r.w,
+      edge: r.edge,
+      upset: r.upset,
+      line: r.line,
+      score: [...score]
+    });
+  });
+  let sudden = null;
+  if (score[0] === score[1]) {
+    const best = t => t.team.map((_, k) => entry(t, k)).filter(Boolean).sort((x, y) => y.price - x.price || (x.item.name < y.item.name ? -1 : 1))[0] || null;
+    const a = best(A),
+      b = best(B);
+    const r = battleDuel(rng, kind, a, b, maxP);
+    score[r.w]++;
+    sudden = {
+      slot: 'Sudden death',
+      a: view(a),
+      b: view(b),
+      w: r.w,
+      edge: r.edge,
+      upset: r.upset,
+      line: r.line,
+      score: [...score]
+    };
+    duels.push(sudden);
+  }
+  return {
+    v: 'battle',
+    kind: kindId,
+    duels,
+    score,
+    winner: score[0] > score[1] ? 0 : 1,
+    sudden: !!sudden,
+    et: false,
+    pens: null,
+    events: []
+  };
+}
+const battleRulesLine = topic => {
+  const k = battleKind(topic);
+  return k ? k.emoji + ' ' + k.name + 's: teams face off slot by slot. The pick the room paid more for has the edge (never more than 78%), and luck does the rest. Just for fun — not a real prediction.' : '';
+};
 const isFootball = topic => !!topic && topic.layout === 'pitch';
 const ATTRS = ['PAC', 'SHO', 'PAS', 'DRI', 'DEF', 'PHY'];
 const ROLE_SHAPE = {
@@ -21858,12 +22044,16 @@ function decideMatchup(d, m, mode, fin) {
     const w = tieBreak();
     return {
       winner: w.id,
-      why: 'Tied ' + va + '–' + vb + ' on votes; ' + w.name + ' goes through as the higher-rated team.'
+      why: 'Tied ' + va + '–' + vb + ' on votes; ' + w.name + ' goes through as the stronger team.'
     };
   }
   const mt = m.match;
   if (mode === 'sim') {
     const w = mt.winner === 0 ? A : B;
+    if (mt.v === 'battle') return {
+      winner: w.id,
+      why: w.name + ' won the ' + (BATTLE_KINDS[mt.kind] || BATTLE_KINDS.fight).name.toLowerCase() + ' ' + mt.score[mt.winner] + '–' + mt.score[1 - mt.winner] + (mt.sudden ? ' in sudden death' : '') + '.'
+    };
     if (mt.pens) return {
       winner: w.id,
       why: 'It finished ' + mt.score[0] + '–' + mt.score[1] + ' after extra time; ' + w.name + ' won ' + Math.max(...mt.pens) + '–' + Math.min(...mt.pens) + ' on penalties.'
@@ -21882,7 +22072,7 @@ function decideMatchup(d, m, mode, fin) {
     const w = mt.winner === 0 ? A : B;
     return {
       winner: w.id,
-      why: 'Dead level on the combined score, so the match result decides: ' + w.name + (mt.pens ? ' on penalties.' : mt.et ? ' after extra time.' : ' won the match.'),
+      why: 'Dead level on the combined score, so the ' + (mt.v === 'battle' ? 'battle' : 'match') + ' result decides: ' + w.name + (mt.v === 'battle' ? mt.sudden ? ' won in sudden death.' : ' won the battle.' : mt.pens ? ' on penalties.' : mt.et ? ' after extra time.' : ' won the match.'),
       detail
     };
   }
@@ -21896,7 +22086,7 @@ function decideMatchup(d, m, mode, fin) {
 const finaleMode = d => {
   const f = d.rules && d.rules.finale || {};
   const m = f.mode || 'vote';
-  return !isFootball(d.topic) && (m === 'sim' || m === 'combined') ? 'bracket' : m;
+  return !isFootball(d.topic) && !hasBattle(d.topic) && (m === 'sim' || m === 'combined') ? 'bracket' : m;
 };
 const FINALE_DEFAULTS = {
   mode: 'vote',
@@ -21984,6 +22174,9 @@ function playMatchup(d, r, i) {
   if (!m.a || !m.b || m.match || m.winner) return d;
   const A = teamOf(d, m.a),
     B = teamOf(d, m.b);
+  if (!isFootball(d.topic)) return withMatchup(d, r, i, {
+    match: simulateBattle(d, A, B, m.id)
+  });
   let home = null;
   if (finCfg(d).home) {
     const ra = teamRating(d, A).rating,
@@ -22081,7 +22274,7 @@ function championStory(d) {
   if (!games.length) return champ.name + ' was the only team with players, so they win by default.';
   const bits = [];
   const rec = finaleRecord(d, champ.id);
-  if (needsMatch(f.mode)) bits.push('Won ' + rec.won + ' of ' + rec.played + ' match' + (rec.played === 1 ? '' : 'es') + ', scoring ' + rec.gf + ' and conceding ' + rec.ga + '.');else bits.push('Won ' + rec.won + ' head-to-head vote' + (rec.won === 1 ? '' : 's') + '.');
+  if (needsMatch(f.mode) && !isFootball(d.topic)) bits.push('Won ' + rec.won + ' of ' + rec.played + ' battle' + (rec.played === 1 ? '' : 's') + ', winning ' + rec.gf + ' rounds and losing ' + rec.ga + '.');else if (needsMatch(f.mode)) bits.push('Won ' + rec.won + ' of ' + rec.played + ' match' + (rec.played === 1 ? '' : 'es') + ', scoring ' + rec.gf + ' and conceding ' + rec.ga + '.');else bits.push('Won ' + rec.won + ' head-to-head vote' + (rec.won === 1 ? '' : 's') + '.');
   if (isFootball(d.topic)) {
     const tr = teamRating(d, champ);
     const all = d.managers.filter(m => m.team.some(Boolean)).map(m => teamRating(d, m).rating).sort((a, b) => b - a);
@@ -22149,6 +22342,9 @@ function packTopic(t, withPhotos) {
     ...(t.era ? {
       er: t.era
     } : {}),
+    ...(t.battle ? {
+      bt: t.battle
+    } : {}),
     i: t.items.map(it => {
       const r = [it.name, it.pos || '', it.desc || '', it.emoji || '', it.imageUrl || '', it.wiki || '', it.kit || null, it.photosOff ? 1 : 0];
       if (withPhotos && it.photo) r.push(it.photo);
@@ -22211,6 +22407,9 @@ function unpackTopic(o) {
       } : {}),
       ...(o.er === 'now' || o.er === 'prime' ? {
         era: o.er
+      } : {}),
+      ...(typeof o.bt === 'string' && BATTLE_KINDS[o.bt] ? {
+        battle: o.bt
       } : {}),
       kitShape: o.ks === 'tank' ? 'tank' : '',
       kitLabel: o.kl === 'initials' ? 'initials' : '',
@@ -22372,7 +22571,7 @@ function computeAwards(d) {
       const loser = teamOf(d, lm.winner === lm.a ? lm.b : lm.a);
       const va = Object.values(lm.votes || {}).filter(v => v === lm.winner).length,
         vb = Object.values(lm.votes || {}).length - va;
-      if (lm.match && lm.match.pens) add('robbed', '😤', 'Most Robbed', loser, 'Lost the final on penalties.');else if (lm.match && Math.abs(lm.match.score[0] - lm.match.score[1]) === 1 && d.finale.mode === 'sim') add('robbed', '😤', 'Most Robbed', loser, 'Lost the final by a single goal.');else if (d.finale.mode === 'bracket' && va - vb === 1) add('robbed', '😤', 'Most Robbed', loser, 'Lost the final by a single vote.');
+      if (lm.match && lm.match.pens) add('robbed', '😤', 'Most Robbed', loser, 'Lost the final on penalties.');else if (lm.match && Math.abs(lm.match.score[0] - lm.match.score[1]) === 1 && d.finale.mode === 'sim') add('robbed', '😤', 'Most Robbed', loser, lm.match.v === 'battle' ? 'Lost the final by a single round.' : 'Lost the final by a single goal.');else if (d.finale.mode === 'bracket' && va - vb === 1) add('robbed', '😤', 'Most Robbed', loser, 'Lost the final by a single vote.');
     }
     if (isFootball(d.topic)) {
       const giant = games.map(({
@@ -24597,6 +24796,17 @@ function TopicEditor({
     onChange: v => set({
       layout: v
     })
+  })), topic.layout !== 'pitch' && React.createElement("div", {
+    className: "field"
+  }, React.createElement("span", {
+    className: "label"
+  }, "Fun battles (Battles finale)"), React.createElement(Seg, {
+    label: "Fun battle style",
+    value: topic.battle || 'none',
+    options: [['none', 'Off'], ['fight', '⚔️ Fight'], ['powers', '💥 Powers'], ['survival', '🧟 Survival'], ['cute', '🥰 Cuteness'], ['weird', '🤡 Silly']],
+    onChange: v => set({
+      battle: v === 'none' ? '' : v
+    })
   })), topic.layout === 'pitch' && React.createElement("div", {
     className: "field"
   }, React.createElement("span", {
@@ -25688,8 +25898,8 @@ function rulesLines(rules, opts) {
   L.push(['🤝', tw.trades.on ? 'Trade window: ' + tw.trades.minutes + ' min' + (tw.trades.money ? ', money allowed' : '') : 'Trade window: off']);
   L.push(['🏆', 'Winner: ' + {
     vote: 'group vote',
-    bracket: 'head-to-head vote bracket' + (fin.tiebreak === 'revote' ? ' (ties: vote again once)' : ' (ties: higher-rated team)'),
-    sim: 'match simulator knockout',
+    bracket: 'head-to-head vote bracket' + (fin.tiebreak === 'revote' ? ' (ties: vote again once)' : ' (ties: stronger team)'),
+    sim: 'match / battle knockout',
     combined: 'combined finale ' + fin.weight + '% match / ' + (100 - fin.weight) + '% votes'
   }[fin.mode] + (fin.home && (fin.mode === 'sim' || fin.mode === 'combined') ? ' · home advantage for the higher seed' : '')]);
   return L;
@@ -25762,6 +25972,7 @@ function SetupRules({
     }
   });
   const foot = defaultsMode || isFootball(topic);
+  const bk = !defaultsMode && battleKind(topic);
   const sk = skipCfg(rules.skip ? rules : {
     skip: SKIP_DEFAULTS
   });
@@ -26322,15 +26533,17 @@ function SetupRules({
   }, "How the champion is chosen"), React.createElement(Seg, {
     label: "Winner selection",
     value: fin.mode,
-    options: [['vote', 'Vote'], ['bracket', 'Bracket'], ['sim', 'Matches'], ['combined', 'Combined']],
+    options: [['vote', 'Vote'], ['bracket', 'Bracket'], ['sim', bk ? 'Battles' : 'Matches'], ['combined', 'Combined']],
     onChange: v => setF({
       mode: v
     })
   }), React.createElement("p", {
     className: "hint"
-  }, fin.mode === 'vote' ? 'Everyone votes once for the best team (the classic way).' : fin.mode === 'bracket' ? 'Teams meet 1v1 in a knockout bracket. Players not in the matchup vote; you never vote for your own team.' : fin.mode === 'sim' ? 'Every bracket matchup is an animated football match. Win to go through.' : 'Each matchup has an animated match and a vote, combined into one score.'), !foot && (fin.mode === 'sim' || fin.mode === 'combined') && React.createElement("p", {
+  }, fin.mode === 'vote' ? 'Everyone votes once for the best team (the classic way).' : fin.mode === 'bracket' ? 'Teams meet 1v1 in a knockout bracket. Players not in the matchup vote; you never vote for your own team.' : fin.mode === 'sim' ? bk ? 'Every bracket matchup is an animated ' + bk.name.toLowerCase() + ': picks face off slot by slot. Win to go through.' : 'Every bracket matchup is an animated football match. Win to go through.' : bk ? 'Each matchup has an animated ' + bk.name.toLowerCase() + ' and a vote, combined into one score.' : 'Each matchup has an animated match and a vote, combined into one score.'), !foot && !bk && (fin.mode === 'sim' || fin.mode === 'combined') && React.createElement("p", {
     className: "warn"
-  }, "Matches only work for the football topics (Premier League Legends, Current Footballers, Football GOATs). For this topic the bracket uses votes instead.")), fin.mode === 'combined' && React.createElement("div", {
+  }, "Matches work on the football topics and on fun-battle topics (animals, superpowers, zombie kit, cutest animals and more). For this topic the bracket uses votes instead."), bk && (fin.mode === 'sim' || fin.mode === 'combined') && React.createElement("p", {
+    className: "hint"
+  }, battleRulesLine(topic))), fin.mode === 'combined' && React.createElement("div", {
     className: "field"
   }, React.createElement("span", {
     className: "label"
@@ -26350,7 +26563,7 @@ function SetupRules({
   }, "If a vote is tied"), React.createElement(Seg, {
     label: "Tiebreaker",
     value: fin.tiebreak,
-    options: [['rating', 'Stronger team (Now/Prime)'], ['revote', 'Vote again once']],
+    options: [['rating', foot ? 'Stronger team (Now/Prime)' : 'Stronger team'], ['revote', 'Vote again once']],
     onChange: v => setF({
       tiebreak: v
     })
@@ -26360,7 +26573,7 @@ function SetupRules({
     className: "field"
   }, React.createElement("span", {
     className: "label"
-  }, "Match speed"), React.createElement(Seg, {
+  }, bk ? 'Battle speed' : 'Match speed'), React.createElement(Seg, {
     label: "Match speed",
     value: fin.speed,
     options: [['instant', 'Instant'], ['fast', 'Fast'], ['normal', 'Normal']],
@@ -26369,21 +26582,21 @@ function SetupRules({
     })
   }), React.createElement("p", {
     className: "hint"
-  }, "How fast matches start playing. Everyone can still pause, change speed or skip while watching.")), React.createElement(Toggle, {
+  }, "How fast matches start playing. Everyone can still pause, change speed or skip while watching.")), !bk && React.createElement(Toggle, {
     on: fin.commentary,
     onChange: v => setF({
       commentary: v
     }),
     title: "Match commentary",
     sub: "Show the running commentary feed (goals and cards always show)."
-  }), React.createElement(Toggle, {
+  }), !bk && React.createElement(Toggle, {
     on: !!fin.home,
     onChange: v => setF({
       home: v
     }),
     title: "Home advantage",
     sub: "The higher seed plays at home: a small boost to its expected goals (+0.15). Off by default."
-  }), React.createElement("p", {
+  }), !bk && React.createElement("p", {
     className: "hint"
   }, "Knockout matches that end level go to extra time, then penalties. Player numbers are Draft Night estimates (Now for current players, Prime for legends), not official EA Sports FC numbers."))), tab === 'review' && React.createElement("div", {
     className: "stack",
@@ -29125,7 +29338,10 @@ function Results({
   }[fmode], d.rules.finale && d.rules.finale.mode !== fmode ? ' (Matches need a football topic, so this topic uses the vote bracket.)' : ''), isFootball(d.topic) && React.createElement("button", {
     className: "btn",
     onClick: () => setFriendly(true)
-  }, "\u26BD Friendly match", finDone ? ' / rematch' : ''), live && onPlayAgain && d.votesRevealed && React.createElement("button", {
+  }, "\u26BD Friendly match", finDone ? ' / rematch' : ''), hasBattle(d.topic) && React.createElement("button", {
+    className: "btn",
+    onClick: () => setFriendly(true)
+  }, battleKind(d.topic).emoji, " Friendly ", battleKind(d.topic).name.toLowerCase()), live && onPlayAgain && d.votesRevealed && React.createElement("button", {
     className: "btn btn-gold",
     onClick: onPlayAgain
   }, "Play again"), React.createElement("button", {
@@ -29561,6 +29777,7 @@ function migrateTopics(stored) {
     return {
       ...t,
       era: t.era || s.era,
+      battle: t.battle || s.battle,
       art: t.art || s.art,
       folder: t.folder || s.folder,
       kitShape: t.kitShape || s.kitShape,
@@ -31421,6 +31638,10 @@ class Boundary extends React.Component {
 }
 if (window.__DN_TEST__) window.__DN = {
   finale: {
+    simulateBattle,
+    hasBattle,
+    battleKind,
+    BATTLE_KINDS,
     eraOf,
     eraWord,
     buildBracket,
@@ -31610,6 +31831,205 @@ if (window.__DN_TEST__) window.__DN = {
 store.init().finally(() => {
   ReactDOM.createRoot(document.getElementById('root')).render(React.createElement(Boundary, null, React.createElement(App, null)));
 });
+function BattleFighter({
+  d,
+  e,
+  team,
+  won,
+  lost
+}) {
+  if (!e) return React.createElement("div", {
+    className: "fighter empty",
+    style: mStyle(team)
+  }, React.createElement("span", {
+    className: "f-art"
+  }, "\u2014"), React.createElement("b", {
+    className: "f-n"
+  }, "Nobody"), React.createElement("span", {
+    className: "f-t"
+  }, team.name));
+  const item = d.items[e.itemId] || {
+    name: e.name,
+    emoji: e.emoji
+  };
+  return React.createElement("div", {
+    className: 'fighter' + (won ? ' won' : '') + (lost ? ' lost' : ''),
+    style: mStyle(team)
+  }, React.createElement("span", {
+    className: "f-art"
+  }, React.createElement(ItemArt, {
+    item: item,
+    topic: d.topic,
+    size: 72
+  })), React.createElement("b", {
+    className: "f-n"
+  }, e.name), React.createElement("span", {
+    className: "f-t"
+  }, team.emoji, " ", team.name, " \xB7 $", e.price));
+}
+function BattleView({
+  d,
+  A,
+  B,
+  match,
+  speed,
+  onDone,
+  label
+}) {
+  const kind = BATTLE_KINDS[match.kind] || BATTLE_KINDS.fight;
+  const instant = speed === 'instant';
+  const N = match.duels.length;
+  const [shown, setShown] = useState(instant ? N : 0);
+  const [hit, setHit] = useState(false);
+  const step = speed === 'fast' ? 1300 : 2800;
+  const done = shown >= N;
+  const fired = useRef(false);
+  const feedRef = useRef(null);
+  useEffect(() => {
+    if (done) {
+      if (!fired.current) {
+        fired.current = true;
+        if (!instant) audio.play('whistle');
+        onDone && onDone();
+      }
+      return undefined;
+    }
+    const du = match.duels[shown];
+    if (!hit) {
+      const t = setTimeout(() => {
+        setHit(true);
+        audio.play(du.upset ? 'cheer' : 'gavel');
+      }, ms(step * 0.5));
+      return () => clearTimeout(t);
+    }
+    const t = setTimeout(() => {
+      setShown(shown + 1);
+      setHit(false);
+    }, ms(step * 0.5 + (du.upset ? 700 : 0)));
+    return () => clearTimeout(t);
+  }, [shown, hit, done]);
+  useEffect(() => {
+    const f = feedRef.current;
+    if (f) f.scrollTop = f.scrollHeight;
+  }, [shown]);
+  const cur = done ? null : match.duels[shown];
+  const score = cur && hit ? cur.score : shown ? match.duels[shown - 1].score : [0, 0];
+  const anim = !reducedMotion();
+  const roundLabel = (du, k) => du.slot === 'Sudden death' ? '⚡ Sudden death' : kind.round + ' ' + (k + 1) + ' · ' + du.slot;
+  return React.createElement("div", {
+    className: "matchview battleview"
+  }, React.createElement("div", {
+    className: "scoreboard"
+  }, React.createElement("div", {
+    className: "sb-team"
+  }, React.createElement(Badge, {
+    m: A
+  }), React.createElement("span", {
+    className: "sb-n"
+  }, A.name)), React.createElement("div", {
+    className: "sb-mid"
+  }, React.createElement("span", {
+    className: "sb-score num",
+    "aria-live": "polite"
+  }, score[0], "\u2013", score[1]), React.createElement("span", {
+    className: "sb-clock num"
+  }, done ? 'Final' + (match.sudden ? ' · sudden death' : '') : kind.round + ' ' + (shown + 1) + ' of ' + N)), React.createElement("div", {
+    className: "sb-team"
+  }, React.createElement(Badge, {
+    m: B
+  }), React.createElement("span", {
+    className: "sb-n"
+  }, B.name))), !done && React.createElement("div", {
+    className: "sb-progress"
+  }, React.createElement("i", {
+    style: {
+      width: (shown + (hit ? 1 : 0.5)) / N * 100 + '%'
+    }
+  })), cur && React.createElement("div", {
+    className: 'duel' + (anim ? ' anim' : '') + (hit ? ' hit w' + cur.w : ''),
+    key: shown
+  }, React.createElement("p", {
+    className: "eyebrow",
+    style: {
+      textAlign: 'center'
+    }
+  }, roundLabel(cur, shown)), React.createElement("div", {
+    className: "duel-row"
+  }, React.createElement(BattleFighter, {
+    d: d,
+    e: cur.a,
+    team: A,
+    won: hit && cur.w === 0,
+    lost: hit && cur.w === 1
+  }), React.createElement("span", {
+    className: "clash",
+    "aria-hidden": "true"
+  }, kind.emoji), React.createElement(BattleFighter, {
+    d: d,
+    e: cur.b,
+    team: B,
+    won: hit && cur.w === 1,
+    lost: hit && cur.w === 0
+  })), React.createElement("p", {
+    className: 'duel-line' + (cur.upset && hit ? ' upset' : ''),
+    "aria-live": "polite"
+  }, hit ? cur.line : 'Face off…')), shown > 0 && React.createElement("div", {
+    className: "mfeed",
+    ref: feedRef,
+    "aria-live": "polite"
+  }, match.duels.slice(0, shown).map((du, k) => React.createElement("p", {
+    key: k,
+    className: 'mev ' + (du.upset ? 'goal' : 'chance') + ' t' + du.w
+  }, React.createElement("span", {
+    className: "mm num"
+  }, du.slot === 'Sudden death' ? '⚡' : 'R' + (k + 1)), React.createElement("span", null, du.upset ? '😱 ' : '', du.line, React.createElement("small", null, " \xB7 ", (du.w === 0 ? A : B).name))))), !done && React.createElement("button", {
+    type: "button",
+    className: "btn btn-ghost btn-sm",
+    onClick: () => {
+      setShown(N);
+      setHit(false);
+    }
+  }, "Skip to the end"), done && React.createElement(BattleSummary, {
+    d: d,
+    A: A,
+    B: B,
+    match: match
+  }));
+}
+function BattleSummary({
+  d,
+  A,
+  B,
+  match
+}) {
+  const kind = BATTLE_KINDS[match.kind] || BATTLE_KINDS.fight;
+  const W = match.winner === 0 ? A : B;
+  const upsets = match.duels.filter(x => x.upset).length;
+  return React.createElement("div", {
+    className: "board msummary"
+  }, React.createElement("h3", null, kind.emoji, " ", kind.name, " summary"), React.createElement("p", {
+    className: "small",
+    style: {
+      margin: 0
+    }
+  }, React.createElement("b", null, A.name, " ", match.score[0], "\u2013", match.score[1], " ", B.name), match.sudden ? ' · decided in sudden death' : ''), match.duels.map((du, k) => React.createElement("p", {
+    key: k,
+    className: "small",
+    style: {
+      margin: 0
+    }
+  }, du.slot === 'Sudden death' ? '⚡' : kind.round + ' ' + (k + 1), ": ", du.a ? du.a.name : 'nobody', " v ", du.b ? du.b.name : 'nobody', " \u2192 ", React.createElement("b", null, (du.w === 0 ? du.a : du.b).name), du.upset ? ' (upset!)' : '')), React.createElement("p", {
+    className: "small",
+    style: {
+      margin: 0
+    }
+  }, "\uD83C\uDFC5 ", W.name, " win", upsets ? ' · ' + upsets + ' upset' + (upsets === 1 ? '' : 's') : ''), React.createElement("p", {
+    className: "hint",
+    style: {
+      margin: 0
+    }
+  }, "Just for fun: the pick the room paid more for has the edge in each duel (never more than 78%), and luck does the rest. It\u2019s not a real prediction."));
+}
 const EST_LABEL = 'Estimated by Draft Night · not official EA Sports FC / FIFA numbers';
 const ATTR_NAMES = {
   PAC: 'Pace',
@@ -31987,6 +32407,12 @@ function MatchSummary({
   B,
   match
 }) {
+  if (match.v === 'battle') return React.createElement(BattleSummary, {
+    d: d,
+    A: A,
+    B: B,
+    match: match
+  });
   const goals = [0, 1].map(k => match.events.filter(e => e.type === 'goal' && e.team === k));
   const cards = match.events.filter(e => e.type === 'yellow' || e.type === 'red');
   const incomplete = [A, B].filter(t => isFootball(d.topic) && teamRating(d, t).provisional);
@@ -32227,9 +32653,10 @@ function Finale({
   const [matchOver, setMatchOver] = useState(false);
   const [view, setView] = useState(null);
   const R = fin.bracket.rounds.length;
+  const bk = battleKind(d.topic);
   const modeName = {
     bracket: 'Head-to-head bracket',
-    sim: 'Match simulator',
+    sim: bk ? bk.name + ' bracket' : 'Match simulator',
     combined: 'Combined finale'
   }[mode];
   const begin = () => {
@@ -32349,7 +32776,7 @@ function Finale({
   })), host ? React.createElement("button", {
     className: "btn btn-gold",
     onClick: begin
-  }, needsVote(mode) ? mode === 'combined' ? 'Vote, then kick off' : 'Vote on this matchup' : 'Kick off') : waiting) : fin.champion ? React.createElement(React.Fragment, null, React.createElement("h2", {
+  }, needsVote(mode) ? mode === 'combined' ? bk ? 'Vote, then ' + bk.start.toLowerCase() : 'Vote, then kick off' : 'Vote on this matchup' : bk ? bk.start : 'Kick off') : waiting) : fin.champion ? React.createElement(React.Fragment, null, React.createElement("h2", {
     className: "display",
     style: {
       fontSize: 30
@@ -32373,7 +32800,7 @@ function Finale({
     onOpen: setView
   }), mode === 'combined' && React.createElement("p", {
     className: "hint"
-  }, "Combined score: ", cfg.weight, "% match performance + ", 100 - cfg.weight, "% votes. If it\u2019s dead level, the match result (extra time or penalties) decides."));
+  }, "Combined score: ", cfg.weight, "% ", bk ? 'battle' : 'match', " performance + ", 100 - cfg.weight, "% votes. If it\u2019s dead level, the ", bk ? 'battle result' : 'match result (extra time or penalties)', " decides."));
   return React.createElement("div", {
     className: "finale",
     role: "dialog",
@@ -32481,7 +32908,7 @@ function MatchupResult({
     className: "key m"
   }), " match ", cfg.weight, "% \xB7 ", React.createElement("span", {
     className: "key v"
-  }), " votes ", 100 - cfg.weight, "%. ", m.detail, ". Match share = (goals + \xBD) \xF7 (total goals + 1), so a 6\u20135 isn\u2019t worth more than a 2\u20131 swing.")), m.match && React.createElement(MatchSummary, {
+  }), " votes ", 100 - cfg.weight, "%. ", m.detail, ". ", m.match.v === 'battle' ? 'Battle share = (rounds won + ½) ÷ (rounds + 1).' : 'Match share = (goals + ½) ÷ (total goals + 1), so a 6–5 isn’t worth more than a 2–1 swing.')), m.match && React.createElement(MatchSummary, {
     d: d,
     A: A,
     B: B,
@@ -32569,19 +32996,21 @@ function FriendlySheet({
     style: {
       fontSize: 28
     }
-  }, "Friendly match"), React.createElement("p", {
+  }, "Friendly ", battleKind(d.topic) ? 'battle' : 'match'), React.createElement("p", {
     className: "hint"
   }, "You need two teams with players."), React.createElement("button", {
     className: "btn btn-ghost",
     onClick: onClose
   }, "Close"));
+  const bk = battleKind(d.topic);
   const play = () => {
     const k = n + 1;
     setN(k);
+    const key = 'friendly:' + Date.now() + ':' + k;
     setGame({
       A: teamOf(d, a),
       B: teamOf(d, b),
-      match: simulateMatch(d, teamOf(d, a), teamOf(d, b), 'friendly:' + Date.now() + ':' + k, false),
+      match: bk ? simulateBattle(d, teamOf(d, a), teamOf(d, b), key) : simulateMatch(d, teamOf(d, a), teamOf(d, b), key, false),
       k
     });
   };
@@ -32595,7 +33024,7 @@ function FriendlySheet({
     style: {
       fontSize: 28
     }
-  }, "Friendly match"), game ? React.createElement(React.Fragment, null, React.createElement(MatchView, {
+  }, "Friendly ", bk ? bk.name.toLowerCase() : 'match'), game ? React.createElement(React.Fragment, null, React.createElement(MatchView, {
     key: game.k,
     d: d,
     A: game.A,
@@ -32616,7 +33045,7 @@ function FriendlySheet({
     className: "field"
   }, React.createElement("label", {
     htmlFor: "fr-a"
-  }, "Home"), React.createElement("select", {
+  }, bk ? 'Team 1' : 'Home'), React.createElement("select", {
     id: "fr-a",
     className: "input",
     value: a,
@@ -32625,11 +33054,11 @@ function FriendlySheet({
     key: t.id,
     value: t.id,
     disabled: t.id === b
-  }, t.emoji, " ", t.name, numbersShown() ? ' · ' + teamRating(d, t).rating : '')))), React.createElement("div", {
+  }, t.emoji, " ", t.name, !bk && numbersShown() ? ' · ' + teamRating(d, t).rating : '')))), React.createElement("div", {
     className: "field"
   }, React.createElement("label", {
     htmlFor: "fr-b"
-  }, "Away"), React.createElement("select", {
+  }, bk ? 'Team 2' : 'Away'), React.createElement("select", {
     id: "fr-b",
     className: "input",
     value: b,
@@ -32638,13 +33067,13 @@ function FriendlySheet({
     key: t.id,
     value: t.id,
     disabled: t.id === a
-  }, t.emoji, " ", t.name, numbersShown() ? ' · ' + teamRating(d, t).rating : '')))), React.createElement("button", {
+  }, t.emoji, " ", t.name, !bk && numbersShown() ? ' · ' + teamRating(d, t).rating : '')))), React.createElement("button", {
     className: "btn btn-gold",
     disabled: !a || !b || a === b,
     onClick: play
-  }, "Kick off"), React.createElement("p", {
+  }, bk ? bk.start : 'Kick off'), React.createElement("p", {
     className: "hint"
-  }, "Friendlies can end in a draw. Each kick-off is a new random game.")), React.createElement("button", {
+  }, bk ? 'Each one is a new random battle. Just for fun — the result doesn’t count.' : 'Friendlies can end in a draw. Each kick-off is a new random game.')), React.createElement("button", {
     className: "btn btn-ghost",
     onClick: onClose
   }, "Close"));
@@ -33421,7 +33850,7 @@ function PitchMatch({
   }));
 }
 function MatchView(props) {
-  return props.match && props.match.v === 2 ? React.createElement(PitchMatch, props) : React.createElement(MatchPlayer, props);
+  return props.match && props.match.v === 'battle' ? React.createElement(BattleView, props) : props.match && props.match.v === 2 ? React.createElement(PitchMatch, props) : React.createElement(MatchPlayer, props);
 }
 const FB_CONFIG = {
   apiKey: 'AIzaSyCjw0jMkbljpMKol013HCe_l_h8nzNLtCY',

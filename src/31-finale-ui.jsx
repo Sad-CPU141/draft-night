@@ -186,6 +186,7 @@ function MatchPlayer({ d, A, B, match, speed, commentary, onDone, label }) {
 }
 
 function MatchSummary({ d, A, B, match }) {
+  if (match.v === 'battle') return <BattleSummary d={d} A={A} B={B} match={match} />;
   const goals = [0, 1].map((k) => match.events.filter((e) => e.type === 'goal' && e.team === k));
   const cards = match.events.filter((e) => e.type === 'yellow' || e.type === 'red');
   const incomplete = [A, B].filter((t) => isFootball(d.topic) && teamRating(d, t).provisional);
@@ -287,7 +288,8 @@ function Finale({ d, onChange, onClose, onChampion }) {
   const [matchOver, setMatchOver] = useState(false);
   const [view, setView] = useState(null); // decided matchup to look at
   const R = fin.bracket.rounds.length;
-  const modeName = { bracket: 'Head-to-head bracket', sim: 'Match simulator', combined: 'Combined finale' }[mode];
+  const bk = battleKind(d.topic);
+  const modeName = { bracket: 'Head-to-head bracket', sim: bk ? bk.name + ' bracket' : 'Match simulator', combined: 'Combined finale' }[mode];
   const begin = () => {
     const at = { r: nx.r, i: nx.i }; setMatchOver(false);
     if (needsVote(mode)) onChange(withUi(botMatchVotes(d, at.r, at.i), { stage: 'vote', cur: at }));
@@ -325,7 +327,7 @@ function Finale({ d, onChange, onClose, onChampion }) {
           <div className="vsrow">
             {[nx.m.a, nx.m.b].map((id, k) => { const t = teamOf(d, id); return <React.Fragment key={id}>{k === 1 && <span className="vs">VS</span>}<div className="vsteam"><Badge m={t} size={52} /><b>{t.name}</b>{isFootball(d.topic) && numbersShown() && <span className="small num">{eraWord(d.topic)} strength {teamRating(d, t).rating}{teamRating(d, t).provisional ? ' (prov.)' : ''}</span>}</div></React.Fragment>; })}
           </div>
-          {host ? <button className="btn btn-gold" onClick={begin}>{needsVote(mode) ? (mode === 'combined' ? 'Vote, then kick off' : 'Vote on this matchup') : 'Kick off'}</button> : waiting}
+          {host ? <button className="btn btn-gold" onClick={begin}>{needsVote(mode) ? (mode === 'combined' ? (bk ? 'Vote, then ' + bk.start.toLowerCase() : 'Vote, then kick off') : 'Vote on this matchup') : bk ? bk.start : 'Kick off'}</button> : waiting}
         </> : fin.champion ? <>
           <h2 className="display" style={{ fontSize: 30 }}>We have a champion</h2>
           {host ? <button className="btn btn-gold" onClick={onChampion}>🏆 Reveal the champion</button> : waiting}
@@ -335,7 +337,7 @@ function Finale({ d, onChange, onClose, onChampion }) {
         </>}
       </div>
       <BracketView d={d} current={nx} onOpen={setView} />
-      {mode === 'combined' && <p className="hint">Combined score: {cfg.weight}% match performance + {100 - cfg.weight}% votes. If it’s dead level, the match result (extra time or penalties) decides.</p>}
+      {mode === 'combined' && <p className="hint">Combined score: {cfg.weight}% {bk ? 'battle' : 'match'} performance + {100 - cfg.weight}% votes. If it’s dead level, the {bk ? 'battle result' : 'match result (extra time or penalties)'} decides.</p>}
     </>
   );
   return (
@@ -377,7 +379,7 @@ function MatchupResult({ d, m, r, final, onNext, host = true }) {
               <b className="num">{Math.round((p * cfg.weight + v * (100 - cfg.weight)))}%</b>
             </div>
           ))}
-          <p className="hint" style={{ margin: 0 }}><span className="key m" /> match {cfg.weight}% · <span className="key v" /> votes {100 - cfg.weight}%. {m.detail}. Match share = (goals + ½) ÷ (total goals + 1), so a 6–5 isn’t worth more than a 2–1 swing.</p>
+          <p className="hint" style={{ margin: 0 }}><span className="key m" /> match {cfg.weight}% · <span className="key v" /> votes {100 - cfg.weight}%. {m.detail}. {m.match.v === 'battle' ? 'Battle share = (rounds won + ½) ÷ (rounds + 1).' : 'Match share = (goals + ½) ÷ (total goals + 1), so a 6–5 isn’t worth more than a 2–1 swing.'}</p>
         </div>
       )}
       {m.match && <MatchSummary d={d} A={A} B={B} match={m.match} />}
@@ -416,20 +418,21 @@ function FriendlySheet({ d, onClose }) {
   const [game, setGame] = useState(null);
   const [n, setN] = useState(0);
   const cfg = finCfg(d);
-  if (teams.length < 2) return <Sheet center onClose={onClose}><h2 className="display" style={{ fontSize: 28 }}>Friendly match</h2><p className="hint">You need two teams with players.</p><button className="btn btn-ghost" onClick={onClose}>Close</button></Sheet>;
-  const play = () => { const k = n + 1; setN(k); setGame({ A: teamOf(d, a), B: teamOf(d, b), match: simulateMatch(d, teamOf(d, a), teamOf(d, b), 'friendly:' + Date.now() + ':' + k, false), k }); };
+  if (teams.length < 2) return <Sheet center onClose={onClose}><h2 className="display" style={{ fontSize: 28 }}>Friendly {battleKind(d.topic) ? 'battle' : 'match'}</h2><p className="hint">You need two teams with players.</p><button className="btn btn-ghost" onClick={onClose}>Close</button></Sheet>;
+  const bk = battleKind(d.topic);
+  const play = () => { const k = n + 1; setN(k); const key = 'friendly:' + Date.now() + ':' + k; setGame({ A: teamOf(d, a), B: teamOf(d, b), match: bk ? simulateBattle(d, teamOf(d, a), teamOf(d, b), key) : simulateMatch(d, teamOf(d, a), teamOf(d, b), key, false), k }); };
   return (
     <Sheet center onClose={onClose}>
       <p className="eyebrow">Exhibition · doesn’t change any result</p>
-      <h2 className="display" style={{ fontSize: 28 }}>Friendly match</h2>
+      <h2 className="display" style={{ fontSize: 28 }}>Friendly {bk ? bk.name.toLowerCase() : 'match'}</h2>
       {game ? <>
         <MatchView key={game.k} d={d} A={game.A} B={game.B} match={game.match} speed={cfg.speed} commentary={cfg.commentary} label={'friendly' + game.k} />
         <div className="row"><button className="btn grow" onClick={play}>Rematch</button><button className="btn btn-ghost grow" onClick={() => setGame(null)}>Pick teams</button></div>
       </> : <>
-        <div className="field"><label htmlFor="fr-a">Home</label><select id="fr-a" className="input" value={a} onChange={(e) => setA(e.target.value)}>{teams.map((t) => <option key={t.id} value={t.id} disabled={t.id === b}>{t.emoji} {t.name}{numbersShown() ? ' · ' + teamRating(d, t).rating : ''}</option>)}</select></div>
-        <div className="field"><label htmlFor="fr-b">Away</label><select id="fr-b" className="input" value={b} onChange={(e) => setB(e.target.value)}>{teams.map((t) => <option key={t.id} value={t.id} disabled={t.id === a}>{t.emoji} {t.name}{numbersShown() ? ' · ' + teamRating(d, t).rating : ''}</option>)}</select></div>
-        <button className="btn btn-gold" disabled={!a || !b || a === b} onClick={play}>Kick off</button>
-        <p className="hint">Friendlies can end in a draw. Each kick-off is a new random game.</p>
+        <div className="field"><label htmlFor="fr-a">{bk ? 'Team 1' : 'Home'}</label><select id="fr-a" className="input" value={a} onChange={(e) => setA(e.target.value)}>{teams.map((t) => <option key={t.id} value={t.id} disabled={t.id === b}>{t.emoji} {t.name}{!bk && numbersShown() ? ' · ' + teamRating(d, t).rating : ''}</option>)}</select></div>
+        <div className="field"><label htmlFor="fr-b">{bk ? 'Team 2' : 'Away'}</label><select id="fr-b" className="input" value={b} onChange={(e) => setB(e.target.value)}>{teams.map((t) => <option key={t.id} value={t.id} disabled={t.id === a}>{t.emoji} {t.name}{!bk && numbersShown() ? ' · ' + teamRating(d, t).rating : ''}</option>)}</select></div>
+        <button className="btn btn-gold" disabled={!a || !b || a === b} onClick={play}>{bk ? bk.start : 'Kick off'}</button>
+        <p className="hint">{bk ? 'Each one is a new random battle. Just for fun — the result doesn’t count.' : 'Friendlies can end in a draw. Each kick-off is a new random game.'}</p>
       </>}
       <button className="btn btn-ghost" onClick={onClose}>Close</button>
     </Sheet>
@@ -745,4 +748,4 @@ function PitchMatch({ d, A, B, match, speed, commentary, onDone, label }) {
   );
 }
 // Old saved matches (before the pitch) keep their text-only replay.
-function MatchView(props) { return props.match && props.match.v === 2 ? <PitchMatch {...props} /> : <MatchPlayer {...props} />; }
+function MatchView(props) { return props.match && props.match.v === 'battle' ? <BattleView {...props} /> : props.match && props.match.v === 2 ? <PitchMatch {...props} /> : <MatchPlayer {...props} />; }

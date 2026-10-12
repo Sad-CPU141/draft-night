@@ -27,10 +27,19 @@ function folderList(topics, includeDefaults) {
 }
 // Football numbers describe one moment: current players are shown as they are Now, legends at their Prime.
 const STARTER_ERA = { 't-cf': 'now', 't-pl': 'prime', 't-goat': 'prime' };
+// Fun-battle style for built-in topics (see 29-battles.js); copies and shared topics keep it.
+const STARTER_BATTLE = {
+  't-ani': 'fight', 't-cats': 'fight', 't-sharks': 'fight', 't-raptors': 'fight', 't-reptiles': 'fight', 't-snakes': 'fight', 't-dinos': 'fight',
+  't-prehistmammals': 'fight', 't-myth': 'fight', 't-safari': 'fight', 't-arctic': 'fight', 't-primates': 'fight', 't-deepsea': 'fight',
+  't-extinct': 'fight', 't-insects': 'fight', 't-aussie': 'fight', 't-whales': 'fight',
+  't-pow': 'powers', 't-powercombos': 'powers', 't-worstpowers': 'weird',
+  't-zomb': 'survival', 't-island': 'survival',
+  't-cute': 'cute', 't-pet': 'cute', 't-dogbreeds': 'cute', 't-catbreeds': 'cute',
+};
 function starterTopics() {
   const v3 = [...sportsTopicsV3(), ...foodTopicsV3(), ...entTopicsV3(), ...travelTopicsV3(), ...animalTopicsV3(), ...styleTopicsV3(), ...funTopicsV3()];
   return [...baseTopics(), ...evenMoreTopics(), ...funTopics()].map((t) => ({ ...t, folder: STARTER_FOLDER[t.id] || 'My Topics', photos: Object.prototype.hasOwnProperty.call(PHOTO_TOPICS, t.id) }))
-    .concat(v3.map((t) => ({ ...t, builtin: true }))).map(withExtras).map((t) => (STARTER_ERA[t.id] ? { ...t, era: STARTER_ERA[t.id] } : t));
+    .concat(v3.map((t) => ({ ...t, builtin: true }))).map(withExtras).map((t) => (STARTER_ERA[t.id] ? { ...t, era: STARTER_ERA[t.id] } : STARTER_BATTLE[t.id] ? { ...t, battle: STARTER_BATTLE[t.id] } : t));
 }
 /* ---------- extra items for big groups (up to 16 players) ----------
    23-extra-*.js files add items to built-in topics without touching the originals.

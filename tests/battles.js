@@ -1,0 +1,52 @@
+// Fun battles: the "Matches" finale for non-football topics.
+module.exports = async function battleTests({ ok, boot, btn, click, sleep }) {
+  console.log('Fun battles');
+  const P = await boot({ idb: false });
+  const { DN } = P; const F = DN.finale;
+  const ts = DN.starterTopics(); const T = (id) => ts.find((t) => t.id === id);
+  const fill = (topic, n, seed) => {
+    const ms = [...Array(n)].map((_, i) => ({ id: 'm' + i, name: ['Lions', 'Sharks', 'Owls', 'Wolves', 'Bears'][i], color: DN.COLORS[i], emoji: 'x', human: true }));
+    let d = DN.createDraft(topic, ms, { ...DN.DEFAULT_RULES, slots: topic.slots, finale: { mode: 'sim', speed: 'instant' } }, { seed });
+    let g = 0, r = 0;
+    while (!DN.isDraftOver(d) && g++ < 800) {
+      if (d.phase === 'auction') { const m = d.managers.find((x, k) => (k + r++) % 2 === 0 && DN.canBid(d, x, DN.nextAmount(d))) || d.managers.find((x) => DN.canBid(d, x, DN.nextAmount(d))); d = m ? DN.sell(DN.placeBid(d, m.id, DN.nextAmount(d))) : DN.skipItem(d); }
+      else if (d.phase === 'freepick') { const cp = DN.currentPicker(d); d = DN.freePick(d, d.leftover.find((x) => DN.canTake(d, cp.m, x))); } else break;
+    }
+    return d;
+  };
+  const battleIds = ts.filter((t) => F.hasBattle(t)).map((t) => t.id);
+  ok(battleIds.length >= 20 && ['t-ani', 't-pow', 't-zomb', 't-dinos', 't-cute'].every((id) => battleIds.includes(id)) && !battleIds.some((id) => ['t-pl', 't-cf', 't-goat'].includes(id)), 'fun battles on ' + battleIds.length + ' topics (animals, superpowers, zombie kit, dinosaurs, cutest…), never on football');
+  const d = fill(T('t-ani'), 4, 'bt1');
+  ok(d.phase === 'done' && F.finaleMode(d) === 'sim', 'a fun-battle topic keeps the Battles finale instead of falling back to votes');
+  const [A, B] = d.managers;
+  const m1 = F.simulateBattle(d, A, B, 'k1'), m2 = F.simulateBattle(d, A, B, 'k1');
+  ok(JSON.stringify(m1) === JSON.stringify(m2), 'a battle is recorded once: the same key replays the same result');
+  ok(m1.duels.length >= T('t-ani').slots.length && m1.score[0] !== m1.score[1] && m1.score[m1.winner] > m1.score[1 - m1.winner], 'every slot is a duel and there is always a winner (sudden death on ties)');
+  const edges = []; for (let k = 0; k < 40; k++) F.simulateBattle(fill(T('t-pow'), 2, 'e' + k), ...fill(T('t-pow'), 2, 'e' + k).managers, 'x').duels.forEach((x) => { if (x.edge != null) edges.push(x.edge); });
+  ok(edges.length > 50 && edges.every((e) => e >= 0.22 && e <= 0.78), 'luck always matters: no duel edge outside 22–78% (' + edges.length + ' duels)');
+  // Paying more gives the edge (over many simulated battles).
+  let big = 0, n = 0;
+  const rich = { ...A, team: A.team.map((x, k) => (x ? { ...x, price: k % 2 ? 1 : 6 } : x)) }, poor = { ...B, team: B.team.map((x, k) => (x ? { ...x, price: k % 2 ? 5 : 1 } : x)) };
+  for (let k = 0; k < 300; k++) { const b = F.simulateBattle(d, rich, poor, 'p' + k); b.duels.forEach((x) => { if (x.a && x.b && x.a.price !== x.b.price) { n++; if ((x.a.price > x.b.price) === (x.w === 0)) big++; } }); }
+  ok(n > 0 && big / n > 0.55 && big / n < 0.8, 'the pricier pick wins more often, but not always (' + Math.round((100 * big) / Math.max(1, n)) + '%)');
+  let f = F.startFinale(d); let nx, guard = 0;
+  while ((nx = F.nextMatchup(f.finale.bracket)) && guard++ < 10) { f = F.playMatchup(f, nx.r, nx.i); f = F.resolveMatchup(f, nx.r, nx.i); }
+  ok(!!f.finale.champion && /battle/.test(F.championStory(f)), 'a full battle bracket crowns a champion (' + F.championStory(f).slice(0, 60) + '…)');
+  const cut = F.simulateBattle(fill(T('t-cute'), 2, 'c'), ...fill(T('t-cute'), 2, 'c').managers, 'y');
+  ok(cut.kind === 'cute' && cut.duels.every((x) => x.line && !/\{[wl]\}/.test(x.line)), 'each battle style has its own lines (Cuteness Contest), all filled in');
+  const rt = DN.share.unpackTopic(DN.share.packTopic(T('t-zomb'), false));
+  ok(rt.ok && rt.topic.battle === 'survival' && F.hasBattle(rt.topic), 'shared and copied topics keep their battle style');
+  // Screen: play a battle through the UI at instant speed.
+  const raw = { ...d, mode: 'local', createdAt: Date.now(), history: [] };
+  const U = await boot({ idb: false, storage: { dn_current_v1: JSON.stringify(raw) } });
+  await click(U.w, btn(U.d, 'Resume draft'));
+  ok(/Friendly battle/.test(U.d.body.textContent), 'results offer a friendly battle');
+  await click(U.w, btn(U.d, 'Start the finale'));
+  await click(U.w, btn(U.d, 'Start the battle'));
+  await sleep(200);
+  ok(!!U.d.querySelector('.battleview .scoreboard') && /Battle summary/.test(U.d.body.textContent) && /Just for fun/.test(U.d.body.textContent), 'the battle screen plays and ends with a summary that says it’s just for fun');
+  await click(U.w, btn(U.d.querySelector('.finale'), 'Continue')); await sleep(150);
+  if (!/won the battle/.test(U.d.body.textContent)) console.log('   page:', U.d.querySelector('.finale') && U.d.querySelector('.finale').textContent.slice(0, 300));
+  ok(/won the battle/.test(U.d.body.textContent), 'the result explains who won the battle and by how much');
+  U.w.close(); P.w.close();
+};
