@@ -1,4 +1,4 @@
-/* Draft Night a3f9fd18e7 — built from src/ by build.js. Edit src/, not this file. */
+/* Draft Night 3b02321cff — built from src/ by build.js. Edit src/, not this file. */
 "use strict";
 (function(){
 function _extends() { return _extends = Object.assign ? Object.assign.bind() : function (n) { for (var e = 1; e < arguments.length; e++) { var t = arguments[e]; for (var r in t) ({}).hasOwnProperty.call(t, r) && (n[r] = t[r]); } return n; }, _extends.apply(null, arguments); }
@@ -21245,9 +21245,6 @@ const BATTLE_KINDS = {
     start: 'Start the battle',
     emoji: '⚔️',
     round: 'Round',
-    bar: 'hp',
-    barName: 'Health',
-    moves: ['{a} lunges at {b}!', '{a} lands a heavy hit!', '{a} strikes back!', '{a} charges in!', '{a} dodges and counters!', '{a} goes for the finish!'],
     win: ['{w} overpowers {l}!', '{w} pins {l} down!', '{l} never saw {w} coming.', '{w} outlasts {l} in a long scrap.', '{w} sends {l} running!', 'A brutal clash — {w} comes out on top.'],
     upset: ['UPSET! {w} somehow beats {l}!', 'Nobody expected that: {w} takes down {l}!'],
     noshow: ['{w} wins by walkover — nobody turned up to face it.']
@@ -21257,9 +21254,6 @@ const BATTLE_KINDS = {
     start: 'Start the clash',
     emoji: '💥',
     round: 'Clash',
-    bar: 'hp',
-    barName: 'Energy',
-    moves: ['{a} powers up and blasts {b}!', '{a} counters with a surge!', '{a} breaks through {b}’s defence!', '{a} unleashes everything!'],
     win: ['{w} cancels out {l}!', '{w} is just too much for {l}.', '{l} fizzles out against {w}.', '{w} lands the knockout blow!', 'Sparks fly — {w} wins the clash.'],
     upset: ['WHAT?! {w} beats {l}!', 'Plot twist: {w} outsmarts {l}!'],
     noshow: ['{w} wins unopposed.']
@@ -21269,9 +21263,6 @@ const BATTLE_KINDS = {
     start: 'Start the showdown',
     emoji: '🤡',
     round: 'Showdown',
-    bar: 'hp',
-    barName: 'Dignity',
-    moves: ['{a} tries something… it sort of works.', '{a} confuses {b}!', '{a} does… something?', '{a} embarrasses {b}!'],
     win: ['{w} is slightly less useless than {l}.', '{l} trips over itself; {w} wins by default-ish.', 'The crowd groans… {w} edges it.', '{w} somehow helps. {l} does not.'],
     upset: ['Against all logic, {w} wins!', 'Chaos! {w} beats {l}!'],
     noshow: ['{w} wins because nobody else showed up.']
@@ -21281,9 +21272,6 @@ const BATTLE_KINDS = {
     start: 'Start the showdown',
     emoji: '🧟',
     round: 'Night',
-    bar: 'meter',
-    barName: 'Survival',
-    moves: ['{a} keeps the team going!', '{a} saves the day!', '{a} gets them through another hour!', '{a} comes in clutch!'],
     win: ['{w} keeps the team alive. {l} doesn’t help.', '{w} saves the night; {l} gets left behind.', 'When it mattered, {w} beat {l}.', '{w} gets them through. {l} breaks.'],
     upset: ['Who knew? {w} beats {l} when it counts!', 'Surprise hero: {w}!'],
     noshow: ['{w} wins the night — the other team had nothing.']
@@ -21293,9 +21281,6 @@ const BATTLE_KINDS = {
     start: 'Start the contest',
     emoji: '🥰',
     round: 'Round',
-    bar: 'meter',
-    barName: 'Aww meter',
-    moves: ['{a} does a little head tilt. Aww!', '{a} rolls over. The crowd melts!', '{a} yawns adorably!', '{a} blinks slowly. Too cute!'],
     win: ['The crowd melts for {w}!', '{w} wins the aww-off against {l}.', '{l} is adorable, but {w} is MORE adorable.', 'Tiny paws, big win: {w}!'],
     upset: ['Underdog cuteness! {w} steals it from {l}!', 'Nobody saw that coming: {w} wins the crowd!'],
     noshow: ['{w} wins with no competition.']
@@ -21332,48 +21317,8 @@ function battleDuel(rng, kind, a, b, maxP) {
     w,
     edge,
     upset,
-    line: fill(upset ? kind.upset : kind.win, W.item.name, L.item.name),
-    hits: battleHits(rng, kind, w, [a.item.name, b.item.name])
+    line: fill(upset ? kind.upset : kind.win, W.item.name, L.item.name)
   };
-}
-function battleHits(rng, kind, w, names) {
-  const split = (total, n) => {
-    const r = [...Array(n)].map(() => 0.6 + rng());
-    const s = r.reduce((x, y) => x + y, 0);
-    const out = r.map(x => Math.max(5, Math.round(x / s * total)));
-    out[n - 1] = total - out.slice(0, -1).reduce((x, y) => x + y, 0);
-    return out;
-  };
-  const n = 2 + (rng() < 0.5 ? 1 : 0);
-  const m = rng() < 0.5 ? n : n - 1;
-  const wHits = split(100, n),
-    lHits = split(30 + Math.round(rng() * 55), m);
-  const order = [];
-  let wi = 0,
-    li = 0;
-  let turn = m === n ? 1 - w : w;
-  while (wi < n || li < m) {
-    if (turn === w && wi < n) order.push({
-      by: w,
-      amt: wHits[wi++]
-    });else if (turn !== w && li < m) order.push({
-      by: 1 - w,
-      amt: lHits[li++]
-    });
-    turn = 1 - turn;
-  }
-  const moves = kind.moves || ['{a} attacks!'];
-  return order.map(h => ({
-    ...h,
-    line: moves[Math.floor(rng() * moves.length)].replace('{a}', names[h.by]).replace('{b}', names[1 - h.by])
-  }));
-}
-function battleBars(kind, hits, k) {
-  const got = [0, 0];
-  hits.slice(0, k).forEach(h => {
-    got[h.by] += h.amt;
-  });
-  return kind && kind.bar === 'meter' ? [Math.min(100, got[0]), Math.min(100, got[1])] : [Math.max(0, 100 - got[1]), Math.max(0, 100 - got[0])];
 }
 function simulateBattle(d, A, B, key) {
   const kindId = battleKindId(d.topic) || 'fight';
@@ -21411,7 +21356,6 @@ function simulateBattle(d, A, B, key) {
       edge: r.edge,
       upset: r.upset,
       line: r.line,
-      hits: r.hits || [],
       score: [...score]
     });
   });
@@ -21430,7 +21374,6 @@ function simulateBattle(d, A, B, key) {
       edge: r.edge,
       upset: r.upset,
       line: r.line,
-      hits: r.hits || [],
       score: [...score]
     };
     duels.push(sudden);
@@ -31811,7 +31754,6 @@ class Boundary extends React.Component {
 }
 if (window.__DN_TEST__) window.__DN = {
   finale: {
-    battleBars,
     simulateBattle,
     hasBattle,
     battleKind,
@@ -32012,10 +31954,7 @@ function BattleFighter({
   e,
   team,
   won,
-  lost,
-  bar,
-  barName,
-  hurt
+  lost
 }) {
   if (!e) return React.createElement("div", {
     className: "fighter empty",
@@ -32032,7 +31971,7 @@ function BattleFighter({
     emoji: e.emoji
   };
   return React.createElement("div", {
-    className: 'fighter' + (won ? ' won' : '') + (lost ? ' lost' : '') + (hurt ? ' ' + hurt : ''),
+    className: 'fighter' + (won ? ' won' : '') + (lost ? ' lost' : ''),
     style: mStyle(team)
   }, React.createElement("span", {
     className: "f-art"
@@ -32044,19 +31983,7 @@ function BattleFighter({
     className: "f-n"
   }, e.name), React.createElement("span", {
     className: "f-t"
-  }, team.emoji, " ", team.name, " \xB7 $", e.price), bar != null && React.createElement("span", {
-    className: "f-bar",
-    role: "meter",
-    "aria-label": barName,
-    "aria-valuenow": bar,
-    "aria-valuemin": 0,
-    "aria-valuemax": 100
-  }, React.createElement("i", {
-    style: {
-      width: bar + '%'
-    },
-    className: bar <= 25 ? 'low' : ''
-  }), React.createElement("small", null, barName, " ", bar)));
+  }, team.emoji, " ", team.name, " \xB7 $", e.price));
 }
 function BattleView({
   d,
@@ -32071,14 +31998,11 @@ function BattleView({
   const instant = speed === 'instant';
   const N = match.duels.length;
   const [shown, setShown] = useState(instant ? N : 0);
-  const [step, setStep] = useState(0);
-  const fast = speed === 'fast';
+  const [hit, setHit] = useState(false);
+  const step = speed === 'fast' ? 1300 : 2800;
   const done = shown >= N;
   const fired = useRef(false);
   const feedRef = useRef(null);
-  const cur = done ? null : match.duels[shown];
-  const H = cur ? (cur.hits || []).length : 0;
-  const hit = !!cur && step > H;
   useEffect(() => {
     if (done) {
       if (!fired.current) {
@@ -32088,28 +32012,26 @@ function BattleView({
       }
       return undefined;
     }
-    if (step <= H) {
+    const du = match.duels[shown];
+    if (!hit) {
       const t = setTimeout(() => {
-        const nx = step + 1;
-        setStep(nx);
-        if (nx > H) audio.play(cur.upset ? 'cheer' : 'gavel');else audio.play('bid');
-      }, ms(step === 0 ? fast ? 450 : 900 : fast ? 550 : 1100));
+        setHit(true);
+        audio.play(du.upset ? 'cheer' : 'gavel');
+      }, ms(step * 0.5));
       return () => clearTimeout(t);
     }
     const t = setTimeout(() => {
       setShown(shown + 1);
-      setStep(0);
-    }, ms((fast ? 800 : 1700) + (cur.upset ? 700 : 0)));
+      setHit(false);
+    }, ms(step * 0.5 + (du.upset ? 700 : 0)));
     return () => clearTimeout(t);
-  }, [shown, step, done]);
+  }, [shown, hit, done]);
   useEffect(() => {
     const f = feedRef.current;
     if (f) f.scrollTop = f.scrollHeight;
   }, [shown]);
-  const score = hit ? cur.score : shown ? match.duels[shown - 1].score : [0, 0];
-  const bars = cur && cur.a && cur.b ? battleBars(kind, cur.hits || [], Math.min(step, H)) : [null, null];
-  const lastMove = cur && step >= 1 && step <= H ? cur.hits[step - 1] : null;
-  const hurtSide = lastMove && kind.bar !== 'meter' ? 1 - lastMove.by : null;
+  const cur = done ? null : match.duels[shown];
+  const score = cur && hit ? cur.score : shown ? match.duels[shown - 1].score : [0, 0];
   const anim = !reducedMotion();
   const roundLabel = (du, k) => du.slot === 'Sudden death' ? '⚡ Sudden death' : kind.round + ' ' + (k + 1) + ' · ' + du.slot;
   return React.createElement("div", {
@@ -32139,7 +32061,7 @@ function BattleView({
     className: "sb-progress"
   }, React.createElement("i", {
     style: {
-      width: (shown + (H ? Math.min(step, H + 1) / (H + 1) : hit ? 1 : 0.5)) / N * 100 + '%'
+      width: (shown + (hit ? 1 : 0.5)) / N * 100 + '%'
     }
   })), cur && React.createElement("div", {
     className: 'duel' + (anim ? ' anim' : '') + (hit ? ' hit w' + cur.w : ''),
@@ -32156,27 +32078,20 @@ function BattleView({
     e: cur.a,
     team: A,
     won: hit && cur.w === 0,
-    lost: hit && cur.w === 1,
-    bar: bars[0],
-    barName: kind.barName,
-    hurt: anim && hurtSide === 0 ? 'hurt' + step % 2 : ''
+    lost: hit && cur.w === 1
   }), React.createElement("span", {
-    className: 'clash' + (lastMove && anim ? ' hitting' : ''),
-    "aria-hidden": "true",
-    key: 'c' + step
+    className: "clash",
+    "aria-hidden": "true"
   }, kind.emoji), React.createElement(BattleFighter, {
     d: d,
     e: cur.b,
     team: B,
     won: hit && cur.w === 1,
-    lost: hit && cur.w === 0,
-    bar: bars[1],
-    barName: kind.barName,
-    hurt: anim && hurtSide === 1 ? 'hurt' + step % 2 : ''
+    lost: hit && cur.w === 0
   })), React.createElement("p", {
-    className: 'duel-line' + (cur.upset && hit ? ' upset' : '') + (lastMove ? ' move t' + lastMove.by : ''),
+    className: 'duel-line' + (cur.upset && hit ? ' upset' : ''),
     "aria-live": "polite"
-  }, hit ? cur.line : lastMove ? lastMove.line : 'Face off…')), shown > 0 && React.createElement("div", {
+  }, hit ? cur.line : 'Face off…')), shown > 0 && React.createElement("div", {
     className: "mfeed",
     ref: feedRef,
     "aria-live": "polite"
@@ -32190,7 +32105,7 @@ function BattleView({
     className: "btn btn-ghost btn-sm",
     onClick: () => {
       setShown(N);
-      setStep(0);
+      setHit(false);
     }
   }, "Skip to the end"), done && React.createElement(BattleSummary, {
     d: d,

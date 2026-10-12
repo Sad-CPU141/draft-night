@@ -34,12 +34,6 @@ module.exports = async function battleTests({ ok, boot, btn, click, sleep }) {
   ok(!!f.finale.champion && /battle/.test(F.championStory(f)), 'a full battle bracket crowns a champion (' + F.championStory(f).slice(0, 60) + '…)');
   const cut = F.simulateBattle(fill(T('t-cute'), 2, 'c'), ...fill(T('t-cute'), 2, 'c').managers, 'y');
   ok(cut.kind === 'cute' && cut.duels.every((x) => x.line && !/\{[wl]\}/.test(x.line)), 'each battle style has its own lines (Cuteness Contest), all filled in');
-  {
-    const all = []; for (let k = 0; k < 60; k++) all.push(...F.simulateBattle(d, A, B, 'h' + k).duels.filter((x) => x.a && x.b));
-    const good = all.every((x) => { const h = x.hits; const got = [0, 0]; h.forEach((m) => { got[m.by] += m.amt; }); return h.length >= 3 && h.every((m) => m.amt > 0 && m.line && !/\{[ab]\}/.test(m.line)) && got[x.w] === 100 && got[1 - x.w] < 100 && h[h.length - 1].by === x.w; });
-    ok(all.length > 100 && good, 'every duel plays out as 3+ moves: the winner lands the last one and drains the loser’s bar to 0 (' + all.length + ' duels)');
-    ok(JSON.stringify(F.battleBars(F.BATTLE_KINDS.fight, all[0].hits, all[0].hits.length)[1 - all[0].w]) === '0' && F.battleBars(F.BATTLE_KINDS.cute, all[0].hits, all[0].hits.length)[all[0].w] === 100, 'health bars drain in fights; the aww meter fills up in cuteness contests');
-  }
   const rt = DN.share.unpackTopic(DN.share.packTopic(T('t-zomb'), false));
   ok(rt.ok && rt.topic.battle === 'survival' && F.hasBattle(rt.topic), 'shared and copied topics keep their battle style');
   // Screen: play a battle through the UI at instant speed.

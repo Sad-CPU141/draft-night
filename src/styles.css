@@ -614,13 +614,3 @@ html[data-motion="reduce"] *,html[data-motion="reduce"] *::before,html[data-moti
 .choosewin{border-color:var(--gold)}
 .choosewin .btn{flex-direction:column;gap:2px;padding-top:12px;padding-bottom:12px;white-space:normal;line-height:1.15}
 .cw-sub{display:block;font-family:var(--body);font-size:12px;font-weight:600;text-transform:none;letter-spacing:0;opacity:.8}
-.f-bar{position:relative;display:block;width:100%;height:16px;border-radius:999px;background:#0f0c21;border:1px solid var(--line);overflow:hidden;margin-top:2px}
-.f-bar i{position:absolute;left:0;top:0;bottom:0;background:#2fd17c;border-radius:999px;transition:width .45s ease}
-.f-bar i.low{background:#ff4d6d}
-.f-bar small{position:relative;z-index:1;display:block;font-family:var(--cond);font-weight:800;font-size:10px;letter-spacing:.04em;line-height:14px;color:#fff;text-shadow:0 1px 2px #000}
-.duel.anim .duel-row .fighter.hurt0{animation:hurtA .4s ease}
-.duel.anim .duel-row .fighter.hurt1{animation:hurtB .4s ease}
-.duel.anim .clash.hitting{animation:clash .45s ease}
-.duel-line.move{font-weight:700;color:var(--text)}
-@keyframes hurtA{0%,100%{transform:none}25%{transform:translateX(-6px) rotate(-2deg)}50%{transform:translateX(6px) rotate(2deg)}75%{transform:translateX(-3px)}}
-@keyframes hurtB{0%,100%{transform:none}25%{transform:translateX(-6px) rotate(-2deg)}50%{transform:translateX(6px) rotate(2deg)}75%{transform:translateX(-3px)}}
