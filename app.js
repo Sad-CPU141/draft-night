@@ -1,4 +1,4 @@
-/* Draft Night 9a406c02c3 — built from src/ by build.js. Edit src/, not this file. */
+/* Draft Night 897dc86fdf — built from src/ by build.js. Edit src/, not this file. */
 "use strict";
 (function(){
 function _extends() { return _extends = Object.assign ? Object.assign.bind() : function (n) { for (var e = 1; e < arguments.length; e++) { var t = arguments[e]; for (var r in t) ({}).hasOwnProperty.call(t, r) && (n[r] = t[r]); } return n; }, _extends.apply(null, arguments); }
@@ -627,7 +627,7 @@ function starterTopics() {
     builtin: true
   }))).map(withExtras);
 }
-const EXTRAS_V = 1;
+const EXTRAS_V = 2;
 function extraItemsFor(id) {
   const src = typeof EXTRA_ITEMS !== 'undefined' && EXTRA_ITEMS[id] || '';
   return src.trim() ? src.trim().split('\n').map((line, i) => {
@@ -6530,6 +6530,956 @@ function toggleIn(list, id) {
   if (s.has(id)) s.delete(id);else s.add(id);
   return [...s];
 }
+const EXTRA_ANIMALS = {
+  't-ani': `
+Hippo Bull|Land|Territorial river heavyweight|🦛
+Lioness|Land|The pride's hunter|🦁
+Mandrill|Land|Colourful and fierce|🐒
+Narwhal|Sea|Unicorn tusk|🦄
+Polar Bear|Land|Biggest land carnivore|🐻‍❄️
+Jaguar|Land|Crushing bite|🐆
+Leopard|Land|Climbs with its prey|🐆
+Cape Buffalo|Land|Black death of the savanna|🐃
+Moose|Land|Huge and grumpy|🫎
+Bison|Land|Charging tonne|🦬
+Wolverine|Land|Pound-for-pound tough|🦡
+Hyena|Land|Bone-crushing jaws|🐺
+Silverback Gorilla|Land|Gentle until not|🦍
+Anaconda|Land|Constrictor|🐍
+King Cobra|Land|Longest venomous snake|🐍
+Black Mamba|Land|Fastest snake|🐍
+Kodiak Bear|Land|Giant brown bear|🐻
+Giraffe|Land|Deadly kick|🦒
+Ostrich|Land|Kicks like a truck|🪶
+Cassowary|Land|Dagger claws|🐦
+Saltwater Crocodile|Land|Strongest bite|🐊
+Hammerhead Shark|Sea|Wide-set eyes|🦈
+Tiger Shark|Sea|Eats anything|🦈
+Bull Shark|Sea|Swims up rivers|🦈
+Leopard Seal|Sea|Antarctic hunter|🦭
+Walrus|Sea|Tusks|🦭
+Sperm Whale|Sea|Fights giant squid|🐋
+Box Jellyfish|Sea|Deadly sting|🪼
+Electric Eel|Sea|600 volts|⚡
+Mantis Shrimp|Sea|Fastest punch|🦐
+Barracuda|Sea|Torpedo teeth|🐟
+Moray Eel|Sea|Double jaws|🐍
+Golden Eagle|Air|Hunts deer|🦅
+Harpy Eagle|Air|Talons like grizzly claws|🦅
+Peregrine Falcon|Air|Fastest animal alive|🦅
+Andean Condor|Air|Giant wingspan|🦅
+Great Horned Owl|Air|Silent hunter|🦉
+Vulture|Air|Cleans up|🦅
+Crow|Air|Genius bird|🐦‍⬛
+Goose|Air|Pure aggression|🪿
+Pelican|Air|Huge beak|🐦
+Albatross|Air|Longest wings|🕊️
+Murder Hornet|Air|Asian giant hornet|🐝
+Dragonfly|Air|Perfect hunter|🪰
+Bullet Ant|Land|Most painful sting|🐜
+Scorpion|Land|Venomous tail|🦂
+Tarantula|Land|Hairy spider|🕷️
+Snapping Turtle|Sea|Beak bite|🐢
+Piranha|Sea|Swarm attack|🐟
+Stingray|Sea|Barbed tail|🐟
+Killer Bee|Air|Aggressive swarm|🐝
+Bat Swarm|Air|Thousands strong|🦇`,
+  't-pet': `
+Labrador|Dog|Family favourite|🐕
+Beagle|Dog|Nose first|🐶
+Corgi|Dog|Royal shorties|🐕
+Dachshund|Dog|Sausage dog|🌭
+Shiba Inu|Dog|Doge|🐕
+Poodle|Dog|Smart and fluffy|🐩
+Chihuahua|Dog|Tiny and brave|🐕
+Border Collie|Dog|Smartest dog|🐕
+Bulldog|Dog|Wrinkly|🐶
+Pug|Dog|Squishy face|🐶
+Samoyed|Dog|Smiling cloud|🐕
+Cavapoo|Dog|Teddy bear|🐶
+British Shorthair|Cat|Round and calm|🐈
+Bengal Cat|Cat|Mini leopard|🐆
+Scottish Fold|Cat|Folded ears|🐱
+Russian Blue|Cat|Silver coat|🐈
+Tabby Cat|Cat|Classic stripes|🐈
+Black Cat|Cat|Lucky or not|🐈‍⬛
+Orange Cat|Cat|One brain cell|🐈
+Calico Cat|Cat|Three colours|🐈
+Birman|Cat|Silky and gentle|🐈
+Abyssinian|Cat|Active explorer|🐈
+Norwegian Forest Cat|Cat|Viking cat|🐈
+Exotic Shorthair|Cat|Flat-faced cutie|🐱
+Cockatiel|Other|Whistles tunes|🦜
+Canary|Other|Sings all day|🐤
+Gecko|Other|Sticky feet|🦎
+Hermit Crab|Other|Shell swapper|🦀
+Gerbil|Other|Desert digger|🐭
+Rat|Other|Clever and clean|🐀
+Mouse|Other|Tiny|🐁
+Pony|Other|Mini horse|🐴
+Betta Fish|Other|Fancy fins|🐟
+Koi|Other|Pond royalty|🐟`,
+  't-cats': `
+Sunda Leopard Cat||Small island hunter|🐈
+Chinese Mountain Cat||Rare cat of the Tibetan plateau|🐈
+Javan Leopard||Rare island leopard|🐆
+Bengal Tiger
+Amur Tiger
+Sumatran Tiger
+Malayan Tiger
+Asiatic Lion
+Barbary Lion
+White Lion
+White Tiger
+Black Panther
+Amur Leopard
+Persian Leopard
+African Leopard
+Indian Leopard
+Sri Lankan Leopard
+Florida Panther
+Andean Mountain Cat
+Pampas Cat
+Geoffroy's Cat
+Kodkod
+Oncilla
+Flat-headed Cat
+Marbled Cat
+Asian Golden Cat
+African Golden Cat
+Bornean Bay Cat
+Jungle Cat
+Wildcat
+African Wildcat
+Leopard Cat
+Sunda Clouded Leopard
+King Cheetah
+Asiatic Cheetah
+Northeast African Cheetah
+Liger
+Tigon
+Saber-toothed Cat||||Smilodon
+Cave Lion
+American Lion`,
+  't-dogbreeds': `
+Alaskan Malamute
+Bichon Frise
+Boston Terrier
+Cane Corso
+Dogo Argentino
+English Springer Spaniel
+Irish Setter
+Irish Wolfhound
+Jack Russell Terrier
+Labradoodle
+Goldendoodle
+Lhasa Apso
+Mastiff
+Old English Sheepdog
+Papillon
+Pekingese
+Pit Bull
+Rhodesian Ridgeback
+Saint Bernard
+Schnauzer
+Scottish Terrier
+Shetland Sheepdog
+Weimaraner
+Whippet
+West Highland White Terrier
+Vizsla
+Basenji
+Basset Hound
+Bloodhound
+Borzoi
+Afghan Hound
+Great Pyrenees
+Leonberger
+Tibetan Mastiff
+Xoloitzcuintle`,
+  't-catbreeds': `
+Donskoy||Hairless Russian breed|🐈
+Ukrainian Levkoy||Folded-ear hairless cat|🐈
+Bombay
+Chartreux
+Korat
+LaPerm
+Manx
+Nebelung
+Ocicat
+Oriental Shorthair
+Peterbald
+Pixie-bob
+Selkirk Rex
+Singapura
+Snowshoe
+Somali
+Toyger
+American Curl
+American Bobtail
+Balinese
+Burmilla
+Cymric
+Havana Brown
+Japanese Bobtail
+Kurilian Bobtail
+Lykoi
+Minuet
+Ojos Azules
+Highlander
+Chausie
+Serengeti
+Sokoke
+Thai
+Aegean Cat
+Khao Manee
+Mekong Bobtail
+Australian Mist
+German Rex`,
+  't-sharks': `
+Blacknose Shark||Small Atlantic shark|🦈
+Daggernose Shark||Long pointed snout|🦈
+Galápagos Shark
+Silky Shark
+Dusky Shark
+Sandbar Shark
+Spinner Shark
+Blacktip Shark
+Caribbean Reef Shark
+Grey Reef Shark
+Silvertip Shark
+Scalloped Hammerhead
+Smooth Hammerhead
+Porbeagle
+Salmon Shark
+Longfin Mako
+Bigeye Thresher
+Pelagic Thresher
+Tawny Nurse Shark
+Epaulette Shark
+Port Jackson Shark
+Horn Shark
+Bamboo Shark
+Spiny Dogfish
+Small-spotted Catshark
+Swell Shark
+Lantern Shark
+Pocket Shark
+Bluntnose Sixgill Shark
+Broadnose Sevengill Shark
+Pacific Sleeper Shark
+Kitefin Shark
+Sawshark
+Tasselled Wobbegong
+Crocodile Shark
+Speartooth Shark
+Ganges Shark
+Pondicherry Shark
+Whitenose Shark`,
+  't-whales': `
+Southern Right Whale
+Bryde's Whale
+Omura's Whale
+Pygmy Right Whale
+Pygmy Sperm Whale
+Dwarf Sperm Whale
+Baird's Beaked Whale
+Blainville's Beaked Whale
+Northern Bottlenose Whale
+Melon-headed Whale
+Pygmy Killer Whale
+Long-finned Pilot Whale
+Short-finned Pilot Whale
+Atlantic Spotted Dolphin
+Pantropical Spotted Dolphin
+Striped Dolphin
+Rough-toothed Dolphin
+Fraser's Dolphin
+Dusky Dolphin
+Hourglass Dolphin
+White-beaked Dolphin
+Atlantic White-sided Dolphin
+Peale's Dolphin
+Chilean Dolphin
+Heaviside's Dolphin
+Indo-Pacific Humpback Dolphin
+Australian Snubfin Dolphin
+Tucuxi
+La Plata Dolphin
+Ganges River Dolphin
+Indus River Dolphin
+Harbour Porpoise
+Dall's Porpoise
+Finless Porpoise
+Spectacled Porpoise
+Burmeister's Porpoise
+Northern Right Whale Dolphin
+Southern Right Whale Dolphin
+Antarctic Minke Whale
+Pygmy Blue Whale`,
+  't-raptors': `
+Bateleur
+Tawny Eagle
+African Fish Eagle
+White-tailed Eagle
+Booted Eagle
+Short-toed Snake Eagle
+Crested Caracara
+Laughing Falcon
+Lanner Falcon
+Prairie Falcon
+American Kestrel
+Eurasian Hobby
+Aplomado Falcon
+Cooper's Hawk
+Sharp-shinned Hawk
+Rough-legged Buzzard
+Common Buzzard
+Ferruginous Hawk
+Swainson's Hawk
+Black Kite
+Snail Kite
+Swallow-tailed Kite
+Hen Harrier
+Western Marsh Harrier
+Northern Harrier
+King Vulture
+Egyptian Vulture
+Griffon Vulture
+Lappet-faced Vulture
+Black Vulture
+Burrowing Owl
+Great Grey Owl
+Tawny Owl
+Spotted Owl
+Elf Owl
+Blakiston's Fish Owl
+Short-eared Owl
+Long-eared Owl`,
+  't-parrots': `
+Green-winged Macaw
+Military Macaw
+Spix's Macaw
+Palm Cockatoo
+Major Mitchell's Cockatoo
+Gang-gang Cockatoo
+Red-tailed Black Cockatoo
+Yellow-headed Amazon
+Monk Parakeet
+Rose-ringed Parakeet
+Alexandrine Parakeet
+Senegal Parrot
+Kakariki
+Hawk-headed Parrot
+Caique
+Golden Conure
+Jenday Conure
+Pacific Parrotlet
+Superb Fairywren
+Painted Bunting
+Scarlet Tanager
+Paradise Tanager
+Wilson's Bird-of-paradise
+King of Saxony Bird-of-paradise
+Victoria Crowned Pigeon
+Nicobar Pigeon
+Lady Amherst's Pheasant
+Himalayan Monal
+Keel-billed Toucan
+Hoatzin
+Bee-eater
+Hummingbird
+Sunbird
+Hoopoe
+Roseate Spoonbill
+Scarlet Ibis
+Sri Lanka Junglefowl
+Crested Partridge`,
+  't-reptiles': `
+Black Caiman
+Chinese Alligator
+Cuban Crocodile
+Mugger Crocodile
+Tomistoma
+Dwarf Crocodile
+Hawksbill Sea Turtle
+Loggerhead Sea Turtle
+Kemp's Ridley Sea Turtle
+Olive Ridley Sea Turtle
+Box Turtle
+Red-eared Slider
+Softshell Turtle
+Mata Mata
+Spur-thighed Tortoise
+Sulcata Tortoise
+Radiated Tortoise
+Leopard Tortoise
+Veiled Chameleon
+Jackson's Chameleon
+Crested Gecko
+Tokay Gecko
+Satanic Leaf-tailed Gecko
+Flying Dragon
+Armadillo Girdled Lizard
+Chinese Water Dragon
+Rhinoceros Iguana
+Green Basilisk
+Perentie
+Lace Monitor
+Savannah Monitor
+Black-throated Monitor
+Mexican Beaded Lizard
+Glass Lizard
+Uromastyx
+Desert Monitor
+Collared Lizard
+Anole
+Slow Worm`,
+  't-snakes': `
+Puff Adder
+Rhinoceros Viper
+Bushmaster
+Eyelash Viper
+Timber Rattlesnake
+Mojave Rattlesnake
+Tiger Snake
+Coastal Taipan
+Death Adder
+Mulga Snake
+Red-bellied Black Snake
+Banded Krait
+Many-banded Krait
+Indian Cobra
+Monocled Cobra
+Egyptian Cobra
+Cape Cobra
+Rinkhals
+Boomslang
+Twig Snake
+Green Mamba
+Jameson's Mamba
+Emerald Tree Boa
+Rainbow Boa
+Rosy Boa
+Kenyan Sand Boa
+Dumeril's Boa
+Rock Python
+Carpet Python
+Children's Python
+Blood Python
+Hognose Snake
+Rat Snake
+Kingsnake
+Rough Green Snake
+Paradise Flying Snake
+Vine Snake
+Wolf Snake`,
+  't-dinos': `
+Albertosaurus
+Gorgosaurus
+Tarbosaurus
+Daspletosaurus
+Megalosaurus
+Ceratosaurus
+Suchomimus
+Acrocanthosaurus
+Carcharodontosaurus
+Mapusaurus
+Majungasaurus
+Yutyrannus
+Microraptor
+Oviraptor
+Compsognathus
+Coelophysis
+Herrerasaurus
+Plateosaurus
+Camarasaurus
+Brontosaurus
+Mamenchisaurus
+Sauroposeidon
+Dreadnoughtus
+Patagotitan
+Amargasaurus
+Nigersaurus
+Styracosaurus
+Pachyrhinosaurus
+Centrosaurus
+Protoceratops
+Psittacosaurus
+Kentrosaurus
+Euoplocephalus
+Nodosaurus
+Maiasaura
+Corythosaurus
+Lambeosaurus
+Shantungosaurus
+Ouranosaurus
+Dimetrodon
+Ichthyosaurus
+Elasmosaurus
+Liopleurodon
+Kronosaurus
+Dimorphodon
+Rhamphorhynchus
+Tupandactylus
+Sarcosuchus
+Deinosuchus
+Postosuchus
+Troodon
+Muttaburrasaurus
+Minmi
+Mussaurus`,
+  't-prehistmammals': `
+Megaloceros||||Irish elk
+Megalonyx
+Toxodon
+Arsinoitherium
+Uintatherium
+Brontotherium
+Amphicyon
+Daeodon
+Sarkastodon
+Thylacosmilus
+Xenosmilus
+Homotherium
+Cave Hyena
+Columbian Mammoth
+Steppe Mammoth
+Gomphotherium
+Platybelodon
+Moeritherium
+Pakicetus
+Rodhocetus
+Dorudon
+Livyatan
+Josephoartigasia
+Castoroides
+Procoptodon
+Palorchestes
+Zygomaturus
+Megalania
+Phorusrhacos
+Titanis
+Gastornis
+Hipparion
+Eohippus
+Synthetoceras
+Merychippus
+Aepycamelus
+Sivatherium
+Giant Beaver||||Castoroides
+Ground Sloth||||Ground sloth`,
+  't-insects': `
+Fire Ant
+Army Ant
+Carpenter Ant
+Weaver Ant
+Velvet Ant
+Tarantula Hawk
+Paper Wasp
+Yellowjacket
+Carpenter Bee
+Mason Bee
+Hornet
+Blue Morpho
+Swallowtail Butterfly
+Painted Lady
+Peacock Butterfly
+Glasswing Butterfly
+Death's-head Hawkmoth
+Hummingbird Hawk-moth
+Rosy Maple Moth
+Cecropia Moth
+Silkworm
+Firebug
+Shield Bug
+Water Strider
+Giant Water Bug
+Assassin Bug
+Cicada Killer
+Jewel Beetle
+Rhinoceros Beetle
+Titan Beetle
+Tiger Beetle
+Click Beetle
+Weevil
+Earwig
+Silverfish
+Flea
+Housefly
+Horsefly
+Hoverfly
+Lacewing
+Mayfly
+Damselfly
+Katydid
+Cricket`,
+  't-farm': `
+Guinea Hog||Small heritage farm pig|🐖
+Belted Galloway||The 'Oreo cow'|🐄
+Jacob Sheep||Up to six horns|🐑
+Brahma Chicken||Giant fluffy hen|🐔
+Indian Runner Duck||Walks upright like a bottle|🦆
+Nubian Goat||Long floppy ears|🐐
+Hen
+Rooster
+Piglet
+Calf
+Lamb
+Dairy Cow
+Holstein Friesian
+Angus Cattle
+Hereford Cattle
+Jersey Cow
+Merino Sheep
+Suffolk Sheep
+Nigerian Dwarf Goat
+Boer Goat
+Angora Goat
+Clydesdale
+Shire Horse
+Shetland Pony
+Arabian Horse
+Pekin Duck
+Muscovy Duck
+Mallard
+Peacock
+Pheasant
+Pigeon
+Barn Cat
+Zebu
+Brahman Cattle
+Dromedary
+Bactrian Camel
+Reindeer
+Emu
+Hinny
+Mini Donkey||||Donkey
+Silkie Chicken
+Wagyu Cattle`,
+  't-safari': `
+Puku||Golden floodplain antelope|🦌
+Sitatunga||Swamp antelope|🦌
+Lechwe||Splashes through floodplains|🦌
+Common Reedbuck||Hides in tall grass|🦌
+Gelada||Bleeding-heart monkey|🐒
+Black-and-white Colobus||Flowing white cape|🐒
+Steenbok||Tiny solitary antelope|🦌
+Common Duiker||Ducks into the bush|🦌
+Pel's Fishing Owl||Ginger owl that fishes|🦉
+Hamerkop||Builds giant nests|🐦
+Black Rhinoceros
+Masai Giraffe
+Grevy's Zebra
+Plains Zebra
+Topi
+Thomson's Gazelle
+Grant's Gazelle
+Springbok
+Eland
+Sable Antelope
+Roan Antelope
+Oryx
+Waterbuck
+Nyala
+Bushbuck
+Dik-dik
+Klipspringer
+Hartebeest
+Bongo
+Gerenuk
+Caracal
+Serval
+African Civet
+Honey Badger
+Banded Mongoose
+Bat-eared Fox
+Black-backed Jackal
+Aardwolf
+Striped Hyena
+Bushbaby
+Vervet Monkey
+Olive Baboon
+Rock Hyrax
+Marabou Stork
+Shoebill
+Southern Ground Hornbill
+Lilac-breasted Roller
+Kori Bustard
+Grey Crowned Crane
+African Fish Eagle
+Martial Eagle
+Black Mamba
+African Rock Python
+Leopard Tortoise
+Nile Monitor
+Dung Beetle`,
+  't-arctic': `
+Arctic Skua||Pirate of the skies|🐦
+Beluga Calf||Born grey, turns white|🐋
+Arctic Fox Kit||Fluffy brown pup|🦊
+Snowshoe Hare||Giant snowy feet|🐇
+Northern Fulmar||Tube-nosed seabird|🐦
+Sea Angel||Tiny winged snail|🪽
+Arctic Char
+Bearded Seal
+Hooded Seal
+Spotted Seal
+Ribbon Seal
+Steller Sea Lion
+Sea Otter
+Arctic Ground Squirrel
+Collared Lemming
+Ermine
+Canada Lynx
+Grizzly Bear
+Moose
+Dall Sheep
+Reindeer
+Svalbard Reindeer
+Gyrfalcon
+Ivory Gull
+Little Auk
+Thick-billed Murre
+Common Eider
+King Eider
+Long-tailed Duck
+Snow Bunting
+Common Raven
+Glaucous Gull
+Black Guillemot
+Atlantic Cod
+Arctic Cod
+Polar Cod
+Greenland Halibut
+Lion's Mane Jellyfish
+Snow Crab
+Arctic Woolly Bear Moth
+Sea Butterfly
+Kamchatka Brown Bear
+Muskrat`,
+  't-aussie': `
+Eastern Grey Kangaroo
+Tree-kangaroo
+Quoll
+Bandicoot
+Bettong
+Potoroo
+Pademelon
+Rock-wallaby
+Ringtail Possum
+Greater Glider
+Feathertail Glider
+Honey Possum
+Marsupial Mole
+Spotted-tailed Quoll
+Brolga
+Jabiru
+Rainbow Lorikeet
+Sulphur-crested Cockatoo
+Pink Cockatoo
+Black Swan
+Australian Magpie
+Wedge-tailed Eagle
+Tawny Frogmouth
+Lace Monitor
+Perentie
+Shingleback Lizard
+Blue-tongued Lizard
+Eastern Water Dragon
+Freshwater Crocodile
+Tiger Snake
+Eastern Brown Snake
+Redback Spider
+Huntsman Spider
+Green Tree Frog
+Corroboree Frog
+Leafy Seadragon
+Weedy Seadragon
+Little Penguin
+Australian Sea Lion`,
+  't-primates': `
+Western Lowland Gorilla
+Eastern Gorilla
+Bornean Orangutan
+Sumatran Orangutan
+Tapanuli Orangutan
+Lar Gibbon
+Hoolock Gibbon
+Drill
+Olive Baboon
+Chacma Baboon
+Barbary Macaque
+Crab-eating Macaque
+Bonnet Macaque
+Lion-tailed Macaque
+Hanuman Langur
+Douc Langur
+Dusky Leaf Monkey
+Red Colobus
+De Brazza's Monkey
+Diana Monkey
+Patas Monkey
+Owl Monkey
+Saki Monkey
+Woolly Monkey
+Muriqui
+Emperor Tamarin
+Cotton-top Tamarin
+Common Marmoset
+Aye-aye
+Indri
+Sifaka
+Mouse Lemur
+Slow Loris
+Potto
+Western Tarsier
+Gray Langur
+Golden Langur
+Black-headed Spider Monkey
+Red-shanked Douc
+Allen's Swamp Monkey`,
+  't-deepsea': `
+Dragonfish
+Black Dragonfish
+Stoplight Loosejaw
+Deep-sea Lizardfish
+Tripod Fish
+Hagfish
+Glass Squid
+Bigfin Squid
+Firefly Squid
+Cock-eyed Squid
+Telescope Octopus
+Glass Octopus
+Flapjack Octopus
+Basket Star
+Brittle Star
+Sea Spider
+Giant Amphipod
+Zombie Worm
+Pompeii Worm
+Football Fish
+Triplewart Seadevil
+Ghost Shark
+Sixgill Shark
+Greenland Shark
+Sleeper Shark
+Megamouth Shark
+Cookiecutter Shark
+Pelican Eel
+Snipe Eel
+Cusk Eel
+Grenadier
+Orange Roughy
+Pacific Blackdragon
+Benthocodon
+Atolla Jellyfish
+Crown Jellyfish
+Comb Jelly
+Giant Phantom Jelly
+Sea Toad
+Bristlemouth`,
+  't-extinct': `
+Sabre-toothed Cat||||Smilodon
+Woolly Rhinoceros
+Mastodon
+Giant Ground Sloth
+Glyptodon
+Dire Wolf
+Short-faced Bear
+Cave Bear
+Megalania
+Thylacoleo
+Diprotodon
+Terror Bird
+Titanoboa
+Heath Hen
+Pink-headed Duck
+Spectacled Cormorant
+Atlas Bear
+Barbary Lion
+Caspian Tiger
+Bali Tiger
+Zanzibar Leopard
+Toolache Wallaby
+Falkland Islands Wolf
+Japanese Wolf
+Mexican Grizzly Bear
+Tarpan
+Bluebuck
+Schomburgk's Deer
+Sea Mink
+Stephens Island Wren
+Huia
+Laughing Owl
+Kauaʻi ʻōʻō
+Christmas Island Pipistrelle
+Pinta Island Tortoise
+Rocky Mountain Locust
+Xerces Blue
+Chinese Paddlefish
+Northern White Rhinoceros
+Spix's Macaw
+Sumatran Rhinoceros`,
+  't-cute': `
+Baby Koala||Tiny clinging joey|🐨
+Fluffy Owlet||Ball of feathers|🦉
+Baby Hedgehog||Soft little spikes|🦔
+Baby Capybara||Calm mini chonk|🐹
+Bunny Kit||Pocket-sized rabbit|🐇
+Baby Red Panda||Fuzzy and tiny|🐼
+Baby Otter
+Panda Cub
+Koala Joey
+Baby Penguin
+Puffin
+Guinea Pig
+Netherland Dwarf Rabbit
+Lop Rabbit
+Golden Retriever Puppy
+Pomeranian
+Samoyed
+Corgi Puppy
+French Bulldog
+Pug
+Baby Goat
+Piglet
+Calf
+Foal
+Fawn
+Baby Hippo
+Baby Giraffe
+Baby Sloth
+Pygmy Hedgehog
+Sugar Glider
+Fennec Fox Kit
+Red Fox Kit
+Snow Leopard Cub
+Lion Cub
+Tiger Cub
+Polar Bear Cub
+Baby Seal
+Sea Lion Pup
+Beluga Calf
+Dumbo Octopus
+Pygmy Hippo
+Slow Loris
+Sand Cat
+Pallas's Cat
+Ermine
+Long-tailed Tit
+Chick
+Baby Owl
+Alpaca
+Marmot
+Chipmunk
+Dormouse
+Harvest Mouse
+Jerboa
+Pika
+Wombat Joey`
+};
 const EXTRA_ENT = {
   't-rap': `
 Lauryn Hill
@@ -8766,6 +9716,1442 @@ Sirene
 Leyden
 Shropshire Blue`
 };
+const EXTRA_FUN = {
+  't-pow': `
+Super Hearing
+Intangibility
+Duplication
+Regeneration
+Gravity Control
+Size Changing
+Water Powers
+Earth Powers
+Electricity Powers
+Super Jump
+Wall Crawling
+Portals
+Technopathy
+Telepathy
+Animal Shapeshifting
+Danger Sense
+Super Charisma
+Plant Control
+Sound Waves
+Rewind 10 Seconds
+`,
+  't-myth': `
+Kitsune
+Banshee
+Gorgon
+Chimera
+Harpy
+Manticore
+Wendigo
+Djinn
+Roc
+Nymph
+Siren
+Selkie
+Goblin
+Ogre
+Dwarf
+Leprechaun
+Gnome
+Pixie
+Hippogriff
+Kelpie
+Jackalope
+Mothman
+Sea serpent
+Wyvern
+Bunyip
+Tengu
+Qilin
+Chinese dragon
+Nāga
+Garuda
+Anubis
+Valkyrie
+Satyr
+Faun
+Behemoth
+Ifrit
+Mummy
+Headless Horseman
+`,
+  't-job': `
+Pro Gamer
+Formula One Driver
+Movie Director
+Video Game Tester
+Fighter Pilot
+Surgeon
+Racing Driver
+Personal Trainer
+Barber
+Mechanic
+Food Critic
+Park Ranger
+Diplomat
+Journalist
+Data Scientist
+Animator
+Graphic Designer
+Interior Designer
+Wildlife Photographer
+Air Traffic Controller
+Deep-sea Diver
+Car Designer
+Football Manager
+Hotel Owner
+`,
+  't-zomb': `
+Machete|Weapon
+Sledgehammer|Weapon
+Spear|Weapon
+Golf Club|Weapon
+Cricket Bat|Weapon
+Axe|Weapon
+Shovel|Weapon
+Crossbow|Weapon
+Slingshot|Weapon
+Hammer|Weapon
+Lockpick Set|Tool
+Multi-tool|Tool
+Bolt Cutters|Tool
+Wind-up Torch|Tool
+Solar Charger|Tool
+Water Filter|Tool
+Fire Starter|Tool
+Whistle|Tool
+Tarp|Tool
+Sewing Kit|Tool
+Rice Sack|Supply
+Peanut Butter|Supply
+Tuna Cans|Supply
+Instant Noodles|Supply
+Honey|Supply
+Dried Fruit|Supply
+Protein Bars|Supply
+Painkillers|Supply
+Bandages|Supply
+Water Purification Tablets|Supply
+Warm Blanket|Supply
+Rain Poncho|Supply
+Spare Socks|Supply
+Hiking Boots|Supply
+Backpack|Supply
+Candles|Supply
+Matches|Supply
+Seeds to Grow Food|Supply
+Salt|Supply
+Coffee|Supply
+Chocolate|Supply
+Vitamins|Supply
+Soap|Supply
+Toilet Paper|Supply
+Garbage Bags|Supply
+Armoured Car|FLEX
+Boat|FLEX
+Horse|FLEX
+Skateboard|FLEX
+Drone|FLEX
+Ladder|FLEX
+Tent|FLEX
+Generator|FLEX
+Hazmat Suit|FLEX
+Riot Shield|FLEX
+Motorcycle Helmet|FLEX
+Trained Medic Friend|FLEX
+`,
+  't-island': `
+Axe
+Shovel
+Tarp
+Cooking Pot
+Spear Gun
+Life Jacket
+Waterproof Matches
+Binoculars
+Seeds
+Chickens
+Goat
+Notebook & Pen
+Deck of Cards
+Volleyball
+Sunglasses
+Flip-flops
+Toothbrush
+Multi-tool
+Hot Chocolate
+Bag of Dates
+Solar Fridge
+Radio
+`,
+  't-inv': `
+Steam engine
+Telescope
+Microscope
+X-ray
+Anaesthesia
+Pasteurization
+Penicillin
+Concrete
+Plumbing
+Battery
+Radio
+Satellite
+Rocket
+Laser
+Transistor
+Solar panel
+Electric motor
+Jet engine
+Helicopter
+Train
+Elevator
+Escalator
+Credit card
+Barcode
+QR code
+Email
+Search engine
+Social media
+Smartwatch
+Calculator
+Typewriter
+Sewing machine
+Dishwasher
+Vacuum cleaner
+Toaster
+Umbrella
+Velcro
+Plastic
+Lightning rod
+Pencil
+`,
+  't-board': `
+Mahjong
+Rummikub
+Yahtzee
+Mancala
+Stratego
+Othello
+Boggle
+Blokus
+Mastermind
+Hungry Hungry Hippos
+Mouse Trap
+Kerplunk
+Don't Break the Ice
+Pandemic
+Ticket to Ride
+Carcassonne
+Dixit
+Splendor
+Azul
+Sushi Go!
+Skip-Bo
+Phase 10
+Crazy Eights
+Old Maid
+Blackjack
+Solitaire
+Speed
+War
+Hearts
+Bananagrams
+Apples to Apples
+Cards Against Humanity
+Pass the Pigs
+Headbanz
+The Game of Life
+Cranium
+Kalah
+Baloot
+Tarneeb
+Jackaroo
+`,
+  't-toys': `
+Barbie
+Transformers
+Teenage Mutant Ninja Turtles
+Polly Pocket
+Bratz
+My Little Pony
+Hatchimals
+Shopkins
+L.O.L. Surprise!
+Lite-Brite
+Spirograph
+Magna Doodle
+Super Soaker
+Frisbee
+Hula hoop
+Pogo stick
+Skateboard
+Jump rope
+Toy train
+Wooden blocks
+Rocking horse
+Mr. Potato Head
+Stretch Armstrong
+Bop It
+Simon
+Magic 8 Ball
+View-Master
+Tickle Me Elmo
+Beanie Babies
+Zhu Zhu Pets
+Sylvanian Families
+Playmobil
+K'Nex
+Mega Bloks
+Duplo
+Yu-Gi-Oh! cards
+Gogo's Crazy Bones
+Nintendo 64
+Tamiya
+Light-up sneakers
+`,
+  't-emoji': `
+Heart Eyes
+Wink
+Kiss
+Blush
+Grinning
+Rolling on the Floor
+Zany Face
+Shushing
+Zipper Mouth
+Neutral Face
+Expressionless
+Unamused
+Grimacing
+Relieved
+Sleeping
+Drooling
+Face Mask
+Cold Face
+Hot Face
+Woozy
+Cowboy
+Disguise
+Monocle
+Pouting
+Angry
+Screaming
+Exploding Head
+Flushed
+Pensive
+Worried
+Yawning
+Devil
+Alien
+Robot
+Poop
+Monkey See No Evil
+Flexed Bicep
+Clapping
+OK Hand
+Peace Sign
+Crossed Fingers
+Raising Hands
+Waving Hand
+Handshake
+Brain
+Trophy
+Crown
+Gem
+Money Bag
+Lightning
+Rainbow
+Star
+Check Mark
+Cross Mark
+White Flag
+`,
+  't-hobby': `
+Painting
+Writing
+Singing
+Dancing
+Tennis
+Padel
+Golf
+Horse riding
+Archery
+Surfing
+Skiing
+Snowboarding
+Scuba diving
+Yoga
+Bird watching
+Astronomy
+Model building
+Pottery
+Woodworking
+Origami
+Puzzle solving
+Podcasting
+Collecting cards
+DJing
+`,
+  't-road': `
+Travel Pillow
+Trail Mix
+Pretzels
+Energy Drinks
+Iced Coffee
+Car Phone Mount
+Paper Map
+First Aid Kit
+Jumper Cables
+Tire Pressure Gauge
+Flashlight
+Cooler Bag
+Paper Towels
+Trash Bags
+Tissues
+Lip Balm
+Sunscreen
+Pillow & Blanket Set
+Card Games
+Travel Mug
+Audiobook
+Road Trip Bingo
+Headphones
+Tablet with Movies
+Toll Pass
+Spare Change
+Phone Holder Fan
+Dates & Nuts
+Cookies
+Popcorn
+Extra Hoodie
+Slippers
+Car Air Freshener
+Window Sun Shades
+Loaded Snack Bag
+Instant Camera Film
+Licorice
+Sour Candy
+`,
+  't-smell': `
+Fresh Rain on Concrete
+Gingerbread
+Lemon
+Jasmine
+Sandalwood
+Honey
+Pizza in the Oven
+Vanilla Candle
+Sunscreen
+Chlorine Pool
+Cardamom Coffee
+Rose Water
+Freshly Cut Wood
+Clean Baby
+Leather
+Strawberries
+Caramel
+Mango
+Saffron
+Bonfire Marshmallows
+Fresh Mint Tea
+Peppermint
+`,
+  't-holi': `
+Lantern Festival
+Ganesh Chaturthi
+Mawlid
+Islamic New Year
+Laylat al-Qadr
+Saudi National Day
+Founding Day
+Independence Day
+Bastille Day
+St. Patrick's Day
+Mid-Autumn Festival
+Carnival
+Oktoberfest
+Day of the Dead
+Rosh Hashanah
+Passover
+Vesak
+Songkran
+Bonfire Night
+Remembrance Day
+Labour Day
+Earth Day
+Father's Day
+Teacher's Day
+Friendship Day
+April Fools' Day
+Pi Day
+Star Wars Day
+First Day of Summer
+First Snowfall
+World Kindness Day
+Children's Day
+Anniversary
+Family Reunion
+Your Team's Final
+`,
+  't-gadget': `
+Laptop
+Tablet
+Smartwatch
+Fitness tracker
+E-reader
+Action camera
+Mirrorless camera
+Gimbal
+Wireless charger
+Smart speaker
+Smart bulb
+Smart doorbell
+Smart lock
+Dashcam
+Portable monitor
+Gaming headset
+Streaming microphone
+Webcam
+Capture card
+Gaming controller
+Retro handheld
+Electric toothbrush
+Massage gun
+Portable blender
+Coffee machine
+Hoverboard
+Tracker tag
+Noise machine
+Portable fan
+USB hub
+Graphics tablet
+Label maker
+Translator earbuds
+Digital photo frame
+`,
+  't-wknd': `
+Cinema Trip
+Spa Day
+Shisha Café Night
+Karaoke
+Camping Trip
+Fishing
+Cycling
+Football Watch Party
+Cooking Something New
+Car Meet
+Desert Trip
+Day Trip to a New City
+Thrift Shopping
+Pottery Class
+Mini Golf
+Water Park
+Video Call with Old Friends
+Do Absolutely Nothing
+`,
+  't-school': `
+Calculus
+Algebra
+Geometry
+Literature
+Creative Writing
+Spanish
+Arabic
+Islamic Studies
+World Religions
+Civics
+Politics
+Sociology
+Anthropology
+Engineering
+Robotics
+Coding Club
+Graphic Design
+Photography
+Film Studies
+Cooking Class
+Home Economics
+Woodwork
+Physical Education
+Swimming Lessons
+Environmental Science
+Earth Science
+Anatomy
+Forensic Science
+Debate
+Public Speaking
+Entrepreneurship
+Personal Finance
+Study Hall
+Assembly
+`,
+  't-redflags': `
+Talks over everyone
+Laughs at people getting hurt
+Keeps score in friendships
+Never asks how you are
+Only calls when they need something
+Shares your secrets
+Mean to people they think are "below" them
+Makes every story about them
+Can't lose at anything
+Blames everyone else
+Brags about cheating
+Flakes on plans last minute
+Rude to customer service
+Gossips about everyone
+Always "joking" when it hurts
+Never lets you pick the music
+Plays music out loud on the bus
+Leaves you on read for days
+Borrows things and never returns them
+Says "I'm brutally honest"
+Has no friends from before
+Treats you differently in public
+Hates every film you like
+Makes fun of your hobbies
+Reads your texts over your shoulder
+Never tips
+Drives aggressively
+Doesn't flush
+Picks fights online
+Never admits they're wrong
+Always one-upping your stories
+Loud on speaker phone in public
+Starts drama in the group chat
+Takes 50 photos of their food
+Late to everything, never sorry
+Mocks people's accents
+Can't keep a single plant alive (and blames you)
+Thinks rules don't apply to them
+Doesn't wash their hands
+Gets angry at referees on TV for hours
+`,
+  't-greenflags': `
+Asks how your day was
+Remembers your birthday
+Owns up to mistakes
+Includes everyone
+Good with your family
+Stands up for people
+Gives honest advice
+Shows up when it matters
+Shares their charger
+Saves you the last slice
+Sends memes that remind them of you
+Asks before borrowing
+Returns what they borrow
+Picks up the bill sometimes
+Checks you got home safe
+Listens without interrupting
+Keeps your secrets
+Brings snacks
+Good loser
+Humble winner
+Tips well
+Polite to strangers
+Laughs at themselves
+Keeps their word
+Says thank you
+Learns your favourite things
+Gives credit to others
+Calm in a crisis
+Reads the room
+Cleans up after themselves
+Encourages you to rest
+Plans surprises
+Remembers your friends' names
+Tells you when there's food in your teeth
+Drives you to the airport
+Asks your opinion
+Loves their grandparents
+Volunteers
+Picks up the phone
+Lets you pick the film
+`,
+  't-skills': `
+Basic plumbing
+Hanging a shelf
+Speed reading
+Note taking
+Basic electrical safety
+Packing a suitcase well
+Making a good first impression
+Remembering names
+Active listening
+Giving a good apology
+Saying no politely
+Writing a good email
+Basic Excel
+Typing without looking
+Video editing
+Resisting impulse buys
+Meal prepping
+Baking bread
+Grilling
+Knife skills
+Cleaning a bathroom properly
+Doing laundry right
+Folding a fitted sheet
+Tying a tie
+Shaving properly
+Basic sewing
+Riding a bike
+Ice skating
+Basic fitness
+Stretching
+Meditation
+Sleeping well
+Spotting scams
+Online privacy
+Backing up your files
+Basic first aid for burns
+Tying knots
+Basic camping
+Calming down in an argument
+Learning how to learn
+`,
+  't-splurge': `
+Pillows
+A sofa
+A desk
+A monitor
+Your keyboard
+Hiking boots
+Rain jacket
+Winter boots
+Sunglasses
+Skincare
+A good wallet
+Backpack
+Car seat for kids
+Pots and pans
+A blender
+Air purifier
+Bed frame
+Towels
+Your wedding
+A family holiday
+Healthy groceries
+Therapy and wellbeing
+Driving lessons
+Home insurance
+Tools that last
+A good bag
+Hair clippers
+Gaming chair
+Phone case
+Power bank
+Your commute
+Good socks
+Photo printing
+Learning a language
+Weekend getaway
+Restaurant birthdays
+A good barber
+Tailoring
+Noise-cancelling earbuds
+A reliable bike
+`,
+  't-waste': `
+Phone screen insurance you never use
+Premium versions you don't need
+Paid parking you could avoid
+Fancy pet clothes
+Pre-cut fruit
+Brand-name medicine
+Single-use gadgets
+Gold-plated cables
+Expensive gym clothes for no gym
+Hotel breakfast
+Convenience store prices
+Holiday souvenirs
+Mobile game gems
+Premium fuel for a normal car
+Overpriced theme park photos
+Movie theatre 3D upgrade
+Fancy candles you never light
+Bulk buying food that expires
+Tanning beds
+Teeth-whitening gadgets
+Car leasing for status
+Overdraft fees
+Payday loans
+Fancy notebooks you never write in
+Kitchen gadgets you use once
+Gaming chairs as decoration
+Expensive phone upgrades every year
+Exercise bikes used as hangers
+Branded water bottles
+Influencer products
+Collecting plastic bags
+Paid dating apps
+Seat upgrades on 1-hour flights
+Fake designer stuff
+VIP queue passes
+Monthly snack boxes
+Paid emoji packs
+Rental insurance add-ons
+Premium chewing gum
+Fidget toys you lose in a week
+`,
+  't-partybring': `
+Paper plates
+Ice cream
+Cookies
+Fruit platter
+Sandwiches
+Popcorn
+Juice
+Sparkling water
+A cooler
+Card games
+Party hats
+Confetti
+Bluetooth mic
+Projector
+Extension cord
+Power bank
+Wet wipes
+Trash bags
+Mini fan
+A blanket
+A frisbee
+Candles
+Decorations
+Dates and coffee
+Samosas
+Shawarma platter
+Cupcakes
+Brownies
+Doughnuts
+Pizza rolls
+Chocolate fountain
+Nachos
+Wings
+Mocktails
+Hot chocolate station
+Jenga
+Mario Kart
+FIFA
+Your funniest friend
+A gift for the host
+`,
+  't-business': `
+Pizza place
+Burger joint
+Shawarma shop
+Juice bar
+Sneaker reselling
+Streetwear brand
+Perfume brand
+Skincare brand
+Tutoring company
+Driving school
+Escape room
+Bowling alley
+Arcade
+Cinema
+Padel courts
+Football academy
+Car rental
+Luxury car rental
+Event planning
+Photography studio
+Recording studio
+Podcast network
+Game studio
+App development agency
+Marketing agency
+Cleaning company
+Moving company
+Pet grooming
+Bakery café
+Candy shop
+Flower shop
+Furniture brand
+Watch shop
+Bike shop
+Phone accessories brand
+Board game café
+Karting track
+`,
+  't-worldslive': `
+Avonlea
+Wonderland
+Oz
+Candy Land
+The Hundred Acre Wood
+Middle-earth
+Tatooine
+Coruscant
+Rivendell
+The Avatar World's Air Temples
+Pallet Town
+Kanto
+Sodor
+Toontown
+Agrabah
+Atlantica
+Radiator Springs
+San Fransokyo
+Metropolis
+Stars Hollow
+Pawnee
+Smurf Village
+Gravity Falls
+Hogsmeade
+Ninjago City
+Skyrim
+Tamriel
+Azeroth
+Paddington's London
+The Lego Movie's Bricksburg
+The Incredibles' Metroville
+Spirited Away's Bathhouse
+Totoro's Countryside
+Sky Island
+The Sims Neighbourhood
+Rocket League Arena
+Fortnite Island
+Minecraft Village
+Stardew Valley
+Animal Crossing Village
+`,
+  't-worldsavoid': `
+The Hunger Games Capitol
+The Labyrinth
+The Other World from Coraline
+Skynet's Future
+The Borg Cube
+King's Landing
+Vecna's Mind Lair
+The Island from Lost
+Mad Max's Wasteland
+The Thing's Antarctic Base
+Jurassic World
+The Lost World
+Planet of the Apes
+Alien's Nostromo
+LV-426
+The Shining's Overlook Hotel
+Elm Street
+Camp Crystal Lake
+Derry
+The Twilight Zone
+The Hunger Games' District 12
+The Glade
+Divergent's Chicago
+Oceania from 1984
+Gilead
+Westworld
+Black Mirror's world
+Resident Evil's Mansion
+Five Nights at Freddy's Pizzeria
+Bloodborne's Yharnam
+Elden Ring's Lands Between
+Dark Souls' Anor Londo
+Fallout's Vault
+Half-Life's City 17
+The Last of Us World
+The Death Star
+Mustafar
+The Shadow Realm
+Pennywise's Sewers
+The Nether
+The End
+Zombieland
+`,
+  't-annoying': `
+People who walk four across
+Kicking the back of your seat
+Phone ringing in the cinema
+Neighbours drilling at 8 am
+Shoes that squeak
+Cold food that should be hot
+Hot drinks that are too hot
+Missing the bus by seconds
+Wi-Fi that drops
+Typing "lol" with a straight face
+Stepping on LEGO
+Receipts that are 2 metres long
+Online forms that reset
+Captchas
+Two-factor codes that never arrive
+Getting your sleeve wet washing hands
+Hair in the food
+Someone eating your leftovers
+Slow lifts
+Car alarms at night
+People not saying thank you
+Tags that itch
+Shoelaces untying
+Running out of toilet paper
+Bad parking
+Queue jumpers
+Soggy chips
+Phone updates at the worst time
+Loud speakerphone calls
+Low battery warning at 20%
+Hiccups
+Sneezing in sunlight
+Cracked phone screen
+Stickers that won't peel
+Charging cables that only work at an angle
+Group projects
+Leaving your phone at home
+Rain right after you wash the car
+Ads before a 10-second video
+"We need to talk"
+`,
+  't-satisfying': `
+Peeling a perfect orange in one go
+Cracking an egg perfectly
+Folding a fitted sheet right
+Empty inbox
+Deleting old files
+Organising your desk
+Soap cutting videos
+Slime
+Making a perfect pour
+Catching your phone before it drops
+Hitting all green lights
+Finding the perfect parking spot
+First bite of a crispy burger
+Opening a fresh tub of Nutella
+Watching ice melt on a hot day
+Car wash foam
+Lawn mower stripes
+Perfect latte art
+Finishing a series
+Completing a game 100%
+Dunking the ball
+Top-bin goal
+Hole in one
+Strike in bowling
+Untangling a knot
+Fitting everything in the dishwasher
+Closing a full suitcase
+Scraping ice off a windscreen
+Snapping a chocolate bar
+Pouring cereal then milk perfectly
+The sound of a can opening
+Ripping off a sticker in one piece
+Pancake flip landing
+Sweeping into a dustpan in one go
+Plugging a USB in first try
+Hearing your name called first
+Everything charged before bed
+A clean car interior
+A fresh pair of socks
+`,
+  't-dayimprovers': `
+Breakfast in bed
+The bus arriving right as you get there
+A random good review at work
+Seeing an old friend
+A baby smiling at you
+A free upgrade
+Finding a parking spot right outside
+Getting extra fries
+A cancelled meeting
+Perfect weather
+Phone at 100% in the morning
+A good workout
+A fresh haircut
+New shoes
+A thank-you message
+Your favourite song on shuffle
+Your mum's cooking
+A clean house
+A day off
+Smell of rain
+A good book
+A funny meme
+Your crush texting back
+Learning something new
+Finishing a task you've been avoiding
+Someone remembering your name
+A stranger holding the door
+A kid giving you a drawing
+Getting a package
+Sleeping 8 hours
+A good parking spot at the mall
+A new episode out
+Winning a game with friends
+A sunny morning walk
+Fresh juice
+Cookies out of the oven
+A long hug
+Your pet happy to see you
+Ice cream truck
+`,
+  't-spend100': `
+Football boots
+A good backpack
+Video game subscription
+Fancy brunch for two
+Karaoke night
+Cinema with snacks
+Day pass at a spa
+Bike repair
+New headphones
+Mechanical keyboard
+Art supplies
+A good pillow
+Running shoes
+Restaurant you always wanted to try
+Mini golf and dinner
+Phone accessories
+A watch strap
+A nice perfume sample set
+Fishing gear
+Camping gear
+Treat your parents
+Surprise for a friend
+Pizza party
+Plants for your room
+Lego set
+Puzzle collection
+Fruit basket
+New bedsheets
+Tickets to a local game
+Cooking class
+Painting class
+Online course
+Car detailing
+A good knife
+Phone stand and ring light
+Sunglasses
+Hat collection
+Coffee beans and grinder
+Frame your best photos
+`,
+  't-spend1000': `
+A gaming console and games
+A new bed
+A gym membership for a year
+A weekend in a cabin
+Diving course
+Flying lesson
+Track day in a sports car
+A designer bag
+Fragrance collection
+A good camera lens
+Home studio setup
+Pro football boots and kit
+A new wardrobe
+Kitchen upgrade
+Treat the whole family to dinner
+Buy a bike and gear
+Electric scooter
+Smart home setup
+Desk setup upgrade
+A good mattress
+Language course abroad
+Concert tour tickets
+Theme park trip
+Sports game VIP seats
+Gift for your parents
+Surprise party for a friend
+Car repairs
+Rent buffer
+Stocks or index fund
+A gold chain
+A designer watch
+Desert safari with friends
+A spa weekend
+Weekend in Dubai
+Tickets to a final
+Buy your first shares
+Learn to drive
+Hot air balloon ride
+Camping gear for life
+`,
+  't-3am': `
+Watch a full football match replay
+Research random facts
+Make a smoothie
+Play chess online
+Learn a new skill on YouTube
+Video call a friend in another time zone
+Take a long shower
+Organise your phone photos
+Write a to-do list for tomorrow
+Plan your dream trip
+Make a sandwich
+Rewatch old videos
+Listen to a podcast
+Watch the stars from the roof
+Pet your cat
+Text your crush (bad idea)
+Online shopping you'll regret
+Do a puzzle
+Build Lego
+Write a song
+Practise guitar quietly
+Pray
+Watch a scary film
+Make hot chocolate
+Do homework you forgot
+Edit videos
+Stalk old photos
+Learn a magic trick
+Watch speedruns
+Take a walk outside
+Rewatch your favourite film
+Read old messages
+Make a vision board
+Learn to cook something
+Plan a business
+Fold laundry
+Workout at home
+Watch cooking videos
+Plan a surprise
+`,
+  't-worstpowers': `
+Smell colours
+Super strength, but only when sneezing
+Teleport, but only to your school
+Talk to bugs who only complain
+Invisible clothes, not you
+Fly, but only 1 km/h
+Super speed, only while walking backwards in sand
+Turn water into slightly warmer water
+Mind reading, only for babies
+Summon a spoon (once a day)
+Perfect memory of every ad you've seen
+Grow your fingernails instantly
+Shoot bubbles from your nose
+Know everyone's shoe size
+Change the colour of bananas
+Telekinesis for paper clips only
+Breathe fire, but it's cold
+Sneeze glitter
+Turn into a pigeon at random
+Hear every phone ringing in the city
+Know when food is about to burn, 1 second late
+Turn invisible when you sleep
+Heal others, but you get their cold
+Talk to computers who don't answer
+Control traffic lights, but only red
+Make anyone sleepy, including yourself
+Every door you open squeaks
+Stretch your arms 1 cm
+Change channels on other people's TVs
+Super jump, only on stairs
+Always find the slowest queue
+Super taste, but everything tastes like broccoli
+Freeze objects, but only ice
+Become immortal at age 90
+Light up like a lamp when nervous
+Glow in the dark, only in daylight
+Understand cats, who hate you
+Duplicate yourself, but the copy is lazy
+Shapeshift, only into a teapot
+Predict the weather, 5 minutes late
+`,
+  't-powercombos': `
+Healing + Super Speed
+Invisibility + Flight
+Shapeshifting + Telepathy
+Fire Powers + Ice Powers
+Telekinesis + Super Intelligence
+Teleportation + Time Freeze
+Super Strength + Invulnerability
+Mind Reading + Time Travel
+Laser Eyes + X-Ray Vision
+Duplication + Teleportation
+Animal Control + Flight
+Super Luck + Time Travel
+Photographic Memory + Speed Reading
+Force Fields + Super Strength
+Plant Control + Healing
+Weather Control + Lightning
+Night Vision + Invisibility
+Speak Every Language + Teleportation
+Intangibility + Teleportation
+Gravity Control + Super Strength
+Healing + Immortality
+Mind Control + Invisibility
+Water Breathing + Talk to Animals
+Technopathy + Super Intelligence
+Elasticity + Super Strength
+Super Speed + Never Need Sleep
+`,
+  't-shouldexist': `
+A dishwasher that also puts dishes away
+Self-tying shoelaces for everyone
+A mute button for people
+Rain-proof phone screens
+A car that parks itself everywhere
+Shoes that charge your phone
+A bed that makes itself
+A "find my everything" button
+Edible water bottles
+A pillow that stays cool all night
+A shower with saved settings
+Groceries that come to you instantly
+Homework that does itself
+An app that ends awkward silences
+Sunglasses that dim the sun on command
+A toaster that never burns
+Pizza that stays hot for hours
+A clock that adds an extra hour on weekends
+A plane seat with real legroom
+Wi-Fi that works in lifts
+Ice cream that doesn't melt
+A sleeping pod at school
+A taxi drone
+A translator earpiece for animals
+An app that tells you who ate your food
+A room that cleans itself while you sleep
+Chocolate that's healthy
+A personal weather bubble
+A fridge that tells you what to cook
+Glasses that remind you of names
+A pen that never runs out
+A mirror that shows your outfit from behind
+Self-charging phones
+A button that ends meetings
+Clothes that change size as you grow
+A real-life inventory bag
+A car that never needs fuel
+A lunchbox that keeps food fresh forever
+An alarm that gently pulls you out of bed
+A one-hour flight to anywhere
+`,
+  't-collect': `
+Postcards
+Bottle caps
+Vintage cameras
+Old phones
+Sneaker boxes
+Perfume bottles
+Model cars
+Trading cards
+Football stickers
+Panini albums
+Baseball cards
+Basketball cards
+Seashells
+Fossils
+Antique maps
+Vinyl toys
+Swords
+Pens
+Notebooks
+Banknotes
+Movie tickets
+Concert tickets
+Magazines
+Matchbox cars
+Teacups
+Lego minifigures
+Video game consoles
+Arcade machines
+Typewriters
+Glass bottles
+Patches
+Caps
+Football boots
+Jerseys
+Autographs
+Rubik's cubes
+Puzzles
+Board games
+Classic cars
+`,
+  't-overrated': `
+Celebrity restaurants
+Birthday surprises at work
+Big weddings
+Expensive sneakers
+Matching outfits
+Celebrity perfumes
+Theme park queues
+Five-star hotel breakfasts
+Overpriced popcorn
+Waking up at 5 am
+Wellness retreats
+Detox teas
+Influencer gyms
+Fancy cupcakes
+Cold brew
+Luxury cars in traffic
+Fancy cars for the school run
+TikTok trends
+Reality TV
+Award shows
+Superhero films (the 30th one)
+Remakes
+Sequels
+Ten-step skincare
+Tiny houses
+Open-plan offices
+Group holidays
+Bottle service
+Glamping
+Smart watches for texting
+Hoverboards
+Gold phone cases
+Wireless everything
+Unboxing videos
+"Secret" menu items
+Ultra-hot sauce challenges
+Food served on boards
+Paying for blue ticks
+Last-minute shopping
+Huge TVs
+Buffets
+`,
+  't-underrated': `
+Rice
+Soup
+Bananas
+Cold pizza
+Sleeping in socks
+Afternoon tea
+Morning walks
+Clean bedsheets
+Cooking at home
+Reading before bed
+Water parks
+Picnics
+Local markets
+Thrift shops
+Second-hand books
+Handwritten letters
+Uncles who tell jokes
+Old cartoons
+Classic films
+Mixtapes
+Flip phones
+Bicycles
+Hiking
+Sunsets
+Dates
+Hot showers
+Cold water
+Tidy rooms
+Calendars
+Notebooks
+Asking for help
+Free museums
+Coupons
+Second-hand cars
+Village life
+Long drives
+Quiet friends
+Learning to cook
+Listening
+`
+};
 const EXTRA_SPORTS = {
   't-pl': `
 Ederson|GK|Man City · 2017–25||Ederson (footballer, born 1993)
@@ -10335,7 +12721,1811 @@ Italy v Germany||World Cup classics
 Sporting v Porto||Portuguese rivalry
 Croatian Eternal Derby||Dinamo Zagreb v Hajduk Split||||Eternal derby (Croatia)`
 };
-const EXTRA_ITEMS = Object.assign({}, EXTRA_SPORTS, EXTRA_SPORTS2, EXTRA_FOOD, EXTRA_ENT);
+const EXTRA_STYLE = {
+  't-car': `
+Ford Mustang GT|Daily
+Volkswagen Polo|Daily
+Toyota GR Yaris|Daily
+Lexus RX|SUV
+Kia Telluride|SUV
+Chevrolet Corvette Sting Ray '63|Classic
+Mercedes-AMG One|Supercar
+BMW M5|Daily
+Ferrari SF90 Stradale|Supercar
+Lamborghini Huracán|Supercar
+McLaren 720S|Supercar
+Audi R8|Supercar
+Nissan GT-R|Supercar
+Chevrolet Corvette C8|Supercar
+Mercedes-AMG GT|Supercar
+Aston Martin Vantage|Supercar
+Pagani Huayra|Supercar
+Rimac Nevera|Supercar
+Ferrari 296 GTB|Supercar
+Toyota Camry|Daily
+Honda Accord|Daily
+Mazda3|Daily
+Kia K5|Daily
+Volkswagen Jetta|Daily
+Hyundai Sonata|Daily
+Audi A4|Daily
+Mercedes-Benz C-Class|Daily
+BMW 3 Series|Daily
+Toyota Prius|Daily
+Subaru WRX|Daily
+Lexus IS|Daily
+Nissan Patrol|SUV
+Lexus LX|SUV
+Porsche Cayenne|SUV
+BMW X5|SUV
+Cadillac Escalade|SUV
+Ford Bronco|SUV
+Land Rover Defender|SUV
+Toyota RAV4|SUV
+Audi Q8|SUV
+Chevrolet Tahoe|SUV
+Jaguar E-Type|Classic
+Aston Martin DB5|Classic
+Volkswagen Beetle|Classic
+Shelby Cobra|Classic
+Lamborghini Miura|Classic
+DeLorean DMC-12|Classic
+Dodge Charger '69|Classic
+Porsche 356|Classic
+Ferrari 250 GTO|Classic
+Mini Cooper (classic)|Classic
+`,
+  't-shoe': `
+Air Max 95
+Air Max 1
+Air Max 270
+Nike Air Huarache
+Nike Air Presto
+Nike Vapormax
+Nike SB Dunk
+Nike Air Foamposite
+Air Jordan 6
+Air Jordan 12
+Yeezy Boost 350
+Adidas Stan Smith
+Adidas Forum
+Adidas Campus
+Adidas Spezial
+Adidas NMD
+Adidas Handball Spezial
+New Balance 2002R
+New Balance 9060
+New Balance 530
+New Balance 574
+Asics Gel-Lyte III
+Asics Gel-1130
+Hoka Clifton
+Salomon Speedcross
+Onitsuka Tiger Mexico 66
+Vans Sk8-Hi
+Vans Slip-On
+Converse Run Star Hike
+Puma Palermo
+Reebok Classic Leather
+Saucony Shadow 6000
+Common Projects Achilles
+Golden Goose Superstar
+Balenciaga Triple S
+Alexander McQueen Oversized Sneaker
+Dr. Martens 1460
+Clarks Wallabee
+`,
+  't-luxcars': `
+Rolls-Royce Wraith
+Rolls-Royce Dawn
+Bentley Flying Spur
+Bentley Mulsanne
+Mercedes-Maybach GLS
+Mercedes-Benz EQS
+Mercedes-AMG S 63
+BMW i7
+BMW XM
+BMW M8
+Audi RS7
+Audi RS e-tron GT
+Porsche Taycan
+Porsche Cayenne
+Lexus LX
+Lexus LC
+Aston Martin DBX
+Aston Martin DBS
+Ferrari Roma
+Ferrari 12Cilindri
+Lamborghini Revuelto
+McLaren GT
+Maserati Levante
+Maserati GranTurismo
+Cadillac Celestiq
+Cadillac CT5-V Blackwing
+Lincoln Continental
+Genesis GV80
+Lucid Gravity
+Tesla Model S Plaid
+Range Rover Sport
+Land Rover Defender 130
+Jaguar XJ
+Volvo XC90 Recharge
+Infiniti QX80
+Bentley Batur
+Rolls-Royce Boat Tail
+Mercedes-Maybach SL
+Polestar 1
+`,
+  't-supercars': `
+Ferrari 488 GTB
+Ferrari 458 Italia
+Ferrari 12Cilindri
+Ferrari Roma
+Ferrari Daytona SP3
+Lamborghini Gallardo
+Lamborghini Murciélago
+Lamborghini Diablo
+Lamborghini Temerario
+McLaren 765LT
+McLaren 570S
+McLaren 650S
+McLaren MP4-12C
+McLaren W1
+Porsche 911 Turbo S
+Porsche Carrera GT
+Porsche 959
+Mercedes-Benz SLS AMG
+Mercedes-McLaren SLR
+Aston Martin DBS
+Aston Martin Valhalla
+Bentley Continental GT Speed
+Chevrolet Corvette Z06
+Chevrolet Corvette ZR1
+Dodge Viper ACR
+Ford GT40
+Jaguar XJ220
+Lotus Emira
+Lotus Exige
+Maserati MC12
+Noble M600
+Saleen S7
+Honda NSX (first generation)
+BMW M1
+BMW i8
+Audi R8 V10 Performance
+De Tomaso Pantera
+Ferrari Testarossa
+Lamborghini Countach LPI 800-4
+`,
+  't-hypercars': `
+Bugatti Mistral
+Bugatti Centodieci
+Bugatti La Voiture Noire
+Bugatti EB110
+Koenigsegg One:1
+Koenigsegg CCX
+Koenigsegg Gemera
+Koenigsegg CC850
+Pagani Huayra R
+Pagani Zonda R
+Pagani Imola
+McLaren Elva
+McLaren Sabre
+McLaren W1
+McLaren F1
+Ferrari Enzo
+Ferrari FXX-K
+Ferrari Monza SP2
+Porsche Carrera GT
+Mercedes-Benz CLK GTR
+Aston Martin Valhalla
+Aston Martin One-77
+Aston Martin Vulcan
+Lamborghini Veneno
+Lamborghini Centenario
+Lamborghini Sesto Elemento
+Lamborghini Countach LPI 800-4
+Rimac Concept One
+Pininfarina Battista
+Czinger 21C
+Hennessey Venom GT
+Jaguar XJ220
+Maserati MC12
+Saleen S7
+W Motors Lykan HyperSport
+Zenvo TSR-S
+Apollo IE
+De Tomaso P72
+Ferrari Daytona SP3
+`,
+  't-jdm': `
+Nissan Skyline GT-R R32
+Nissan Skyline GT-R R33
+Nissan Silvia S13
+Nissan 180SX
+Nissan 370Z
+Nissan Z (RZ34)
+Toyota Supra (A90)
+Toyota Chaser
+Toyota Mark II
+Toyota Crown
+Toyota Soarer
+Toyota Celica
+Toyota Starlet
+Honda Civic EG
+Honda Civic EK9
+Honda Prelude
+Honda CR-X
+Honda Beat
+Acura Integra
+Mazda RX-3
+Mazda Cosmo
+Mazda Savanna RX-7 (FC)
+Mazda Autozam AZ-1
+Mitsubishi Eclipse
+Mitsubishi Pajero
+Mitsubishi FTO
+Subaru BRZ
+Subaru Legacy
+Subaru Forester STI
+Suzuki Cappuccino
+Suzuki Swift Sport
+Daihatsu Copen
+Nissan Stagea
+Nissan Cefiro
+Nissan Laurel
+Lexus IS 300
+Toyota Century
+Toyota Hiace
+Nissan Patrol Y61
+`,
+  't-classics': `
+Chevrolet Chevelle SS
+Ford Thunderbird
+Ford Mustang Boss 429
+Buick Riviera
+Oldsmobile 442
+Plymouth Road Runner
+Dodge Challenger (1970)
+AMC Javelin
+Chevrolet Impala (1964)
+Lincoln Continental (1961)
+Cadillac Series 62
+Jaguar XK120
+Austin-Healey 3000
+MG MGB
+Triumph TR6
+Lotus Elan
+Lotus Seven
+Porsche 911 (1964)
+Porsche 550 Spyder
+Mercedes-Benz W113
+Mercedes-Benz 190 SL
+BMW 507
+BMW E30 M3
+Alfa Romeo Spider
+Alfa Romeo Giulia GT
+Lancia Stratos
+Lancia Delta Integrale
+Ferrari 275
+Ferrari Daytona
+Ferrari Dino
+Maserati Ghibli (1967)
+Lamborghini 350 GT
+Rolls-Royce Silver Ghost
+Bentley Blower
+Bugatti Type 57
+Toyota Land Cruiser FJ40
+Ford Bronco (1966)
+Chevrolet Nomad
+`,
+  't-evs': `
+Tesla Roadster
+Tesla Semi
+Lucid Gravity
+Rivian R2
+Porsche Macan Electric
+Audi Q8 e-tron
+Audi Q4 e-tron
+BMW i7
+BMW iX3
+Mercedes-Benz EQE
+Mercedes-Benz G 580 EQ
+Mercedes-AMG EQS
+Hyundai Ioniq 5 N
+Kia EV3
+Kia Niro EV
+Genesis GV60
+Genesis Electrified G80
+Volkswagen ID. Buzz
+Volkswagen ID.3
+Cadillac Lyriq
+Cadillac Escalade IQ
+Chevrolet Silverado EV
+Chevrolet Equinox EV
+Chevrolet Blazer EV
+GMC Hummer EV
+Ford Puma Gen-E
+Polestar 3
+Polestar 4
+Volvo EX30
+Volvo EX90
+Nissan Ariya
+Toyota bZ4X
+Subaru Solterra
+Lotus Eletre
+BYD Dolphin
+BYD Atto 3
+BYD Han
+NIO ET7
+Zeekr 001
+`,
+  't-suvs': `
+Mercedes-Benz GLS
+Mercedes-Benz GLE
+BMW X7
+BMW X6
+BMW X3
+Audi Q8
+Audi Q5
+Porsche Macan
+Lexus RX
+Lexus GX
+Toyota Highlander
+Toyota Sequoia
+Toyota Fortuner
+Toyota Prado
+Nissan Pathfinder
+Nissan X-Trail
+Honda Pilot
+Hyundai Santa Fe
+Hyundai Tucson
+Kia Sorento
+Kia Sportage
+Mazda CX-5
+Mazda CX-90
+Subaru Outback
+Subaru Forester
+Volkswagen Tiguan
+Volkswagen Touareg
+Chevrolet Suburban
+Ford Expedition
+Lincoln Navigator
+Jeep Grand Wagoneer
+Range Rover Sport
+Range Rover Velar
+Aston Martin DBX
+Maserati Levante
+Ferrari Purosangue
+Infiniti QX80
+Genesis GV80
+Suzuki Jimny
+`,
+  't-pickups': `
+Ram 2500
+Ram 3500
+Chevrolet Silverado HD
+GMC Sierra HD
+Nissan Titan
+Ford Ranger Raptor
+Chevrolet Colorado ZR2
+Toyota Tacoma TRD Pro
+Ram 1500 Rebel
+Chevrolet Silverado EV
+Nissan Navara
+Mazda BT-50
+Mercedes-Benz X-Class
+Kia Tasman
+Ineos Quartermaster
+Chevrolet Avalanche
+Cadillac Escalade EXT
+Hummer H2 SUT
+Lincoln Mark LT
+Ford Lobo
+Dodge Dakota
+Toyota T100
+Chevrolet S-10
+Jeep Comanche
+Subaru BRAT
+Chevrolet El Camino
+Ford Ranchero
+Ford F-100
+Chevrolet C/K
+Dodge Ram SRT-10
+Ford SVT Lightning
+GMC Syclone
+Holden Ute
+Ford Falcon Ute
+Toyota Land Cruiser 70 pickup
+Toyota Stout
+Nissan Hardbody
+Datsun 620
+Great Wall Poer
+`,
+  't-motorbikes': `
+Kawasaki Ninja ZX-10R
+Kawasaki Ninja 400
+Kawasaki Z1
+Yamaha YZF-R6
+Yamaha YZF-R7
+Yamaha XSR900
+Yamaha VMAX
+Yamaha Ténéré 700
+Honda Grom
+Honda Rebel 500
+Honda CBR600RR
+Honda Super Cub
+Suzuki GSX-S1000
+Suzuki SV650
+Suzuki V-Strom
+Ducati Diavel
+Ducati Multistrada
+Ducati Streetfighter V4
+Ducati SuperSport
+BMW R nineT
+BMW M 1000 RR
+BMW K 1600
+Triumph Rocket 3
+Triumph Street Triple
+Triumph Tiger 900
+KTM 390 Duke
+KTM RC 390
+KTM 1290 Super Adventure
+Harley-Davidson Road Glide
+Harley-Davidson Street Glide
+Harley-Davidson Iron 883
+Harley-Davidson LiveWire
+Indian Chief
+Indian FTR
+Royal Enfield Interceptor 650
+Royal Enfield Himalayan
+Aprilia Tuono V4
+MV Agusta Brutale
+Moto Guzzi V7
+`,
+  't-carbrands': `
+Alfa Romeo
+Acura
+Infiniti
+Lincoln
+Buick
+GMC
+Chrysler
+Ram
+Mitsubishi
+Suzuki
+Peugeot
+Renault
+Citroën
+Fiat
+Lancia
+Abarth
+Skoda
+SEAT
+Cupra
+Opel
+Vauxhall
+Mini
+Smart
+Alpine
+Lotus
+Pagani
+Rimac
+Lucid
+Polestar
+Dacia
+Saab
+Holden
+Pontiac
+Hummer
+Isuzu
+Daihatsu
+Geely
+Chery
+Haval
+Nio
+Xpeng
+Zeekr
+Tata Motors
+Mahindra
+Proton
+Ceer
+`,
+  't-luxbrands': `
+Acne Studios
+Bulgari
+Cartier
+Tiffany & Co.
+Van Cleef & Arpels
+Jacquemus
+Marni
+Maison Margiela
+Rick Owens
+Amiri
+Jil Sander
+Lanvin
+Kenzo
+Moschino
+Max Mara
+Salvatore Ferragamo
+Etro
+Zegna
+Brioni
+Kiton
+Berluti
+Christian Louboutin
+Jimmy Choo
+Manolo Blahnik
+Golden Goose
+Stella McCartney
+Chloé
+Alaïa
+Vivienne Westwood
+Paul Smith
+Dsquared2
+Philipp Plein
+Mulberry
+Goyard
+Hugo Boss
+`,
+  't-streetwear': `
+Off-White
+Fear of God Essentials
+A-Cold-Wall*
+Anti Social Social Club
+Undefeated
+Huf
+Obey
+Diamond Supply Co.
+Mastermind Japan
+Neighborhood
+WTAPS
+Human Made
+Sacai
+Comme des Garçons Play
+Y-3
+Yeezy
+Cactus Jack
+Broken Planet
+Sp5der
+Eric Emanuel
+Kapital
+Aape
+Noah
+Awake NY
+Pleasures
+Brain Dead
+Martine Rose
+Daily Paper
+Ader Error
+Arc'teryx
+Salomon
+Dickies
+Levi's
+Converse
+Reebok
+Ralph Lauren Polo
+Tommy Hilfiger
+`,
+  't-watches': `
+Blancpain
+Ulysse Nardin
+Girard-Perregaux
+Piaget
+Franck Muller
+Jacob & Co.
+Roger Dubuis
+F.P. Journe
+H. Moser & Cie
+MB&F
+Greubel Forsey
+Parmigiani Fleurier
+Bell & Ross
+Oris
+Rado
+Montblanc
+Baume & Mercier
+Frederique Constant
+Nomos Glashütte
+Glashütte Original
+Sinn
+Junghans
+Orient
+Casio
+Timex
+Fossil
+Daniel Wellington
+MVMT
+Movado
+Victorinox
+Bulova
+Raymond Weil
+Maurice Lacroix
+Christopher Ward
+Samsung Galaxy Watch
+`,
+  't-fragrance': `
+Dior Homme Intense
+Dior Fahrenheit
+Chanel Allure Homme Sport
+Chanel Coco Mademoiselle
+Creed Silver Mountain Water
+Creed Green Irish Tweed
+Tom Ford Ombré Leather
+Tom Ford Lost Cherry
+Tom Ford Noir Extreme
+YSL La Nuit de L'Homme
+YSL Libre
+Versace Dylan Blue
+Paco Rabanne Invictus
+Jean Paul Gaultier Ultra Male
+Jean Paul Gaultier Le Beau
+Giorgio Armani Stronger With You
+Armani Sì
+Valentino Uomo Born in Roma Intense
+Prada L'Homme
+Guerlain L'Homme Idéal
+Hermès Terre d'Hermès
+Hermès Un Jardin sur le Nil
+Montblanc Explorer
+Azzaro The Most Wanted
+Viktor & Rolf Spicebomb
+Dolce & Gabbana Light Blue
+Gucci Bloom
+Gucci Guilty
+Burberry Hero
+Mancera Cedrat Boisé
+Parfums de Marly Delina
+Amouage Interlude Man
+Maison Francis Kurkdjian Grand Soir
+Ajmal Wisal
+Lattafa Asad
+Afnan 9PM
+Al Haramain Amber Oud
+Ard Al Zaafaran Dirham
+`,
+  't-hairstyles': `
+Low Fade
+Mid Fade
+High Fade
+Drop Fade
+Temple Fade
+Bald Fade
+Shadow Fade
+Comb Over
+Brush Up
+Spiky Hair
+Messy Fringe
+Bowl Cut
+Middle Part
+Wolf Cut
+Shag
+Long Layers
+Top Knot
+Half Up
+Slicked Undercut
+Hard Part
+Crop Fade
+Frohawk
+Sponge Twists
+Freeform Locs
+Starter Locs
+High Top
+Flat Top
+Jheri Curl
+Finger Coils
+Curly Taper
+Buzz Fade
+Military Cut
+Butch Cut
+Ducktail
+Rockabilly Quiff
+`,
+  't-bballshoes': `
+Air Jordan 6
+Air Jordan 7
+Air Jordan 8
+Air Jordan 9
+Air Jordan 10
+Air Jordan 14
+Air Jordan 23
+Air Jordan XX8
+Nike Kobe 4
+Nike Kobe 8
+Nike Hyperdunk
+Nike Zoom Kobe 1
+Nike Air Max Uptempo
+Nike Air Flight 89
+Nike Air Force Max
+Nike Shox BB4
+Nike Zoom GT Cut
+Nike G.T. Jump
+Nike PG
+Nike Giannis Immortality
+Nike LeBron 7
+Nike Zoom Generation
+Nike Air Zoom Flight 95
+Nike Air Total Max Uptempo
+Adidas Dame
+Adidas Trae Young 1
+Adidas T-Mac 1
+Adidas Kobe 1
+Adidas Crazy 1
+Reebok Answer
+Reebok Pump Omni Lite
+Under Armour Curry 1
+Puma Clyde
+Puma MB.03
+Li-Ning Way of Wade
+Converse Weapon
+And1 Tai Chi
+Fila Grant Hill 2
+`,
+  't-bags': `
+Hermès Constance
+Hermès Evelyne
+Hermès Picotin
+Chanel 2.55
+Chanel 19
+Chanel Deauville Tote
+Chanel Gabrielle
+Louis Vuitton Alma
+Louis Vuitton Pochette Métis
+Louis Vuitton Capucines
+Louis Vuitton Twist
+Louis Vuitton Christopher Backpack
+Dior Book Tote
+Dior Bobby
+Dior Caro
+Gucci Dionysus
+Gucci Horsebit 1955
+Gucci Bamboo 1947
+Fendi Peekaboo
+Fendi First
+Prada Cleo
+Prada Re-Nylon Backpack
+Bottega Veneta Jodie
+Bottega Veneta Andiamo
+Celine Luggage
+Celine Belt Bag
+Loewe Flamenco
+Loewe Hammock
+Saint Laurent Sac de Jour
+Saint Laurent Kate
+Balenciaga Hourglass
+Balenciaga Le Cagole
+Givenchy Pandora
+Miu Miu Arcadie
+Chloé Paddington
+Mulberry Bayswater
+Goyard Saigon
+Telfar Medium Shopper
+Marc Jacobs The Tote Bag
+`,
+  't-outerwear': `
+Shearling Jacket
+Aviator Jacket
+Car Coat
+Chesterfield Coat
+Mac Coat
+Cape
+Poncho
+Kimono Jacket
+Utility Jacket
+Safari Jacket
+Overshirt
+Coach Jacket
+Souvenir Jacket
+Down Vest
+Barn Jacket
+Waxed Jacket
+Barbour Jacket
+Moncler Puffer
+The North Face Nuptse
+Arc'teryx Beta
+Patagonia Retro-X
+Columbia Fleece
+Carhartt Detroit Jacket
+Levi's Trucker Jacket
+Schott Perfecto
+Alpha Industries MA-1
+Burberry Trench
+Stone Island Jacket
+Track Top
+Zip-up Hoodie
+Puffer Vest
+Cropped Puffer
+Long Puffer Coat
+Wool Coat
+Camel Coat
+Belted Coat
+`,
+  't-sunglasses': `
+Ray-Ban Round
+Ray-Ban Justin
+Ray-Ban Erika
+Ray-Ban Hexagonal
+Oakley Sutro
+Oakley Flak
+Oakley Juliet
+Oakley Gascan
+Persol 649
+Tom Ford Snowdon
+Saint Laurent SL 1
+Versace Medusa
+Dior So Real
+Chanel Pilot
+Fendi Eyeline
+Balenciaga Rim
+Prada Symbole
+Carrera Champion
+Police Sunglasses
+Polaroid Sunglasses
+Revo
+Smith Optics
+Bollé
+Le Specs
+Retrosuperfuture
+Garrett Leight
+`
+};
+const EXTRA_TRAVEL = {
+  't-trav': `
+Vancouver|City
+Wadi Rum|Nature
+Los Angeles|City
+Hong Kong|City
+Prague|City
+Vienna|City
+Budapest|City
+Florence|City
+Venice|City
+Madrid|City
+Mexico City|City
+Buenos Aires|City
+Toronto|City
+Doha|City
+Kuala Lumpur|City
+Shanghai|City
+Osaka|City
+Riyadh|City
+Edinburgh|City
+Copenhagen|City
+Phuket|Beach
+Mauritius|Beach
+Seychelles|Beach
+Mykonos|Beach
+Tulum|Beach
+Fiji|Beach
+Gold Coast|Beach
+Algarve|Beach
+Amalfi Coast|Beach
+Langkawi|Beach
+Sharm El Sheikh|Beach
+Ibiza|Beach
+Bahamas|Beach
+Yosemite|Nature
+Patagonia|Nature
+Serengeti|Nature
+Norwegian fjords|Nature
+Ha Long Bay|Nature
+Lake Como|Nature
+Cappadocia|Nature
+AlUla|Nature
+Scottish Highlands|Nature
+New Zealand|Nature
+Dolomites|Nature
+Yellowstone|Nature
+Petra|Nature
+Costa Rica|Nature
+Lapland|Nature
+Galápagos Islands|Nature
+`,
+  't-ctry': `
+Ireland|Europe
+Austria|Europe
+Belgium|Europe
+Sweden|Europe
+Norway|Europe
+Denmark|Europe
+Poland|Europe
+Croatia|Europe
+Iceland|Europe
+Czech Republic|Europe
+Bosnia and Herzegovina|Europe
+Albania|Europe
+Vietnam|Asia
+Philippines|Asia
+Singapore|Asia
+Qatar|Asia
+Jordan|Asia
+Kuwait|Asia
+Oman|Asia
+Bangladesh|Asia
+Sri Lanka|Asia
+Uzbekistan|Asia
+Maldives|Asia
+Nepal|Asia
+Tanzania|Africa
+Ethiopia|Africa
+Senegal|Africa
+Tunisia|Africa
+Algeria|Africa
+Rwanda|Africa
+Uganda|Africa
+Cameroon|Africa
+Ivory Coast|Africa
+Sudan|Africa
+Somalia|Africa
+Madagascar|Africa
+Namibia|Africa
+Botswana|Africa
+Colombia|Americas
+Peru|Americas
+Chile|Americas
+Cuba|Americas
+Uruguay|Americas
+Ecuador|Americas
+Costa Rica|Americas
+Dominican Republic|Americas
+Panama|Americas
+Venezuela|Americas
+Trinidad and Tobago|Americas
+`,
+  't-capitals': `
+Brussels
+Bern
+Warsaw
+Budapest
+Helsinki
+Reykjavík
+Kyiv
+Bucharest
+Sofia
+Belgrade
+Zagreb
+Sarajevo
+Tirana
+Valletta
+Edinburgh
+Kuwait City
+Muscat
+Manama
+Baghdad
+Beirut
+Damascus
+Tehran
+Kabul
+Tashkent
+Astana
+Dhaka
+Kathmandu
+Colombo
+Hanoi
+Manila
+Jakarta
+Taipei
+Ulaanbaatar
+Addis Ababa
+Accra
+Abuja
+Dakar
+Tunis
+Algiers
+Khartoum
+Kigali
+Pretoria
+Bogotá
+Santiago
+Caracas
+Quito
+Montevideo
+Panama City
+`,
+  't-landmarks': `
+Louvre
+Arc de Triomphe
+Notre-Dame de Paris
+Buckingham Palace
+Tower of London
+Trevi Fountain
+St. Peter's Basilica
+Duomo di Milano
+Kremlin
+Saint Basil's Cathedral
+Blue Mosque
+Topkapı Palace
+Charles Bridge
+Cologne Cathedral
+Atomium
+Little Mermaid statue
+Parthenon
+Kinkaku-ji
+Fushimi Inari-taisha
+Tokyo Tower
+Tokyo Skytree
+Marina Bay Sands
+Petronas Towers
+Gateway of India
+Golden Temple
+Badshahi Mosque
+Faisal Mosque
+Kingdom Centre
+Masmak Fortress
+Al Wahbah Crater
+Abu Simbel
+Great Sphinx of Giza
+Karnak
+Table Mountain
+Space Needle
+Hollywood Sign
+Gateway Arch
+Lincoln Memorial
+White House
+Château Frontenac
+Hoover Dam
+Teotihuacan
+Sugarloaf Mountain
+Leshan Giant Buddha
+Borobudur
+`,
+  't-wonders': `
+Lake Natron
+Mount Kilimanjaro
+Amazon River
+Yosemite Valley
+Komodo Island
+Socotra
+Wadi Rum
+Lake Baikal
+Grand Prismatic Spring
+Bryce Canyon
+Monument Valley
+Cliffs of Moher
+Fjords of Norway
+Milford Sound
+Torres del Paine
+Perito Moreno Glacier
+Okavango Delta
+Ngorongoro Crater
+Lake Hillier
+Waitomo Glowworm Caves
+Son Doong Cave
+Mammoth Cave
+Blue Lagoon
+Jiuzhaigou
+Guilin
+Li River
+Danxia Landform
+Mount Roraima
+Sossusvlei
+Great Blue Hole
+Kawah Ijen
+Dolomites
+Eisriesenwelt
+Chocolate Hills
+Fly Geyser
+`,
+  't-islands': `
+Lanzarote
+Gran Canaria
+Corfu
+Rhodes
+Malta
+Gozo
+Corsica
+Skye
+Isle of Wight
+Aruba
+Curaçao
+St. Lucia
+Antigua
+Bermuda
+Turks and Caicos
+Cuba
+Puerto Rico
+Tahiti
+Moorea
+Samoa
+Tasmania
+Fraser Island
+Langkawi
+Penang
+Boracay
+Palawan
+Okinawa
+Hokkaido
+Lombok
+Gili Islands
+Koh Samui
+Koh Phi Phi
+Réunion
+Cape Verde
+Socotra
+Bahrain
+`,
+  't-beaches': `
+Clearwater Beach
+Siesta Key
+Venice Beach
+Huntington Beach
+Myrtle Beach
+Cannon Beach
+Manly Beach
+Surfers Paradise
+Cable Beach
+Hyams Beach
+Ipanema
+Baía do Sancho
+Playa del Carmen
+Playa Norte
+Eagle Beach
+Shoal Bay
+Trunk Bay
+Horseshoe Bay
+Seven Mile Beach (Jamaica)
+Nissi Beach
+Myrtos Beach
+Balos Lagoon
+La Concha
+Praia do Camilo
+Nazaré
+Porthcurno
+Luskentyre
+Biarritz
+Plage de Palombaggia
+Spiaggia dei Conigli
+Patong Beach
+White Beach Boracay
+Nacpan Beach
+Kuta Beach
+Diani Beach
+Nungwi
+Clifton Beaches
+Lagos Bar Beach
+La Mer
+Kite Beach
+Durrat Al Arus
+Half Moon Bay
+`,
+  't-themeparks': `
+Disney's Hollywood Studios
+Epcot
+Disney's Animal Kingdom
+Tokyo DisneySea
+Hong Kong Disneyland
+Shanghai Disneyland
+Walt Disney Studios Park
+Universal Studios Singapore
+Universal Studios Beijing
+SeaWorld Orlando
+Knott's Berry Farm
+Kings Dominion
+Carowinds
+Silver Dollar City
+Six Flags Great Adventure
+Six Flags Over Texas
+Kennywood
+Holiday World
+Blackpool Pleasure Beach
+Paultons Park
+Legoland Billund
+Legoland Windsor
+Parc Astérix
+Heide Park
+Movie Park Germany
+Walibi Holland
+Energylandia
+Fuji-Q Highland
+Nagashima Spa Land
+Chimelong Ocean Kingdom
+Dreamworld
+Warner Bros. Movie World
+IMG Worlds of Adventure
+Motiongate Dubai
+Yas Waterworld
+Six Flags Qiddiya
+Boulevard World
+Gröna Lund
+`,
+  't-europe': `
+Valencia
+Málaga
+Granada
+San Sebastián
+Bilbao
+Nice
+Lyon
+Marseille
+Bordeaux
+Strasbourg
+Hamburg
+Cologne
+Frankfurt
+Heidelberg
+Salzburg
+Bratislava
+Ljubljana
+Zagreb
+Split
+Belgrade
+Sarajevo
+Mostar
+Sofia
+Bucharest
+Warsaw
+Gdańsk
+Tallinn
+Riga
+Vilnius
+Helsinki
+Bergen
+Gothenburg
+Rotterdam
+Antwerp
+Ghent
+Luxembourg
+Valletta
+Palermo
+Verona
+Bologna
+Turin
+Lucerne
+Bath
+York
+Oxford
+Cambridge
+Glasgow
+Belfast
+Kotor
+`,
+  't-asia': `
+Yokohama
+Nagoya
+Hiroshima
+Sapporo
+Nara
+Fukuoka
+Incheon
+Gyeongju
+Guangzhou
+Chengdu
+Xi'an
+Hangzhou
+Guilin
+Chongqing
+Kaohsiung
+Tainan
+Phuket
+Pattaya
+Penang
+Malacca
+Kota Kinabalu
+Bali
+Yogyakarta
+Surabaya
+Cebu
+Da Nang
+Hoi An
+Hue
+Luang Prabang
+Vientiane
+Phnom Penh
+Yangon
+Bagan
+Kolkata
+Bengaluru
+Chennai
+Hyderabad
+Agra
+Varanasi
+Goa
+Udaipur
+Islamabad
+Peshawar
+Pokhara
+Thimphu
+Malé
+Tashkent
+Samarkand
+Bukhara
+Bishkek
+`,
+  't-mecities': `
+Eskişehir
+Al Khobar
+Dhahran
+Tabuk
+Yanbu
+Al-Ahsa
+Ha'il
+Najran
+Jazan
+Buraidah
+Diriyah
+NEOM
+Ras Al Khaimah
+Ajman
+Fujairah
+Al Ain
+Umm Al Quwain
+Al Wakrah
+Lusail
+Sohar
+Nizwa
+Sur
+Muharraq
+Aqaba
+Irbid
+Madaba
+Tripoli, Lebanon
+Byblos
+Sidon
+Tyre
+Homs
+Latakia
+Basra
+Mosul
+Najaf
+Karbala
+Sulaymaniyah
+Mashhad
+Tabriz
+Yazd
+Kashan
+Kerman
+Izmir
+Antalya
+Bursa
+Konya
+Trabzon
+Gaziantep
+Luxor
+Aswan
+`,
+  't-nacities': `
+Portland
+Minneapolis
+Detroit
+St. Louis
+Kansas City
+Charlotte
+Raleigh
+Salt Lake City
+Pittsburgh
+Baltimore
+Tampa
+Jacksonville
+San Antonio
+Sacramento
+San Jose
+Cleveland
+Cincinnati
+Columbus
+Indianapolis
+Milwaukee
+Memphis
+Albuquerque
+Tucson
+Anchorage
+Charleston
+Savannah
+Santa Fe
+Victoria
+Hamilton
+Kitchener
+London, Ontario
+Regina
+Saskatoon
+St. John's
+Whistler
+Banff
+Monterrey
+Tijuana
+Puebla
+Oaxaca
+Mérida
+Playa del Carmen
+Puerto Vallarta
+Los Cabos
+San Miguel de Allende
+Havana
+`,
+  't-africa': `
+Alexandria
+Aswan
+Hurghada
+Giza
+Abu Simbel
+Rabat
+Tangier
+Agadir
+Sahara Desert
+Merzouga
+Djerba
+Carthage
+Ngorongoro Crater
+Lake Malawi
+Bwindi Impenetrable Forest
+Kampala
+Dar es Salaam
+Mombasa
+Lamu
+Diani Beach
+Garden Route
+Stellenbosch
+Table Mountain
+Robben Island
+Windhoek
+Etosha National Park
+Skeleton Coast
+Chobe National Park
+Lake Victoria
+Gorée Island
+Cape Coast
+Abuja
+Timbuktu
+Zanzibar City
+Kilwa Kisiwani
+Mount Kenya
+`,
+  't-states': `
+Washington, D.C.
+Puerto Rico
+Guam
+United States Virgin Islands
+American Samoa
+Northern Mariana Islands
+`,
+  't-canada': `
+Thousand Islands|Place
+Cabot Trail|Place
+Gros Morne National Park|Place
+Signal Hill|Place
+Lunenburg|Place
+Montreal Old Port|Place
+Mont-Tremblant|Place
+Percé Rock|Place
+Hopewell Rocks|Place
+Toronto Islands|Place
+Prince Edward County|Place
+Royal Ontario Museum|Place
+Capilano Suspension Bridge|Place
+Butchart Gardens|Place
+Okanagan Valley|Place
+Emerald Lake|Place
+Icefields Parkway|Place
+Columbia Icefield|Place
+Calgary Stampede|Place
+Dinosaur Provincial Park|Place
+Riding Mountain National Park|Place
+Yellowknife|Place
+Dawson City|Place
+`,
+  't-saudicities': `
+Jubbah
+Al Kharj
+Hofuf
+Al Mubarraz
+Ras Tanura
+Al Khafji
+Hafar Al-Batin
+Arar
+Al Qurayyat
+Bisha
+Al Wajh
+Umluj
+Duba
+Rabigh
+Al Lith
+Al Qunfudhah
+Sharurah
+Wadi ad-Dawasir
+Al Majma'ah
+Shaqra
+Az Zulfi
+Ar Rass
+Dumat al-Jandal
+Tayma
+Ushaiqer
+Farasan Islands
+Al Wahbah Crater
+Elephant Rock
+Rijal Almaa
+Al Soudah
+Qiddiya
+King Abdullah Economic City
+Masmak Fortress
+Al-Balad
+Jeddah Corniche
+Riyadh Boulevard
+Jabal Sawda
+`,
+  't-airports': `
+Abu Dhabi International
+Bahrain International
+Muscat International
+Kuwait International
+King Fahd International
+Prince Mohammad bin Abdulaziz International
+Cairo International
+Queen Alia International
+London Gatwick
+Manchester Airport
+Dublin Airport
+Copenhagen Airport
+Vienna Airport
+Rome Fiumicino
+Barcelona–El Prat
+Lisbon Airport
+Athens International
+Oslo Gardermoen
+Stockholm Arlanda
+Tokyo Narita
+Kansai International
+Shanghai Pudong
+Beijing Capital
+Taiwan Taoyuan
+Bangkok Suvarnabhumi
+Kuala Lumpur International
+Indira Gandhi International
+Chhatrapati Shivaji Maharaj International
+Melbourne Airport
+Auckland Airport
+San Francisco International
+Miami International
+Seattle–Tacoma
+Calgary International
+Mexico City International
+São Paulo–Guarulhos
+Johannesburg O. R. Tambo
+Addis Ababa Bole International
+`,
+  't-mountains': `
+Lhotse
+Makalu
+Cho Oyu
+Dhaulagiri
+Manaslu
+Nanga Parbat
+Ama Dablam
+Mount Ararat
+Mount Damavand
+Mont Blanc du Tacul
+Zugspitze
+Jungfrau
+Grossglockner
+Triglav
+Monte Rosa
+Pico de Orizaba
+Popocatépetl
+Chimborazo
+Huascarán
+Fitz Roy
+Cerro Torre
+Mount Whitney
+Mount Hood
+Mount Shasta
+Pikes Peak
+Longs Peak
+Mount Washington
+Mount Kinabalu
+Mount Rinjani
+Mount Bromo
+Mount Mayon
+Jade Mountain
+Hallasan
+Mount Tai
+Huangshan
+Mount Hermon
+Jebel Shams
+`,
+  't-deserts': `
+Owyhee Desert
+Red Desert
+Alvord Desert
+Ad-Dahna Desert
+Great Indian Desert
+Dasht-e Lut
+Ordos Desert
+Badain Jaran Desert
+Tengger Desert
+Painted Desert
+Black Rock Desert
+White Sands
+Little Sandy Desert
+Tanami Desert
+Gibson Desert
+Strzelecki Desert
+Sechura Desert
+Monte Desert
+Libyan Desert
+Nubian Desert
+Eastern Desert
+Ténéré
+Ogaden
+Chalbi Desert
+Karoo
+Bayuda Desert
+Dasht-e Margo
+Registan Desert
+Cholistan Desert
+Sinai Desert
+Al-Jafurah
+Judaean Desert
+Accona Desert
+Tabernas Desert
+Bardenas Reales
+Lençóis Maranhenses
+`,
+  't-natparks': `
+Grand Teton
+Olympic
+Mount Rainier
+Denali
+Redwood
+Death Valley
+Canyonlands
+Capitol Reef
+Shenandoah
+Hawaii Volcanoes
+Big Bend
+Badlands
+Kootenay
+Yoho
+Waterton Lakes
+Cape Breton Highlands
+Fundy
+Algonquin
+Peak District
+Cairngorms
+Swiss National Park
+Berchtesgaden
+Triglav
+Vatnajökull
+Thingvellir
+Jostedalsbreen
+Abel Tasman
+Tongariro
+Blue Mountains
+Daintree
+Etosha
+Chobe
+Hwange
+Bwindi
+Amboseli
+Tsavo
+Masai Mara
+Iguazú
+Los Glaciares
+Manu
+`,
+  't-lakes': `
+Lake Maggiore
+Lake Constance
+Lake Wakatipu
+Lake Wanaka
+Emerald Lake
+Maligne Lake
+Lake O'Hara
+Abraham Lake
+Lake Michigan
+Lake Erie
+Lake Huron
+Great Salt Lake
+Lake Placid
+Flathead Lake
+Lake Chelan
+Lake Tanganyika
+Lake Nakuru
+Lake Retba
+Lake Natron
+Lake Inle
+Lake Toba
+Lake Kivu
+Pangong Lake
+West Lake
+Lake Ashi
+Lake Sevan
+Lake Van
+Lake Balaton
+Lake Bohinj
+Eibsee
+Plansee
+Lago di Braies
+Lake Brienz
+Lake Thun
+`,
+  't-rivers': `
+Ob River
+Yenisei
+Lena River
+Amur River
+Mackenzie River
+Columbia River
+Ohio River
+Snake River
+Arkansas River
+Paraná River
+Orinoco
+São Francisco River
+Magdalena River
+Brahmaputra
+Irrawaddy
+Chao Phraya
+Pearl River
+Han River
+Sumida River
+Limpopo River
+Orange River
+Okavango River
+Senegal River
+Loire
+Rhône
+Po
+Elbe
+Oder
+Vistula
+Dnieper
+Ebro
+Tagus
+Guadalquivir
+Moselle
+River Severn
+River Clyde
+Arno
+Kura River
+`,
+  't-ski': `
+Saas-Fee
+Davos
+Laax
+Engelberg
+Crans-Montana
+Andermatt
+Tignes
+Les Arcs
+La Plagne
+Avoriaz
+Les Deux Alpes
+Alpe d'Huez
+Megève
+Sölden
+Saalbach
+Mayrhofen
+Obergurgl
+Zell am See
+Livigno
+Cervinia
+Madonna di Campiglio
+Val Gardena
+Sestriere
+Åre
+Hemsedal
+Baqueira-Beret
+Grandvalira
+Steamboat
+Snowbird
+Alta
+Deer Valley
+Sun Valley
+Taos Ski Valley
+Killington
+Stowe
+Big White
+Sun Peaks
+Fernie
+Kicking Horse
+Le Massif
+Gudauri
+Rusutsu
+Furano
+Yongpyong
+Thredbo
+Queenstown
+`
+};
+const EXTRA_ITEMS = Object.assign({}, EXTRA_SPORTS, EXTRA_SPORTS2, EXTRA_FOOD, EXTRA_ENT, EXTRA_ANIMALS, EXTRA_FUN, EXTRA_TRAVEL, EXTRA_STYLE);
 const PHOTO_TOPICS = {
   't-pl': {
     'Tony Adams': 'Tony Adams (footballer)'
@@ -15197,6 +19387,7 @@ function makeBots(count, level, seed, avoidColors) {
 function itemFame(item) {
   const s = (item.desc || '') + ' ';
   let f = 0.32 + unit('fame', item.name) * 0.22;
+  if (/-e\d+$/.test(item.id || '')) f -= 0.1;
   const n = s.match(/(\d+)\s*[×x]\s/);
   if (n) f += Math.min(0.32, 0.06 * parseInt(n[1], 10));
   if (/MVP|Ballon d'Or|World Cup|champion|Golden|legend|record|GOAT|Hall of Fame|all-time|greatest|King|icon|the original/i.test(s)) f += 0.18;
@@ -15239,6 +19430,13 @@ function botValue(d, bot, item, rng) {
     v *= Math.pow(sc, 0.5 + L.scarcity);
   } else v *= Math.pow(sc, L.scarcity * 0.5);
   if (type === 'chaos' && unit('crush', bot.name, item.name) < 0.12) v *= 1.9;
+  if (sc < 1 && L.scarcity > 0.3) {
+    const rest = d.queue.slice(1).map(id => visibleItem(d, id)).filter(it => it && slotKey(d, it) === slotKey(d, item));
+    if (rest.length) {
+      const avg = rest.reduce((n, it) => n + itemFame(it), 0) / rest.length;
+      v *= Math.pow(clamp(fame / avg, 0.5, 1.6), 1.6 * L.scarcity * (1 - sc));
+    }
+  }
   if (L.scarcity > 0.3) {
     const options = d.queue.slice(1).filter(id => assignSlot(bot, visibleItem(d, id), slots) >= 0).length;
     if (options < emptyCount(bot) * 1.5) v *= 1 + 0.25 * L.scarcity;

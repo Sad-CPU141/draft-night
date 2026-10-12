@@ -58,6 +58,8 @@ function makeBots(count, level, seed, avoidColors) {
 function itemFame(item) {
   const s = (item.desc || '') + ' ';
   let f = 0.32 + unit('fame', item.name) * 0.22;
+  // Hand-picked headliners are the household names; big-group extras (ids ending -e<n>) are the deeper cuts.
+  if (/-e\d+$/.test(item.id || '')) f -= 0.1;
   const n = s.match(/(\d+)\s*[×x]\s/);
   if (n) f += Math.min(0.32, 0.06 * parseInt(n[1], 10));
   if (/MVP|Ballon d'Or|World Cup|champion|Golden|legend|record|GOAT|Hall of Fame|all-time|greatest|King|icon|the original/i.test(s)) f += 0.18;
@@ -94,6 +96,11 @@ function botValue(d, bot, item, rng) {
   if (type === 'needs') { v *= exact ? 1.3 : fame > 0.7 ? 0.7 : 0.3; v *= Math.pow(sc, 0.5 + L.scarcity); }
   else v *= Math.pow(sc, L.scarcity * 0.5);
   if (type === 'chaos' && unit('crush', bot.name, item.name) < 0.12) v *= 1.9; // a random favourite
+  // Plenty left for this slot: sharp bots hold out for the better names instead of settling.
+  if (sc < 1 && L.scarcity > 0.3) {
+    const rest = d.queue.slice(1).map((id) => visibleItem(d, id)).filter((it) => it && slotKey(d, it) === slotKey(d, item));
+    if (rest.length) { const avg = rest.reduce((n, it) => n + itemFame(it), 0) / rest.length; v *= Math.pow(clamp(fame / avg, 0.5, 1.6), 1.6 * L.scarcity * (1 - sc)); }
+  }
   // Endgame: few options left for its empty slots → worth more.
   if (L.scarcity > 0.3) {
     const options = d.queue.slice(1).filter((id) => assignSlot(bot, visibleItem(d, id), slots) >= 0).length;

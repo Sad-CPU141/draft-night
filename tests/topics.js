@@ -26,6 +26,20 @@ module.exports = async function topicTests({ ok, boot, btn, click, sleep }) {
   const dupItems = ts.filter((t) => new Set(t.items.map((i) => i.name.toLowerCase())).size !== t.items.length).map((t) => t.name);
   ok(!dupItems.length, 'no duplicate items inside a topic' + (dupItems.length ? ': ' + dupItems.join(', ') : ''));
   ok(ts.every((t) => t.slots.length && t.items.every((i) => i.name && i.id)), 'every topic has slots and named items');
+  // Big groups: every topic fills 16 players unless reality caps it (or it waits on scene art).
+  const CAPPED = ['t-f1', 't-plclubs', 't-wonder', 't-nbateams', 't-saudi', 't-states', 't-canada', 't-ff', 't-house', 't-backyard', 't-outfit'];
+  const small = ts.filter((t) => L.maxPlayersFor(t) < 16 && !CAPPED.includes(t.id)).map((t) => t.id + ' ' + L.maxPlayersFor(t));
+  ok(!small.length, 'every other topic has enough items for 16 players' + (small.length ? ': ' + small.join(', ') : ' (' + (ts.length - CAPPED.length) + ' topics)'));
+  const badPos = ts.filter((t) => t.items.some((i) => i.pos) && t.items.some((i) => /-e\d+$/.test(i.id) && !t.slots.some((sl) => sl.toLowerCase() === (i.pos || '').toLowerCase()) && !/flex/i.test(i.pos || ''))).map((t) => t.id);
+  ok(!badPos.length, 'extra items in position topics all use a real position' + (badPos.length ? ': ' + badPos.join(', ') : ''));
+  ok(L.maxPlayersFor({ slots: ['A', 'A', 'B'], items: [...Array(10)].map((_, i) => ({ pos: 'A' })).concat([{ pos: 'B' }, { pos: 'B' }, { pos: 'B' }]) }) === 3 && L.maxPlayersFor({ slots: ['Pick 1', 'Pick 2'], items: [...Array(9)].map(() => ({})) }) === 4, 'player capacity counts each position separately');
+  {
+    const ani = ts.find((t) => t.id === 't-cats');
+    const old = { ...ani, extrasV: 1, items: ani.items.filter((i) => !/-e\d+$/.test(i.id)).concat([{ id: 'mine-1', name: 'My Own Cat', pos: '', photo: '' }]) };
+    const m = DN.migrateTopics([old]).find((t) => t.id === 't-cats');
+    ok(m.items.length === ani.items.length + 1 && m.items.some((i) => i.name === 'My Own Cat') && m.extrasV === ani.extrasV, 'saved copies gain the new extras once and keep their own items (' + old.items.length + ' -> ' + m.items.length + ')');
+    ok(DN.migrateTopics([m]).find((t) => t.id === 't-cats').items.length === m.items.length, 'running the upgrade again adds nothing twice');
+  }
   const pitch = ts.filter((t) => t.layout === 'pitch').map((t) => t.id).sort();
   ok(JSON.stringify(pitch) === JSON.stringify(['t-cf', 't-goat', 't-pl']), 'only the 3 football topics use the pitch, ratings and simulator (' + pitch.join(', ') + ')');
   ok(ts.filter((t) => t.layout !== 'pitch').every((t) => !DN.finale.isFootball(t)), 'no other topic is treated as football');

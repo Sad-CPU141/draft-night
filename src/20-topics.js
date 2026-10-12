@@ -34,7 +34,7 @@ function starterTopics() {
    23-extra-*.js files add items to built-in topics without touching the originals.
    Line format: Name | position | short description | emoji | Wikipedia page (optional).
    Extra items get stable ids "<topic>-e<n>" and are skipped if the name already exists. */
-const EXTRAS_V = 1;
+const EXTRAS_V = 2;
 function extraItemsFor(id) {
   const src = (typeof EXTRA_ITEMS !== 'undefined' && EXTRA_ITEMS[id]) || '';
   return src.trim() ? src.trim().split('\n').map((line, i) => { const [n, p, d, e, w] = line.split('|').map((x) => (x || '').trim()); const it = { id: id + '-e' + i, name: n, pos: p, desc: d, emoji: e, photo: '' }; if (w) it.wiki = w; return it; }) : [];
