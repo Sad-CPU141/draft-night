@@ -49,11 +49,13 @@ function simulateFor(d, A, B, key) {
   if (k === 'fight') return simulateArena(d, A, B, key);
   if (k === 'survival') return simulateSurvival(d, A, B, key);
   if (k === 'powers' || k === 'weird') return simulateMissions(d, A, B, key);
+  if (k === 'cute') return simulateShow(d, A, B, key);
   return simulateBattle(d, A, B, key);
 }
 // One line for the result screen.
 function simWhy(w, mt) {
   if (mt.v === 'survival') { const ws = mt.score[mt.winner], ls = mt.score[1 - mt.winner]; const f = mt.final[mt.winner]; return w.name + (f.rescued ? ' got rescued' : ' survived ' + ws + ' day' + (ws === 1 ? '' : 's')) + (ws !== ls ? ' (the others lasted ' + ls + ')' : mt.how === 'rescue' ? ', and got rescued first' : mt.how === 'shape' ? ', level on days but in better shape' : ' and won the last night') + '.'; }
+  if (mt.v === 'show') return w.name + ' won the cuteness contest ' + mt.score[mt.winner] + '–' + mt.score[1 - mt.winner] + (mt.how === 'points' ? ' on total points' : mt.how === 'crowd' ? ' — the crowd decided' : '') + '.';
   if (mt.v === 'mission') return w.name + ' won ' + mt.score[mt.winner] + ' of ' + mt.missions.length + ' missions.';
   return w.name + ' won the ' + ((BATTLE_KINDS[mt.kind] || BATTLE_KINDS.fight).name).toLowerCase() + ' ' + mt.score[mt.winner] + '–' + mt.score[1 - mt.winner] + (mt.sudden ? ' in sudden death' : '') + '.';
 }

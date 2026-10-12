@@ -694,3 +694,20 @@ html[data-motion="reduce"] *,html[data-motion="reduce"] *::before,html[data-moti
 .mcell{display:flex;gap:8px;align-items:flex-start;background:var(--panel);border:2px solid var(--c,var(--line));border-radius:14px;padding:8px;min-width:0}
 .mcell.ok{background:#1d3a2c}.mcell.bad{background:#3a1d26}
 .mc-p{display:block;font-size:13px;overflow-wrap:anywhere}
+
+/* Cuteness show */
+.stage{position:relative;border-radius:18px;border:2px solid var(--line);overflow:hidden;padding:10px 10px 8px;background:radial-gradient(ellipse at 50% -10%,rgba(255,240,180,.55),transparent 60%),linear-gradient(90deg,#7a1028 0 9%,#3a2050 9% 91%,#7a1028 91%)}
+.stage-title{margin:0 0 8px;text-align:center;font-family:var(--cond);font-weight:800;letter-spacing:.06em;text-transform:uppercase;color:var(--gold)}
+.stage-row{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.sact{display:flex;flex-direction:column;align-items:center;gap:4px;text-align:center;padding:8px 4px;border-radius:14px;border:2px solid var(--c,var(--line));background:rgba(15,12,33,.55);min-width:0}
+.sact.won{box-shadow:0 0 0 3px var(--gold),0 0 22px rgba(255,200,61,.45)}
+.sa-n{font-size:14px;overflow-wrap:anywhere}
+.stage.anim .sact{animation:fightL .5s cubic-bezier(.2,.8,.2,1.2)}
+.stage.anim .sact:last-child{animation-name:fightR}
+.scards{display:flex;gap:4px}
+.scard{display:inline-flex;align-items:center;justify-content:center;width:30px;height:34px;border-radius:6px;background:#2c2659;color:#fff;font-family:var(--display);font-size:18px}
+.scard.up{background:#fff;color:#1b1530;animation:apopc .3s ease}
+.sa-total{font-family:var(--display);font-size:24px;color:var(--gold)}
+.judges{display:flex;justify-content:center;gap:14px;margin-top:8px}
+.judge{display:flex;flex-direction:column;align-items:center;font-size:24px;line-height:1}
+.judge small{font-size:10px;color:var(--muted);margin-top:2px}

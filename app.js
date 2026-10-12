@@ -1,4 +1,4 @@
-/* Draft Night 34be851c93 — built from src/ by build.js. Edit src/, not this file. */
+/* Draft Night 008ca3fd71 — built from src/ by build.js. Edit src/, not this file. */
 "use strict";
 (function(){
 function _extends() { return _extends = Object.assign ? Object.assign.bind() : function (n) { for (var e = 1; e < arguments.length; e++) { var t = arguments[e]; for (var r in t) ({}).hasOwnProperty.call(t, r) && (n[r] = t[r]); } return n; }, _extends.apply(null, arguments); }
@@ -23271,6 +23271,7 @@ function simulateFor(d, A, B, key) {
   if (k === 'fight') return simulateArena(d, A, B, key);
   if (k === 'survival') return simulateSurvival(d, A, B, key);
   if (k === 'powers' || k === 'weird') return simulateMissions(d, A, B, key);
+  if (k === 'cute') return simulateShow(d, A, B, key);
   return simulateBattle(d, A, B, key);
 }
 function simWhy(w, mt) {
@@ -23280,6 +23281,7 @@ function simWhy(w, mt) {
     const f = mt.final[mt.winner];
     return w.name + (f.rescued ? ' got rescued' : ' survived ' + ws + ' day' + (ws === 1 ? '' : 's')) + (ws !== ls ? ' (the others lasted ' + ls + ')' : mt.how === 'rescue' ? ', and got rescued first' : mt.how === 'shape' ? ', level on days but in better shape' : ' and won the last night') + '.';
   }
+  if (mt.v === 'show') return w.name + ' won the cuteness contest ' + mt.score[mt.winner] + '–' + mt.score[1 - mt.winner] + (mt.how === 'points' ? ' on total points' : mt.how === 'crowd' ? ' — the crowd decided' : '') + '.';
   if (mt.v === 'mission') return w.name + ' won ' + mt.score[mt.winner] + ' of ' + mt.missions.length + ' missions.';
   return w.name + ' won the ' + (BATTLE_KINDS[mt.kind] || BATTLE_KINDS.fight).name.toLowerCase() + ' ' + mt.score[mt.winner] + '–' + mt.score[1 - mt.winner] + (mt.sudden ? ' in sudden death' : '') + '.';
 }
@@ -24502,6 +24504,129 @@ function simulateMissions(d, A, B, key) {
     missions,
     score,
     winner: score[0] > score[1] ? 0 : 1,
+    sudden: false,
+    et: false,
+    pens: null,
+    events: []
+  };
+}
+const SHOW_JUDGES = [{
+  name: 'Nana Fluff',
+  emoji: '👵',
+  w: [2, 0.5, 0.5, 1],
+  love: ['Look at that FLOOF!', 'I want to knit it a jumper.', 'So soft I could cry.'],
+  meh: ['Needs more fluff, dear.', 'Not cuddly enough for me.']
+}, {
+  name: 'Little Tim',
+  emoji: '🧒',
+  w: [0.5, 1.5, 1.5, 0.5],
+  love: ['IT’S SO TINY!', 'Hahaha, again! Again!', 'Can I keep it?!'],
+  meh: ['It’s too big.', 'Boring. Where’s the trick?']
+}, {
+  name: 'Captain Charm',
+  emoji: '🎩',
+  w: [0.5, 0.5, 1, 2],
+  love: ['Pure star quality.', 'Those eyes! Magnificent.', 'A natural on stage.'],
+  meh: ['Lacks presence.', 'I’ve seen more charm in a spoon.']
+}];
+const SHOW_ROUNDS = [{
+  title: 'The Entrance',
+  emoji: '🚪',
+  w: [1, 0.5, 0.5, 1.5],
+  act: ['{c} struts onto the stage.', '{c} peeks out from behind the curtain.', '{c} waddles in to huge applause.']
+}, {
+  title: 'Party Trick',
+  emoji: '🎪',
+  w: [0.3, 0.8, 1.8, 1],
+  act: ['{c} does a spin!', '{c} rolls over on command.', '{c} tries a trick… and falls over adorably.']
+}, {
+  title: 'The Close-up',
+  emoji: '🔍',
+  w: [1.5, 1.2, 0.3, 1],
+  act: ['The camera zooms in on {c}’s little face.', '{c} blinks slowly at the judges.', '{c} does the head tilt.']
+}, {
+  title: 'Costume Round',
+  emoji: '🎀',
+  w: [1, 1, 1, 1],
+  act: ['{c} in a tiny hat!', '{c} dressed as a pumpkin.', '{c} wearing sunglasses. Iconic.']
+}, {
+  title: 'Grand Finale',
+  emoji: '🌟',
+  w: [1, 1, 1, 1.4],
+  act: ['{c} takes a bow.', '{c} falls asleep on stage. The crowd melts.', '{c} sneezes. The internet will never recover.']
+}];
+function simulateShow(d, A, B, key) {
+  const rng = seeded(d.seed, 'show', key);
+  const teams = [A, B].map(t => t.team.filter(Boolean).map(x => d.items[x.itemId]).filter(Boolean).map(item => {
+    const s = itemStats(d.topic, item);
+    return {
+      name: item.name,
+      itemId: item.id,
+      v: s ? s.vals : [5, 5, 5, 5]
+    };
+  }));
+  const n = Math.min(SHOW_ROUNDS.length, Math.max(teams[0].length, teams[1].length));
+  const used = [new Set(), new Set()];
+  const rounds = [];
+  const score = [0, 0];
+  const pts = [0, 0];
+  for (let r = 0; r < n; r++) {
+    const R = SHOW_ROUNDS[r];
+    const fit = c => c.v.reduce((s, v, i) => s + v * R.w[i], 0);
+    const acts = [0, 1].map(s => {
+      const c = teams[s].filter(x => !used[s].has(x.name)).sort((x, y) => fit(y) - fit(x))[0];
+      if (!c) return null;
+      used[s].add(c.name);
+      const form = 0.85 + rng() * 0.3;
+      const marks = SHOW_JUDGES.map(J => {
+        const taste = c.v.reduce((s, v, i) => s + v * J.w[i] * R.w[i], 0) / J.w.reduce((s, w, i) => s + w * R.w[i], 0);
+        const m = clamp(Math.round(taste * form + (rng() - 0.5) * 4), 1, 10);
+        return {
+          m,
+          say: m >= 8 ? pickOf(rng, J.love) : m <= 4 ? pickOf(rng, J.meh) : ''
+        };
+      });
+      const total = marks.reduce((s, x) => s + x.m, 0);
+      return {
+        name: c.name,
+        itemId: c.itemId,
+        act: pickOf(rng, R.act).replace('{c}', c.name),
+        marks,
+        total
+      };
+    });
+    let w;
+    if (!acts[0] || !acts[1]) w = acts[0] ? 0 : 1;else w = acts[0].total !== acts[1].total ? acts[0].total > acts[1].total ? 0 : 1 : rng() < 0.5 ? 0 : 1;
+    score[w]++;
+    acts.forEach((a, s) => {
+      if (a) pts[s] += a.total;
+    });
+    rounds.push({
+      title: R.title,
+      emoji: R.emoji,
+      acts,
+      w,
+      score: [...score],
+      tie: acts[0] && acts[1] && acts[0].total === acts[1].total
+    });
+  }
+  let winner,
+    how = 'rounds';
+  if (score[0] !== score[1]) winner = score[0] > score[1] ? 0 : 1;else if (pts[0] !== pts[1]) {
+    winner = pts[0] > pts[1] ? 0 : 1;
+    how = 'points';
+  } else {
+    winner = rng() < 0.5 ? 0 : 1;
+    how = 'crowd';
+  }
+  return {
+    v: 'show',
+    kind: 'cute',
+    rounds,
+    score,
+    pts,
+    winner,
+    how,
     sudden: false,
     et: false,
     pens: null,
@@ -34324,7 +34449,8 @@ if (window.__DN_TEST__) window.__DN = {
     simulateFor,
     simulateSurvival,
     SURVIVAL_EVENTS,
-    simulateMissions
+    simulateMissions,
+    simulateShow
   },
   finale: {
     simulateBattle,
@@ -35532,6 +35658,12 @@ function MatchSummary({
   B,
   match
 }) {
+  if (match.v === 'show') return React.createElement(ShowSummary, {
+    d: d,
+    A: A,
+    B: B,
+    match: match
+  });
   if (match.v === 'mission') return React.createElement(MissionSummary, {
     d: d,
     A: A,
@@ -36993,7 +37125,7 @@ function PitchMatch({
   }));
 }
 function MatchView(props) {
-  return props.match && props.match.v === 'mission' ? React.createElement(MissionView, props) : props.match && props.match.v === 'survival' ? React.createElement(SurvivalView, props) : props.match && props.match.v === 'arena' ? React.createElement(ArenaView, props) : props.match && props.match.v === 'battle' ? React.createElement(BattleView, props) : props.match && props.match.v === 2 ? React.createElement(PitchMatch, props) : React.createElement(MatchPlayer, props);
+  return props.match && props.match.v === 'show' ? React.createElement(ShowView, props) : props.match && props.match.v === 'mission' ? React.createElement(MissionView, props) : props.match && props.match.v === 'survival' ? React.createElement(SurvivalView, props) : props.match && props.match.v === 'arena' ? React.createElement(ArenaView, props) : props.match && props.match.v === 'battle' ? React.createElement(BattleView, props) : props.match && props.match.v === 2 ? React.createElement(PitchMatch, props) : React.createElement(MatchPlayer, props);
 }
 function MissionCell({
   d,
@@ -37197,6 +37329,215 @@ function MissionSummary({
       margin: 0
     }
   }, "Each stage tests one stat (Draft Night\u2019s estimates) plus luck", match.silly ? ', and the Chaos stat can flip a result' : '', ". Just for fun."));
+}
+function ShowAct({
+  d,
+  team,
+  a,
+  marks,
+  won
+}) {
+  if (!a) return React.createElement("div", {
+    className: "sact empty",
+    style: mStyle(team)
+  }, React.createElement("b", null, team.name), React.createElement("p", {
+    className: "small muted"
+  }, "Nobody left to send."));
+  const item = d.items[a.itemId] || {
+    name: a.name
+  };
+  return React.createElement("div", {
+    className: 'sact' + (won ? ' won' : ''),
+    style: mStyle(team)
+  }, React.createElement(ItemArt, {
+    item: item,
+    topic: d.topic,
+    size: 64,
+    round: true
+  }), React.createElement("b", {
+    className: "sa-n"
+  }, a.name), React.createElement("span", {
+    className: "small muted"
+  }, team.name), React.createElement("div", {
+    className: "scards"
+  }, SHOW_JUDGES.map((J, k) => React.createElement("span", {
+    key: k,
+    className: 'scard' + (k < marks ? ' up' : ''),
+    title: J.name
+  }, k < marks ? a.marks[k].m : J.emoji))), marks >= 3 && React.createElement("b", {
+    className: "sa-total num"
+  }, a.total));
+}
+function ShowView({
+  d,
+  A,
+  B,
+  match,
+  speed,
+  onDone,
+  label
+}) {
+  const instant = speed === 'instant';
+  const R = match.rounds;
+  const [ri, setRi] = useState(instant ? R.length : 0);
+  const [st, setSt] = useState(0);
+  const fast = speed === 'fast';
+  const done = ri >= R.length;
+  const fired = useRef(false);
+  const feedRef = useRef(null);
+  useEffect(() => {
+    if (done) {
+      if (!fired.current) {
+        fired.current = true;
+        if (!instant) audio.play('fanfare');
+        onDone && onDone();
+      }
+      return undefined;
+    }
+    const rd = R[ri];
+    const t = setTimeout(() => {
+      if (st < 7) {
+        const nx = st + 1;
+        setSt(nx);
+        if (nx === 7) audio.play('cheer');else {
+          const side = nx <= 3 ? 0 : 1;
+          const a = rd.acts[side];
+          const m = a && a.marks[(nx - 1) % 3];
+          if (m) audio.play(m.m >= 8 ? 'big' : 'bid');
+        }
+      } else {
+        setRi(ri + 1);
+        setSt(0);
+      }
+    }, ms(st === 0 ? fast ? 1000 : 2000 : st < 7 ? fast ? 450 : 900 : fast ? 1100 : 2200));
+    return () => clearTimeout(t);
+  }, [ri, st, done]);
+  useEffect(() => {
+    const f = feedRef.current;
+    if (f) f.scrollTop = f.scrollHeight;
+  }, [ri]);
+  const rd = done ? null : R[ri];
+  const score = rd && st >= 7 ? rd.score : ri ? R[ri - 1].score : [0, 0];
+  const lastSay = rd && st >= 1 && st <= 6 ? (() => {
+    const side = st <= 3 ? 0 : 1;
+    const a = rd.acts[side];
+    const k = (st - 1) % 3;
+    return a && a.marks[k].say ? SHOW_JUDGES[k].emoji + ' ' + SHOW_JUDGES[k].name + ': “' + a.marks[k].say + '”' : null;
+  })() : null;
+  const anim = !reducedMotion();
+  return React.createElement("div", {
+    className: "matchview showview"
+  }, React.createElement("div", {
+    className: "scoreboard"
+  }, React.createElement("div", {
+    className: "sb-team"
+  }, React.createElement(Badge, {
+    m: A
+  }), React.createElement("span", {
+    className: "sb-n"
+  }, A.name)), React.createElement("div", {
+    className: "sb-mid"
+  }, React.createElement("span", {
+    className: "sb-score num",
+    "aria-live": "polite"
+  }, (done ? match.score : score)[0], "\u2013", (done ? match.score : score)[1]), React.createElement("span", {
+    className: "sb-clock num"
+  }, done ? 'Rounds won' : 'Round ' + (ri + 1) + ' of ' + R.length)), React.createElement("div", {
+    className: "sb-team"
+  }, React.createElement(Badge, {
+    m: B
+  }), React.createElement("span", {
+    className: "sb-n"
+  }, B.name))), rd && React.createElement("div", {
+    className: 'stage' + (anim ? ' anim' : ''),
+    key: ri
+  }, React.createElement("p", {
+    className: "stage-title"
+  }, rd.emoji, " ", rd.title), React.createElement("div", {
+    className: "stage-row"
+  }, React.createElement(ShowAct, {
+    d: d,
+    team: A,
+    a: rd.acts[0],
+    marks: Math.max(0, Math.min(3, st)),
+    won: st >= 7 && rd.w === 0
+  }), React.createElement(ShowAct, {
+    d: d,
+    team: B,
+    a: rd.acts[1],
+    marks: Math.max(0, Math.min(3, st - 3)),
+    won: st >= 7 && rd.w === 1
+  })), React.createElement("div", {
+    className: "judges"
+  }, SHOW_JUDGES.map(J => React.createElement("span", {
+    key: J.name,
+    className: "judge",
+    title: J.name
+  }, J.emoji, React.createElement("small", null, J.name))))), rd && React.createElement("p", {
+    className: "duel-line",
+    "aria-live": "polite"
+  }, st === 0 ? rd.acts.filter(Boolean).map(a => a.act).join(' ') : st >= 7 ? (rd.w === 0 ? A : B).name + ' take the round' + (rd.tie ? ' on the crowd’s cheer!' : '!') : lastSay || 'The judges are thinking…'), ri > 0 && React.createElement("div", {
+    className: "mfeed",
+    ref: feedRef
+  }, R.slice(0, ri).map((x, k) => React.createElement("p", {
+    key: k,
+    className: "mev"
+  }, React.createElement("span", {
+    className: "mm num"
+  }, "R", k + 1), React.createElement("span", null, x.emoji, " ", React.createElement("b", null, x.title, ":"), " ", x.acts.map((a, s) => a ? a.name + ' ' + a.total : null).filter(Boolean).join(' v '), " \u2192 ", (x.w === 0 ? A : B).name)))), !done && React.createElement("button", {
+    type: "button",
+    className: "btn btn-ghost btn-sm",
+    onClick: () => {
+      setRi(R.length);
+      setSt(0);
+    }
+  }, "Skip to the end"), done && React.createElement(ShowSummary, {
+    d: d,
+    A: A,
+    B: B,
+    match: match
+  }));
+}
+function ShowSummary({
+  d,
+  A,
+  B,
+  match
+}) {
+  const W = match.winner === 0 ? A : B;
+  const star = match.rounds.flatMap(r => r.acts.map((a, s) => a ? {
+    a,
+    s
+  } : null)).filter(Boolean).sort((x, y) => y.a.total - x.a.total)[0];
+  return React.createElement("div", {
+    className: "board msummary"
+  }, React.createElement("h3", null, "\uD83E\uDD70 Show summary"), React.createElement("p", {
+    className: "small",
+    style: {
+      margin: 0
+    }
+  }, React.createElement("b", null, A.name, " ", match.score[0], "\u2013", match.score[1], " ", B.name), " on rounds \xB7 points ", match.pts[0], "\u2013", match.pts[1]), match.rounds.map((r, k) => React.createElement("p", {
+    key: k,
+    className: "small",
+    style: {
+      margin: 0
+    }
+  }, r.emoji, " ", r.title, ": ", r.acts.map(a => a ? a.name + ' (' + a.total + ')' : 'nobody').join(' v '), " \u2192 ", React.createElement("b", null, (r.w === 0 ? A : B).name))), star && React.createElement("p", {
+    className: "small",
+    style: {
+      margin: 0
+    }
+  }, "\u2B50 Star of the show: ", star.a.name, " (", (star.s === 0 ? A : B).name, ") with ", star.a.total, "/30"), React.createElement("p", {
+    className: "small",
+    style: {
+      margin: 0
+    }
+  }, "\uD83C\uDFC5 ", W.name, " win", match.how === 'points' ? ' on total points' : match.how === 'crowd' ? ' — the crowd decided!' : ''), React.createElement("p", {
+    className: "hint",
+    style: {
+      margin: 0
+    }
+  }, "Each judge has their own taste (fluff, tiny & funny, charm), scoring Draft Night\u2019s estimated stats plus how they do on the night. Just for fun."));
 }
 const NEED_LABEL = need => need.split('').map(t => SURVIVAL_TAGS[t] ? SURVIVAL_TAGS[t][1] + ' ' + SURVIVAL_TAGS[t][0] : '').filter(Boolean).join(' · ');
 function SurvivalCamp({

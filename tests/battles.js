@@ -84,6 +84,27 @@ module.exports = async function battleTests({ ok, boot, btn, click, sleep }) {
     const wd = fill(T('t-worstpowers'), 2, 'wp'); const wm = S.simulateFor(wd, ...wd.managers, 'w');
     ok(wm.v === 'mission' && wm.silly && wm.missions.every((m) => m.stages.some((x) => x.stat === 'C')), 'Worst Superpowers get silly everyday missions with a Chaos stage');
   }
+  {
+    // Step 6: the cuteness show.
+    const S = DN.simStats; const cd = fill(T('t-cute'), 2, 'cs1'); const [CA, CB] = cd.managers;
+    const sh = S.simulateFor(cd, CA, CB, 'cs');
+    ok(sh.v === 'show' && sh.rounds.length === T('t-cute').slots.length && sh.rounds.every((r) => r.acts.every((a) => !a || (a.marks.length === 3 && a.marks.every((m) => m.m >= 1 && m.m <= 10) && a.act && !/\{c\}/.test(a.act)))), 'cute topics put on a show: one round per slot, three judges scoring 1–10 (' + sh.score.join('–') + ')');
+    ok(JSON.stringify(sh) === JSON.stringify(S.simulateFor(cd, CA, CB, 'cs')), 'a recorded show replays exactly');
+    const mk = (names) => ({ name: 'T', team: names.map((n) => ({ itemId: T('t-cute').items.find((i) => i.name === n).id, price: 1 })) });
+    const dd = { seed: 's', topic: T('t-cute'), items: Object.fromEntries(T('t-cute').items.map((i) => [i.id, i])), rules: { slots: T('t-cute').slots } };
+    let g = 0; for (let k = 0; k < 200; k++) if (S.simulateFor(dd, mk(['Panda Cub', 'Bunny Kit', 'Baby Red Panda', 'Fluffy Owlet', 'Kitten']), mk(['Meerkat', 'Capybara', 'Puffin', 'Sloth', 'Alpaca']), 'g' + k).winner === 0) g++;
+    ok(g > 120 && g < 200, 'the fluffiest, tiniest line-up usually wins, but the judges can surprise (' + Math.round(g / 2) + '%)');
+    // Screens for missions and the show.
+    for (const [tid, startBtn, sumRe, cls] of [['t-pow', 'Start the clash', /Mission summary/, '.missionview'], ['t-cute', 'Start the contest', /Show summary/, '.showview']]) {
+      const f0 = fill(T(tid), 3, 'ui' + tid); const raw = { ...f0, rules: { ...f0.rules, finale: { ...f0.rules.finale, speed: 'normal' } }, mode: 'local', createdAt: Date.now(), history: [] };
+      const X = await boot({ idb: false, speed: 0.05, storage: { dn_current_v1: JSON.stringify(raw) } });
+      await click(X.w, btn(X.d, 'Resume draft')); await click(X.w, btn(X.d, 'Start the finale')); await click(X.w, btn(X.d, startBtn)); await sleep(300);
+      const mid = !!X.d.querySelector(cls);
+      await click(X.w, btn(X.d, 'Skip to the end')); await sleep(100);
+      ok(mid && sumRe.test(X.d.body.textContent), (tid === 't-pow' ? 'the missions screen' : 'the cuteness show screen') + ' plays and ends with a summary');
+      X.w.close();
+    }
+  }
   const rt = DN.share.unpackTopic(DN.share.packTopic(T('t-zomb'), false));
   ok(rt.ok && rt.topic.battle === 'survival' && F.hasBattle(rt.topic), 'shared and copied topics keep their battle style');
   // Screen: play a battle through the UI at instant speed.
