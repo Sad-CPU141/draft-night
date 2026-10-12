@@ -29,9 +29,12 @@ module.exports = async function topicTests({ ok, boot, btn, click, sleep }) {
   {
     const K = (id) => L.artKind(ts.find((t) => t.id === id));
     const kinds = {}; ts.forEach((t) => { const k = L.artKind(t); kinds[k] = (kinds[k] || 0) + 1; });
-    ok(K('t-house') === 'drawn' && K('t-goat') === 'drawn' && K('t-capitals') === 'photo' && K('t-redflags') === 'emoji', 'every topic card is tagged 🎨 Drawn, 📷 Photos, 😀 Emojis or 🎨 + 😀 both (' + Object.entries(kinds).map(([k, n]) => k + ' ' + n).join(', ') + ')');
+    ok(K('t-house') === 'drawn' && K('t-goat') === 'photo' && K('t-cf') === 'photo' && K('t-capitals') === 'photo' && K('t-redflags') === 'emoji', 'pictures are classified correctly behind the badges: photo topics are never called drawn (' + Object.entries(kinds).map(([k, n]) => k + ' ' + n).join(', ') + ')');
     const mixed = { ...ts.find((t) => t.id === 't-house') }; mixed.items = [...mixed.items, { id: 'x1', name: 'Moon Base', emoji: '🌕' }];
-    ok(L.artKind(mixed) === 'mixed', 'a drawn topic with an undrawn item of your own is tagged as drawn + emojis');
+    const illus = ts.filter((t) => ['drawn', 'mixed', 'kit'].includes(L.artKind(t))).map((t) => t.id).sort();
+    const sims = ts.filter((t) => L.simKind(t)).map((t) => t.id);
+    ok(JSON.stringify(illus) === JSON.stringify(['t-backyard', 't-club', 't-ff', 't-house', 't-outfit']) && ['t-cf', 't-goat', 't-pl', 't-ani', 't-pow'].every((id) => sims.includes(id)), '🎨 Illustrated badge on the 5 drawn topics (4 picture-builders + club kits); Simulation badge on ' + sims.length + ' topics (3 football + fun battles)');
+    ok(L.artKind(mixed) === 'mixed', 'a drawn topic with an extra item of your own keeps its Illustrated badge');
   }
   // Big groups: every topic fills 16 players unless reality caps it (or it waits on scene art).
   const CAPPED = ['t-f1', 't-plclubs', 't-wonder', 't-nbateams', 't-saudi', 't-states', 't-canada', 't-ff', 't-house', 't-backyard', 't-outfit'];

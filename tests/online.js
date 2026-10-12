@@ -89,7 +89,7 @@ module.exports = async function onlineTests({ ok, boot, btn, click, sleep }) {
   await click(H.w, [...H.d.querySelectorAll('.folder')].find((b) => b.querySelector('.fn').textContent === 'Animals'));
   ok(await until(() => /Animal Fight Squad/.test(text(T)) && /Animals/.test(T.d.querySelector('.tvtopics-head').textContent)), 'opening a folder on the host phone shows that folder on the TV');
   ok(await until(() => /The host is looking at/.test(text(A)) && /Animals/.test(text(A))), 'players’ phones say what the host is looking at');
-  ok(!!T.d.querySelector('.tvtopics .arttag'), 'TV topic cards show their picture tag (drawn / photos / emojis)');
+  ok(!!T.d.querySelector('.tvtopics .tbadge.sim') && !T.d.querySelector('.arttag') && !/📷 Photos|😀 Emojis/.test(text(T)), 'TV topic cards show the Simulation badge, and no photo/emoji labels');
   await click(H.w, H.d.querySelector('.iconbtn[aria-label="All folders"]'));
   await click(H.w, [...H.d.querySelectorAll('.ttab')].find((b) => /Favourites/.test(b.textContent)));
   const favCard = [...H.d.querySelectorAll('.tcard')].find((b) => b.textContent.includes(rivers.name));

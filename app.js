@@ -1,4 +1,4 @@
-/* Draft Night d0223747d5 — built from src/ by build.js. Edit src/, not this file. */
+/* Draft Night efb3f08c2b — built from src/ by build.js. Edit src/, not this file. */
 "use strict";
 (function(){
 function _extends() { return _extends = Object.assign ? Object.assign.bind() : function (n) { for (var e = 1; e < arguments.length; e++) { var t = arguments[e]; for (var r in t) ({}).hasOwnProperty.call(t, r) && (n[r] = t[r]); } return n; }, _extends.apply(null, arguments); }
@@ -22959,30 +22959,41 @@ function lum(hex) {
 }
 const artOf = topic => topic && topic.art || (topic && topic.layout === 'pitch' ? 'kit' : 'emoji');
 function artKind(t) {
-  const art = artOf(t);
   if (sceneOf(t)) {
     const drawn = t.items.filter(i => sceneHasArt(t, i)).length;
     return drawn >= t.items.length ? 'drawn' : drawn ? 'mixed' : 'emoji';
   }
-  if (art === 'kit') return 'drawn';
   if (t.photos) return 'photo';
+  if (artOf(t) === 'kit') return 'kit';
   return 'emoji';
 }
-const ART_TAGS = {
-  drawn: ['🎨 Drawn', 'every item is illustrated'],
-  mixed: ['🎨 + 😀 Drawn & emojis', 'some drawn, the rest emojis'],
-  photo: ['📷 Photos', 'real photos (emoji if one can’t load)'],
-  emoji: ['😀 Emojis', 'emoji pictures']
-};
+function simKind(t) {
+  if (isFootball(t)) return {
+    emoji: '⚽',
+    name: 'football matches'
+  };
+  const b = battleKind(t);
+  return b ? {
+    emoji: b.emoji,
+    name: b.name.toLowerCase() + 's'
+  } : null;
+}
 function ArtTag({
   t
 }) {
   const k = artKind(t);
-  const [label, title] = ART_TAGS[k];
+  const sim = simKind(t);
+  const illus = k === 'drawn' || k === 'mixed' || k === 'kit';
+  if (!illus && !sim) return null;
   return React.createElement("span", {
-    className: 'arttag ' + k,
-    title: title
-  }, label);
+    className: "tbadges"
+  }, illus && React.createElement("span", {
+    className: "tbadge illus",
+    title: k === 'kit' ? 'Illustrated: every club is drawn as its kit' : 'Illustrated: your picks build one drawn picture' + (k === 'mixed' ? ' (some items show as emojis)' : '')
+  }, "\uD83C\uDFA8 Illustrated"), sim && React.createElement("span", {
+    className: "tbadge sim",
+    title: 'Simulation: the finale can be played as animated ' + sim.name
+  }, sim.emoji, " Simulation"));
 }
 function ArtLegend() {
   return React.createElement("p", {
@@ -22990,9 +23001,11 @@ function ArtLegend() {
     style: {
       margin: 0
     }
-  }, Object.values(ART_TAGS).map(([l, ti]) => React.createElement("span", {
-    key: l
-  }, React.createElement("b", null, l), " = ", ti)));
+  }, React.createElement("span", null, React.createElement("b", {
+    className: "tbadge illus"
+  }, "\uD83C\uDFA8 Illustrated"), " drawn by Draft Night \u2014 most build one picture of your picks"), React.createElement("span", null, React.createElement("b", {
+    className: "tbadge sim"
+  }, "\uD83C\uDFAE Simulation"), " the winner can be decided by an animated match or battle"));
 }
 function imageSources(item, topic, wikiUrl) {
   const out = [];
@@ -31838,6 +31851,7 @@ if (window.__DN_TEST__) window.__DN = {
   },
   topicsLib: {
     artKind,
+    simKind,
     maxPlayersFor,
     POPULARITY,
     popScore,
@@ -35363,7 +35377,7 @@ function TvTopics({
       t: t
     })), React.createElement("span", {
       className: "sub"
-    }, t.items.length, " items \xB7 ", t.slots.length, " slots", maxPlayersFor(t) < MAX_MANAGERS ? ' · 👥 up to ' + Math.max(2, maxPlayersFor(t)) + ' players' : '', hasBattle(t) ? ' · ' + battleKind(t).emoji + ' battles' : isFootball(t) ? ' · ⚽ matches' : '')))
+    }, t.items.length, " items \xB7 ", t.slots.length, " slots", maxPlayersFor(t) < MAX_MANAGERS ? ' · 👥 up to ' + Math.max(2, maxPlayersFor(t)) + ' players' : '')))
   }), React.createElement("p", {
     className: "hint"
   }, "The host\u2019s own topics only show on their phone."));

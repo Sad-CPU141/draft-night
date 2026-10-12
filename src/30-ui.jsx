@@ -43,15 +43,31 @@ function lum(hex) { const h = hex.replace('#', ''); const v = [0, 2, 4].map((i) 
 const artOf = (topic) => (topic && topic.art) || (topic && topic.layout === 'pitch' ? 'kit' : 'emoji');
 // What pictures a topic uses, for the tag on its card: drawn, photos, emojis, or drawn + emojis.
 function artKind(t) {
-  const art = artOf(t);
   if (sceneOf(t)) { const drawn = t.items.filter((i) => sceneHasArt(t, i)).length; return drawn >= t.items.length ? 'drawn' : drawn ? 'mixed' : 'emoji'; }
-  if (art === 'kit') return 'drawn';
-  if (t.photos) return 'photo';
+  if (t.photos) return 'photo'; // football photos fall back to drawn kits, but what you see is the photo
+  if (artOf(t) === 'kit') return 'kit';
   return 'emoji';
 }
-const ART_TAGS = { drawn: ['🎨 Drawn', 'every item is illustrated'], mixed: ['🎨 + 😀 Drawn & emojis', 'some drawn, the rest emojis'], photo: ['📷 Photos', 'real photos (emoji if one can’t load)'], emoji: ['😀 Emojis', 'emoji pictures'] };
-function ArtTag({ t }) { const k = artKind(t); const [label, title] = ART_TAGS[k]; return <span className={'arttag ' + k} title={title}>{label}</span>; }
-function ArtLegend() { return <p className="hint artlegend" style={{ margin: 0 }}>{Object.values(ART_TAGS).map(([l, ti]) => <span key={l}><b>{l}</b> = {ti}</span>)}</p>; }
+// Which unique extras a topic has: a drawn picture that builds as you win items, and/or a simulated finale.
+function simKind(t) { if (isFootball(t)) return { emoji: '⚽', name: 'football matches' }; const b = battleKind(t); return b ? { emoji: b.emoji, name: b.name.toLowerCase() + 's' } : null; }
+function ArtTag({ t }) {
+  const k = artKind(t); const sim = simKind(t); const illus = k === 'drawn' || k === 'mixed' || k === 'kit';
+  if (!illus && !sim) return null;
+  return (
+    <span className="tbadges">
+      {illus && <span className="tbadge illus" title={k === 'kit' ? 'Illustrated: every club is drawn as its kit' : 'Illustrated: your picks build one drawn picture' + (k === 'mixed' ? ' (some items show as emojis)' : '')}>🎨 Illustrated</span>}
+      {sim && <span className="tbadge sim" title={'Simulation: the finale can be played as animated ' + sim.name}>{sim.emoji} Simulation</span>}
+    </span>
+  );
+}
+function ArtLegend() {
+  return (
+    <p className="hint artlegend" style={{ margin: 0 }}>
+      <span><b className="tbadge illus">🎨 Illustrated</b> drawn by Draft Night — most build one picture of your picks</span>
+      <span><b className="tbadge sim">🎮 Simulation</b> the winner can be decided by an animated match or battle</span>
+    </p>
+  );
+}
 
 // Picture priority: uploaded photo → image link → Wikipedia photo → jersey/emoji.
 // Any source that fails to load drops to the next one.
@@ -3413,7 +3429,7 @@ class Boundary extends React.Component {
   }
 }
 
-if (window.__DN_TEST__) window.__DN = { finale: { simulateBattle, hasBattle, battleKind, BATTLE_KINDS, eraOf, eraWord, buildBracket, advanceBracket, nextMatchup, matchVoters, canVoteFor, decideMatchup, simulateMatch, playerRating, teamRating, matchupVoteBot, finaleMode, isFootball, startFinale, castMatchVote, botMatchVotes, playMatchup, resolveMatchup, getMatchup, needsVote, needsMatch, votingDone, finaleStandings, finaleRecord, championStory, goldenBoot, matchVoteProblem, roundName, FINALE_DEFAULTS, validRating, matchScript, revealedEvents, matchFrame, lineupOf, expectedGoals, strength2, squad }, audio, AUDIO_DEFAULTS, share: { encodeTopic, decodeShared, packTopic, unpackTopic, topicCode, shareLink, MAX_LINK }, stats: { careerStats, computeAwards, computeShame, hallOfShame, humanPlayers }, bots: { makeBots, nextBotAction, botDecision, botFreePickChoice, botVote, teamScore, voteChoices, itemFame, seeded, BOT_LEVELS, BOT_TYPES, botCardPlay, botVeto, botNominate, botTradeDecision, botTradeOffer }, twists: { twistRules, TWIST_DEFAULTS, playCard, answerCard, cardProblem, doubleProblem, nominate, currentNominator, nominationPool, botActors, botAdvisers, participants, visibleItem, isHidden, rarityOf, frozenNow, proposeTrade, acceptTrade, rejectTrade, cancelTrade, closeTrades, tradeProblem, openTrades, hasCard }, auction: { withdraw, isOut, auctionEnd, owesBid, withdrawProblem, outIds, owing, botPassers, botForcedBid, runAction, ownerInfo, migrateSettings, rulesLines }, scenes: { SCENES, sceneOf, placeScene, sceneKey, SceneCanvas, SceneView, sceneHasArt }, skips: { SKIP_DEFAULTS, skipCfg, skipRulesOn, presenter, skipVerdict, eligibleFor, endgameNow, endgameSoon, chooseForced, autoChooseForced, presenterLine, botSkipSave, botForcedChoice, unsoldOutcome, skipChip }, topicsLib: { artKind, maxPlayersFor, POPULARITY, popScore, byPopularity, folderOrder, favouritesOrder, prefsOf, isBuiltIn, folderOf, folderList, matchTopic, toggleIn }, DEFAULT_SOLO, isFlex, canBid, createDraft, placeBid, sell, skipItem, undo, freePick, currentPicker, canTake, nextAmount, isDraftOver, draftStats, winsBoard, tally, starterTopics, migrateTopics, validateBackup, makeBackup, wikiTitleFor, PHOTO_TOPICS, store, wiki, DEFAULT_RULES, COLORS, emptyCount, assignSlot, maxBid };
+if (window.__DN_TEST__) window.__DN = { finale: { simulateBattle, hasBattle, battleKind, BATTLE_KINDS, eraOf, eraWord, buildBracket, advanceBracket, nextMatchup, matchVoters, canVoteFor, decideMatchup, simulateMatch, playerRating, teamRating, matchupVoteBot, finaleMode, isFootball, startFinale, castMatchVote, botMatchVotes, playMatchup, resolveMatchup, getMatchup, needsVote, needsMatch, votingDone, finaleStandings, finaleRecord, championStory, goldenBoot, matchVoteProblem, roundName, FINALE_DEFAULTS, validRating, matchScript, revealedEvents, matchFrame, lineupOf, expectedGoals, strength2, squad }, audio, AUDIO_DEFAULTS, share: { encodeTopic, decodeShared, packTopic, unpackTopic, topicCode, shareLink, MAX_LINK }, stats: { careerStats, computeAwards, computeShame, hallOfShame, humanPlayers }, bots: { makeBots, nextBotAction, botDecision, botFreePickChoice, botVote, teamScore, voteChoices, itemFame, seeded, BOT_LEVELS, BOT_TYPES, botCardPlay, botVeto, botNominate, botTradeDecision, botTradeOffer }, twists: { twistRules, TWIST_DEFAULTS, playCard, answerCard, cardProblem, doubleProblem, nominate, currentNominator, nominationPool, botActors, botAdvisers, participants, visibleItem, isHidden, rarityOf, frozenNow, proposeTrade, acceptTrade, rejectTrade, cancelTrade, closeTrades, tradeProblem, openTrades, hasCard }, auction: { withdraw, isOut, auctionEnd, owesBid, withdrawProblem, outIds, owing, botPassers, botForcedBid, runAction, ownerInfo, migrateSettings, rulesLines }, scenes: { SCENES, sceneOf, placeScene, sceneKey, SceneCanvas, SceneView, sceneHasArt }, skips: { SKIP_DEFAULTS, skipCfg, skipRulesOn, presenter, skipVerdict, eligibleFor, endgameNow, endgameSoon, chooseForced, autoChooseForced, presenterLine, botSkipSave, botForcedChoice, unsoldOutcome, skipChip }, topicsLib: { artKind, simKind, maxPlayersFor, POPULARITY, popScore, byPopularity, folderOrder, favouritesOrder, prefsOf, isBuiltIn, folderOf, folderList, matchTopic, toggleIn }, DEFAULT_SOLO, isFlex, canBid, createDraft, placeBid, sell, skipItem, undo, freePick, currentPicker, canTake, nextAmount, isDraftOver, draftStats, winsBoard, tally, starterTopics, migrateTopics, validateBackup, makeBackup, wikiTitleFor, PHOTO_TOPICS, store, wiki, DEFAULT_RULES, COLORS, emptyCount, assignSlot, maxBid };
 store.init().finally(() => {
   ReactDOM.createRoot(document.getElementById('root')).render(<Boundary><App /></Boundary>);
 });

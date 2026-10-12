@@ -1,4 +1,4 @@
-/* Draft Night d0223747d5 — built from src/styles.css */
+/* Draft Night efb3f08c2b — built from src/styles.css */
 /* Layout: one phone-width column, a stage-lit backdrop, the auction screen as a full-height console with a sticky gavel bar. */
 :root{
   --ink:#0f0c21; --stage:#19153a; --panel:#221d47; --panel2:#2c2659; --line:#3d3672;
@@ -606,3 +606,9 @@ html[data-motion="reduce"] *,html[data-motion="reduce"] *::before,html[data-moti
 .tvtopics .stack-sm{display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:10px;align-items:start}
 .tvtopics .stack-sm>.tabs,.tvtopics .stack-sm>.row,.tvtopics .stack-sm>p,.tvtopics .stack-sm>h3,.tvtopics .stack-sm>.foldergrid{grid-column:1/-1}
 .tvtopics .trow2 .tcard{background:var(--panel);border:2px solid var(--line);border-radius:16px;padding:10px;width:100%}
+.tbadges{display:inline-flex;flex-wrap:wrap;gap:4px;margin-left:6px;vertical-align:middle}
+.tbadges .arttag{margin-left:0}
+.tbadge{display:inline-block;padding:2px 8px;border-radius:999px;font-family:var(--cond);font-size:11px;font-weight:800;letter-spacing:.04em;text-transform:uppercase;white-space:nowrap;line-height:1.4}
+.tbadge.illus{background:#a777ff;color:#1a0b3a}
+.tbadge.sim{background:#2fd17c;color:#0f2a1b}
+.artlegend b.tbadge{margin-right:4px}

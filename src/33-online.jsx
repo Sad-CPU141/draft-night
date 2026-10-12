@@ -271,7 +271,7 @@ function TvTopics({ topics, browse, onExit, code, players }) {
       <FolderBrowser topics={built} q={browse.q || ''} folder={browse.folder || null} setFolder={noop} view={browse.view === 'favs' ? 'popular' : browse.view || 'folders'} setView={noop} prefs={{ fav: [], pin: [] }} renderTopic={(t) => (
         <div className="tcard">
           <span className="em">{t.emoji || '🎲'}</span>
-          <span className="meta"><span className="name">{t.name}<ArtTag t={t} /></span><span className="sub">{t.items.length} items · {t.slots.length} slots{maxPlayersFor(t) < MAX_MANAGERS ? ' · 👥 up to ' + Math.max(2, maxPlayersFor(t)) + ' players' : ''}{hasBattle(t) ? ' · ' + battleKind(t).emoji + ' battles' : isFootball(t) ? ' · ⚽ matches' : ''}</span></span>
+          <span className="meta"><span className="name">{t.name}<ArtTag t={t} /></span><span className="sub">{t.items.length} items · {t.slots.length} slots{maxPlayersFor(t) < MAX_MANAGERS ? ' · 👥 up to ' + Math.max(2, maxPlayersFor(t)) + ' players' : ''}</span></span>
         </div>
       )} />
       <p className="hint">The host’s own topics only show on their phone.</p>
