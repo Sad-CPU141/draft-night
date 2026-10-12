@@ -1,4 +1,4 @@
-/* Draft Night a83da5e5c1 — built from src/ by build.js. Edit src/, not this file. */
+/* Draft Night d0223747d5 — built from src/ by build.js. Edit src/, not this file. */
 "use strict";
 (function(){
 function _extends() { return _extends = Object.assign ? Object.assign.bind() : function (n) { for (var e = 1; e < arguments.length; e++) { var t = arguments[e]; for (var r in t) ({}).hasOwnProperty.call(t, r) && (n[r] = t[r]); } return n; }, _extends.apply(null, arguments); }
@@ -22958,6 +22958,42 @@ function lum(hex) {
   return 0.2126 * v[0] + 0.7152 * v[1] + 0.0722 * v[2];
 }
 const artOf = topic => topic && topic.art || (topic && topic.layout === 'pitch' ? 'kit' : 'emoji');
+function artKind(t) {
+  const art = artOf(t);
+  if (sceneOf(t)) {
+    const drawn = t.items.filter(i => sceneHasArt(t, i)).length;
+    return drawn >= t.items.length ? 'drawn' : drawn ? 'mixed' : 'emoji';
+  }
+  if (art === 'kit') return 'drawn';
+  if (t.photos) return 'photo';
+  return 'emoji';
+}
+const ART_TAGS = {
+  drawn: ['🎨 Drawn', 'every item is illustrated'],
+  mixed: ['🎨 + 😀 Drawn & emojis', 'some drawn, the rest emojis'],
+  photo: ['📷 Photos', 'real photos (emoji if one can’t load)'],
+  emoji: ['😀 Emojis', 'emoji pictures']
+};
+function ArtTag({
+  t
+}) {
+  const k = artKind(t);
+  const [label, title] = ART_TAGS[k];
+  return React.createElement("span", {
+    className: 'arttag ' + k,
+    title: title
+  }, label);
+}
+function ArtLegend() {
+  return React.createElement("p", {
+    className: "hint artlegend",
+    style: {
+      margin: 0
+    }
+  }, Object.values(ART_TAGS).map(([l, ti]) => React.createElement("span", {
+    key: l
+  }, React.createElement("b", null, l), " = ", ti)));
+}
 function imageSources(item, topic, wikiUrl) {
   const out = [];
   if (item.photo) out.push({
@@ -24175,7 +24211,9 @@ function TopicsList({
       className: "name"
     }, t.name, !isBuiltIn(t) && React.createElement("span", {
       className: "yours"
-    }, "Yours")), React.createElement("span", {
+    }, "Yours"), React.createElement(ArtTag, {
+      t: t
+    })), React.createElement("span", {
       className: "sub"
     }, t.items.length, " items \xB7 ", t.slots.join(', '), maxPlayersFor(t) < MAX_MANAGERS ? ' · 👥 best for up to ' + Math.max(2, maxPlayersFor(t)) : '')), React.createElement("span", {
       className: "muted",
@@ -25747,10 +25785,22 @@ function SetupTopic({
   folder,
   setFolder,
   prefs,
-  setPrefs
+  setPrefs,
+  onBrowse
 }) {
   const [q, setQ] = useState('');
   const [view, setView] = useState('folders');
+  const browseRef = useRef(onBrowse);
+  browseRef.current = onBrowse;
+  useEffect(() => {
+    if (!browseRef.current) return undefined;
+    const t = setTimeout(() => browseRef.current && browseRef.current({
+      view,
+      folder: folder || null,
+      q: q.trim().slice(0, 40)
+    }), q ? 350 : 0);
+    return () => clearTimeout(t);
+  }, [view, folder, q]);
   const random = () => {
     const playable = t => t.items.length && t.slots.length;
     const p = prefs || {
@@ -25769,7 +25819,7 @@ function SetupTopic({
   }, "What are we drafting?"), React.createElement(TopicSearch, {
     q: q,
     setQ: setQ
-  }), React.createElement(FolderBrowser, {
+  }), React.createElement(ArtLegend, null), React.createElement(FolderBrowser, {
     topics: topics,
     q: q,
     folder: folder,
@@ -25795,7 +25845,9 @@ function SetupTopic({
       className: "name"
     }, t.name, !isBuiltIn(t) && React.createElement("span", {
       className: "yours"
-    }, "Yours")), React.createElement("span", {
+    }, "Yours"), React.createElement(ArtTag, {
+      t: t
+    })), React.createElement("span", {
       className: "sub"
     }, t.items.length, " items \xB7 ", t.slots.length, " slots", maxPlayersFor(t) < MAX_MANAGERS ? ' · 👥 up to ' + Math.max(2, maxPlayersFor(t)) + ' players' : '')), React.createElement("span", {
       className: "muted",
@@ -31785,6 +31837,7 @@ if (window.__DN_TEST__) window.__DN = {
     skipChip
   },
   topicsLib: {
+    artKind,
     maxPlayersFor,
     POPULARITY,
     popScore,
@@ -34538,7 +34591,18 @@ function OnlineHome({
     title: "Online"
   }), React.createElement("h2", {
     className: "display"
-  }, "Play on your own phones"), typeof navigator !== 'undefined' && navigator.onLine === false && React.createElement("p", {
+  }, "Play on your own phones"), initialCode && cleanCode(initialCode).length === 5 && React.createElement("div", {
+    className: "card stack-sm joincard"
+  }, React.createElement("b", null, "\uD83D\uDCF7 Joining room ", cleanCode(initialCode)), React.createElement("p", {
+    className: "small muted",
+    style: {
+      margin: 0
+    }
+  }, name ? 'Ready when you are.' : 'Type your name below, then tap Join.'), React.createElement("button", {
+    className: "btn btn-gold",
+    disabled: !name,
+    onClick: () => onJoin(cleanCode(initialCode))
+  }, "Join room ", cleanCode(initialCode))), typeof navigator !== 'undefined' && navigator.onLine === false && React.createElement("p", {
     className: "warn"
   }, "This device is offline. Online rooms need an internet connection; Solo and Local work offline."), React.createElement("p", {
     className: "muted",
@@ -34730,12 +34794,55 @@ function initialLobby(topic, rules) {
     } : rules
   };
 }
+function QrCode({
+  text,
+  size = 180,
+  label
+}) {
+  const path = useMemo(() => {
+    if (typeof qrcode === 'undefined' || !text) return null;
+    try {
+      const q = qrcode(0, 'M');
+      q.addData(text);
+      q.make();
+      const n = q.getModuleCount();
+      let p = '';
+      for (let r = 0; r < n; r++) for (let c = 0; c < n; c++) if (q.isDark(r, c)) p += 'M' + (c + 4) + ' ' + (r + 4) + 'h1v1h-1z';
+      return {
+        p,
+        n: n + 8
+      };
+    } catch (e) {
+      return null;
+    }
+  }, [text]);
+  if (!path) return null;
+  return React.createElement("svg", {
+    className: "qr",
+    width: size,
+    height: size,
+    viewBox: '0 0 ' + path.n + ' ' + path.n,
+    role: "img",
+    "aria-label": label || 'QR code',
+    shapeRendering: "crispEdges"
+  }, React.createElement("rect", {
+    width: path.n,
+    height: path.n,
+    fill: "#fff",
+    rx: "2"
+  }), React.createElement("path", {
+    d: path.p,
+    fill: "#000"
+  }));
+}
+const roomLink = code => location.origin + location.pathname + '#room=' + code;
 function RoomCode({
   code,
   big
 }) {
-  const link = location.origin + location.pathname + '#room=' + code;
+  const link = roomLink(code);
   const [msg, setMsg] = useState('');
+  const [qr, setQr] = useState(false);
   const share = async () => {
     try {
       if (navigator.share) {
@@ -34763,12 +34870,33 @@ function RoomCode({
   }, "Room code"), React.createElement("b", {
     className: "num",
     "aria-label": 'Room code ' + code.split('').join(' ')
-  }, code), big ? React.createElement("span", {
+  }, code), big ? React.createElement(React.Fragment, null, React.createElement(QrCode, {
+    text: link,
+    size: 240,
+    label: 'QR code to join room ' + code
+  }), React.createElement("span", {
     className: "small"
-  }, "Open ", location.host, location.pathname.replace(/index\.html$/, ''), " \u2192 Online \u2192 enter the code") : React.createElement("button", {
+  }, "\uD83D\uDCF7 Scan with your phone camera to join \u2014 or open ", location.host, location.pathname.replace(/index\.html$/, ''), " \u2192 Online \u2192 enter the code")) : React.createElement(React.Fragment, null, React.createElement("div", {
+    className: "row",
+    style: {
+      justifyContent: 'center',
+      gap: 8,
+      flexWrap: 'wrap'
+    }
+  }, React.createElement("button", {
+    className: "btn btn-sm",
+    onClick: () => setQr(!qr),
+    "aria-expanded": qr
+  }, qr ? 'Hide QR code' : '📷 Show QR code'), React.createElement("button", {
     className: "btn btn-sm",
     onClick: share
-  }, "Share invite link"), msg && React.createElement("span", {
+  }, "Share invite link")), qr && React.createElement(React.Fragment, null, React.createElement(QrCode, {
+    text: link,
+    size: 220,
+    label: 'QR code to join room ' + code
+  }), React.createElement("span", {
+    className: "small"
+  }, "Friends scan this with their phone camera to join this room."))), msg && React.createElement("span", {
     className: "small muted",
     style: {
       overflowWrap: 'anywhere'
@@ -34858,20 +34986,33 @@ function Lobby({
     className: "muted"
   }, "Setting up the room\u2026"));
   const topicObj = cfg.topic ? unpackTopic(cfg.topic).topic : null;
+  const stopBrowse = () => {
+    set({
+      browse: null
+    });
+    setView('lobby');
+  };
   if (isHost && view === 'topic') return React.createElement(SetupTopic, {
     topics: topics,
     folder: folder,
     setFolder: setFolder,
     prefs: topicPrefs,
     setPrefs: setTopicPrefs,
-    onBack: () => setView('lobby'),
-    onTopics: () => setView('lobby'),
+    onBack: stopBrowse,
+    onTopics: stopBrowse,
+    onBrowse: b => {
+      const cur = cfg.browse || {};
+      if (cur.view !== b.view || cur.folder !== b.folder || cur.q !== b.q) set({
+        browse: b
+      });
+    },
     onPick: id => {
       const t = topics.find(x => x.id === id);
       set({
         topic: packTopic(onlineTopic(t), false),
         topicName: t.name,
         topicEmoji: t.emoji,
+        browse: null,
         rules: {
           ...cfg.rules,
           ...twistRules(cfg.rules),
@@ -34926,6 +35067,13 @@ function Lobby({
     trades: 'Trades'
   })[k]);
   const fin = r.finale && r.finale.mode || 'vote';
+  if (tv && cfg.browse) return React.createElement(TvTopics, {
+    topics: topics,
+    browse: cfg.browse,
+    onExit: tvView ? () => setTvView(false) : null,
+    code: room.code,
+    players: players
+  });
   if (tv) return React.createElement("div", {
     className: "app tvlobby"
   }, React.createElement(TvExit, {
@@ -35124,7 +35272,12 @@ function Lobby({
     onThisScreen: () => setTvView(true)
   })) : React.createElement(React.Fragment, null, React.createElement("div", {
     className: "card stack-sm"
-  }, React.createElement("h3", null, cfg.topicEmoji, " ", cfg.topicName || 'The host is picking a topic'), React.createElement("p", {
+  }, React.createElement("h3", null, cfg.topicEmoji, " ", cfg.topicName || 'The host is picking a topic'), cfg.browse && React.createElement("p", {
+    className: "small",
+    style: {
+      margin: 0
+    }
+  }, "\uD83D\uDC40 The host is looking at ", cfg.browse.q ? 'topics matching “' + cfg.browse.q + '”' : cfg.browse.folder ? folderEmoji(cfg.browse.folder) + ' ' + cfg.browse.folder : cfg.browse.view === 'popular' ? 'the most popular topics' : 'the topic folders', tvs.length ? ' — it’s on the TV' : '', "."), React.createElement("p", {
     className: "small muted",
     style: {
       margin: 0
@@ -35156,6 +35309,64 @@ function Lobby({
       textAlign: 'center'
     }
   }, "Waiting for the host to start\u2026")));
+}
+function TvTopics({
+  topics,
+  browse,
+  onExit,
+  code,
+  players
+}) {
+  const noop = () => {};
+  const built = topics.filter(isBuiltIn);
+  const what = browse.q ? 'Searching “' + browse.q + '”' : browse.folder ? folderEmoji(browse.folder) + ' ' + browse.folder : browse.view === 'popular' ? '🔥 Most popular' : browse.view === 'favs' ? '⭐ Host’s favourites' : '📁 All folders';
+  return React.createElement("div", {
+    className: "app tvlobby tvtopics"
+  }, React.createElement(TvExit, {
+    onExit: onExit
+  }), React.createElement("div", {
+    className: "row tvtopics-head"
+  }, React.createElement("div", {
+    className: "grow"
+  }, React.createElement("p", {
+    className: "eyebrow"
+  }, "Room ", code, " \xB7 ", players.filter(p => p.online).length, " in"), React.createElement("h2", {
+    className: "display",
+    style: {
+      margin: 0
+    }
+  }, "\uD83C\uDFB2 Pick a topic"), React.createElement("p", {
+    className: "small muted",
+    style: {
+      margin: 0
+    }
+  }, "The host is choosing on their phone \xB7 ", what, ". Shout out what you want!"))), React.createElement(ArtLegend, null), React.createElement(FolderBrowser, {
+    topics: built,
+    q: browse.q || '',
+    folder: browse.folder || null,
+    setFolder: noop,
+    view: browse.view === 'favs' ? 'popular' : browse.view || 'folders',
+    setView: noop,
+    prefs: {
+      fav: [],
+      pin: []
+    },
+    renderTopic: t => React.createElement("div", {
+      className: "tcard"
+    }, React.createElement("span", {
+      className: "em"
+    }, t.emoji || '🎲'), React.createElement("span", {
+      className: "meta"
+    }, React.createElement("span", {
+      className: "name"
+    }, t.name, React.createElement(ArtTag, {
+      t: t
+    })), React.createElement("span", {
+      className: "sub"
+    }, t.items.length, " items \xB7 ", t.slots.length, " slots", maxPlayersFor(t) < MAX_MANAGERS ? ' · 👥 up to ' + Math.max(2, maxPlayersFor(t)) + ' players' : '', hasBattle(t) ? ' · ' + battleKind(t).emoji + ' battles' : isFootball(t) ? ' · ⚽ matches' : '')))
+  }), React.createElement("p", {
+    className: "hint"
+  }, "The host\u2019s own topics only show on their phone."));
 }
 function RoomGame({
   room,

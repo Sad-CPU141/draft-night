@@ -41,6 +41,17 @@ function kitNumber(item) {
 function lum(hex) { const h = hex.replace('#', ''); const v = [0, 2, 4].map((i) => parseInt(h.slice(i, i + 2), 16) / 255); return 0.2126 * v[0] + 0.7152 * v[1] + 0.0722 * v[2]; }
 // What kind of picture a topic uses. Older saved topics without the field get a sensible default.
 const artOf = (topic) => (topic && topic.art) || (topic && topic.layout === 'pitch' ? 'kit' : 'emoji');
+// What pictures a topic uses, for the tag on its card: drawn, photos, emojis, or drawn + emojis.
+function artKind(t) {
+  const art = artOf(t);
+  if (sceneOf(t)) { const drawn = t.items.filter((i) => sceneHasArt(t, i)).length; return drawn >= t.items.length ? 'drawn' : drawn ? 'mixed' : 'emoji'; }
+  if (art === 'kit') return 'drawn';
+  if (t.photos) return 'photo';
+  return 'emoji';
+}
+const ART_TAGS = { drawn: ['🎨 Drawn', 'every item is illustrated'], mixed: ['🎨 + 😀 Drawn & emojis', 'some drawn, the rest emojis'], photo: ['📷 Photos', 'real photos (emoji if one can’t load)'], emoji: ['😀 Emojis', 'emoji pictures'] };
+function ArtTag({ t }) { const k = artKind(t); const [label, title] = ART_TAGS[k]; return <span className={'arttag ' + k} title={title}>{label}</span>; }
+function ArtLegend() { return <p className="hint artlegend" style={{ margin: 0 }}>{Object.values(ART_TAGS).map(([l, ti]) => <span key={l}><b>{l}</b> = {ti}</span>)}</p>; }
 
 // Picture priority: uploaded photo → image link → Wikipedia photo → jersey/emoji.
 // Any source that fails to load drops to the next one.
@@ -615,7 +626,7 @@ function TopicsList({ topics, onBack, onOpen, onCreate, onDuplicate, onDelete, f
         <div key={t.id} className="card stack-sm" style={{ padding: 12 }}>
           <button className="tcard" style={{ border: 0, padding: 0, background: 'none' }} onClick={() => onOpen(t.id)}>
             <span className="em">{t.emoji || '🎲'}</span>
-            <span className="meta"><span className="name">{t.name}{!isBuiltIn(t) && <span className="yours">Yours</span>}</span><span className="sub">{t.items.length} items · {t.slots.join(', ')}{maxPlayersFor(t) < MAX_MANAGERS ? ' · 👥 best for up to ' + Math.max(2, maxPlayersFor(t)) : ''}</span></span>
+            <span className="meta"><span className="name">{t.name}{!isBuiltIn(t) && <span className="yours">Yours</span>}<ArtTag t={t} /></span><span className="sub">{t.items.length} items · {t.slots.join(', ')}{maxPlayersFor(t) < MAX_MANAGERS ? ' · 👥 best for up to ' + Math.max(2, maxPlayersFor(t)) : ''}</span></span>
             <span className="muted" style={{ fontSize: 22 }}>›</span>
           </button>
           <div className="row">
@@ -1129,9 +1140,16 @@ function FolderBrowser({ topics, q, folder, setFolder, renderTopic, prefs: prefs
   );
 }
 
-function SetupTopic({ topics, onBack, onPick, onTopics, folder, setFolder, prefs, setPrefs }) {
+function SetupTopic({ topics, onBack, onPick, onTopics, folder, setFolder, prefs, setPrefs, onBrowse }) {
   const [q, setQ] = useState('');
   const [view, setView] = useState('folders');
+  // Online: tell the room what the host is looking at, so the TV can show the same topics.
+  const browseRef = useRef(onBrowse); browseRef.current = onBrowse;
+  useEffect(() => {
+    if (!browseRef.current) return undefined;
+    const t = setTimeout(() => browseRef.current && browseRef.current({ view, folder: folder || null, q: q.trim().slice(0, 40) }), q ? 350 : 0);
+    return () => clearTimeout(t);
+  }, [view, folder, q]);
   // 🎲 Random: any playable topic from what you're looking at (a folder, Popular or Favourites).
   const random = () => {
     const playable = (t) => t.items.length && t.slots.length;
@@ -1144,10 +1162,11 @@ function SetupTopic({ topics, onBack, onPick, onTopics, folder, setFolder, prefs
       <TopBar onBack={folder && !q ? () => setFolder(null) : onBack} title="2 · Topic" />
       <h2 className="display">What are we drafting?</h2>
       <TopicSearch q={q} setQ={setQ} />
+      <ArtLegend />
       <FolderBrowser topics={topics} q={q} folder={folder} setFolder={setFolder} prefs={prefs} setPrefs={setPrefs} view={view} setView={setView} onRandom={random} renderTopic={(t) => (
         <button key={t.id} className="tcard" onClick={() => onPick(t.id)} disabled={!t.items.length || !t.slots.length} style={{ opacity: t.items.length ? 1 : 0.4 }}>
           <span className="em">{t.emoji || '🎲'}</span>
-          <span className="meta"><span className="name">{t.name}{!isBuiltIn(t) && <span className="yours">Yours</span>}</span><span className="sub">{t.items.length} items · {t.slots.length} slots{maxPlayersFor(t) < MAX_MANAGERS ? ' · 👥 up to ' + Math.max(2, maxPlayersFor(t)) + ' players' : ''}</span></span>
+          <span className="meta"><span className="name">{t.name}{!isBuiltIn(t) && <span className="yours">Yours</span>}<ArtTag t={t} /></span><span className="sub">{t.items.length} items · {t.slots.length} slots{maxPlayersFor(t) < MAX_MANAGERS ? ' · 👥 up to ' + Math.max(2, maxPlayersFor(t)) + ' players' : ''}</span></span>
           <span className="muted" style={{ fontSize: 22 }}>›</span>
         </button>
       )} />
@@ -3394,7 +3413,7 @@ class Boundary extends React.Component {
   }
 }
 
-if (window.__DN_TEST__) window.__DN = { finale: { simulateBattle, hasBattle, battleKind, BATTLE_KINDS, eraOf, eraWord, buildBracket, advanceBracket, nextMatchup, matchVoters, canVoteFor, decideMatchup, simulateMatch, playerRating, teamRating, matchupVoteBot, finaleMode, isFootball, startFinale, castMatchVote, botMatchVotes, playMatchup, resolveMatchup, getMatchup, needsVote, needsMatch, votingDone, finaleStandings, finaleRecord, championStory, goldenBoot, matchVoteProblem, roundName, FINALE_DEFAULTS, validRating, matchScript, revealedEvents, matchFrame, lineupOf, expectedGoals, strength2, squad }, audio, AUDIO_DEFAULTS, share: { encodeTopic, decodeShared, packTopic, unpackTopic, topicCode, shareLink, MAX_LINK }, stats: { careerStats, computeAwards, computeShame, hallOfShame, humanPlayers }, bots: { makeBots, nextBotAction, botDecision, botFreePickChoice, botVote, teamScore, voteChoices, itemFame, seeded, BOT_LEVELS, BOT_TYPES, botCardPlay, botVeto, botNominate, botTradeDecision, botTradeOffer }, twists: { twistRules, TWIST_DEFAULTS, playCard, answerCard, cardProblem, doubleProblem, nominate, currentNominator, nominationPool, botActors, botAdvisers, participants, visibleItem, isHidden, rarityOf, frozenNow, proposeTrade, acceptTrade, rejectTrade, cancelTrade, closeTrades, tradeProblem, openTrades, hasCard }, auction: { withdraw, isOut, auctionEnd, owesBid, withdrawProblem, outIds, owing, botPassers, botForcedBid, runAction, ownerInfo, migrateSettings, rulesLines }, scenes: { SCENES, sceneOf, placeScene, sceneKey, SceneCanvas, SceneView, sceneHasArt }, skips: { SKIP_DEFAULTS, skipCfg, skipRulesOn, presenter, skipVerdict, eligibleFor, endgameNow, endgameSoon, chooseForced, autoChooseForced, presenterLine, botSkipSave, botForcedChoice, unsoldOutcome, skipChip }, topicsLib: { maxPlayersFor, POPULARITY, popScore, byPopularity, folderOrder, favouritesOrder, prefsOf, isBuiltIn, folderOf, folderList, matchTopic, toggleIn }, DEFAULT_SOLO, isFlex, canBid, createDraft, placeBid, sell, skipItem, undo, freePick, currentPicker, canTake, nextAmount, isDraftOver, draftStats, winsBoard, tally, starterTopics, migrateTopics, validateBackup, makeBackup, wikiTitleFor, PHOTO_TOPICS, store, wiki, DEFAULT_RULES, COLORS, emptyCount, assignSlot, maxBid };
+if (window.__DN_TEST__) window.__DN = { finale: { simulateBattle, hasBattle, battleKind, BATTLE_KINDS, eraOf, eraWord, buildBracket, advanceBracket, nextMatchup, matchVoters, canVoteFor, decideMatchup, simulateMatch, playerRating, teamRating, matchupVoteBot, finaleMode, isFootball, startFinale, castMatchVote, botMatchVotes, playMatchup, resolveMatchup, getMatchup, needsVote, needsMatch, votingDone, finaleStandings, finaleRecord, championStory, goldenBoot, matchVoteProblem, roundName, FINALE_DEFAULTS, validRating, matchScript, revealedEvents, matchFrame, lineupOf, expectedGoals, strength2, squad }, audio, AUDIO_DEFAULTS, share: { encodeTopic, decodeShared, packTopic, unpackTopic, topicCode, shareLink, MAX_LINK }, stats: { careerStats, computeAwards, computeShame, hallOfShame, humanPlayers }, bots: { makeBots, nextBotAction, botDecision, botFreePickChoice, botVote, teamScore, voteChoices, itemFame, seeded, BOT_LEVELS, BOT_TYPES, botCardPlay, botVeto, botNominate, botTradeDecision, botTradeOffer }, twists: { twistRules, TWIST_DEFAULTS, playCard, answerCard, cardProblem, doubleProblem, nominate, currentNominator, nominationPool, botActors, botAdvisers, participants, visibleItem, isHidden, rarityOf, frozenNow, proposeTrade, acceptTrade, rejectTrade, cancelTrade, closeTrades, tradeProblem, openTrades, hasCard }, auction: { withdraw, isOut, auctionEnd, owesBid, withdrawProblem, outIds, owing, botPassers, botForcedBid, runAction, ownerInfo, migrateSettings, rulesLines }, scenes: { SCENES, sceneOf, placeScene, sceneKey, SceneCanvas, SceneView, sceneHasArt }, skips: { SKIP_DEFAULTS, skipCfg, skipRulesOn, presenter, skipVerdict, eligibleFor, endgameNow, endgameSoon, chooseForced, autoChooseForced, presenterLine, botSkipSave, botForcedChoice, unsoldOutcome, skipChip }, topicsLib: { artKind, maxPlayersFor, POPULARITY, popScore, byPopularity, folderOrder, favouritesOrder, prefsOf, isBuiltIn, folderOf, folderList, matchTopic, toggleIn }, DEFAULT_SOLO, isFlex, canBid, createDraft, placeBid, sell, skipItem, undo, freePick, currentPicker, canTake, nextAmount, isDraftOver, draftStats, winsBoard, tally, starterTopics, migrateTopics, validateBackup, makeBackup, wikiTitleFor, PHOTO_TOPICS, store, wiki, DEFAULT_RULES, COLORS, emptyCount, assignSlot, maxBid };
 store.init().finally(() => {
   ReactDOM.createRoot(document.getElementById('root')).render(<Boundary><App /></Boundary>);
 });

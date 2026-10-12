@@ -51,6 +51,22 @@ module.exports = async function onlineTests({ ok, boot, btn, click, sleep }) {
   ok(/Players · 3/.test(text(H)) && /Alice/.test(text(H)) && /Bob/.test(text(H)) && /TV connected/.test(text(H)), 'host sees Alice and Bob join, and the TV connected');
   ok(/Waiting for the host to start/.test(text(A)) && !btn(A.d, 'Start the draft'), 'players wait in the lobby; only the host can start');
   ok(!!T.d.querySelector('.tvlobby .roomcode.big') && /Alice/.test(text(T)), 'TV shows the big room code and who has joined');
+  const tvQr = T.d.querySelector('.tvlobby .roomcode.big svg.qr path');
+  ok(!!tvQr && tvQr.getAttribute('d').length > 500 && /Scan with your phone camera/.test(text(T)), 'TV shows a QR code people can scan to join');
+  await click(H.w, btn(H.d, 'Show QR code'));
+  ok(!!H.d.querySelector('.roomcode svg.qr') && H.d.querySelector('.roomcode svg.qr').getAttribute('aria-label').includes(code), 'the host can show a QR code on their phone too');
+  {
+    // Scanning the QR opens the room link: the code is filled in and a big Join button is waiting.
+    const J = await boot({ idb: false, speed: 0.02, fb: server.client({ uid: 'scanner' }), url: 'https://sad-cpu141.github.io/draft-night/#room=' + code });
+    await until(() => /Joining room/.test(J.d.body.textContent));
+    ok(/Joining room/.test(J.d.body.textContent) && J.d.querySelector('#on-code').value === code, 'opening the scanned link lands on Online with the room code filled in');
+    await setVal({ w: J.w }, J.d.querySelector('#on-name'), 'Sam');
+    await click(J.w, btn(J.d, 'Join room ' + code));
+    ok(await until(() => /Players · 4/.test(text(H)) && /Sam/.test(text(H))), 'one tap on “Join room” puts them in the same room');
+    await click(H.w, H.d.querySelector('[aria-label="Remove Sam"]'));
+    await until(() => /Players · 3/.test(text(H)));
+    J.w.close();
+  }
   const bad = await phone('mallory');
   await click(bad.w, btn(bad.d, 'Online'));
   await setVal(bad, bad.d.querySelector('#on-name'), 'Mal');
@@ -69,11 +85,18 @@ module.exports = async function onlineTests({ ok, boot, btn, click, sleep }) {
   // Host picks one of the new topics from their Favourites tab in the lobby; it syncs to everyone.
   const rivers = DN.starterTopics().find((t) => t.id === 't-rivers');
   await click(H.w, H.d.querySelector('.tcard'));
+  ok(await until(() => T.d.querySelector('.tvtopics') && /Pick a topic/.test(text(T))), 'when the host opens the topic list, the TV shows the topics too');
+  await click(H.w, [...H.d.querySelectorAll('.folder')].find((b) => b.querySelector('.fn').textContent === 'Animals'));
+  ok(await until(() => /Animal Fight Squad/.test(text(T)) && /Animals/.test(T.d.querySelector('.tvtopics-head').textContent)), 'opening a folder on the host phone shows that folder on the TV');
+  ok(await until(() => /The host is looking at/.test(text(A)) && /Animals/.test(text(A))), 'players’ phones say what the host is looking at');
+  ok(!!T.d.querySelector('.tvtopics .arttag'), 'TV topic cards show their picture tag (drawn / photos / emojis)');
+  await click(H.w, H.d.querySelector('.iconbtn[aria-label="All folders"]'));
   await click(H.w, [...H.d.querySelectorAll('.ttab')].find((b) => /Favourites/.test(b.textContent)));
   const favCard = [...H.d.querySelectorAll('.tcard')].find((b) => b.textContent.includes(rivers.name));
   ok(!!favCard && H.d.querySelectorAll('.trow2').length === 1, 'online lobby: the host’s Favourites tab shows their starred topic');
   await click(H.w, favCard);
   ok(await until(() => text(A).includes(rivers.name) && text(B).includes(rivers.name)), 'a new built-in topic picked in the lobby syncs to every phone (' + rivers.name + ')');
+  ok(await until(() => !T.d.querySelector('.tvtopics') && T.d.querySelector('.tvlobby')), 'once the host picks, the TV goes back to the lobby screen');
   const roomJson = JSON.stringify(roomData(code));
   ok(!/topicPrefs|t-lakes/.test(roomJson) && !roomJson.includes('"fav"'), 'favourites and pins are never written to the online room');
   const prefsA = (A.DN.store.get('dn_settings_v1', {}) || {}).topicPrefs;

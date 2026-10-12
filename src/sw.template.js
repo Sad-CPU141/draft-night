@@ -4,7 +4,7 @@
 const VERSION = '__VERSION__';
 const CACHE = 'draft-night-' + VERSION;
 const CORE = ['./', './index.html', './app.js?v=' + VERSION, './styles.css?v=' + VERSION, './manifest.webmanifest',
-  './vendor/react.production.min.js', './vendor/react-dom.production.min.js', './vendor/html2canvas.min.js',
+  './vendor/react.production.min.js', './vendor/react-dom.production.min.js', './vendor/html2canvas.min.js', './vendor/qrcode.js',
   './icons/icon-192.png', './icons/icon-512.png', './icons/apple-touch-icon.png'];
 
 self.addEventListener('install', (e) => {

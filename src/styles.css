@@ -588,3 +588,20 @@ html[data-motion="reduce"] *,html[data-motion="reduce"] *::before,html[data-moti
 @keyframes fightR{0%{transform:translateX(60%);opacity:0}100%{transform:none;opacity:1}}
 @keyframes clash{0%{transform:scale(1)}40%{transform:scale(1.8) rotate(-12deg)}100%{transform:scale(1)}}
 [data-motion="reduce"] .duel *{animation:none!important;transition:none!important}
+
+/* Picture tags on topic cards */
+.arttag{display:inline-block;margin-left:6px;padding:1px 7px;border-radius:999px;font-family:var(--cond);font-size:11px;font-weight:800;letter-spacing:.03em;vertical-align:middle;white-space:nowrap;background:var(--panel2);color:var(--muted);border:1px solid var(--line)}
+.arttag.drawn{background:#3b2a6e;color:#e9dcff;border-color:#7e62d6}
+.arttag.mixed{background:#33305f;color:#dcd4ff;border-color:#6a5fc0}
+.arttag.photo{background:#173c4a;color:#c9f1ff;border-color:#3b8aa6}
+.artlegend{display:flex;flex-wrap:wrap;gap:4px 12px;font-size:12px}
+/* QR codes for joining a room */
+.qr{display:block;max-width:100%;height:auto;border-radius:10px;box-shadow:0 0 0 6px #fff}
+.roomcode.big .qr{width:min(32vh,300px);height:auto}
+.joincard{border-color:var(--gold)}
+/* TV: the host is choosing a topic */
+.tvtopics .tcard{pointer-events:none}
+.tvtopics .tmarks{display:none}
+.tvtopics .stack-sm{display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:10px;align-items:start}
+.tvtopics .stack-sm>.tabs,.tvtopics .stack-sm>.row,.tvtopics .stack-sm>p,.tvtopics .stack-sm>h3,.tvtopics .stack-sm>.foldergrid{grid-column:1/-1}
+.tvtopics .trow2 .tcard{background:var(--panel);border:2px solid var(--line);border-radius:16px;padding:10px;width:100%}

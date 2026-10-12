@@ -1,10 +1,10 @@
 /* Draft Night service worker.
    App files: network first, so new versions always win when online; cached copy when offline.
    Libraries, icons, fonts: cache first. Wikipedia images are left to the browser cache. */
-const VERSION = 'a83da5e5c1';
+const VERSION = 'd0223747d5';
 const CACHE = 'draft-night-' + VERSION;
 const CORE = ['./', './index.html', './app.js?v=' + VERSION, './styles.css?v=' + VERSION, './manifest.webmanifest',
-  './vendor/react.production.min.js', './vendor/react-dom.production.min.js', './vendor/html2canvas.min.js',
+  './vendor/react.production.min.js', './vendor/react-dom.production.min.js', './vendor/html2canvas.min.js', './vendor/qrcode.js',
   './icons/icon-192.png', './icons/icon-512.png', './icons/apple-touch-icon.png'];
 
 self.addEventListener('install', (e) => {

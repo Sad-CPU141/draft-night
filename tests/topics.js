@@ -26,6 +26,13 @@ module.exports = async function topicTests({ ok, boot, btn, click, sleep }) {
   const dupItems = ts.filter((t) => new Set(t.items.map((i) => i.name.toLowerCase())).size !== t.items.length).map((t) => t.name);
   ok(!dupItems.length, 'no duplicate items inside a topic' + (dupItems.length ? ': ' + dupItems.join(', ') : ''));
   ok(ts.every((t) => t.slots.length && t.items.every((i) => i.name && i.id)), 'every topic has slots and named items');
+  {
+    const K = (id) => L.artKind(ts.find((t) => t.id === id));
+    const kinds = {}; ts.forEach((t) => { const k = L.artKind(t); kinds[k] = (kinds[k] || 0) + 1; });
+    ok(K('t-house') === 'drawn' && K('t-goat') === 'drawn' && K('t-capitals') === 'photo' && K('t-redflags') === 'emoji', 'every topic card is tagged 🎨 Drawn, 📷 Photos, 😀 Emojis or 🎨 + 😀 both (' + Object.entries(kinds).map(([k, n]) => k + ' ' + n).join(', ') + ')');
+    const mixed = { ...ts.find((t) => t.id === 't-house') }; mixed.items = [...mixed.items, { id: 'x1', name: 'Moon Base', emoji: '🌕' }];
+    ok(L.artKind(mixed) === 'mixed', 'a drawn topic with an undrawn item of your own is tagged as drawn + emojis');
+  }
   // Big groups: every topic fills 16 players unless reality caps it (or it waits on scene art).
   const CAPPED = ['t-f1', 't-plclubs', 't-wonder', 't-nbateams', 't-saudi', 't-states', 't-canada', 't-ff', 't-house', 't-backyard', 't-outfit'];
   const small = ts.filter((t) => L.maxPlayersFor(t) < 16 && !CAPPED.includes(t.id)).map((t) => t.id + ' ' + L.maxPlayersFor(t));

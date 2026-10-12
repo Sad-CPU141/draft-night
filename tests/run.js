@@ -39,7 +39,7 @@ async function boot({ idb = true, fetchImpl, storage, speed, url, fakeAudio, com
   if (idb) { const fake = require('fake-indexeddb'); w.indexedDB = fake.indexedDB; w.IDBKeyRange = fake.IDBKeyRange; }
   if (storage) Object.entries(storage).forEach(([k, v]) => w.localStorage.setItem(k, v));
   w.fetch = fetchImpl || (async () => { throw new Error('offline'); });
-  for (const f of ['vendor/react.production.min.js', 'vendor/react-dom.production.min.js', 'app.js']) w.eval(fs.readFileSync(path.join(root, f), 'utf8'));
+  for (const f of ['vendor/react.production.min.js', 'vendor/react-dom.production.min.js', 'vendor/qrcode.js', 'app.js']) w.eval(fs.readFileSync(path.join(root, f), 'utf8'));
   await sleep(150);
   return { dom, w, d: w.document, DN: w.__DN };
 }

@@ -13,6 +13,13 @@ function OnlineHome({ profile, setProfile, last, initialCode, onCreate, onJoin, 
     <div className="app">
       <TopBar onBack={onBack} title="Online" />
       <h2 className="display">Play on your own phones</h2>
+      {initialCode && cleanCode(initialCode).length === 5 && (
+        <div className="card stack-sm joincard">
+          <b>📷 Joining room {cleanCode(initialCode)}</b>
+          <p className="small muted" style={{ margin: 0 }}>{name ? 'Ready when you are.' : 'Type your name below, then tap Join.'}</p>
+          <button className="btn btn-gold" disabled={!name} onClick={() => onJoin(cleanCode(initialCode))}>Join room {cleanCode(initialCode)}</button>
+        </div>
+      )}
       {typeof navigator !== 'undefined' && navigator.onLine === false && <p className="warn">This device is offline. Online rooms need an internet connection; Solo and Local work offline.</p>}
       <p className="muted" style={{ margin: 0 }}>The host makes a room, friends join with the code, and everyone bids from their own phone. A laptop or TV can show the big screen.</p>
       {last && (
@@ -83,9 +90,29 @@ function initialLobby(topic, rules) {
     topic: topic ? packTopic(onlineTopic(topic), false) : null, topicName: topic ? topic.name : '', topicEmoji: topic ? topic.emoji : '', rules: topic ? { ...rules, slots: [...topic.slots] } : rules };
 }
 
+// A QR code drawn as SVG (vendor/qrcode.js, MIT). Scanning it opens the link on the phone.
+function QrCode({ text, size = 180, label }) {
+  const path = useMemo(() => {
+    if (typeof qrcode === 'undefined' || !text) return null;
+    try {
+      const q = qrcode(0, 'M'); q.addData(text); q.make();
+      const n = q.getModuleCount(); let p = '';
+      for (let r = 0; r < n; r++) for (let c = 0; c < n; c++) if (q.isDark(r, c)) p += 'M' + (c + 4) + ' ' + (r + 4) + 'h1v1h-1z';
+      return { p, n: n + 8 };
+    } catch (e) { return null; }
+  }, [text]);
+  if (!path) return null;
+  return (
+    <svg className="qr" width={size} height={size} viewBox={'0 0 ' + path.n + ' ' + path.n} role="img" aria-label={label || 'QR code'} shapeRendering="crispEdges">
+      <rect width={path.n} height={path.n} fill="#fff" rx="2" /><path d={path.p} fill="#000" />
+    </svg>
+  );
+}
+const roomLink = (code) => location.origin + location.pathname + '#room=' + code;
 function RoomCode({ code, big }) {
-  const link = location.origin + location.pathname + '#room=' + code;
+  const link = roomLink(code);
   const [msg, setMsg] = useState('');
+  const [qr, setQr] = useState(false);
   const share = async () => {
     try { if (navigator.share) { await navigator.share({ title: 'Draft Night', text: 'Join my Draft Night room: ' + code, url: link }); return; } } catch (e) { return; }
     try { await navigator.clipboard.writeText(link); setMsg('Link copied.'); } catch (e) { setMsg(link); }
@@ -94,8 +121,16 @@ function RoomCode({ code, big }) {
     <div className={'roomcode' + (big ? ' big' : '')}>
       <span className="eyebrow">Room code</span>
       <b className="num" aria-label={'Room code ' + code.split('').join(' ')}>{code}</b>
-      {big ? <span className="small">Open {location.host}{location.pathname.replace(/index\.html$/, '')} → Online → enter the code</span>
-        : <button className="btn btn-sm" onClick={share}>Share invite link</button>}
+      {big ? <>
+        <QrCode text={link} size={240} label={'QR code to join room ' + code} />
+        <span className="small">📷 Scan with your phone camera to join — or open {location.host}{location.pathname.replace(/index\.html$/, '')} → Online → enter the code</span>
+      </> : <>
+        <div className="row" style={{ justifyContent: 'center', gap: 8, flexWrap: 'wrap' }}>
+          <button className="btn btn-sm" onClick={() => setQr(!qr)} aria-expanded={qr}>{qr ? 'Hide QR code' : '📷 Show QR code'}</button>
+          <button className="btn btn-sm" onClick={share}>Share invite link</button>
+        </div>
+        {qr && <><QrCode text={link} size={220} label={'QR code to join room ' + code} /><span className="small">Friends scan this with their phone camera to join this room.</span></>}
+      </>}
       {msg && <span className="small muted" style={{ overflowWrap: 'anywhere' }}>{msg}</span>}
     </div>
   );
@@ -133,8 +168,10 @@ function Lobby({ room, topics, rulePrefs, onLeave: leaveNow, onStart, tv: tvProp
   const tvs = people.filter((p) => p.kind === 'tv' && p.online);
   if (!cfg) return <div className="app"><TopBar onBack={onLeave} title="Lobby" /><p className="muted">Setting up the room…</p></div>;
   const topicObj = cfg.topic ? unpackTopic(cfg.topic).topic : null;
-  if (isHost && view === 'topic') return <SetupTopic topics={topics} folder={folder} setFolder={setFolder} prefs={topicPrefs} setPrefs={setTopicPrefs} onBack={() => setView('lobby')} onTopics={() => setView('lobby')}
-    onPick={(id) => { const t = topics.find((x) => x.id === id); set({ topic: packTopic(onlineTopic(t), false), topicName: t.name, topicEmoji: t.emoji, rules: { ...cfg.rules, ...twistRules(cfg.rules), slots: [...t.slots] } }); setView('lobby'); }} />;
+  const stopBrowse = () => { set({ browse: null }); setView('lobby'); };
+  if (isHost && view === 'topic') return <SetupTopic topics={topics} folder={folder} setFolder={setFolder} prefs={topicPrefs} setPrefs={setTopicPrefs} onBack={stopBrowse} onTopics={stopBrowse}
+    onBrowse={(b) => { const cur = cfg.browse || {}; if (cur.view !== b.view || cur.folder !== b.folder || cur.q !== b.q) set({ browse: b }); }}
+    onPick={(id) => { const t = topics.find((x) => x.id === id); set({ topic: packTopic(onlineTopic(t), false), topicName: t.name, topicEmoji: t.emoji, browse: null, rules: { ...cfg.rules, ...twistRules(cfg.rules), slots: [...t.slots] } }); setView('lobby'); }} />;
   if (isHost && view === 'rules' && topicObj) {
     const seats = seatsFromLobby(room, cfg);
     return <SetupRules topic={topicObj} managers={seats.length ? seats : [{ id: 'a' }, { id: 'b' }]} rules={cfg.rules} setRules={(r) => set({ rules: r })} onBack={() => setView('lobby')} title="Online · Rules" startLabel="Save rules"
@@ -146,6 +183,7 @@ function Lobby({ room, topics, rulePrefs, onLeave: leaveNow, onStart, tv: tvProp
   const r = cfg.rules || {};
   const twistsOn = ['chaos', 'mystery', 'rarity', 'trades'].filter((k) => r[k] && r[k].on).map((k) => ({ chaos: 'Chaos Cards', mystery: 'Mystery items', rarity: 'Rarity', trades: 'Trades' }[k]));
   const fin = (r.finale && r.finale.mode) || 'vote';
+  if (tv && cfg.browse) return <TvTopics topics={topics} browse={cfg.browse} onExit={tvView ? () => setTvView(false) : null} code={room.code} players={players} />;
   if (tv) return (
     <div className="app tvlobby">
       <TvExit onExit={tvView ? () => setTvView(false) : null} />
@@ -206,6 +244,7 @@ function Lobby({ room, topics, rulePrefs, onLeave: leaveNow, onStart, tv: tvProp
         <>
           <div className="card stack-sm">
             <h3>{cfg.topicEmoji} {cfg.topicName || 'The host is picking a topic'}</h3>
+            {cfg.browse && <p className="small" style={{ margin: 0 }}>👀 The host is looking at {cfg.browse.q ? 'topics matching “' + cfg.browse.q + '”' : cfg.browse.folder ? folderEmoji(cfg.browse.folder) + ' ' + cfg.browse.folder : cfg.browse.view === 'popular' ? 'the most popular topics' : 'the topic folders'}{tvs.length ? ' — it’s on the TV' : ''}.</p>}
             <p className="small muted" style={{ margin: 0 }}>{money(r.budget || 20)} budget · {(r.slots || []).length} slots · {cfg.clock}s bid clock{twistsOn.length ? ' · ' + twistsOn.join(', ') : ''} · winner by {fin === 'vote' ? 'vote' : fin}</p>
             <details><summary className="label">All rules for this room</summary><RulesSummary rules={{ ...RULE_DEFAULTS(), ...r }} opts={{ teams: cfg.teamMode, clock: cfg.clock }} /><p className="hint" style={{ margin: 0 }}>A bot covers a dropped player after {cfg.coverAfter || 60}s. Only the host can change these.</p></details>
             <p className="small muted" style={{ margin: 0 }}>{cfg.teamMode ? cfg.teamCount + ' teams' + (cfg.fillBots ? ', bots fill empty spots' : '') : 'Everyone for themselves' + (cfg.bots ? ' + ' + cfg.bots + ' bot' + (cfg.bots === 1 ? '' : 's') : '')}</p>
@@ -213,6 +252,29 @@ function Lobby({ room, topics, rulePrefs, onLeave: leaveNow, onStart, tv: tvProp
           <p className="muted" style={{ textAlign: 'center' }}>Waiting for the host to start…</p>
         </>
       )}
+    </div>
+  );
+}
+
+// TV: while the host chooses, the big screen shows the same folder / search, so the room can shout out picks.
+function TvTopics({ topics, browse, onExit, code, players }) {
+  const noop = () => {};
+  const built = topics.filter(isBuiltIn);
+  const what = browse.q ? 'Searching “' + browse.q + '”' : browse.folder ? folderEmoji(browse.folder) + ' ' + browse.folder : browse.view === 'popular' ? '🔥 Most popular' : browse.view === 'favs' ? '⭐ Host’s favourites' : '📁 All folders';
+  return (
+    <div className="app tvlobby tvtopics">
+      <TvExit onExit={onExit} />
+      <div className="row tvtopics-head">
+        <div className="grow"><p className="eyebrow">Room {code} · {players.filter((p) => p.online).length} in</p><h2 className="display" style={{ margin: 0 }}>🎲 Pick a topic</h2><p className="small muted" style={{ margin: 0 }}>The host is choosing on their phone · {what}. Shout out what you want!</p></div>
+      </div>
+      <ArtLegend />
+      <FolderBrowser topics={built} q={browse.q || ''} folder={browse.folder || null} setFolder={noop} view={browse.view === 'favs' ? 'popular' : browse.view || 'folders'} setView={noop} prefs={{ fav: [], pin: [] }} renderTopic={(t) => (
+        <div className="tcard">
+          <span className="em">{t.emoji || '🎲'}</span>
+          <span className="meta"><span className="name">{t.name}<ArtTag t={t} /></span><span className="sub">{t.items.length} items · {t.slots.length} slots{maxPlayersFor(t) < MAX_MANAGERS ? ' · 👥 up to ' + Math.max(2, maxPlayersFor(t)) + ' players' : ''}{hasBattle(t) ? ' · ' + battleKind(t).emoji + ' battles' : isFootball(t) ? ' · ⚽ matches' : ''}</span></span>
+        </div>
+      )} />
+      <p className="hint">The host’s own topics only show on their phone.</p>
     </div>
   );
 }
