@@ -186,6 +186,7 @@ function MatchPlayer({ d, A, B, match, speed, commentary, onDone, label }) {
 }
 
 function MatchSummary({ d, A, B, match }) {
+  if (match.v === 'arena') return <ArenaSummary d={d} A={A} B={B} match={match} />;
   if (match.v === 'battle') return <BattleSummary d={d} A={A} B={B} match={match} />;
   const goals = [0, 1].map((k) => match.events.filter((e) => e.type === 'goal' && e.team === k));
   const cards = match.events.filter((e) => e.type === 'yellow' || e.type === 'red');
@@ -379,7 +380,7 @@ function MatchupResult({ d, m, r, final, onNext, host = true }) {
               <b className="num">{Math.round((p * cfg.weight + v * (100 - cfg.weight)))}%</b>
             </div>
           ))}
-          <p className="hint" style={{ margin: 0 }}><span className="key m" /> match {cfg.weight}% · <span className="key v" /> votes {100 - cfg.weight}%. {m.detail}. {m.match.v === 'battle' ? 'Battle share = (rounds won + ½) ÷ (rounds + 1).' : 'Match share = (goals + ½) ÷ (total goals + 1), so a 6–5 isn’t worth more than a 2–1 swing.'}</p>
+          <p className="hint" style={{ margin: 0 }}><span className="key m" /> match {cfg.weight}% · <span className="key v" /> votes {100 - cfg.weight}%. {m.detail}. {isSimResult(m.match) ? 'Battle share = (rounds won + ½) ÷ (rounds + 1).' : 'Match share = (goals + ½) ÷ (total goals + 1), so a 6–5 isn’t worth more than a 2–1 swing.'}</p>
         </div>
       )}
       {m.match && <MatchSummary d={d} A={A} B={B} match={m.match} />}
@@ -420,7 +421,7 @@ function FriendlySheet({ d, onClose }) {
   const cfg = finCfg(d);
   if (teams.length < 2) return <Sheet center onClose={onClose}><h2 className="display" style={{ fontSize: 28 }}>Friendly {battleKind(d.topic) ? 'battle' : 'match'}</h2><p className="hint">You need two teams with players.</p><button className="btn btn-ghost" onClick={onClose}>Close</button></Sheet>;
   const bk = battleKind(d.topic);
-  const play = () => { const k = n + 1; setN(k); const key = 'friendly:' + Date.now() + ':' + k; setGame({ A: teamOf(d, a), B: teamOf(d, b), match: bk ? simulateBattle(d, teamOf(d, a), teamOf(d, b), key) : simulateMatch(d, teamOf(d, a), teamOf(d, b), key, false), k }); };
+  const play = () => { const k = n + 1; setN(k); const key = 'friendly:' + Date.now() + ':' + k; setGame({ A: teamOf(d, a), B: teamOf(d, b), match: bk ? simulateFor(d, teamOf(d, a), teamOf(d, b), key) : simulateMatch(d, teamOf(d, a), teamOf(d, b), key, false), k }); };
   return (
     <Sheet center onClose={onClose}>
       <p className="eyebrow">Exhibition · doesn’t change any result</p>
@@ -748,4 +749,4 @@ function PitchMatch({ d, A, B, match, speed, commentary, onDone, label }) {
   );
 }
 // Old saved matches (before the pitch) keep their text-only replay.
-function MatchView(props) { return props.match && props.match.v === 'battle' ? <BattleView {...props} /> : props.match && props.match.v === 2 ? <PitchMatch {...props} /> : <MatchPlayer {...props} />; }
+function MatchView(props) { return props.match && props.match.v === 'arena' ? <ArenaView {...props} /> : props.match && props.match.v === 'battle' ? <BattleView {...props} /> : props.match && props.match.v === 2 ? <PitchMatch {...props} /> : <MatchPlayer {...props} />; }

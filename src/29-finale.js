@@ -332,7 +332,7 @@ function decideMatchup(d, m, mode, fin) {
   const mt = m.match;
   if (mode === 'sim') {
     const w = mt.winner === 0 ? A : B;
-    if (mt.v === 'battle') return { winner: w.id, why: w.name + ' won the ' + ((BATTLE_KINDS[mt.kind] || BATTLE_KINDS.fight).name).toLowerCase() + ' ' + mt.score[mt.winner] + '–' + mt.score[1 - mt.winner] + (mt.sudden ? ' in sudden death' : '') + '.' };
+    if (isSimResult(mt)) return { winner: w.id, why: w.name + ' won the ' + ((BATTLE_KINDS[mt.kind] || BATTLE_KINDS.fight).name).toLowerCase() + ' ' + mt.score[mt.winner] + '–' + mt.score[1 - mt.winner] + (mt.sudden ? ' in sudden death' : '') + '.' };
     if (mt.pens) return { winner: w.id, why: 'It finished ' + mt.score[0] + '–' + mt.score[1] + ' after extra time; ' + w.name + ' won ' + Math.max(...mt.pens) + '–' + Math.min(...mt.pens) + ' on penalties.' };
     return { winner: w.id, why: w.name + ' won ' + mt.score[mt.winner] + '–' + mt.score[1 - mt.winner] + (mt.et ? ' after extra time' : '') + '.' };
   }
@@ -342,7 +342,7 @@ function decideMatchup(d, m, mode, fin) {
   const voteA = va + vb ? va / (va + vb) : 0.5;
   const total = wMatch * perfA + (1 - wMatch) * voteA;
   const detail = 'Match ' + Math.round(perfA * 100) + '% × ' + Math.round(wMatch * 100) + '% + votes ' + Math.round(voteA * 100) + '% × ' + Math.round((1 - wMatch) * 100) + '% = ' + Math.round(total * 100) + '% for ' + A.name;
-  if (Math.abs(total - 0.5) < 1e-9) { const w = mt.winner === 0 ? A : B; return { winner: w.id, why: 'Dead level on the combined score, so the ' + (mt.v === 'battle' ? 'battle' : 'match') + ' result decides: ' + w.name + (mt.v === 'battle' ? (mt.sudden ? ' won in sudden death.' : ' won the battle.') : mt.pens ? ' on penalties.' : mt.et ? ' after extra time.' : ' won the match.'), detail }; }
+  if (Math.abs(total - 0.5) < 1e-9) { const w = mt.winner === 0 ? A : B; return { winner: w.id, why: 'Dead level on the combined score, so the ' + (isSimResult(mt) ? 'battle' : 'match') + ' result decides: ' + w.name + (isSimResult(mt) ? (mt.sudden ? ' won in sudden death.' : ' won the battle.') : mt.pens ? ' on penalties.' : mt.et ? ' after extra time.' : ' won the match.'), detail }; }
   const w = total > 0.5 ? A : B;
   return { winner: w.id, why: w.name + ' wins on the combined score (' + Math.round((w === A ? total : 1 - total) * 100) + '%).', detail };
 }
@@ -397,7 +397,7 @@ function playMatchup(d, r, i) {
   const m = getMatchup(d, r, i);
   if (!m.a || !m.b || m.match || m.winner) return d;
   const A = teamOf(d, m.a), B = teamOf(d, m.b);
-  if (!isFootball(d.topic)) return withMatchup(d, r, i, { match: simulateBattle(d, A, B, m.id) });
+  if (!isFootball(d.topic)) return withMatchup(d, r, i, { match: simulateFor(d, A, B, m.id) });
   let home = null;
   if (finCfg(d).home) { const ra = teamRating(d, A).rating, rb = teamRating(d, B).rating; home = ra >= rb ? 0 : 1; }
   return withMatchup(d, r, i, { match: simulateMatch(d, A, B, m.id, true, { home }) });

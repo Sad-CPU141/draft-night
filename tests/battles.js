@@ -34,6 +34,21 @@ module.exports = async function battleTests({ ok, boot, btn, click, sleep }) {
   ok(!!f.finale.champion && /battle/.test(F.championStory(f)), 'a full battle bracket crowns a champion (' + F.championStory(f).slice(0, 60) + '…)');
   const cut = F.simulateBattle(fill(T('t-cute'), 2, 'c'), ...fill(T('t-cute'), 2, 'c').managers, 'y');
   ok(cut.kind === 'cute' && cut.duels.every((x) => x.line && !/\{[wl]\}/.test(x.line)), 'each battle style has its own lines (Cuteness Contest), all filled in');
+  {
+    // Step 3: creature topics use the animal arena, driven by stats.
+    const S = DN.simStats;
+    const ar = S.simulateFor(d, A, B, 'ar1');
+    ok(ar.v === 'arena' && JSON.stringify(ar) === JSON.stringify(S.simulateFor(d, A, B, 'ar1')), 'animal topics play in the arena, and a recorded fight replays exactly');
+    ok(ar.rounds.length >= 5 && ar.rounds.slice(0, 4).map((x) => x.arena).join('') === 'LLWA' && ar.score[ar.winner] > ar.score[1 - ar.winner], 'Animal Fight Squad rounds follow its slots (land, land, water, sky) and someone always wins');
+    ok(ar.rounds.every((x) => x.how === 'walkover' || x.events.length >= 2) && ar.rounds.every((x) => ['knockout', 'retreat', 'decision', 'exhaustion', 'walkover'].includes(x.how)), 'every round is a real fight that ends in a knockout, retreat, exhaustion or the judges');
+    const fz = (n, P, Sp, De, W, T, M, hab) => ({ name: n, P, S: Sp, D: De, W, T, M, hab, total: P + Sp + De + W + T + M });
+    const strong = fz('Big', 9, 7, 8, 8, 7, 6, 'L'), weak = fz('Small', 2, 5, 2, 2, 3, 3, 'L'), even = fz('Even', 7, 7, 7, 7, 7, 7, 'L');
+    let big = 0, ev = 0; for (let k = 0; k < 200; k++) { if (S.arenaFight(DN.bots.seeded('b', k), strong, weak, 'L').w === 0) big++; if (S.arenaFight(DN.bots.seeded('e', k), even, { ...even, name: 'Even 2' }, 'L').w === 0) ev++; }
+    ok(big >= 190 && ev > 70 && ev < 130, 'stats decide fights: much stronger wins ' + Math.round(big / 2) + '% of the time, an even match is a coin toss (' + Math.round(ev / 2) + '%)');
+    const shark = fz('Shark', 9, 6, 6, 9, 6, 4, 'W'), lion = fz('Lion', 9, 6, 5, 8, 6, 7, 'L');
+    let sw = 0, sl = 0; for (let k = 0; k < 200; k++) { if (S.arenaFight(DN.bots.seeded('w', k), shark, lion, 'W').w === 0) sw++; if (S.arenaFight(DN.bots.seeded('l', k), shark, lion, 'L').w === 0) sl++; }
+    ok(sw > 160 && sl < 30, 'home turf matters: a shark wins in water (' + Math.round(sw / 2) + '%) and loses on land (' + Math.round(sl / 2) + '%)');
+  }
   const rt = DN.share.unpackTopic(DN.share.packTopic(T('t-zomb'), false));
   ok(rt.ok && rt.topic.battle === 'survival' && F.hasBattle(rt.topic), 'shared and copied topics keep their battle style');
   // Screen: play a battle through the UI at instant speed.
@@ -44,7 +59,7 @@ module.exports = async function battleTests({ ok, boot, btn, click, sleep }) {
   await click(U.w, btn(U.d, 'Start the finale'));
   await click(U.w, btn(U.d, 'Start the battle'));
   await sleep(200);
-  ok(!!U.d.querySelector('.battleview .scoreboard') && /Battle summary/.test(U.d.body.textContent) && /Just for fun/.test(U.d.body.textContent), 'the battle screen plays and ends with a summary that says it’s just for fun');
+  ok(!!U.d.querySelector('.arenaview .scoreboard') && /Battle summary/.test(U.d.body.textContent) && /Just for fun/.test(U.d.body.textContent), 'the animal arena plays and ends with a summary that says it’s just for fun');
   await click(U.w, btn(U.d.querySelector('.finale'), 'Continue')); await sleep(150);
   if (!/won the battle/.test(U.d.body.textContent)) console.log('   page:', U.d.querySelector('.finale') && U.d.querySelector('.finale').textContent.slice(0, 300));
   ok(/won the battle/.test(U.d.body.textContent), 'the result explains who won the battle and by how much');

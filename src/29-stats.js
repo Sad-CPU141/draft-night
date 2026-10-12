@@ -131,7 +131,7 @@ function computeAwards(d) {
       const lm = last.m; const loser = teamOf(d, lm.winner === lm.a ? lm.b : lm.a);
       const va = Object.values(lm.votes || {}).filter((v) => v === lm.winner).length, vb = Object.values(lm.votes || {}).length - va;
       if (lm.match && lm.match.pens) add('robbed', '😤', 'Most Robbed', loser, 'Lost the final on penalties.');
-      else if (lm.match && Math.abs(lm.match.score[0] - lm.match.score[1]) === 1 && d.finale.mode === 'sim') add('robbed', '😤', 'Most Robbed', loser, lm.match.v === 'battle' ? 'Lost the final by a single round.' : 'Lost the final by a single goal.');
+      else if (lm.match && Math.abs(lm.match.score[0] - lm.match.score[1]) === 1 && d.finale.mode === 'sim') add('robbed', '😤', 'Most Robbed', loser, isSimResult(lm.match) ? 'Lost the final by a single round.' : 'Lost the final by a single goal.');
       else if (d.finale.mode === 'bracket' && va - vb === 1) add('robbed', '😤', 'Most Robbed', loser, 'Lost the final by a single vote.');
     }
     if (isFootball(d.topic)) {

@@ -43,6 +43,13 @@ const BATTLE_KINDS = {
 const battleKindId = (topic) => { if (!topic || topic.layout === 'pitch') return null; const k = topic.battle || STARTER_BATTLE[topic.id]; return BATTLE_KINDS[k] ? k : null; };
 const battleKind = (topic) => { const k = battleKindId(topic); return k ? BATTLE_KINDS[k] : null; };
 const hasBattle = (topic) => !!battleKindId(topic);
+// The full simulation for a topic's style (step by step these replace the simple duel).
+function simulateFor(d, A, B, key) {
+  const k = battleKindId(d.topic);
+  if (k === 'fight') return simulateArena(d, A, B, key);
+  return simulateBattle(d, A, B, key);
+}
+const isSimResult = (mt) => !!mt && (mt.v === 'battle' || mt.v === 'arena' || mt.v === 'survival' || mt.v === 'mission' || mt.v === 'show');
 
 // One duel: the pricier pick has the edge, capped so luck always matters.
 function battleDuel(rng, kind, a, b, maxP) {
