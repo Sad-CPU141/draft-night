@@ -91,7 +91,12 @@ function botValue(d, bot, item, rng) {
   let v = fair * (0.5 + 1.15 * fame) * botTaste(bot, item);
   const exact = !isFlex(slots[idx]);
   const sc = scarcityOf(d, item);
-  if (type === 'spender') { v *= fame > 0.6 ? 1.75 : 0.95; if (bot.budget >= d.rules.budget * 0.6) v *= 1.15; }
+  if (type === 'spender') {
+    // Big Spender chases the stars: famous outright, or clearly above what's left in the pool.
+    const rest = d.queue.slice(1, 41).map((id) => visibleItem(d, id)).filter(Boolean);
+    const avg = rest.length ? rest.reduce((n, it) => n + itemFame(it), 0) / rest.length : 0.45;
+    v *= fame > 0.6 || fame > avg + 0.06 ? 1.75 : 0.95; if (bot.budget >= d.rules.budget * 0.6) v *= 1.15;
+  }
   if (type === 'bargain') v *= 0.72;
   if (type === 'needs') { v *= exact ? 1.3 : fame > 0.7 ? 0.7 : 0.3; v *= Math.pow(sc, 0.5 + L.scarcity); }
   else v *= Math.pow(sc, L.scarcity * 0.5);

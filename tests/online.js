@@ -252,7 +252,7 @@ module.exports = async function onlineTests({ ok, boot, btn, click, sleep }) {
         if (room(p) && room(p).amHost && (s.trade.proposals.some((x) => x.status !== 'pending') || guard % 200 === 199) && fbtn(p, 'Finish trading')) { await click(p.w, fbtn(p, 'Finish trading')); continue; }
       }
       if (s.phase === 'done' && !s.votesRevealed) {
-        if (fbtn(p, 'Vote for the best team')) { await click(p.w, fbtn(p, 'Vote for the best team')); const v = [...p.d.querySelectorAll('.modal .votebtn')].find((x) => !x.disabled); if (v) { await click(p.w, v); await click(p.w, fbtn(p, 'Lock in')); if (fbtn(p, 'OK')) await click(p.w, fbtn(p, 'OK')); } continue; }
+        if (fbtn(p, 'Vote for the best team') || fbtn(p, '🗳️ Vote')) { await click(p.w, fbtn(p, 'Vote for the best team') || fbtn(p, '🗳️ Vote')); const v = [...p.d.querySelectorAll('.modal .votebtn')].find((x) => !x.disabled); if (v) { await click(p.w, v); await click(p.w, fbtn(p, 'Lock in')); if (fbtn(p, 'OK')) await click(p.w, fbtn(p, 'OK')); } continue; }
         if (room(p) && room(p).amHost && fbtn(p, 'Reveal the winner')) { await click(p.w, fbtn(p, 'Reveal the winner')); continue; }
       }
     }

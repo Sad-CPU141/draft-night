@@ -44,6 +44,8 @@ async function boot({ idb = true, fetchImpl, storage, speed, url, fakeAudio, com
   return { dom, w, d: w.document, DN: w.__DN };
 }
 const $ = (d, sel) => d.querySelector(sel);
+// Topics with a simulation ask “Vote or let the simulation decide?” — the Vote choice opens the same secret vote.
+const voteBtn = (d) => btn(d, 'Start the secret vote') || btn(d, 'Vote for the best team') || btn(d, '🗳️ Vote');
 const btn = (d, text) => [...d.querySelectorAll('button,[role=button]')].find((b) => b.textContent.replace(/\s+/g, ' ').trim().toLowerCase().includes(text.toLowerCase()));
 async function click(w, el) { if (!el) throw new Error('missing element'); el.dispatchEvent(new w.MouseEvent('click', { bubbles: true })); await sleep(30); }
 async function tap(w, el) { el.dispatchEvent(new w.MouseEvent('pointerdown', { bubbles: true })); el.dispatchEvent(new w.MouseEvent('pointerup', { bubbles: true })); await sleep(30); }
@@ -165,7 +167,7 @@ async function tap(w, el) { el.dispatchEvent(new w.MouseEvent('pointerdown', { b
       }
     }
     ok(/Final teams/.test(d.body.textContent), 'draft played to the results screen by tapping');
-    await click(w, btn(d, 'Start the secret vote'));
+    await click(w, voteBtn(d));
     const names = [...d.querySelectorAll('.votegrid .votebtn')];
     ok(names.length === 4, 'vote screen lists all 4 managers');
     for (let i = 0; i < 4; i++) {
@@ -430,7 +432,7 @@ async function tap(w, el) { el.dispatchEvent(new w.MouseEvent('pointerdown', { b
       await sleep(20);
     }
     ok(/Final teams/.test(d.body.textContent), 'team draft played to the results');
-    await click(w, btn(d, 'Start the secret vote'));
+    await click(w, voteBtn(d));
     const voters = [...d.querySelectorAll('.votegrid .votebtn')];
     ok(voters.length === 4, 'all 4 players vote');
     await click(w, voters[0]);
@@ -580,7 +582,7 @@ async function tap(w, el) { el.dispatchEvent(new w.MouseEvent('pointerdown', { b
       if (d.querySelector('.mgr.thinking')) sawThinking = true;
       if (d.querySelector('.mgr .bubble, .bubble.inline')) sawBubble = true;
       const lead = d.querySelector('.mgr.isLead'); if (lead && !lead.classList.contains('you')) sawBotLead = true;
-      if (/Vote for the best team/.test(d.body.textContent)) break;
+      if (/Vote for the best team|How do we pick the winner/.test(d.body.textContent)) break;
       const fl = d.querySelector('.flash'); if (fl && Math.random() < 0.3) await click(w, fl);
       const letIt = btn(d, 'Let it happen'); if (letIt) await click(w, letIt);
       const fin = btn(d, 'Finish trading'); if (fin && Math.random() < 0.2) await click(w, fin);
@@ -590,8 +592,8 @@ async function tap(w, el) { el.dispatchEvent(new w.MouseEvent('pointerdown', { b
       const bid = btn(d, 'Bid $'); if (bid && !bid.disabled && Math.random() < 0.04) await click(w, bid);
       await sleep(20);
     }
-    if (!/Vote for the best team/.test(d.body.textContent)) { const c = DN.store.get('dn_current_v1') || {}; console.log('    STALL:', c.phase, 'processed', c.processed, 'queue', (c.queue || []).length, 'bid', JSON.stringify(c.bid), '| screen:', d.body.textContent.slice(0, 300)); }
-    ok(/Vote for the best team/.test(d.body.textContent), 'solo draft runs to the results on its own');
+    if (!/Vote for the best team|How do we pick the winner/.test(d.body.textContent)) { const c = DN.store.get('dn_current_v1') || {}; console.log('    STALL:', c.phase, 'processed', c.processed, 'queue', (c.queue || []).length, 'bid', JSON.stringify(c.bid), '| screen:', d.body.textContent.slice(0, 300)); }
+    ok(/Vote for the best team|How do we pick the winner/.test(d.body.textContent), 'solo draft runs to the results on its own');
     ok(sawThinking, 'bots show when they are thinking');
     ok(sawBotLead, 'bots place bids');
     ok(sawBubble, 'trash-talk bubbles appear');
@@ -601,7 +603,7 @@ async function tap(w, el) { el.dispatchEvent(new w.MouseEvent('pointerdown', { b
     const after = JSON.stringify(DN.store.get('dn_current_v1'));
     if (after !== before) { const A = JSON.parse(before), B2 = JSON.parse(after); console.log('    changed keys:', Object.keys(B2).filter((k) => JSON.stringify(A[k]) !== JSON.stringify(B2[k])).join(', '), A.phase, B2.phase); }
     ok(after === before, 'bots stop acting once the draft is over');
-    await click(w, btn(d, 'Vote for the best team'));
+    await click(w, voteBtn(d));
     const choices = [...d.querySelectorAll('.modal .votebtn')];
     ok(choices.length >= 1 && !choices.some((c) => /You\b/.test(c.textContent.split('·')[0])), 'you can’t vote for your own team');
     await click(w, choices[0]);
@@ -649,7 +651,7 @@ async function tap(w, el) { el.dispatchEvent(new w.MouseEvent('pointerdown', { b
     w.__spoken.length = 0;
     await click(w, btn(d, 'Start solo draft'));
     const t0 = Date.now();
-    while (Date.now() - t0 < 90000 && !/Vote for the best team/.test(d.body.textContent)) {
+    while (Date.now() - t0 < 90000 && !/Vote for the best team|How do we pick the winner/.test(d.body.textContent)) {
       const fl = d.querySelector('.flash'); if (fl && Math.random() < 0.2) await click(w, fl);
       const letIt = btn(d, 'Let it happen'); if (letIt) await click(w, letIt);
       const fin = btn(d, 'Finish trading'); if (fin && Math.random() < 0.3) await click(w, fin);
@@ -665,7 +667,7 @@ async function tap(w, el) { el.dispatchEvent(new w.MouseEvent('pointerdown', { b
     ok(w.__spoken.some((x) => /Coming up|Next on the block|Who wants|Here comes|mystery/i.test(x)), 'items are announced as they come up');
     ok(w.__spoken.some((x) => /Going once/.test(x)), 'the going-once countdown is spoken');
     ok(!w.__spoken.some((x, i) => /Going twice/.test(x) && !w.__spoken.slice(0, i).some((y) => /Going once/.test(y))), '“going twice” never comes before “going once”');
-    ok(/Vote for the best team/.test(d.body.textContent), 'the game still runs normally with sound effects unavailable');
+    ok(/Vote for the best team|How do we pick the winner/.test(d.body.textContent), 'the game still runs normally with sound effects unavailable');
     await click(w, d.querySelector('.mute'));
     ok(d.querySelector('.mute').getAttribute('aria-pressed') === 'true', 'the 🔊 button mutes and shows it');
   }

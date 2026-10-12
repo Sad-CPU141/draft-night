@@ -34,13 +34,19 @@ module.exports = async function battleTests({ ok, boot, btn, click, sleep }) {
   ok(!!f.finale.champion && /battle/.test(F.championStory(f)), 'a full battle bracket crowns a champion (' + F.championStory(f).slice(0, 60) + '…)');
   const cut = F.simulateBattle(fill(T('t-cute'), 2, 'c'), ...fill(T('t-cute'), 2, 'c').managers, 'y');
   ok(cut.kind === 'cute' && cut.duels.every((x) => x.line && !/\{[wl]\}/.test(x.line)), 'each battle style has its own lines (Cuteness Contest), all filled in');
+  {
+    const all = []; for (let k = 0; k < 60; k++) all.push(...F.simulateBattle(d, A, B, 'h' + k).duels.filter((x) => x.a && x.b));
+    const good = all.every((x) => { const h = x.hits; const got = [0, 0]; h.forEach((m) => { got[m.by] += m.amt; }); return h.length >= 3 && h.every((m) => m.amt > 0 && m.line && !/\{[ab]\}/.test(m.line)) && got[x.w] === 100 && got[1 - x.w] < 100 && h[h.length - 1].by === x.w; });
+    ok(all.length > 100 && good, 'every duel plays out as 3+ moves: the winner lands the last one and drains the loser’s bar to 0 (' + all.length + ' duels)');
+    ok(JSON.stringify(F.battleBars(F.BATTLE_KINDS.fight, all[0].hits, all[0].hits.length)[1 - all[0].w]) === '0' && F.battleBars(F.BATTLE_KINDS.cute, all[0].hits, all[0].hits.length)[all[0].w] === 100, 'health bars drain in fights; the aww meter fills up in cuteness contests');
+  }
   const rt = DN.share.unpackTopic(DN.share.packTopic(T('t-zomb'), false));
   ok(rt.ok && rt.topic.battle === 'survival' && F.hasBattle(rt.topic), 'shared and copied topics keep their battle style');
   // Screen: play a battle through the UI at instant speed.
   const raw = { ...d, mode: 'local', createdAt: Date.now(), history: [] };
   const U = await boot({ idb: false, storage: { dn_current_v1: JSON.stringify(raw) } });
   await click(U.w, btn(U.d, 'Resume draft'));
-  ok(/Friendly battle/.test(U.d.body.textContent), 'results offer a friendly battle');
+  ok(!/Friendly battle/.test(U.d.body.textContent), 'the friendly battle waits until a winner is decided (it isn’t the main event)');
   await click(U.w, btn(U.d, 'Start the finale'));
   await click(U.w, btn(U.d, 'Start the battle'));
   await sleep(200);
@@ -48,5 +54,22 @@ module.exports = async function battleTests({ ok, boot, btn, click, sleep }) {
   await click(U.w, btn(U.d.querySelector('.finale'), 'Continue')); await sleep(150);
   if (!/won the battle/.test(U.d.body.textContent)) console.log('   page:', U.d.querySelector('.finale') && U.d.querySelector('.finale').textContent.slice(0, 300));
   ok(/won the battle/.test(U.d.body.textContent), 'the result explains who won the battle and by how much');
-  U.w.close(); P.w.close();
+  ok(await (async () => { for (let k = 0; k < 40 && !/Friendly/.test(U.d.body.textContent); k++) { const nb = btn(U.d, 'Reveal the champion') || btn(U.d, 'Back to the bracket') || btn(U.d, 'Start the battle') || btn(U.d.querySelector('.finale') || U.d, 'Continue'); if (!nb) break; await click(U.w, nb); await sleep(120); } return /Friendly battle/.test(U.d.body.textContent); })(), 'after the champion is crowned, a friendly battle is offered');
+  U.w.close();
+  // Default rules (group vote): at the end the group chooses a vote or the simulation.
+  const vd = { ...d, rules: { ...d.rules, finale: { mode: 'vote' } }, mode: 'local', createdAt: Date.now(), history: [] };
+  const V = await boot({ idb: false, storage: { dn_current_v1: JSON.stringify(vd) } });
+  await click(V.w, btn(V.d, 'Resume draft'));
+  ok(/How do we pick the winner\?/.test(V.d.body.textContent) && !!btn(V.d, 'Let the simulation decide') && !btn(V.d, 'Start the secret vote'), 'a simulation topic asks: vote, or let the simulation decide?');
+  await click(V.w, btn(V.d, '🗳️ Vote'));
+  ok(!!V.d.querySelector('.modal, .sheet, [role=dialog]') || /Pass the phone|secret vote|Who votes/i.test(V.d.body.textContent), 'Vote opens the normal secret vote');
+  V.w.close();
+  const V2 = await boot({ idb: false, storage: { dn_current_v1: JSON.stringify(vd) } });
+  await click(V2.w, btn(V2.d, 'Resume draft'));
+  await click(V2.w, btn(V2.d, 'Let the simulation decide'));
+  ok(!!V2.d.querySelector('.finale') && !!btn(V2.d, 'Start the battle') && /Battle bracket/.test(V2.d.body.textContent), 'Let the simulation decide starts a knockout bracket of battles');
+  V2.w.close();
+  const fb = DN.starterTopics().find((t) => t.id === 't-redflags');
+  ok(!F.hasBattle(fb) && !F.isFootball(fb), '(topics without a simulation keep the plain vote)');
+  P.w.close();
 };

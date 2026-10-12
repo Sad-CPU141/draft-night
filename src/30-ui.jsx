@@ -2534,6 +2534,14 @@ function Results({ d, past, onChange, onBack, onUndo, onFinish, onPlayAgain, liv
     audio.say(winners.length > 1 ? callLine('tie', { who: winners.map((w) => w.name).join(' and ') }) : callLine('winner', { who: winners[0].name }), 3, d.id + ':winner:' + Object.keys(d.votes || {}).length);
   }, [revealed, finaleOpen]);
   const openFinale = () => { if (!d.finale) onChange(startFinale(d)); setShowFinale(true); setFinClosed(false); };
+  // Topics with a simulation: at the end the group chooses — a normal vote, or let the simulation decide (bracket).
+  const simTopic = isFootball(d.topic) || hasBattle(d.topic);
+  const canChoose = simTopic && !isFin && !d.finale && !d.votesRevealed && (!online || nv.isHost);
+  const letSimDecide = () => {
+    const fin = { ...FINALE_DEFAULTS, ...((d.rules && d.rules.finale) || {}), mode: 'sim' };
+    onChange(startFinale({ ...d, votes: {}, rules: { ...d.rules, finale: fin } })); setShowFinale(true); setFinClosed(false); setVoting(false);
+  };
+  const simName = isFootball(d.topic) ? 'football matches' : hasBattle(d.topic) ? battleKind(d.topic).name.toLowerCase() + 's' : '';
   // Solo: your vote, then every bot votes for the team it rates highest (never its own), all revealed together.
   const soloVote = (target) => {
     setTimeout(() => {
@@ -2639,16 +2647,26 @@ function Results({ d, past, onChange, onBack, onUndo, onFinish, onPlayAgain, liv
       </div>
 
       <div className="stack resactions">
-        {!online && !d.votesRevealed && !isFin && <button className="btn btn-gold" onClick={() => setVoting(true)}>{solo ? 'Vote for the best team' : Object.keys(d.votes || {}).length ? 'Continue the vote' : 'Start the secret vote'}</button>}
+        {canChoose && (
+          <div className="card stack-sm choosewin">
+            <h3 style={{ margin: 0 }}>🏆 How do we pick the winner?</h3>
+            <div className="row" style={{ gap: 8, alignItems: 'stretch' }}>
+              <button className="btn grow" onClick={() => setVoting(true)} disabled={online && !myOpenVote}>🗳️ Vote<small className="cw-sub">{online ? 'everyone votes on their phone' : 'everyone votes for the best team'}</small></button>
+              <button className="btn btn-gold grow" onClick={letSimDecide}>{isFootball(d.topic) ? '⚽' : battleKind(d.topic).emoji} Let the simulation decide<small className="cw-sub">knockout bracket of {simName}</small></button>
+            </div>
+            {online && humanVotes > 0 && <p className="hint" style={{ margin: 0 }}>Choosing the simulation clears the {humanVotes} vote{humanVotes === 1 ? '' : 's'} already cast.</p>}
+          </div>
+        )}
+        {!online && !d.votesRevealed && !isFin && !canChoose && <button className="btn btn-gold" onClick={() => setVoting(true)}>{solo ? 'Vote for the best team' : Object.keys(d.votes || {}).length ? 'Continue the vote' : 'Start the secret vote'}</button>}
         {online && !d.votesRevealed && !isFin && <>
-          {myOpenVote ? <button className="btn btn-gold" onClick={() => setVoting(true)}>Vote for the best team</button> : <p className="hint" style={{ textAlign: 'center', margin: 0 }}>{nv.tv ? 'Vote on your phones.' : 'Your vote is in.'} {humanVotes} of {humansP.length} players have voted.</p>}
+          {myOpenVote ? (canChoose ? null : <button className="btn btn-gold" onClick={() => setVoting(true)}>Vote for the best team</button>) : <p className="hint" style={{ textAlign: 'center', margin: 0 }}>{nv.tv ? 'Vote on your phones.' : 'Your vote is in.'} {humanVotes} of {humansP.length} players have voted.</p>}
           {nv.isHost && <button className={'btn' + (myOpenVote ? '' : ' btn-gold')} disabled={!humanVotes} onClick={hostReveal}>{humanVotes === humansP.length ? 'Reveal the winner' : 'Reveal now (' + humanVotes + '/' + humansP.length + ')'}</button>}
         </>}
         {!d.votesRevealed && isFin && (!online || nv.isHost) && <button className="btn btn-gold" onClick={openFinale}>{d.finale ? '🏆 Continue the finale' : '🏆 Start the finale'}</button>}
         {!d.votesRevealed && isFin && online && !nv.isHost && (d.finale ? <button className="btn btn-gold" onClick={() => setFinClosed(false)}>🏆 Watch the finale</button> : <p className="hint" style={{ textAlign: 'center', margin: 0 }}>Waiting for the host to start the finale.</p>)}
         {!d.votesRevealed && isFin && !d.finale && <p className="hint" style={{ textAlign: 'center', margin: 0 }}>{{ bracket: 'Head-to-head bracket: teams meet 1v1 and the players not involved vote.', sim: 'Match simulator: every matchup is a simulated football match.', combined: 'Combined finale: each matchup is a match plus a vote (' + finCfg(d).weight + '/' + (100 - finCfg(d).weight) + ').' }[fmode]}{(d.rules.finale && d.rules.finale.mode !== fmode) ? ' (Matches need a football topic, so this topic uses the vote bracket.)' : ''}</p>}
-        {isFootball(d.topic) && <button className="btn" onClick={() => setFriendly(true)}>⚽ Friendly match{finDone ? ' / rematch' : ''}</button>}
-        {hasBattle(d.topic) && <button className="btn" onClick={() => setFriendly(true)}>{battleKind(d.topic).emoji} Friendly {battleKind(d.topic).name.toLowerCase()}</button>}
+        {isFootball(d.topic) && d.votesRevealed && <button className="btn" onClick={() => setFriendly(true)}>⚽ Friendly match{finDone ? ' / rematch' : ''}</button>}
+        {hasBattle(d.topic) && d.votesRevealed && <button className="btn" onClick={() => setFriendly(true)}>{battleKind(d.topic).emoji} Friendly {battleKind(d.topic).name.toLowerCase()}</button>}
         {live && onPlayAgain && d.votesRevealed && <button className="btn btn-gold" onClick={onPlayAgain}>Play again</button>}
         <button className="btn" onClick={() => setPickFormat(true)} disabled={imgBusy}>{imgBusy ? 'Making image…' : 'Save as image'}</button>
         {imgErr && <p className="warn">{imgErr}</p>}
@@ -3429,7 +3447,7 @@ class Boundary extends React.Component {
   }
 }
 
-if (window.__DN_TEST__) window.__DN = { finale: { simulateBattle, hasBattle, battleKind, BATTLE_KINDS, eraOf, eraWord, buildBracket, advanceBracket, nextMatchup, matchVoters, canVoteFor, decideMatchup, simulateMatch, playerRating, teamRating, matchupVoteBot, finaleMode, isFootball, startFinale, castMatchVote, botMatchVotes, playMatchup, resolveMatchup, getMatchup, needsVote, needsMatch, votingDone, finaleStandings, finaleRecord, championStory, goldenBoot, matchVoteProblem, roundName, FINALE_DEFAULTS, validRating, matchScript, revealedEvents, matchFrame, lineupOf, expectedGoals, strength2, squad }, audio, AUDIO_DEFAULTS, share: { encodeTopic, decodeShared, packTopic, unpackTopic, topicCode, shareLink, MAX_LINK }, stats: { careerStats, computeAwards, computeShame, hallOfShame, humanPlayers }, bots: { makeBots, nextBotAction, botDecision, botFreePickChoice, botVote, teamScore, voteChoices, itemFame, seeded, BOT_LEVELS, BOT_TYPES, botCardPlay, botVeto, botNominate, botTradeDecision, botTradeOffer }, twists: { twistRules, TWIST_DEFAULTS, playCard, answerCard, cardProblem, doubleProblem, nominate, currentNominator, nominationPool, botActors, botAdvisers, participants, visibleItem, isHidden, rarityOf, frozenNow, proposeTrade, acceptTrade, rejectTrade, cancelTrade, closeTrades, tradeProblem, openTrades, hasCard }, auction: { withdraw, isOut, auctionEnd, owesBid, withdrawProblem, outIds, owing, botPassers, botForcedBid, runAction, ownerInfo, migrateSettings, rulesLines }, scenes: { SCENES, sceneOf, placeScene, sceneKey, SceneCanvas, SceneView, sceneHasArt }, skips: { SKIP_DEFAULTS, skipCfg, skipRulesOn, presenter, skipVerdict, eligibleFor, endgameNow, endgameSoon, chooseForced, autoChooseForced, presenterLine, botSkipSave, botForcedChoice, unsoldOutcome, skipChip }, topicsLib: { artKind, simKind, maxPlayersFor, POPULARITY, popScore, byPopularity, folderOrder, favouritesOrder, prefsOf, isBuiltIn, folderOf, folderList, matchTopic, toggleIn }, DEFAULT_SOLO, isFlex, canBid, createDraft, placeBid, sell, skipItem, undo, freePick, currentPicker, canTake, nextAmount, isDraftOver, draftStats, winsBoard, tally, starterTopics, migrateTopics, validateBackup, makeBackup, wikiTitleFor, PHOTO_TOPICS, store, wiki, DEFAULT_RULES, COLORS, emptyCount, assignSlot, maxBid };
+if (window.__DN_TEST__) window.__DN = { finale: { battleBars, simulateBattle, hasBattle, battleKind, BATTLE_KINDS, eraOf, eraWord, buildBracket, advanceBracket, nextMatchup, matchVoters, canVoteFor, decideMatchup, simulateMatch, playerRating, teamRating, matchupVoteBot, finaleMode, isFootball, startFinale, castMatchVote, botMatchVotes, playMatchup, resolveMatchup, getMatchup, needsVote, needsMatch, votingDone, finaleStandings, finaleRecord, championStory, goldenBoot, matchVoteProblem, roundName, FINALE_DEFAULTS, validRating, matchScript, revealedEvents, matchFrame, lineupOf, expectedGoals, strength2, squad }, audio, AUDIO_DEFAULTS, share: { encodeTopic, decodeShared, packTopic, unpackTopic, topicCode, shareLink, MAX_LINK }, stats: { careerStats, computeAwards, computeShame, hallOfShame, humanPlayers }, bots: { makeBots, nextBotAction, botDecision, botFreePickChoice, botVote, teamScore, voteChoices, itemFame, seeded, BOT_LEVELS, BOT_TYPES, botCardPlay, botVeto, botNominate, botTradeDecision, botTradeOffer }, twists: { twistRules, TWIST_DEFAULTS, playCard, answerCard, cardProblem, doubleProblem, nominate, currentNominator, nominationPool, botActors, botAdvisers, participants, visibleItem, isHidden, rarityOf, frozenNow, proposeTrade, acceptTrade, rejectTrade, cancelTrade, closeTrades, tradeProblem, openTrades, hasCard }, auction: { withdraw, isOut, auctionEnd, owesBid, withdrawProblem, outIds, owing, botPassers, botForcedBid, runAction, ownerInfo, migrateSettings, rulesLines }, scenes: { SCENES, sceneOf, placeScene, sceneKey, SceneCanvas, SceneView, sceneHasArt }, skips: { SKIP_DEFAULTS, skipCfg, skipRulesOn, presenter, skipVerdict, eligibleFor, endgameNow, endgameSoon, chooseForced, autoChooseForced, presenterLine, botSkipSave, botForcedChoice, unsoldOutcome, skipChip }, topicsLib: { artKind, simKind, maxPlayersFor, POPULARITY, popScore, byPopularity, folderOrder, favouritesOrder, prefsOf, isBuiltIn, folderOf, folderList, matchTopic, toggleIn }, DEFAULT_SOLO, isFlex, canBid, createDraft, placeBid, sell, skipItem, undo, freePick, currentPicker, canTake, nextAmount, isDraftOver, draftStats, winsBoard, tally, starterTopics, migrateTopics, validateBackup, makeBackup, wikiTitleFor, PHOTO_TOPICS, store, wiki, DEFAULT_RULES, COLORS, emptyCount, assignSlot, maxBid };
 store.init().finally(() => {
   ReactDOM.createRoot(document.getElementById('root')).render(<Boundary><App /></Boundary>);
 });
