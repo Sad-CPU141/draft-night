@@ -41,7 +41,7 @@ function RatingChip({ item, topic }) {
       <button type="button" className="ratingchip" onClick={() => setOpen(true)} aria-label={era + ' ' + r.ovr + (r.estimated ? ', estimated' : '') + '. Show details'}>
         {era} <b className="num">{r.ovr}</b>{r.estimated ? ' est.' : ''}
       </button>
-      {open && <Sheet center onClose={() => setOpen(false)}><RatingCard item={item} topic={topic} /><button className="btn btn-ghost" onClick={() => setOpen(false)}>Close</button></Sheet>}
+      {open && ReactDOM.createPortal(<Sheet center onClose={() => setOpen(false)}><RatingCard item={item} topic={topic} /><button className="btn btn-ghost" onClick={() => setOpen(false)}>Close</button></Sheet>, document.body)}
     </>
   );
 }

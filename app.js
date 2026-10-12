@@ -1,4 +1,4 @@
-/* Draft Night 3b02321cff — built from src/ by build.js. Edit src/, not this file. */
+/* Draft Night 272b756f61 — built from src/ by build.js. Edit src/, not this file. */
 "use strict";
 (function(){
 function _extends() { return _extends = Object.assign ? Object.assign.bind() : function (n) { for (var e = 1; e < arguments.length; e++) { var t = arguments[e]; for (var r in t) ({}).hasOwnProperty.call(t, r) && (n[r] = t[r]); } return n; }, _extends.apply(null, arguments); }
@@ -14565,6 +14565,1703 @@ Queenstown
 `
 };
 const EXTRA_ITEMS = Object.assign({}, EXTRA_SPORTS, EXTRA_SPORTS2, EXTRA_FOOD, EXTRA_ENT, EXTRA_ANIMALS, EXTRA_FUN, EXTRA_TRAVEL, EXTRA_STYLE);
+const STATS_ANIMALS = `
+Aardvark=335324 L
+Aardwolf=245323 L
+Acrocanthosaurus=964863 L
+Aepycamelus=453253 L
+African Buffalo=845665 L
+African Civet=244334 L
+African Elephant=938476 L
+African Fish Eagle=372565 A
+African Golden Cat=355445 L
+African Leopard=775766 L
+African Rock Python=727654 LW
+African Wild Dog=574687 L
+African Wildcat=255434 L
+Albatross=262396 A
+Albertosaurus=865763 L
+Aldabra Giant Tortoise=519183 L
+Allen's Swamp Monkey=244335 LW
+Alligator Snapping Turtle=628764 W
+Allosaurus=865864 L
+Amargasaurus=834464 L
+Amazon River Dolphin=356357 W
+Ambulocetus=644664 LW
+American Alligator=838764 LW
+American Kestrel=272325 A
+American Lion=976867 L
+American Mastodon=926365 L
+Amphicyon=865865 L
+Amur Leopard=775766 L
+Amur Tiger=965877 L
+Anaconda=726655 W
+Andean Condor=352374 A
+Andean Mountain Cat=355445 L
+Andrewsarchus=846764 L
+Angel Shark=436653 W
+Anglerfish=225534 W
+Ankylosaurus=729763 L
+Anole=163223 L
+Antarctic Minke Whale=746365 W
+Anubis=877989 L
+Apatosaurus=935465 L
+Aplomado Falcon=282436 A
+Arabian Cobra=455834 L
+Arabian Leopard=675765 L
+Arabian Ostrich=574463 L
+Archaeopteryx=263335 A
+Arctic Char=263243 W
+Arctic Cod=152232 W
+Arctic Fox=355457 L
+Arctic Fox Kit=243225 L
+Arctic Ground Squirrel=153234 L
+Arctic Hare=173253 L
+Arctic Skua=363454 A
+Arctic Tern=272293 A
+Arctic Wolf=665777 L
+Arctic Woolly Bear Moth=114171 L
+Argentinosaurus=9284A4 L
+Armadillo Girdled Lizard=228223 L
+Army Ant=344995 L
+Arsinoitherium=836654 L
+Asian Giant Hornet=448764 A
+Asian Golden Cat=455545 L
+Asiatic Cheetah=592654 L
+Asiatic Lion=865766 L
+Assassin Bug=225633 L
+Atlantic Cod=263242 W
+Atlantic Puffin=273254 WA
+Atlantic Spotted Dolphin=476368 W
+Atlantic White-sided Dolphin=476368 W
+Atlas Bear=846666 L
+Atlas Moth=134131 A
+Atolla Jellyfish=112421 W
+Aurochs=855665 L
+Australian Magpie=263446 A
+Australian Sea Lion=465456 W
+Australian Snubfin Dolphin=365357 W
+Aye-aye=233335 L
+Baiji=365356 W
+Baird's Beaked Whale=745375 W
+Bald Eagle=474676 A
+Bald Uakari=245336 L
+Bali Tiger=865766 L
+Ball Python=325423 L
+Bamboo Shark=235432 W
+Banded Krait=335823 L
+Banded Mongoose=364575 L
+Bandicoot=243334 L
+Banshee=486779 A
+Barbary Lion=965866 L
+Barbary Macaque=354436 L
+Barn Owl=263545 A
+Barracuda=473543 W
+Barreleye=122223 W
+Baryonyx=855764 LW
+Basilisk=767969 L
+Basilosaurus=966855 W
+Basket Star=113122 W
+Basking Shark=726264 W
+Bat=162246 A
+Bat Swarm=474494 A
+Bat-eared Fox=254344 L
+Bateleur=473555 A
+Bearded Dragon=236323 L
+Bearded Seal=546455 W
+Bearded Vulture=464465 A
+Behemoth=938886 L
+Beluga Calf=344246 W
+Beluga Whale=554467 W
+Bengal Tiger=965877 L
+Benthocodon=112321 W
+Bettong=243234 L
+Bigeye Thresher=576564 W
+Bigfin Squid=334533 W
+Bigfoot=865676 L
+Bilby=243233 L
+Bison=856575 L
+Black Caiman=839764 LW
+Black Dragonfish=224533 W
+Black Guillemot=263254 WA
+Black Kite=373445 A
+Black Mamba=575953 L
+Black Panther=875766 L
+Black Rhinoceros=869764 L
+Black Swallower=223423 W
+Black Swan=354344 WA
+Black Vulture=353355 A
+Black-and-white Colobus=264336 L
+Black-backed Jackal=465466 L
+Black-footed Cat=377635 L
+Black-headed Spider Monkey=264347 L
+Black-throated Monitor=446654 L
+Blacknose Shark=465543 W
+Blacktip Reef Shark=465543 W
+Blacktip Shark=575553 W
+Blainville's Beaked Whale=645365 W
+Blakiston's Fish Owl=453545 A
+Blobfish=113111 W
+Blood Python=626543 L
+Blue Morpho=153131 A
+Blue Shark=575663 W
+Blue Whale=9294A5 W
+Blue-tongued Lizard=236323 L
+Blue-tongued Skink=236323 L
+Bluebuck=453253 L
+Bluntnose Sixgill Shark=736653 W
+Boa Constrictor=625654 L
+Bobcat=566555 L
+Bombardier Beetle=238532 L
+Bongo=554354 L
+Bonnet Macaque=354436 L
+Bonnethead=355443 W
+Bonobo=545458 L
+Boomslang=355833 L
+Booted Eagle=373545 A
+Bornean Bay Cat=355445 L
+Bornean Orangutan=745468 L
+Bottlenose Dolphin=576469 W
+Bowhead Whale=937395 W
+Box Jellyfish=228932 W
+Box Turtle=228123 L
+Brachiosaurus=925464 L
+Bramble Cay Melomys=142123 L
+Bristlemouth=152122 W
+Brittle Star=124121 W
+Broadnose Sevengill Shark=666653 W
+Brolga=354344 A
+Brontosaurus=935465 L
+Brontotherium=846564 L
+Bryde's Whale=846375 W
+Bull=845565 L
+Bull Shark=766764 W
+Bullet Ant=237843 L
+Bumblebee=154323 A
+Bunyip=777767 W
+Burmeister's Porpoise=355356 W
+Burmese Python=727654 L
+Burrowing Owl=253434 A
+Bushbaby=263235 L
+Bushbuck=464353 L
+Bushmaster=446833 L
+California Condor=363374 A
+Camarasaurus=925464 L
+Canada Lynx=566555 L
+Cape Buffalo=855665 L
+Cape Cobra=455834 L
+Capuchin Monkey=354448 L
+Caracal=575555 L
+Carcharodontosaurus=965863 L
+Caribbean Monk Seal=456455 W
+Caribbean Reef Shark=665654 W
+Caribou=565474 L
+Carnotaurus=885763 L
+Carolina Parakeet=263235 A
+Carpenter Ant=235532 L
+Carpenter Bee=155323 A
+Carpet Python=525533 L
+Caspian Tiger=965866 L
+Cassowary=666763 L
+Castoroides=636453 LW
+Cave Bear=847665 L
+Cave Hyena=766775 L
+Cave Lion=966866 L
+Cecropia Moth=134131 A
+Centaur=865778 L
+Centrosaurus=847763 L
+Ceratosaurus=865764 L
+Cerberus=967887 L
+Chacma Baboon=564656 L
+Chalicotherium=735554 L
+Cheetah=692655 L
+Children's Python=325423 L
+Chilean Dolphin=365357 W
+Chimaera=335433 W
+Chimera=876888 L
+Chimpanzee=655558 L
+Chinese Alligator=536654 LW
+Chinese dragon=978898 A
+Chinese Mountain Cat=355445 L
+Chinese Paddlefish=645454 W
+Chinese Water Dragon=345424 LW
+Christmas Island Pipistrelle=162135 A
+Chupacabra=566765 L
+Cicada=163142 A
+Cicada Killer=264633 A
+Click Beetle=146222 L
+Clouded Leopard=665756 L
+Coastal Taipan=565943 L
+Cock-eyed Squid=234333 W
+Cockroach=153283 L
+Coelacanth=436453 W
+Coelophysis=474555 L
+Collared Lemming=153133 L
+Collared Lizard=354334 L
+Colossal Squid=934773 W
+Columbian Mammoth=928576 L
+Comb Jelly=112121 W
+Commerson's Dolphin=365357 W
+Common Basilisk=265324 LW
+Common Brushtail Possum=243334 L
+Common Buzzard=363455 A
+Common Dolphin=376368 W
+Common Duiker=363244 L
+Common Eider=253254 WA
+Common Kestrel=272325 A
+Common Marmoset=153236 L
+Common Raven=353448 A
+Common Reedbuck=463254 L
+Common Wombat=447473 L
+Compsognathus=273434 L
+Cookiecutter Shark=234623 W
+Cooper's Hawk=373545 A
+Copperhead=345733 L
+Coral Snake=235833 L
+Corn Snake=234223 L
+Corroboree Frog=133432 LW
+Corythosaurus=735364 L
+Cotton-top Tamarin=163236 L
+Cottonmouth=445733 LW
+Cougar=776765 L
+Crab-eating Macaque=354436 LW
+Crested Caracara=363445 A
+Crested Gecko=133223 L
+Cricket=153132 L
+Crocodile=839764 LW
+Crocodile Shark=345543 W
+Crow=253447 A
+Crown Jellyfish=113322 W
+Crowned Eagle=574675 A
+Cuban Crocodile=757764 LW
+Cusk Eel=234333 W
+Cuvier's Beaked Whale=745385 W
+Cyclops=926765 L
+Daeodon=846664 L
+Daggernose Shark=355443 W
+Dall Sheep=464475 L
+Dall's Porpoise=465356 W
+Damselfly=172232 A
+Daspletosaurus=875863 L
+De Brazza's Monkey=254336 L
+Death Adder=346933 L
+Death's-head Hawkmoth=153232 A
+Deep-sea Lizardfish=345533 W
+Deinonychus=675766 L
+Deinosuchus=939864 LW
+Deinotherium=937466 L
+Desert Horned Viper=346833 L
+Desert Locust=164273 A
+Desert Monitor=456554 L
+Diana Monkey=254336 L
+Dik-dik=163233 L
+Dilophosaurus=675764 L
+Dimetrodon=746654 L
+Dimorphodon=363444 A
+Dingo=564576 L
+Diplodocus=935465 L
+Diprotodon=836464 L
+Dire Wolf=765776 L
+Djinn=868779 A
+Dodo=232232 L
+Doedicurus=739663 L
+Dolphin=476469 W
+Dorudon=756665 W
+Douc Langur=254336 L
+Dragon=979999 A
+Dragonfish=224533 W
+Dragonfly=182544 A
+Dreadnoughtus=9294A4 L
+Drill=664646 L
+Dugong=626354 W
+Dumbo Octopus=223225 W
+Dumeril's Boa=525533 L
+Dung Beetle=636272 L
+Dusky Dolphin=476368 W
+Dusky Leaf Monkey=254336 L
+Dusky Shark=665654 W
+Dwarf=645677 L
+Dwarf Crocodile=448654 LW
+Dwarf Sperm Whale=545356 W
+Earwig=144323 L
+Eastern Brown Snake=455933 L
+Eastern Gorilla=845468 L
+Eastern Grey Kangaroo=665565 L
+Eastern Water Dragon=345424 LW
+Edmontosaurus=835364 L
+Egyptian Cobra=455834 L
+Egyptian Vulture=353356 A
+Eland=755465 L
+Elasmosaurus=756654 W
+Elasmotherium=847764 L
+Electric Eel=546833 W
+Elephant=938476 L
+Elephant Bird=846454 L
+Elf=575669 L
+Elf Owl=142234 A
+Emerald Tree Boa=425533 L
+Emperor Tamarin=163236 L
+Emu=574463 L
+Entelodont=846764 L
+Eohippus=253244 L
+Epaulette Shark=235442 W
+Ermine=375555 L
+Euoplocephalus=729763 L
+Eurasian Eagle-Owl=464655 A
+Eurasian Hobby=282435 A
+Eurasian Lynx=666665 L
+Eyelash Viper=335733 L
+Fairy=282359 A
+Falkland Islands Wolf=454565 L
+False Killer Whale=666667 W
+Fangtooth=234633 W
+Faun=465557 L
+Feathertail Glider=153134 A
+Fer-de-lance=446833 L
+Ferruginous Hawk=473555 A
+Fin Whale=948385 W
+Finless Porpoise=355356 W
+Fire Ant=236753 L
+Firebug=144122 L
+Firefly=153132 A
+Firefly Squid=153233 W
+Fishing Cat=455555 LW
+Flamingo=353344 WA
+Flapjack Octopus=223224 W
+Flat-headed Cat=355445 LW
+Flea=184392 L
+Florida Panther=776765 L
+Flying Dragon=264324 A
+Football Fish=224433 W
+Fraser's Dolphin=476368 W
+Freshwater Crocodile=637764 LW
+Frilled Lizard=356434 L
+Frilled Shark=345643 W
+Gaboon Viper=438843 L
+Galah=263236 A
+Gallimimus=482455 L
+Galápagos Shark=665654 W
+Galápagos Tortoise=519193 L
+Ganges River Dolphin=356356 W
+Ganges Shark=565653 W
+Garter Snake=234323 L
+Garuda=877888 A
+Gastornis=746653 L
+Gelada=554546 L
+Gemsbok=665565 L
+Genie=667779 A
+Geoffroy's Cat=355445 L
+Gerenuk=463254 L
+Gharial=637753 W
+Ghost=355469 A
+Ghost Shark=335433 W
+Giant Amphipod=233242 W
+Giant Beaver=636453 LW
+Giant Ground Sloth=826563 L
+Giant Isopod=237262 W
+Giant Oarfish=526343 W
+Giant Phantom Jelly=525533 W
+Giant Squid=835764 W
+Giant Tube Worm=116181 W
+Giant Water Bug=345633 W
+Gibbon=373346 L
+Giganotosaurus=965863 L
+Gigantopithecus=935567 L
+Gila Monster=448733 L
+Giraffe=755465 L
+Glass Lizard=245323 L
+Glass Octopus=223234 W
+Glass Squid=234233 W
+Glasswing Butterfly=152131 A
+Glaucous Gull=363345 WA
+Glyptodon=729563 L
+Gnome=354458 L
+Goblin=465566 L
+Goblin Shark=436653 W
+Golden Eagle=574675 A
+Golden Langur=254336 L
+Golden Lion Tamarin=163236 L
+Golden Snub-nosed Monkey=354346 L
+Golden Toad=133122 LW
+Golem=929575 L
+Goliath Beetle=448332 L
+Gomphotherium=937466 L
+Goose=454355 WA
+Gorgon=667979 L
+Gorgosaurus=875763 L
+Gorilla=845468 L
+Grant's Gazelle=373254 L
+Grasshopper=263132 L
+Gray Langur=354336 L
+Gray Whale=846385 W
+Great Auk=354253 W
+Great Grey Owl=463545 A
+Great Hammerhead=776665 W
+Great Horned Owl=564655 A
+Great White Shark=966864 W
+Greater Glider=243134 A
+Greater Kudu=665565 L
+Green Anaconda=826654 W
+Green Basilisk=265324 LW
+Green Iguana=345434 L
+Green Mamba=455933 L
+Green Sea Turtle=437273 W
+Green Tree Frog=243223 L
+Green Tree Python=425533 L
+Greenland Halibut=343343 W
+Greenland Shark=627573 W
+Grenadier=243343 W
+Grevy's Zebra=565464 L
+Grey Crowned Crane=354345 A
+Grey Reef Shark=565653 W
+Griffin=877888 A
+Griffon Vulture=453465 A
+Grizzly Bear=957766 L
+Ground Pangolin=339343 L
+Ground Sloth=826563 L
+Gulper Eel=323423 W
+Gyrfalcon=482545 A
+Haast's Eagle=774875 A
+Hagfish=235363 W
+Hamadryas Baboon=564656 L
+Hamerkop=353345 A
+Hammerhead Shark=775665 W
+Hanuman Langur=354336 L
+Harbour Porpoise=365356 W
+Harp Seal=355355 W
+Harpy=566767 A
+Harpy Eagle=674875 A
+Harris's Hawk=473547 A
+Hartebeest=575464 L
+Hatchetfish=152122 W
+Hawksbill Sea Turtle=437273 W
+Headless Horseman=765868 L
+Heath Hen=242232 L
+Heaviside's Dolphin=365357 W
+Hector's Dolphin=365357 W
+Hen Harrier=373445 A
+Hercules Beetle=558342 L
+Herrerasaurus=675664 L
+Hipparion=463454 L
+Hippo=929864 LW
+Hippo Bull=939864 LW
+Hippogriff=776777 A
+Hippopotamus=929864 LW
+Hognose Snake=234324 L
+Homotherium=866766 L
+Honey Badger=559786 L
+Honey Bee=154434 A
+Honey Possum=152134 L
+Hooded Seal=546455 W
+Hoolock Gibbon=373346 L
+Horn Shark=336443 W
+Horned Lizard=237324 L
+Hornet=356633 A
+Horsefly=263332 A
+Hourglass Dolphin=476368 W
+Housefly=172142 A
+Hoverfly=172131 A
+Howler Monkey=354346 L
+Huia=243234 A
+Hummingbird Hawk-moth=172142 A
+Humpback Whale=946485 W
+Huntsman Spider=264433 L
+Hyaenodon=765765 L
+Hydra=968986 W
+Hyena=665776 L
+Iberian Lynx=566565 L
+Ichthyosaurus=675654 W
+Ifrit=878879 A
+Iguanodon=835564 L
+Impala=473264 L
+Indian Cobra=455834 L
+Indian Leopard=775766 L
+Indo-Pacific Humpback Dolphin=465357 W
+Indri=354336 L
+Indus River Dolphin=356356 W
+Inland Taipan=455A33 L
+Irish Elk=756565 L
+Irrawaddy Dolphin=365357 W
+Ivory Gull=263245 A
+Jabiru=454445 A
+Jackalope=373347 L
+Jackson's Chameleon=233324 L
+Jaguar=875766 L
+Jaguarundi=465555 L
+Jameson's Mamba=455933 L
+Japanese Macaque=354447 L
+Japanese Spider Crab=439463 W
+Japanese Wolf=564666 L
+Javan Leopard=675765 L
+Javan Tiger=865766 L
+Jewel Beetle=146222 A
+Josephoartigasia=736453 L
+Jungle Cat=455555 L
+Kamchatka Brown Bear=957766 L
+Kangaroo=665565 L
+Katydid=154132 L
+Kauaʻi ʻōʻō=253234 A
+Kelpie=667667 W
+Kemp's Ridley Sea Turtle=437273 W
+Kentrosaurus=738763 L
+Kenyan Sand Boa=325423 L
+Killer Bee=356744 A
+King Cheetah=692655 L
+King Cobra=556935 L
+King Eider=253254 WA
+King Vulture=353355 A
+Kingsnake=335434 L
+Kitefin Shark=345543 W
+Kitsune=565679 L
+Klipspringer=363354 L
+Koala=233224 L
+Kodiak Bear=968766 L
+Kodkod=255435 L
+Komodo Dragon=747864 L
+Kori Bustard=363344 A
+Kraken=948875 W
+Kronosaurus=865864 W
+La Plata Dolphin=355356 W
+Labrador Duck=253243 WA
+Lace Monitor=456554 L
+Lacewing=152132 A
+Ladybird=145232 A
+Lambeosaurus=735364 L
+Lanner Falcon=282445 A
+Lantern Shark=135432 W
+Lanternfish=152132 W
+Lappet-faced Vulture=463465 A
+Lar Gibbon=373346 L
+Laughing Falcon=373445 A
+Laughing Kookaburra=353446 A
+Laughing Owl=253435 A
+Leafcutter Ant=236572 L
+Leafy Seadragon=113122 W
+Leatherback Sea Turtle=547383 W
+Lechwe=473354 LW
+Lemming=153133 L
+Lemon Shark=565653 W
+Leopard=775766 L
+Leopard Cat=355445 L
+Leopard Gecko=243223 L
+Leopard Seal=655765 W
+Leopard Shark=455543 W
+Leopard Tortoise=418163 L
+Leprechaun=264468 L
+Lesser Flamingo=353344 WA
+Leviathan=9389A6 W
+Liger=965866 L
+Lilac-breasted Roller=262335 A
+Lion=965867 L
+Lion's Mane Jellyfish=526731 W
+Lion-tailed Macaque=354446 L
+Lioness=875877 L
+Liopleurodon=865864 W
+Little Auk=262245 WA
+Little Penguin=254244 W
+Livyatan=966875 W
+Loch Ness Monster=856767 W
+Loggerhead Sea Turtle=437373 W
+Long-eared Owl=263445 A
+Long-finned Pilot Whale=645467 W
+Long-tailed Duck=263254 WA
+Longfin Mako=685653 W
+Luna Moth=134131 A
+Macrauchenia=654464 L
+Maiasaura=735364 L
+Majungasaurus=865763 L
+Malayan Tiger=865766 L
+Mamenchisaurus=925464 L
+Mandrill=665656 L
+Manticore=867888 L
+Mantis Shrimp=548933 W
+Many-banded Krait=335823 L
+Mapusaurus=965863 L
+Marabou Stork=454455 A
+Marbled Cat=355445 L
+Margay=365445 L
+Marine Iguana=345434 LW
+Marsupial Mole=233223 L
+Martial Eagle=674775 A
+Masai Giraffe=755465 L
+Mason Bee=153322 A
+Mastodon=926365 L
+Mata Mata=338433 W
+Mayfly=162112 A
+Medusa=568989 L
+Meerkat=254357 L
+Megalania=846764 L
+Megaloceros=756565 L
+Megalodon=A65964 W
+Megalonyx=726563 L
+Megalosaurus=865763 L
+Megamouth Shark=625253 W
+Megatherium=836563 L
+Melon-headed Whale=565367 W
+Merlin=372435 A
+Mermaid=465468 W
+Merychippus=363354 L
+Mexican Beaded Lizard=448733 L
+Mexican Grizzly Bear=957766 L
+Microraptor=263445 A
+Milk Snake=234323 L
+Minke Whale=746365 W
+Minmi=338562 L
+Minotaur=865776 L
+Moa=644454 L
+Moeritherium=535354 LW
+Mojave Rattlesnake=346933 L
+Monarch Butterfly=152162 A
+Monocled Cobra=455834 L
+Moose=845565 L
+Moray Eel=456643 W
+Mosasaurus=965865 W
+Mosquito=172392 A
+Mothman=566668 A
+Mountain Gorilla=845468 L
+Mouse Lemur=162135 L
+Mugger Crocodile=738764 LW
+Mulga Snake=455833 L
+Mummy=647677 L
+Murder Hornet=448764 A
+Muriqui=354346 L
+Muskox=847565 L
+Muskrat=244333 LW
+Mussaurus=534354 L
+Muttaburrasaurus=735364 L
+Narwhal=655566 W
+Nigersaurus=725354 L
+Nile Crocodile=839764 LW
+Nile Monitor=456654 LW
+Nodosaurus=729563 L
+North Atlantic Right Whale=928375 W
+Northeast African Cheetah=592654 L
+Northern Bottlenose Whale=745375 W
+Northern Fulmar=263354 WA
+Northern Goshawk=473645 A
+Northern Harrier=373445 A
+Northern Right Whale Dolphin=476368 W
+Northern White Rhinoceros=869764 L
+Numbat=243234 L
+Nurse Shark=536453 W
+Nyala=564454 L
+Nymph=355468 L
+Nāga=767879 W
+Oceanic Whitetip=665664 W
+Ocelot=465555 L
+Octopus=346539 W
+Ogre=846654 L
+Okapi=554354 L
+Olive Baboon=564656 L
+Olive Ridley Sea Turtle=437273 W
+Omura's Whale=746365 W
+Oncilla=355445 L
+Orange Roughy=243272 W
+Orangutan=745468 L
+Orca=966878 W
+Orchid Mantis=254435 L
+Oryx=665565 L
+Osprey=473555 A
+Ostrich=574463 L
+Ouranosaurus=735364 L
+Oviraptor=464455 L
+Owl=463545 A
+Owl Monkey=254336 L
+Pachycephalosaurus=746564 L
+Pachyrhinosaurus=847763 L
+Pacific Blackdragon=224533 W
+Pacific Sleeper Shark=626563 W
+Pacific White-sided Dolphin=476368 W
+Pademelon=253234 L
+Painted Lady=153132 A
+Pakicetus=454554 LW
+Pallas's Cat=355445 L
+Palorchestes=736563 L
+Pampas Cat=355445 L
+Panther Chameleon=233324 L
+Pantropical Spotted Dolphin=476368 W
+Paper Wasp=255533 A
+Paraceratherium=937466 L
+Paradise Flying Snake=264424 A
+Parasaurolophus=735365 L
+Parrot=263336 A
+Passenger Pigeon=262252 A
+Patagotitan=9294A4 L
+Patas Monkey=373346 L
+Peacock Butterfly=153132 A
+Peale's Dolphin=476368 W
+Pegasus=685679 A
+Pel's Fishing Owl=453545 A
+Pelagic Thresher=575664 W
+Pelican=453345 WA
+Pelican Eel=323423 W
+Peregrine Falcon=392546 A
+Perentie=556664 L
+Persian Leopard=775766 L
+Philippine Eagle=674775 A
+Philippine Tarsier=153235 L
+Phoenix=778899 A
+Phorusrhacos=665764 L
+Pilot Whale=645467 W
+Pink Cockatoo=253336 A
+Pink-headed Duck=253243 WA
+Pinta Island Tortoise=519183 L
+Piranha=346743 W
+Pixie=271258 A
+Plains Zebra=565464 L
+Plateosaurus=635364 L
+Platybelodon=836465 L
+Platypus=345534 LW
+Plesiosaurus=655654 W
+Pocket Shark=134322 W
+Polar Bear=957767 L
+Polar Cod=152232 W
+Pompeii Worm=129181 W
+Pondicherry Shark=455543 W
+Porbeagle=665654 W
+Port Jackson Shark=336443 W
+Postosuchus=756764 L
+Potoroo=243234 L
+Potto=243234 L
+Prairie Falcon=382445 A
+Praying Mantis=254535 L
+Proboscis Monkey=354345 LW
+Procoptodon=656464 L
+Protoceratops=537553 L
+Psittacosaurus=435453 L
+Pteranodon=563554 A
+Puff Adder=447833 L
+Pufferfish=238932 W
+Puku=463254 LW
+Pygmy Blue Whale=847385 W
+Pygmy Killer Whale=565467 W
+Pygmy Marmoset=152135 L
+Pygmy Right Whale=645365 W
+Pygmy Sperm Whale=545356 W
+Pyrenean Ibex=464464 L
+Qilin=777889 L
+Quagga=565464 L
+Quetzalcoatlus=774664 A
+Quokka=243235 L
+Quoll=354555 L
+Radiated Tortoise=318163 L
+Rainbow Boa=425533 L
+Rainbow Lorikeet=263236 A
+Rat Snake=334423 L
+Red Colobus=254336 L
+Red Kangaroo=765565 L
+Red Kite=373445 A
+Red-bellied Black Snake=345733 L
+Red-eared Slider=226233 W
+Red-shanked Douc=254336 L
+Red-tailed Hawk=473555 A
+Redback Spider=225832 L
+Reindeer=565475 L
+Reticulated Python=827654 L
+Rhamphorhynchus=363444 A
+Rhesus Macaque=354446 L
+Rhino=869764 L
+Rhinoceros Beetle=548332 L
+Rhinoceros Iguana=446534 L
+Rhinoceros Viper=437833 L
+Ribbon Seal=355355 W
+Ring-tailed Lemur=253336 L
+Ringed Seal=355355 W
+Ringtail Possum=243234 L
+Rinkhals=445734 L
+Risso's Dolphin=565367 W
+Roan Antelope=664565 L
+Roc=976876 A
+Rock Hyrax=244334 L
+Rock Ptarmigan=253254 A
+Rock Python=727654 L
+Rock-wallaby=363344 L
+Rocky Mountain Locust=164272 A
+Rodhocetus=554554 W
+Rosy Boa=325423 L
+Rosy Maple Moth=133131 A
+Rough Green Snake=244323 L
+Rough-legged Buzzard=363455 A
+Rough-toothed Dolphin=476368 W
+Russell's Viper=446933 L
+Rusty-spotted Cat=255435 L
+Saber-toothed Cat=866765 L
+Sable Antelope=664565 L
+Sabre-toothed Cat=866765 L
+Saker Falcon=382545 A
+Saki Monkey=254336 L
+Salmon Shark=675654 W
+Saltwater Crocodile=939865 LW
+Sand Cat=355445 L
+Sand Tiger Shark=556653 W
+Sandbar Shark=465543 W
+Sarcosuchus=939864 LW
+Sarkastodon=846665 L
+Satanic Leaf-tailed Gecko=133224 L
+Satyr=565567 L
+Sauroposeidon=9294A4 L
+Savannah Monitor=446554 L
+Saw-scaled Viper=346933 L
+Sawshark=446643 W
+Scalloped Hammerhead=675655 W
+Schomburgk's Deer=463254 L
+Scorpion=338734 L
+Sea Angel=122122 W
+Sea Butterfly=122121 W
+Sea Mink=354455 LW
+Sea Otter=354357 W
+Sea Pig=123121 W
+Sea serpent=857766 W
+Sea Spider=124222 W
+Sea Toad=133221 W
+Secretary Bird=464655 L
+Sei Whale=847385 W
+Selkie=455468 W
+Serval=475555 L
+Shantungosaurus=835364 L
+Sharp-shinned Hawk=372435 A
+Shield Bug=146322 L
+Shingleback Lizard=227323 L
+Shoebill=454545 WA
+Short-beaked Echidna=339333 L
+Short-eared Owl=263445 A
+Short-faced Bear=876766 L
+Short-finned Pilot Whale=645467 W
+Short-toed Snake Eagle=473555 A
+Shortfin Mako=685653 W
+Siamang=474346 L
+Siberian Tiger=965877 L
+Sidewinder=355833 L
+Sifaka=363336 L
+Silkworm=111111 L
+Silky Shark=565653 W
+Silverback Gorilla=855468 L
+Silverfish=153262 L
+Silvertip Shark=665654 W
+Siphonophore=224622 W
+Siren=465679 W
+Sitatunga=463254 LW
+Sivatherium=755465 L
+Sixgill Shark=736653 W
+Sleeper Shark=626563 W
+Slow Loris=223735 L
+Slow Worm=134222 L
+Small-spotted Catshark=245432 W
+Smilodon=866765 L
+Smooth Hammerhead=665654 W
+Snail Kite=363335 A
+Snapping Turtle=528764 W
+Snipe Eel=233222 W
+Snow Bunting=162244 A
+Snow Crab=227343 W
+Snow Goose=354365 A
+Snow Leopard=675766 L
+Snowshoe Hare=173253 L
+Snowy Owl=464555 A
+Softshell Turtle=436543 W
+Southern Cassowary=666763 L
+Southern Ground Hornbill=454556 L
+Southern Right Whale=928375 W
+Southern Right Whale Dolphin=476368 W
+Speartooth Shark=565543 W
+Spectacled Caiman=546654 LW
+Spectacled Cormorant=353254 WA
+Spectacled Porpoise=355356 W
+Sperm Whale=936776 W
+Sphinx=867879 L
+Spider Monkey=264347 L
+Spinner Dolphin=476368 W
+Spinner Shark=575553 W
+Spinosaurus=955864 LW
+Spiny Dogfish=345543 W
+Spiny-tailed Lizard=237334 L
+Spix's Macaw=263236 A
+Spotted Hyena=665776 L
+Spotted Owl=263445 A
+Spotted Seal=355355 W
+Spotted-tailed Quoll=455655 L
+Springbok=473264 L
+Spur-thighed Tortoise=318163 L
+Squirrel Monkey=263346 L
+Sri Lankan Leopard=775766 L
+Stag Beetle=448342 L
+Steenbok=363244 L
+Stegosaurus=828763 L
+Steller Sea Lion=665455 W
+Steller's Sea Cow=816253 W
+Steller's Sea Eagle=574675 A
+Stephens Island Wren=142123 L
+Steppe Mammoth=928576 L
+Stick Insect=113233 L
+Stingray=346733 W
+Stoat=375555 L
+Stoplight Loosejaw=224533 W
+Striped Dolphin=476368 W
+Striped Hyena=565665 L
+Styracosaurus=847763 L
+Suchomimus=855764 LW
+Sugar Glider=163235 A
+Sulcata Tortoise=419163 L
+Sulphur-crested Cockatoo=263336 A
+Sumatran Orangutan=745468 L
+Sumatran Rhinoceros=758764 L
+Sumatran Tiger=865766 L
+Sunda Clouded Leopard=665756 L
+Sunda Leopard Cat=355445 L
+Superb Lyrebird=253236 L
+Svalbard Reindeer=464475 L
+Swainson's Hawk=473555 A
+Swallow-tailed Kite=373445 A
+Swallowtail Butterfly=153131 A
+Swan=454354 WA
+Swell Shark=236432 W
+Swordfish=684654 W
+Sydney Funnel-web Spider=346933 L
+Synthetoceras=564454 L
+Tapanuli Orangutan=745468 L
+Tarantula=346633 L
+Tarantula Hawk=458733 A
+Tarbosaurus=965863 L
+Tarpan=565464 L
+Tasmanian Devil=548765 L
+Tasselled Wobbegong=436543 W
+Tawny Eagle=474565 A
+Tawny Frogmouth=243334 A
+Tawny Nurse Shark=536453 W
+Tawny Owl=463545 A
+Telescope Octopus=223233 W
+Tengu=566778 A
+Termite=135363 L
+Terror Bird=665764 L
+Therizinosaurus=847864 L
+Thick-billed Murre=263254 WA
+Thomson's Gazelle=383254 L
+Thorny Devil=128223 L
+Thresher Shark=575664 W
+Thunderbird=877887 A
+Thylacine=465565 L
+Thylacoleo=756765 L
+Thylacosmilus=756764 L
+Tiger=965877 L
+Tiger Beetle=274542 L
+Tiger Shark=865764 W
+Tiger Snake=455833 L
+Tigon=865766 L
+Timber Rattlesnake=346833 L
+Titan Beetle=558332 L
+Titanis=665764 L
+Titanoboa=927754 W
+Tokay Gecko=345434 L
+Tomistoma=637753 W
+Toolache Wallaby=373344 L
+Topi=575464 L
+Toxodon=735464 L
+Tree-kangaroo=354334 L
+Triceratops=838863 L
+Triplewart Seadevil=224433 W
+Tripod Fish=123232 W
+Troll=846665 L
+Troodon=473458 L
+Tuatara=246434 L
+Tucuxi=365357 W
+Tupandactylus=463454 A
+Turkey Vulture=353365 A
+Twig Snake=235833 L
+Tyrannosaurus=A65865 L
+Uintatherium=836564 L
+Unicorn=766778 L
+Uromastyx=236334 L
+Utahraptor=775766 L
+Valkyrie=777789 A
+Vampire=676878 L
+Vampire Squid=234334 W
+Vaquita=355356 W
+Veiled Chameleon=233324 L
+Velociraptor=575667 L
+Velvet Ant=248732 L
+Vervet Monkey=354346 L
+Vine Snake=245723 L
+Viperfish=235633 W
+Vulture=453465 A
+Wallaby=363344 L
+Walrus=746565 W
+Warthog=546664 L
+Water Strider=173132 W
+Waterbuck=564454 LW
+Weaver Ant=236652 L
+Wedge-tailed Eagle=574675 A
+Weedy Seadragon=113122 W
+Weevil=127221 L
+Wendigo=866778 L
+Werewolf=866877 L
+Western Black Rhinoceros=869764 L
+Western Diamondback Rattlesnake=446933 L
+Western Lowland Gorilla=845468 L
+Western Marsh Harrier=373445 A
+Western Tarsier=153235 L
+Weta=245332 L
+Whale Shark=8263A5 W
+White Lion=965866 L
+White Rhinoceros=959764 L
+White Tiger=965866 L
+White-beaked Dolphin=476368 W
+White-tailed Eagle=574675 A
+Whitenose Shark=455543 W
+Whitetip Reef Shark=465543 W
+Wildcat=455545 L
+Wildebeest=665575 L
+Wobbegong=436543 W
+Wolf=665777 L
+Wolf Snake=334423 L
+Wolverine=657786 L
+Woolly Mammoth=928576 L
+Woolly Monkey=354346 L
+Woolly Rhinoceros=858764 L
+Wyvern=878877 A
+Xenosmilus=866765 L
+Xerces Blue=152121 A
+Yellow-bellied Sea Snake=355833 W
+Yellowjacket=356633 A
+Yeti=856677 L
+Yeti Crab=237342 W
+Yutyrannus=865764 L
+Zanzibar Leopard=675765 L
+Zebra=565464 L
+Zebra Shark=446453 W
+Zombie=636396 L
+Zombie Worm=114181 W
+Zygomaturus=836464 L
+`;
+const STATS_POWERS = `
+Flight=34936
+Invisibility=27577
+Teleportation=26A86
+Time Travel=37698
+Super Strength=97425
+Mind Reading=25269
+Super Speed=769A5
+Healing=19274
+Immortality=2A355
+Shapeshifting=46689
+Telekinesis=86675
+Freeze Time=58796
+X-Ray Vision=22258
+Control Weather=95577
+Fire Powers=94534
+Ice Powers=86534
+Talk to Animals=33256
+Speak Every Language=12269
+Super Intelligence=3446A
+Mind Control=86378
+Clone Yourself=55578
+Elasticity=56564
+Breathe Underwater=24455
+Night Vision=22346
+Super Luck=46466
+Force Field=3A344
+Laser Eyes=94345
+Infinite Money=21384
+Never Need Sleep=13456
+Photographic Memory=11368
+Super Hearing=23357
+Intangibility=29655
+Duplication=65577
+Regeneration=39454
+Gravity Control=96777
+Size Changing=76465
+Water Powers=86564
+Earth Powers=97354
+Electricity Powers=94565
+Super Jump=44834
+Wall Crawling=24634
+Portals=46987
+Technopathy=55679
+Telepathy=35369
+Animal Shapeshifting=66766
+Danger Sense=47356
+Super Charisma=23468
+Plant Control=66464
+Sound Waves=85454
+Rewind 10 Seconds=48577
+Flight + Super Strength=96A57
+Teleportation + Invisibility=48A87
+Time Travel + Healing=3A6A8
+Mind Reading + Shapeshifting=46699
+Super Speed + Intangibility=7AA75
+Telekinesis + Flight=96A76
+Immortality + Healing Others=2A576
+Weather Control + Flight=96987
+Invisibility + Super Hearing=36578
+Elemental Powers + Teleportation=A6A86
+Animal Talk + Shapeshifting=56778
+Duplication + Super Intelligence=6658A
+Time Freeze + Super Speed=79A97
+Laser Eyes + Flight=94A46
+Regeneration + Super Strength=99645
+Portals + Mind Control=869A8
+Ice Powers + Water Breathing=87675
+Telepathy + Teleportation=45A89
+Luck Manipulation + Charisma=46578
+Gravity Control + Flight=97A77
+Technopathy + Invisibility=57789
+Size Changing + Super Strength=97565
+Healing + Super Speed=59A85
+Invisibility + Flight=37A77
+Shapeshifting + Telepathy=4669A
+Fire Powers + Ice Powers=A6655
+Telekinesis + Super Intelligence=8679A
+Teleportation + Time Freeze=69A98
+Super Strength + Invulnerability=9A535
+Mind Reading + Time Travel=3679A
+Laser Eyes + X-Ray Vision=94367
+Duplication + Teleportation=66A88
+Animal Control + Flight=75876
+Super Luck + Time Travel=47788
+Photographic Memory + Speed Reading=1137A
+Force Fields + Super Strength=9A445
+Plant Control + Healing=6A575
+Weather Control + Lightning=A6677
+Night Vision + Invisibility=37578
+Speak Every Language + Teleportation=26A88
+Intangibility + Teleportation=2AA87
+Gravity Control + Super Strength=A7767
+Healing + Immortality=2A375
+Mind Control + Invisibility=86589
+Water Breathing + Talk to Animals=34566
+Technopathy + Super Intelligence=5557A
+Elasticity + Super Strength=97665
+Super Speed + Never Need Sleep=769A6
+`;
+const STATS_WORST = `
+Talk to fish (they're boring)=111229
+Invisible only when nobody's looking=121128
+Super speed, but backwards=213318
+Teleport one metre=113327
+Read pigeons' minds=111237
+Turn into a chair=131116
+Super strength in your little toe=311117
+X-ray vision through socks only=111128
+Fly 2 cm off the ground=112218
+Control the weather in one room=212438
+Predict the past=111229
+Glow in the dark=111326
+Hair changes colour at random=111119
+Super hearing you can't switch off=111237
+Shoot spaghetti from your hands=211319
+Summon one random sock=111219
+Endless hiccups=111119
+Breathe underwater, in bathtubs only=111117
+Talk to plants that ignore you=111128
+Freeze time, but you freeze too=121119
+Invisible to cats only=121127
+Make toast slightly warmer=111316
+Always know the time (to the second)=111337
+Change the TV channel with your mind (only to the news)=111228
+Smell colours=111238
+Super strength, but only when sneezing=411118
+Teleport, but only to your school=113217
+Talk to bugs who only complain=111228
+Invisible clothes, not you=111119
+Fly, but only 1 km/h=112218
+Super speed, only while walking backwards in sand=112118
+Turn water into slightly warmer water=111316
+Mind reading, only for babies=111237
+Summon a spoon (once a day)=111217
+Perfect memory of every ad you've seen=111138
+Grow your fingernails instantly=211217
+Shoot bubbles from your nose=111219
+Know everyone's shoe size=111237
+Change the colour of bananas=111119
+Telekinesis for paper clips only=211327
+Breathe fire, but it's cold=211219
+Sneeze glitter=111219
+Turn into a pigeon at random=113219
+Hear every phone ringing in the city=111236
+Know when food is about to burn, 1 second late=111128
+Turn invisible when you sleep=121118
+Heal others, but you get their cold=111428
+Talk to computers who don't answer=111228
+Control traffic lights, but only red=211428
+Make anyone sleepy, including yourself=212328
+Every door you open squeaks=111119
+Stretch your arms 1 cm=111217
+Change channels on other people's TVs=111328
+Super jump, only on stairs=113218
+Always find the slowest queue=111119
+Super taste, but everything tastes like broccoli=111119
+Freeze objects, but only ice=111127
+Become immortal at age 90=141127
+Light up like a lamp when nervous=111326
+Glow in the dark, only in daylight=111119
+Understand cats, who hate you=111239
+Duplicate yourself, but the copy is lazy=212338
+Shapeshift, only into a teapot=121229
+Predict the weather, 5 minutes late=111228
+`;
+const STATS_SURVIVAL = `
+Baseball Bat=6 W
+Crowbar=7 WU
+Katana=8 W
+Frying Pan=5 WF
+Bow & Arrow=7 WF
+Chainsaw=7 WU
+Hockey Stick=5 W
+Pickaxe=6 WU
+Flashlight=6 L
+Rope=6 UT
+Map=6 N
+Compass=5 N
+Radio=7 N
+Lighter=7 L
+Toolbox=7 U
+Binoculars=5 N
+Pocket Knife=6 UW
+Canned Food=8 F
+Water Bottles=8 H
+First Aid Kit=9 M
+Batteries=6 L
+Energy Bars=7 F
+Sleeping Bag=7 S
+Duct Tape=7 U
+Dog=8 WO
+Bicycle=6 T
+Motorbike=8 T
+Shopping Cart=3 TO
+Walkie-Talkies=6 N
+Night-Vision Goggles=7 LN
+Machete=8 WU
+Sledgehammer=6 WU
+Spear=6 WF
+Golf Club=4 W
+Cricket Bat=6 W
+Axe=8 WU
+Shovel=5 WU
+Crossbow=8 WF
+Slingshot=4 WF
+Hammer=5 WU
+Lockpick Set=6 U
+Multi-tool=8 U
+Bolt Cutters=6 U
+Wind-up Torch=7 L
+Solar Charger=6 LN
+Water Filter=9 H
+Fire Starter=8 L
+Whistle=3 N
+Tarp=6 S
+Sewing Kit=4 UM
+Rice Sack=8 F
+Peanut Butter=7 F
+Tuna Cans=7 F
+Instant Noodles=6 FO
+Honey=6 FM
+Dried Fruit=6 F
+Protein Bars=7 F
+Painkillers=7 M
+Bandages=7 M
+Water Purification Tablets=8 H
+Warm Blanket=6 S
+Rain Poncho=5 S
+Spare Socks=4 SO
+Hiking Boots=6 ST
+Backpack=7 T
+Candles=4 LO
+Matches=6 L
+Seeds to Grow Food=7 F
+Salt=4 F
+Coffee=4 O
+Chocolate=5 FO
+Vitamins=5 M
+Soap=5 M
+Toilet Paper=4 O
+Garbage Bags=4 S
+Armoured Car=9 TW
+Boat=8 T
+Horse=7 T
+Skateboard=4 T
+Drone=6 N
+Ladder=5 U
+Tent=7 S
+Generator=8 L
+Hazmat Suit=7 M
+Riot Shield=8 W
+Motorcycle Helmet=5 W
+Trained Medic Friend=9 MO
+Knife=8 UF
+Fishing Rod=8 F
+Satellite Phone=9 N
+Hammock=5 SO
+Sunscreen=6 M
+Sun Hat=5 S
+Football=4 O
+Guitar=5 O
+Box of Books=4 O
+Sack of Rice=7 F
+Snorkel Set=6 F
+Kayak=7 T
+Speaker=4 O
+Hot Sauce=3 O
+Pillow=4 SO
+Your Best Friend=8 OU
+Your Pet=6 O
+Flare Gun=8 N
+Inflatable Boat=8 T
+Mosquito Net=6 M
+Endless Snacks=9 F
+Mirror=5 N
+Cooking Pot=7 FH
+Spear Gun=8 F
+Life Jacket=6 T
+Waterproof Matches=8 L
+Seeds=6 F
+Chickens=7 F
+Goat=7 FH
+Notebook & Pen=3 O
+Deck of Cards=4 O
+Volleyball=3 O
+Sunglasses=4 M
+Flip-flops=3 S
+Toothbrush=3 M
+Hot Chocolate=4 O
+Bag of Dates=7 F
+Solar Fridge=6 F
+`;
+const STATS_CUTE = `
+Red Panda=8679
+Quokka=5698
+Sea Otter=7589
+Fennec Fox=7778
+Hedgehog=5868
+Koala=8468
+Giant Panda=8398
+Kitten=8879
+Puppy=8789
+Bunny=9768
+Hamster=7877
+Sloth=5476
+Penguin Chick=8888
+Axolotl=2777
+Harp Seal Pup=9579
+Pygmy Marmoset=6967
+Meerkat=4588
+Chinchilla=9766
+Capybara=4387
+Corgi=6597
+Duckling=7967
+Lamb=8577
+Baby Elephant=1489
+Pygmy Goat=5797
+Arctic Fox=9567
+Shiba Inu=7588
+Baby Koala=8879
+Fluffy Owlet=9878
+Baby Hedgehog=6978
+Baby Capybara=5689
+Bunny Kit=9978
+Baby Red Panda=8889
+Baby Otter=7789
+Panda Cub=9789
+Koala Joey=8879
+Baby Penguin=8888
+Puffin=4677
+Guinea Pig=6867
+Netherland Dwarf Rabbit=8968
+Lop Rabbit=8778
+Golden Retriever Puppy=8689
+Pomeranian=9878
+Samoyed=9479
+Corgi Puppy=7799
+French Bulldog=2588
+Pug=2697
+Baby Goat=5898
+Piglet=2788
+Calf=3577
+Foal=4577
+Fawn=3678
+Baby Hippo=1599
+Baby Giraffe=2588
+Baby Sloth=6688
+Pygmy Hedgehog=6968
+Sugar Glider=6977
+Fennec Fox Kit=7889
+Red Fox Kit=7778
+Snow Leopard Cub=9679
+Lion Cub=7679
+Tiger Cub=7679
+Polar Bear Cub=9689
+Baby Seal=8679
+Sea Lion Pup=5678
+Beluga Calf=2678
+Dumbo Octopus=1787
+Pygmy Hippo=2697
+Slow Loris=6758
+Sand Cat=7778
+Pallas's Cat=9488
+Ermine=6867
+Long-tailed Tit=8967
+Chick=8977
+Baby Owl=9878
+Alpaca=8486
+Marmot=6577
+Chipmunk=5877
+Dormouse=6977
+Harvest Mouse=5977
+Jerboa=4887
+Pika=6977
+Wombat Joey=5788
+Golden Retriever=8389
+German Shepherd=6266
+Husky=8378
+Persian Cat=9256
+Siamese Cat=2467
+Maine Coon=9157
+Sphynx Cat=1475
+Ragdoll Cat=9268
+Rabbit=8668
+Parrot=1374
+Budgie=2766
+Goldfish=1854
+Turtle=1754
+Bearded Dragon=1563
+Snake=1442
+Ferret=5587
+Horse=3157
+Mini Pig=2687
+Goat=4386
+Chicken=6566
+Duck=5576
+Tarantula=4531
+Labrador=5378
+Beagle=4677
+Dachshund=3797
+Poodle=8467
+Chihuahua=2886
+Border Collie=6267
+Bulldog=2286
+Cavapoo=8678
+British Shorthair=7357
+Bengal Cat=4366
+Scottish Fold=7478
+Russian Blue=5356
+Tabby Cat=6466
+Black Cat=6467
+Orange Cat=6488
+Calico Cat=6467
+Birman=8357
+Abyssinian=3466
+Norwegian Forest Cat=9157
+Exotic Shorthair=7477
+Cockatiel=4767
+Canary=3864
+Gecko=1765
+Hermit Crab=1872
+Gerbil=5866
+Rat=3566
+Mouse=4865
+Pony=6577
+Betta Fish=1863
+Koi=1453
+Labrador Retriever=5378
+Rottweiler=3156
+Siberian Husky=8378
+Pembroke Welsh Corgi=6597
+Australian Shepherd=7377
+Dobermann=1155
+Great Dane=1176
+Boxer=2276
+Shih Tzu=8778
+Yorkshire Terrier=7867
+Bernese Mountain Dog=8178
+Cavalier King Charles Spaniel=7679
+Saluki=4255
+Akita=7266
+Dalmatian=2366
+Bull Terrier=2286
+Newfoundland=9177
+Maltese=8867
+Greyhound=1265
+Belgian Malinois=4255
+Cocker Spaniel=7577
+Chow Chow=9268
+Alaskan Malamute=8277
+Bichon Frise=9778
+Boston Terrier=2787
+Cane Corso=1145
+Dogo Argentino=1145
+English Springer Spaniel=6477
+Irish Setter=6266
+Irish Wolfhound=5166
+Jack Russell Terrier=3786
+Labradoodle=8478
+Goldendoodle=8479
+Lhasa Apso=8767
+Mastiff=2165
+Old English Sheepdog=9187
+Papillon=6867
+Pekingese=8767
+Pit Bull=1266
+Rhodesian Ridgeback=1255
+Saint Bernard=7178
+Schnauzer=5577
+Scottish Terrier=6667
+Shetland Sheepdog=8577
+Weimaraner=1366
+Whippet=1366
+West Highland White Terrier=7777
+Vizsla=1366
+Basenji=2466
+Basset Hound=2387
+Bloodhound=2286
+Borzoi=6276
+Afghan Hound=8276
+Great Pyrenees=9168
+Leonberger=8177
+Tibetan Mastiff=9165
+Xoloitzcuintle=1476
+Persian=9256
+Siamese=2467
+Ragdoll=9268
+Bengal=4366
+Sphynx=1475
+Siberian=9257
+Devon Rex=2788
+Cornish Rex=2677
+Savannah=3266
+Turkish Angora=8366
+Turkish Van=7377
+Egyptian Mau=3366
+American Shorthair=5466
+Burmese=3567
+Himalayan=9257
+Ragamuffin=9268
+Munchkin=5888
+Tonkinese=4567
+Arabian Mau=3465
+Donskoy=1474
+Ukrainian Levkoy=1474
+Bombay=3467
+Chartreux=6367
+Korat=3466
+LaPerm=6467
+Manx=4577
+Nebelung=7356
+Ocicat=3366
+Oriental Shorthair=2477
+Peterbald=1475
+Pixie-bob=5376
+Selkirk Rex=7477
+Singapura=3767
+Snowshoe=4467
+Somali=6366
+Toyger=4366
+American Curl=5577
+American Bobtail=5367
+Balinese=6367
+Burmilla=6467
+Cymric=6577
+Havana Brown=3366
+Japanese Bobtail=4477
+Kurilian Bobtail=6366
+Lykoi=2582
+Minuet=6888
+Ojos Azules=4466
+Highlander=4276
+Chausie=3265
+Serengeti=3366
+Sokoke=3366
+Thai=3466
+Aegean Cat=4366
+Khao Manee=4468
+Mekong Bobtail=4467
+Australian Mist=5467
+German Rex=3567
+`;
+const SURVIVAL_TAGS = {
+  W: ['Defence', '🛡️'],
+  U: ['Tools', '🔧'],
+  F: ['Food', '🍲'],
+  H: ['Water', '💧'],
+  M: ['Medical', '🩹'],
+  S: ['Shelter', '⛺'],
+  L: ['Light & fire', '🔥'],
+  N: ['Signal & map', '📡'],
+  T: ['Travel', '🚲'],
+  O: ['Morale', '🙂']
+};
+const STAT_SETS = {
+  fight: {
+    src: STATS_ANIMALS,
+    keys: ['Power', 'Speed', 'Defence', 'Weapons', 'Stamina', 'Smarts'],
+    short: ['POW', 'SPD', 'DEF', 'WPN', 'STA', 'SMT']
+  },
+  powers: {
+    src: STATS_POWERS,
+    keys: ['Attack', 'Defence', 'Movement', 'Utility', 'Brains'],
+    short: ['ATK', 'DEF', 'MOV', 'UTL', 'BRN']
+  },
+  weird: {
+    src: STATS_WORST,
+    keys: ['Attack', 'Defence', 'Movement', 'Utility', 'Brains', 'Chaos'],
+    short: ['ATK', 'DEF', 'MOV', 'UTL', 'BRN', 'CHS']
+  },
+  survival: {
+    src: STATS_SURVIVAL,
+    keys: ['Usefulness'],
+    short: ['USE']
+  },
+  cute: {
+    src: STATS_CUTE,
+    keys: ['Fluffy', 'Tiny', 'Funny', 'Charm'],
+    short: ['FLF', 'TNY', 'FUN', 'CHM']
+  }
+};
+const statNum = c => c === 'A' ? 10 : +c || 5;
+const statTables = {};
+function statTable(kindId) {
+  if (statTables[kindId]) return statTables[kindId];
+  const set = STAT_SETS[kindId];
+  const map = {};
+  if (set) set.src.trim().split('\n').forEach(line => {
+    const i = line.lastIndexOf('=');
+    if (i > 0) map[line.slice(0, i).trim().toLowerCase()] = line.slice(i + 1).trim();
+  });
+  return statTables[kindId] = map;
+}
+const HAB_OF_POS = {
+  land: 'L',
+  sea: 'W',
+  water: 'W',
+  air: 'A'
+};
+function itemStats(topic, item) {
+  const kindId = battleKindId(topic);
+  const set = kindId && STAT_SETS[kindId];
+  if (!set || !item) return null;
+  const raw = statTable(kindId)[(item.name || '').trim().toLowerCase()];
+  const listed = !!raw;
+  let vals,
+    hab = '',
+    tags = '';
+  if (kindId === 'survival') {
+    const [n, t] = (raw || '').split(' ');
+    const pos = (item.pos || '').toLowerCase();
+    vals = [raw ? statNum(n) : 5];
+    tags = raw ? t || '' : pos === 'weapon' ? 'W' : pos === 'tool' ? 'U' : pos === 'supply' ? 'F' : 'O';
+  } else {
+    const [code, h] = (raw || '').split(' ');
+    vals = set.keys.map((_, k) => raw ? statNum(code[k]) : clamp(Math.round(4 + unit('stat', item.name, k) * 3), 1, 10));
+    hab = kindId === 'fight' ? h || HAB_OF_POS[(item.pos || '').toLowerCase()] || 'L' : '';
+  }
+  return {
+    kind: kindId,
+    keys: set.keys,
+    short: set.short,
+    vals,
+    hab,
+    tags,
+    listed
+  };
+}
+const statTotal = s => s ? s.vals.reduce((a, b) => a + b, 0) : 0;
 const PHOTO_TOPICS = {
   't-pl': {
     'Tony Adams': 'Tony Adams (footballer)'
@@ -27002,6 +28699,9 @@ function ItemCard({
   }), isFootball(d.topic) && React.createElement(RatingChip, {
     item: item,
     topic: d.topic
+  }), hasBattle(d.topic) && React.createElement(StatChip, {
+    item: item,
+    topic: d.topic
   })), React.createElement("div", {
     className: "nm"
   }, item.name), item.desc && React.createElement("div", {
@@ -30787,10 +32487,10 @@ function SettingsScreen({
     style: {
       margin: 0
     }
-  }, "How big everything looks when this device shows the TV view."), React.createElement("h3", null, "\u26BD Player numbers"), React.createElement(Seg, {
+  }, "How big everything looks when this device shows the TV view."), React.createElement("h3", null, "\uD83D\uDCCA Player numbers & stats"), React.createElement(Seg, {
     label: "Player numbers",
     value: settings.numbers === 'off' ? 'off' : 'on',
-    options: [['on', 'Show Now / Prime'], ['off', 'Hide']],
+    options: [['on', 'Show'], ['off', 'Hide']],
     onChange: v => setS({
       numbers: v
     })
@@ -30799,7 +32499,7 @@ function SettingsScreen({
     style: {
       margin: 0
     }
-  }, "On football topics each player shows one estimated number, labelled ", React.createElement("b", null, "Now"), " (current players, as they are today) or ", React.createElement("b", null, "Prime"), " (legends, at their peak). Hiding them doesn\u2019t change how matches play.")), tab === 'online' && React.createElement("section", {
+  }, "On football topics each player shows one estimated number, labelled ", React.createElement("b", null, "Now"), " (current players, as they are today) or ", React.createElement("b", null, "Prime"), " (legends, at their peak). On simulation topics (animals, superpowers, survival, cute) each item has \uD83D\uDCCA stats. All of these are Draft Night estimates. Hiding them doesn\u2019t change how matches or simulations play.")), tab === 'online' && React.createElement("section", {
     className: "card stack",
     role: "tabpanel"
   }, React.createElement("h3", null, "\uD83C\uDF10 Online"), React.createElement("p", {
@@ -31753,6 +33453,12 @@ class Boundary extends React.Component {
   }
 }
 if (window.__DN_TEST__) window.__DN = {
+  simStats: {
+    itemStats,
+    statTotal,
+    STAT_SETS,
+    statTable
+  },
   finale: {
     simulateBattle,
     hasBattle,
@@ -32148,6 +33854,84 @@ function BattleSummary({
     }
   }, "Just for fun: the pick the room paid more for has the edge in each duel (never more than 78%), and luck does the rest. It\u2019s not a real prediction."));
 }
+const HAB_NAME = {
+  L: '🌍 Land',
+  W: '🌊 Water',
+  A: '🪽 Air'
+};
+function StatCard({
+  item,
+  topic
+}) {
+  const s = itemStats(topic, item);
+  if (!s) return null;
+  return React.createElement("div", {
+    className: "ratingcard statcard"
+  }, React.createElement("div", {
+    className: "rc-top"
+  }, React.createElement("span", {
+    className: "rc-ovr num"
+  }, s.kind === 'survival' ? s.vals[0] : statTotal(s)), React.createElement("span", {
+    className: "rc-role"
+  }, s.kind === 'survival' ? 'Useful' : 'Total'), React.createElement("span", {
+    className: "rc-name"
+  }, item.name)), s.kind === 'survival' ? React.createElement("div", {
+    className: "st-tags"
+  }, (s.tags || '').split('').filter(t => SURVIVAL_TAGS[t]).map(t => React.createElement("span", {
+    key: t,
+    className: "st-tag"
+  }, SURVIVAL_TAGS[t][1], " ", SURVIVAL_TAGS[t][0]))) : React.createElement("div", {
+    className: "rc-attrs"
+  }, s.keys.map((k, i) => React.createElement("div", {
+    key: k,
+    className: "rc-attr"
+  }, React.createElement("span", {
+    className: "k",
+    title: k
+  }, s.short[i]), React.createElement("span", {
+    className: "bar"
+  }, React.createElement("i", {
+    style: {
+      width: s.vals[i] * 10 + '%'
+    }
+  })), React.createElement("span", {
+    className: "v num"
+  }, s.vals[i])))), s.hab && React.createElement("p", {
+    className: "small",
+    style: {
+      margin: 0
+    }
+  }, "Home turf: ", React.createElement("b", null, s.hab.split('').map(h => HAB_NAME[h]).join(' + '))), React.createElement("p", {
+    className: "hint",
+    style: {
+      margin: 0
+    }
+  }, s.listed ? 'Draft Night’s own estimate (1–10), not real data. The simulation uses these numbers.' : 'Not in our list (maybe one of your own items), so it gets a fair middle estimate.'));
+}
+function StatChip({
+  item,
+  topic
+}) {
+  const [open, setOpen] = useState(false);
+  const s = itemStats(topic, item);
+  if (!s || !numbersShown()) return null;
+  const head = s.kind === 'survival' ? 'Useful ' + s.vals[0] : s.short.map((k, i) => i < 2 ? k + ' ' + s.vals[i] : null).filter(Boolean).join(' · ');
+  return React.createElement(React.Fragment, null, React.createElement("button", {
+    type: "button",
+    className: "ratingchip statchip",
+    onClick: () => setOpen(true),
+    "aria-label": 'Stats for ' + item.name + '. Show details'
+  }, "\uD83D\uDCCA ", head), open && ReactDOM.createPortal(React.createElement(Sheet, {
+    center: true,
+    onClose: () => setOpen(false)
+  }, React.createElement(StatCard, {
+    item: item,
+    topic: topic
+  }), React.createElement("button", {
+    className: "btn btn-ghost",
+    onClick: () => setOpen(false)
+  }, "Close")), document.body));
+}
 const EST_LABEL = 'Estimated by Draft Night · not official EA Sports FC / FIFA numbers';
 const ATTR_NAMES = {
   PAC: 'Pace',
@@ -32219,7 +34003,7 @@ function RatingChip({
     "aria-label": era + ' ' + r.ovr + (r.estimated ? ', estimated' : '') + '. Show details'
   }, era, " ", React.createElement("b", {
     className: "num"
-  }, r.ovr), r.estimated ? ' est.' : ''), open && React.createElement(Sheet, {
+  }, r.ovr), r.estimated ? ' est.' : ''), open && ReactDOM.createPortal(React.createElement(Sheet, {
     center: true,
     onClose: () => setOpen(false)
   }, React.createElement(RatingCard, {
@@ -32228,7 +34012,7 @@ function RatingChip({
   }), React.createElement("button", {
     className: "btn btn-ghost",
     onClick: () => setOpen(false)
-  }, "Close")));
+  }, "Close")), document.body));
 }
 function TeamRatingPanel({
   d,

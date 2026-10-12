@@ -89,3 +89,46 @@ function BattleSummary({ d, A, B, match }) {
     </div>
   );
 }
+
+/* ---------- stat cards for simulation topics ---------- */
+const HAB_NAME = { L: '🌍 Land', W: '🌊 Water', A: '🪽 Air' };
+function StatCard({ item, topic }) {
+  const s = itemStats(topic, item);
+  if (!s) return null;
+  return (
+    <div className="ratingcard statcard">
+      <div className="rc-top">
+        <span className="rc-ovr num">{s.kind === 'survival' ? s.vals[0] : statTotal(s)}</span>
+        <span className="rc-role">{s.kind === 'survival' ? 'Useful' : 'Total'}</span>
+        <span className="rc-name">{item.name}</span>
+      </div>
+      {s.kind === 'survival' ? (
+        <div className="st-tags">{(s.tags || '').split('').filter((t) => SURVIVAL_TAGS[t]).map((t) => <span key={t} className="st-tag">{SURVIVAL_TAGS[t][1]} {SURVIVAL_TAGS[t][0]}</span>)}</div>
+      ) : (
+        <div className="rc-attrs">
+          {s.keys.map((k, i) => (
+            <div key={k} className="rc-attr">
+              <span className="k" title={k}>{s.short[i]}</span>
+              <span className="bar"><i style={{ width: s.vals[i] * 10 + '%' }} /></span>
+              <span className="v num">{s.vals[i]}</span>
+            </div>
+          ))}
+        </div>
+      )}
+      {s.hab && <p className="small" style={{ margin: 0 }}>Home turf: <b>{s.hab.split('').map((h) => HAB_NAME[h]).join(' + ')}</b></p>}
+      <p className="hint" style={{ margin: 0 }}>{s.listed ? 'Draft Night’s own estimate (1–10), not real data. The simulation uses these numbers.' : 'Not in our list (maybe one of your own items), so it gets a fair middle estimate.'}</p>
+    </div>
+  );
+}
+function StatChip({ item, topic }) {
+  const [open, setOpen] = useState(false);
+  const s = itemStats(topic, item);
+  if (!s || !numbersShown()) return null;
+  const head = s.kind === 'survival' ? 'Useful ' + s.vals[0] : s.short.map((k, i) => (i < 2 ? k + ' ' + s.vals[i] : null)).filter(Boolean).join(' · ');
+  return (
+    <>
+      <button type="button" className="ratingchip statchip" onClick={() => setOpen(true)} aria-label={'Stats for ' + item.name + '. Show details'}>📊 {head}</button>
+      {open && ReactDOM.createPortal(<Sheet center onClose={() => setOpen(false)}><StatCard item={item} topic={topic} /><button className="btn btn-ghost" onClick={() => setOpen(false)}>Close</button></Sheet>, document.body)}
+    </>
+  );
+}

@@ -614,3 +614,6 @@ html[data-motion="reduce"] *,html[data-motion="reduce"] *::before,html[data-moti
 .choosewin{border-color:var(--gold)}
 .choosewin .btn{flex-direction:column;gap:2px;padding-top:12px;padding-bottom:12px;white-space:normal;line-height:1.15}
 .cw-sub{display:block;font-family:var(--body);font-size:12px;font-weight:600;text-transform:none;letter-spacing:0;opacity:.8}
+.statchip{font-family:var(--cond);font-size:12px}
+.st-tags{display:flex;flex-wrap:wrap;gap:6px}
+.st-tag{background:#1b1530;color:var(--gold);border-radius:999px;padding:3px 10px;font-weight:800;font-size:13px}
