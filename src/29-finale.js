@@ -87,6 +87,7 @@ const COMMENT = {
 };
 const pickLine = (rng, k, vars) => { const ls = COMMENT[k]; return ls[Math.floor(rng() * ls.length)].replace(/\{(\w)\}/g, (_, v) => (vars && vars[v]) || ''); };
 function squad(d, m) {
+  if (isPuppyBowl(d.topic)) return puppySquad(d, m);
   const rows = m.team.map((t, i) => (t ? { name: d.items[t.itemId].name, role: roleOf(d.items[t.itemId], d.rules.slots[i]), r: playerRating(d.items[t.itemId]) } : null)).filter(Boolean);
   return rows;
 }
@@ -127,11 +128,12 @@ function strength2(sq, emptySlots) {
   return { att: att * depth, mid: md * depth, def: df * depth, gk: keeper };
 }
 function poisson(rng, lambda) { const L = Math.exp(-lambda); let k = 0, p = 1; do { k++; p *= rng(); } while (p > L && k < 20); return k - 1; }
-function expectedGoals(st, home) {
+function expectedGoals(st, home, delta) {
   return [0, 1].map((i) => {
     const o = st[1 - i];
     let x = 1.3 * Math.pow(st[i].att / o.def, 1.7) * Math.pow(st[i].mid / o.mid, 0.5) * Math.pow(68 / Math.max(30, o.gk), 0.6);
     if (home === i) x += 0.15;
+    if (delta) x += delta[i] || 0;
     return clamp(x, 0.2, 3.2);
   });
 }
@@ -148,7 +150,7 @@ function simulateMatch(d, A, B, key, knockout, opts) {
   sq.forEach((s, i) => { if (!s.some((p) => p.role === 'GK')) notes.push((i ? B : A).name + ' has no goalkeeper, so an outfield player goes in goal.'); });
   const st = sq.map((s, i) => strength2(s, empty[i]));
   const home = opts && (opts.home === 0 || opts.home === 1) ? opts.home : null;
-  const xg = expectedGoals(st, home);
+  const xg = expectedGoals(st, home, opts && opts.xgDelta);
   const goals = xg.map((x) => poisson(rng, x));
   const stoppage = 1 + Math.floor(rng() * 5);
   const seqs = [];
@@ -446,7 +448,7 @@ function championStory(d) {
   if (!games.length) return champ.name + ' was the only team with players, so they win by default.';
   const bits = [];
   const rec = finaleRecord(d, champ.id);
-  if (needsMatch(f.mode) && !isFootball(d.topic)) bits.push('Won ' + rec.won + ' of ' + rec.played + ' battle' + (rec.played === 1 ? '' : 's') + ', winning ' + rec.gf + ' rounds and losing ' + rec.ga + '.');
+  if (needsMatch(f.mode) && !isFootball(d.topic) && !isPuppyBowl(d.topic)) bits.push('Won ' + rec.won + ' of ' + rec.played + ' battle' + (rec.played === 1 ? '' : 's') + ', winning ' + rec.gf + ' rounds and losing ' + rec.ga + '.');
   else if (needsMatch(f.mode)) bits.push('Won ' + rec.won + ' of ' + rec.played + ' match' + (rec.played === 1 ? '' : 'es') + ', scoring ' + rec.gf + ' and conceding ' + rec.ga + '.');
   else bits.push('Won ' + rec.won + ' head-to-head vote' + (rec.won === 1 ? '' : 's') + '.');
   if (isFootball(d.topic)) {

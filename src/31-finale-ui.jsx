@@ -205,8 +205,9 @@ function MatchSummary({ d, A, B, match }) {
         <span>Possession</span><b className="num">{match.stats.possession[0]}%</b><b className="num">{match.stats.possession[1]}%</b>
       </div>}
       {match.notes.map((n) => <p key={n} className="hint" style={{ margin: 0 }}>ℹ️ {n}</p>)}
+      {!match.forfeit && <MatchReport d={d} A={A} B={B} match={match} />}
       {incomplete.map((t) => <p key={t.id} className="hint" style={{ margin: 0 }}>ℹ️ {t.name}’s squad is incomplete, so empty slots count as weak players (simplified simulation).</p>)}
-      <p className="hint" style={{ margin: 0 }}>A game simulation from the drafted squads and their estimated {eraWord(d.topic)} numbers. It doesn’t predict real results.</p>
+      <p className="hint" style={{ margin: 0 }}>{match.puppy ? 'A Puppy Bowl from the drafted animals’ estimated Fluffy, Tiny, Funny and Charm stats — the cute moments come from those stats too. Just for fun.' : 'A game simulation from the drafted squads and their estimated ' + eraWord(d.topic) + ' numbers. It doesn’t predict real results.'}</p>
     </div>
   );
 }
@@ -424,7 +425,7 @@ function FriendlySheet({ d, onClose }) {
   const cfg = finCfg(d);
   if (teams.length < 2) return <Sheet center onClose={onClose}><h2 className="display" style={{ fontSize: 28 }}>Friendly {battleKind(d.topic) ? 'battle' : 'match'}</h2><p className="hint">You need two teams with players.</p><button className="btn btn-ghost" onClick={onClose}>Close</button></Sheet>;
   const bk = battleKind(d.topic);
-  const play = () => { const k = n + 1; setN(k); const key = 'friendly:' + Date.now() + ':' + k; setGame({ A: teamOf(d, a), B: teamOf(d, b), match: bk ? simulateFor(d, teamOf(d, a), teamOf(d, b), key) : simulateMatch(d, teamOf(d, a), teamOf(d, b), key, false), k }); };
+  const play = () => { const k = n + 1; setN(k); const key = 'friendly:' + Date.now() + ':' + k; setGame({ A: teamOf(d, a), B: teamOf(d, b), match: bk ? simulateFor(d, teamOf(d, a), teamOf(d, b), key, { knockout: false }) : simulateMatch(d, teamOf(d, a), teamOf(d, b), key, false), k }); };
   return (
     <Sheet center onClose={onClose}>
       <p className="eyebrow">Exhibition · doesn’t change any result</p>
@@ -499,12 +500,12 @@ function lineupOf(d, m) {
   const out = [];
   ['GK', 'DEF', 'MID', 'FWD'].forEach((role) => {
     const line = rows.filter((p) => p.role === role);
-    line.forEach((p, k) => out.push({ name: p.name, role, ovr: p.r.ovr, pac: p.r.attrs.PAC, num: (() => { const it = Object.values(d.items).find((x) => x.name === p.name); return it ? kitNumber(it) : k + 1; })(), base: { x: LINE_X[role], y: line.length === 1 ? 0.5 : 0.18 + (0.64 * k) / (line.length - 1) } }));
+    line.forEach((p, k) => out.push({ name: p.name, em: p.emoji || null, role, ovr: p.r.ovr, pac: p.r.attrs.PAC, num: (() => { const it = Object.values(d.items).find((x) => x.name === p.name); return it ? kitNumber(it) : k + 1; })(), base: { x: LINE_X[role], y: line.length === 1 ? 0.5 : 0.18 + (0.64 * k) / (line.length - 1) } }));
   });
   return out;
 }
 function matchScript(match) {
-  const beats = []; let t = 0;
+  const beats = []; let t = 0; let pendingCute = null;
   const add = (b) => { b.t0 = t; t += b.dur; beats.push(b); return b; };
   add({ type: 'kickoff', dur: 2, min: 0, show: [0], reveal: 0.1 });
   match.events.forEach((e, k) => {
@@ -512,10 +513,12 @@ function matchScript(match) {
     if (e.type === 'half' || e.type === 'full' || e.type === 'et' || e.type === 'pens') { add({ type: e.type, dur: e.type === 'half' ? 3.6 : 3, min: e.min, show: [k], reveal: 0.1 }); return; }
     if (e.type === 'pen') { add({ type: 'pen', dur: PIN + 1.9 * TS, min: 120, show: [k], reveal: PIN + 0.75 * TS, pen: e }); return; }
     if (e.type === 'yellow' || e.type === 'red' || e.type === 'note') { const last = beats[beats.length - 1]; last.show.push(k); return; }
+    if (e.type === 'cute') { pendingCute = k; return; }
     if (e.seq == null) return;
     const q = match.seqs[e.seq]; const n = q.chain.length;
     const tail = (q.kind === 'goal' ? 3.6 : q.kind === 'tackle' || q.kind === 'intercept' ? 1.2 : 1.8) * TS;
-    add({ type: 'seq', dur: IN + n * SEG + tail, min: q.min, et: !!q.et, q, show: [k], reveal: IN + n * SEG + (q.kind === 'goal' ? 0.7 : q.kind === 'tackle' || q.kind === 'intercept' ? 0.5 : 0.6) * TS });
+    const sb = add({ type: 'seq', dur: IN + n * SEG + tail, min: q.min, et: !!q.et, q, show: [k], reveal: IN + n * SEG + (q.kind === 'goal' ? 0.7 : q.kind === 'tackle' || q.kind === 'intercept' ? 0.5 : 0.6) * TS });
+    if (pendingCute != null) { sb.cuteK = pendingCute; sb.cute = match.events[pendingCute]; pendingCute = null; }
     // After a goal everyone walks back for the kick-off instead of jumping into place.
     if (q.kind === 'goal') add({ type: 'restart', dur: 2.4, min: q.min, et: !!q.et, show: [], reveal: 0.1 });
   });
@@ -641,6 +644,7 @@ function matchFrame(script, L, t) {
 }
 function revealedEvents(script, t) {
   const out = [];
+  script.beats.forEach((b) => { if (b.cuteK != null && t >= b.t0 + 0.3) out.push(b.cuteK); });
   script.beats.forEach((b) => b.show.forEach((k, j) => { if (t >= b.t0 + (j === 0 ? b.reveal * (b.type === 'seq' || b.type === 'pen' ? 1 : b.dur) : b.reveal)) out.push(k); }));
   return out.sort((a, b2) => a - b2);
 }
@@ -674,6 +678,7 @@ function PitchMatch({ d, A, B, match, speed, commentary, onDone, label }) {
         else if (e.type === 'half' || e.type === 'full') audio.play('whistle');
         else if (e.type === 'red') audio.play('buzzer');
         else if (e.type === 'pen') audio.play(e.scored ? 'bid' : 'buzzer');
+        else if (e.type === 'cute') audio.play(e.good ? 'card' : 'buzzer');
       });
     }
     lastShown.current = shown.length;
@@ -684,7 +689,7 @@ function PitchMatch({ d, A, B, match, speed, commentary, onDone, label }) {
   const score = done ? match.score : [goalsShown.filter((e) => e.team === 0).length, goalsShown.filter((e) => e.team === 1).length];
   const penEv = shown.map((k) => match.events[k]).filter((e) => e.type === 'pen');
   const pens = done ? match.pens : penEv.length ? penEv[penEv.length - 1].pens : null;
-  const keyTypes = ['goal', 'red', 'yellow', 'half', 'full', 'et', 'pens', 'pen', 'note', 'kickoff'];
+  const keyTypes = ['goal', 'red', 'yellow', 'half', 'full', 'et', 'pens', 'pen', 'note', 'kickoff', 'cute'];
   const feed = shown.map((k) => match.events[k]).filter((e) => commentary || keyTypes.includes(e.type));
   const feedRef = useRef(null);
   useEffect(() => { const f = feedRef.current; if (f) f.scrollTop = f.scrollHeight; }, [feed.length]);
@@ -692,7 +697,8 @@ function PitchMatch({ d, A, B, match, speed, commentary, onDone, label }) {
   const stop = match.stoppage || 0;
   const clock = done ? (match.pens ? 'FT · pens' : match.et ? 'AET' : 'FT') : fr.beat.type === 'half' ? 'HT' : fr.min > 90 && !fr.beat.et && fr.beat.type !== 'et' && fr.beat.type !== 'pens' && fr.beat.type !== 'pen' ? '90+' + Math.min(stop, fr.min - 90) + '′' : fr.beat.type === 'pen' || fr.beat.type === 'pens' ? 'PENS' : fr.min + '′' + (fr.beat.et ? ' ET' : '');
   const trA = isFootball(d.topic) ? teamRating(d, A).rating : null, trB = isFootball(d.topic) ? teamRating(d, B).rating : null;
-  const bannerNow = fr.banner || (fr.beat.type === 'half' ? 'HALF-TIME' : fr.beat.type === 'et' ? 'EXTRA TIME' : fr.beat.type === 'pens' ? 'PENALTIES' : fr.beat.type === 'full' && !done ? 'FULL-TIME' : null);
+  const cuteNow = fr.beat.cute && t - fr.beat.t0 < IN + 1.4 && !done ? fr.beat.cute : null;
+  const bannerNow = (cuteNow && cuteNow.banner) || fr.banner || (fr.beat.type === 'half' ? 'HALF-TIME' : fr.beat.type === 'et' ? 'EXTRA TIME' : fr.beat.type === 'pens' ? 'PENALTIES' : fr.beat.type === 'full' && !done ? 'FULL-TIME' : null);
   const short = (n) => { const w = n.split(' '); const s2 = w[w.length - 1]; return s2.length > 10 ? s2.slice(0, 9) + '.' : s2; };
   return (
     <div className="matchview">
@@ -723,14 +729,14 @@ function PitchMatch({ d, A, B, match, speed, commentary, onDone, label }) {
             const cel = fr.celebrate && fr.celebrate.team === team && fr.celebrate.i === i;
             return (
               <g key={team + '-' + i} transform={'translate(' + p.x.toFixed(2) + ' ' + p.y.toFixed(2) + ')'}>
-                <circle r={cel ? 2.6 : 2.1} fill={pl.role === 'GK' ? '#ffd23f' : colors[team].fill} stroke={isHolder || cel ? '#fff' : 'rgba(0,0,0,.55)'} strokeWidth={isHolder || cel ? 0.6 : 0.35} />
-                <text y="0.9" textAnchor="middle" fontSize="2.3" fontWeight="800" fill={pl.role === 'GK' ? '#1b1530' : colors[team].text}>{pl.num}</text>
+                <circle r={cel ? 2.6 : pl.em ? 2.4 : 2.1} fill={pl.role === 'GK' ? '#ffd23f' : colors[team].fill} stroke={isHolder || cel ? '#fff' : 'rgba(0,0,0,.55)'} strokeWidth={isHolder || cel ? 0.6 : 0.35} />
+                {pl.em ? <text y="1.1" textAnchor="middle" fontSize="3">{pl.em}</text> : <text y="0.9" textAnchor="middle" fontSize="2.3" fontWeight="800" fill={pl.role === 'GK' ? '#1b1530' : colors[team].text}>{pl.num}</text>}
                 <text className={'plabel' + (isHolder || cel ? ' on' : '')} y="-2.8" textAnchor="middle" fontSize="2.4" fontWeight="700" fill="#fff">{short(pl.name)}</text>
               </g>
             );
           }))}
           <circle cx={fr.ball.x} cy={fr.ball.y} r="1" fill="#fff" stroke="#111" strokeWidth="0.25" />
-          {bannerNow && !done && <text x={PITCH.w / 2} y={PITCH.h / 2 + 3} textAnchor="middle" fontSize={bannerNow === 'GOAL!' ? 11 : 7} fontWeight="900" fill={bannerNow === 'GOAL!' ? '#ffc83d' : '#fff'} stroke="#0f0c21" strokeWidth="0.6" paintOrder="stroke" className="pbanner">{bannerNow}</text>}
+          {bannerNow && !done && <text x={PITCH.w / 2} y={PITCH.h / 2 + 3} textAnchor="middle" fontSize={bannerNow === 'GOAL!' ? 11 : cuteNow && bannerNow === cuteNow.banner ? 6.5 : 7} fontWeight="900" fill={bannerNow === 'GOAL!' ? '#ffc83d' : cuteNow && bannerNow === cuteNow.banner ? (cuteNow.good ? '#7cf2b0' : '#ff9ab0') : '#fff'} stroke="#0f0c21" strokeWidth="0.6" paintOrder="stroke" className="pbanner">{bannerNow}</text>}
         </svg>
       </div>
       <div className="mctrl" role="group" aria-label="Match controls">
@@ -753,3 +759,46 @@ function PitchMatch({ d, A, B, match, speed, commentary, onDone, label }) {
 }
 // Old saved matches (before the pitch) keep their text-only replay.
 function MatchView(props) { return props.match && props.match.v === 'show' ? <ShowView {...props} /> : props.match && props.match.v === 'mission' ? <MissionView {...props} /> : props.match && props.match.v === 'survival' ? <SurvivalView {...props} /> : props.match && props.match.v === 'arena' ? <ArenaView {...props} /> : props.match && props.match.v === 'battle' ? <BattleView {...props} /> : props.match && props.match.v === 2 ? <PitchMatch {...props} /> : <MatchPlayer {...props} />; }
+
+/* ---------- match report (football and Puppy Bowl), built only from the recorded events ---------- */
+function matchReport(d, A, B, match) {
+  const teams = [A, B];
+  const price = (t, name) => { const x = t.team.find((e) => e && d.items[e.itemId] && d.items[e.itemId].name === name); return x ? x.price || 0 : 0; };
+  const pts = {}; const add = (team, name, n, why) => { if (!name) return; const k = team + '|' + name; pts[k] = pts[k] || { team, name, n: 0, why: [] }; pts[k].n += n; if (why) pts[k].why.push(why); };
+  match.events.forEach((e) => {
+    if (e.type === 'goal') { add(e.team, e.player, 3, 'goal'); if (e.assist) add(e.team, e.assist, 2, 'assist'); }
+    else if (e.type === 'chance' && /save/i.test(e.text) && match.seqs[e.seq]) add(1 - e.team, match.seqs[e.seq].keeper, 1, 'save');
+    else if (e.type === 'tackle') add(e.team, e.player, 0.5, 'tackle');
+    else if (e.type === 'cute' && e.good) add(e.team, e.player, 1, 'cute');
+  });
+  const all = Object.values(pts).sort((x, y) => y.n - x.n);
+  const W = match.winner;
+  const mvp = all.find((p) => W == null || p.team === W) || all[0] || null;
+  // Turning point: the goal after which the eventual winner was never behind or level again.
+  let turning = null;
+  if (W != null) {
+    const goals = match.events.filter((e) => e.type === 'goal');
+    for (let k = goals.length - 1; k >= 0; k--) { const g = goals[k]; if (g.team !== W) break; const before = k ? goals[k - 1].score : [0, 0]; if (before[W] <= before[1 - W]) { turning = g; break; } }
+    if (!turning && match.pens) turning = { pens: true };
+  }
+  // Best buy and biggest flop, by contribution for the money (only drafted, paid picks).
+  const rows = [0, 1].flatMap((i) => teams[i].team.filter(Boolean).map((e) => { const it = d.items[e.itemId]; if (!it) return null; const p = pts[i + '|' + it.name]; return { team: i, name: it.name, price: e.price || 0, n: p ? p.n : 0 }; }).filter(Boolean));
+  const best = rows.filter((r) => r.n > 0).sort((x, y) => y.n / Math.max(1, y.price) - x.n / Math.max(1, x.price))[0] || null;
+  const flop = rows.filter((r) => r.price >= 2 && r.n === 0).sort((x, y) => y.price - x.price)[0] || null;
+  return { mvp, turning, best, flop, priceOf: price };
+}
+function MatchReport({ d, A, B, match }) {
+  const R = matchReport(d, A, B, match);
+  const T = (i) => (i === 0 ? A : B);
+  const why = (p) => { const c = (k) => p.why.filter((x) => x === k).length; const bits = [['goal', 'goal'], ['assist', 'assist'], ['save', 'save'], ['cute', 'cute moment']].map(([k, w]) => (c(k) ? c(k) + ' ' + w + (c(k) > 1 ? 's' : '') : null)).filter(Boolean); return bits.join(', ') || 'kept things ticking'; };
+  return (
+    <div className="mreport">
+      <h4>📋 Match report</h4>
+      {R.mvp && <p className="small"><b>⭐ MVP:</b> {R.mvp.name} ({T(R.mvp.team).name}) — {why(R.mvp)}.</p>}
+      {R.turning && <p className="small"><b>🔄 Turning point:</b> {R.turning.pens ? 'the penalty shoot-out.' : R.turning.player + '’s goal at ' + R.turning.min + '′ put ' + T(R.turning.team).name + ' ahead for good.'}</p>}
+      {R.best && <p className="small"><b>💰 Best buy:</b> {R.best.name} — ${R.best.price} for {T(R.best.team).name}.</p>}
+      {R.flop && <p className="small"><b>📉 Quiet day:</b> {R.flop.name} cost ${R.flop.price} and didn’t get on the scoresheet.</p>}
+      {match.puppy && match.moments && match.moments.length > 0 && <p className="small"><b>🐾 Cute moments:</b> {match.moments.map((m) => m.emoji + ' ' + m.player + ' (' + T(m.team).name + ') → ' + m.outcome).join(' · ')}</p>}
+    </div>
+  );
+}

@@ -34,7 +34,7 @@ const BATTLE_KINDS = {
     noshow: ['{w} wins the night — the other team had nothing.'],
   },
   cute: {
-    name: 'Cuteness Contest', start: 'Start the contest', emoji: '🥰', round: 'Round',
+    name: 'Puppy Bowl', start: 'Kick off', emoji: '🥰', round: 'Round',
     win: ['The crowd melts for {w}!', '{w} wins the aww-off against {l}.', '{l} is adorable, but {w} is MORE adorable.', 'Tiny paws, big win: {w}!'],
     upset: ['Underdog cuteness! {w} steals it from {l}!', 'Nobody saw that coming: {w} wins the crowd!'],
     noshow: ['{w} wins with no competition.'],
@@ -44,12 +44,12 @@ const battleKindId = (topic) => { if (!topic || topic.layout === 'pitch') return
 const battleKind = (topic) => { const k = battleKindId(topic); return k ? BATTLE_KINDS[k] : null; };
 const hasBattle = (topic) => !!battleKindId(topic);
 // The full simulation for a topic's style (step by step these replace the simple duel).
-function simulateFor(d, A, B, key) {
+function simulateFor(d, A, B, key, opts) {
   const k = battleKindId(d.topic);
   if (k === 'fight') return simulateArena(d, A, B, key);
   if (k === 'survival') return simulateSurvival(d, A, B, key);
   if (k === 'powers' || k === 'weird') return simulateMissions(d, A, B, key);
-  if (k === 'cute') return simulateShow(d, A, B, key);
+  if (k === 'cute') return simulatePuppyBowl(d, A, B, key, opts && opts.knockout === false ? false : true);
   return simulateBattle(d, A, B, key);
 }
 // One line for the result screen.

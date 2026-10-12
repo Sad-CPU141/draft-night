@@ -1,4 +1,4 @@
-/* Draft Night 008ca3fd71 — built from src/styles.css */
+/* Draft Night ce12892475 — built from src/styles.css */
 /* Layout: one phone-width column, a stage-lit backdrop, the auction screen as a full-height console with a sticky gavel bar. */
 :root{
   --ink:#0f0c21; --stage:#19153a; --panel:#221d47; --panel2:#2c2659; --line:#3d3672;
@@ -712,3 +712,7 @@ html[data-motion="reduce"] *,html[data-motion="reduce"] *::before,html[data-moti
 .judges{display:flex;justify-content:center;gap:14px;margin-top:8px}
 .judge{display:flex;flex-direction:column;align-items:center;font-size:24px;line-height:1}
 .judge small{font-size:10px;color:var(--muted);margin-top:2px}
+.mreport{border-top:2px solid var(--line);padding-top:8px;display:flex;flex-direction:column;gap:4px}
+.mreport h4{margin:0;font-size:15px}
+.mreport .small{margin:0}
+.mev.cute{color:#ffd1e3}

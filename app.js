@@ -1,4 +1,4 @@
-/* Draft Night 008ca3fd71 — built from src/ by build.js. Edit src/, not this file. */
+/* Draft Night ce12892475 — built from src/ by build.js. Edit src/, not this file. */
 "use strict";
 (function(){
 function _extends() { return _extends = Object.assign ? Object.assign.bind() : function (n) { for (var e = 1; e < arguments.length; e++) { var t = arguments[e]; for (var r in t) ({}).hasOwnProperty.call(t, r) && (n[r] = t[r]); } return n; }, _extends.apply(null, arguments); }
@@ -23247,8 +23247,8 @@ const BATTLE_KINDS = {
     noshow: ['{w} wins the night — the other team had nothing.']
   },
   cute: {
-    name: 'Cuteness Contest',
-    start: 'Start the contest',
+    name: 'Puppy Bowl',
+    start: 'Kick off',
     emoji: '🥰',
     round: 'Round',
     win: ['The crowd melts for {w}!', '{w} wins the aww-off against {l}.', '{l} is adorable, but {w} is MORE adorable.', 'Tiny paws, big win: {w}!'],
@@ -23266,12 +23266,12 @@ const battleKind = topic => {
   return k ? BATTLE_KINDS[k] : null;
 };
 const hasBattle = topic => !!battleKindId(topic);
-function simulateFor(d, A, B, key) {
+function simulateFor(d, A, B, key, opts) {
   const k = battleKindId(d.topic);
   if (k === 'fight') return simulateArena(d, A, B, key);
   if (k === 'survival') return simulateSurvival(d, A, B, key);
   if (k === 'powers' || k === 'weird') return simulateMissions(d, A, B, key);
-  if (k === 'cute') return simulateShow(d, A, B, key);
+  if (k === 'cute') return simulatePuppyBowl(d, A, B, key, opts && opts.knockout === false ? false : true);
   return simulateBattle(d, A, B, key);
 }
 function simWhy(w, mt) {
@@ -23516,6 +23516,7 @@ const pickLine = (rng, k, vars) => {
   return ls[Math.floor(rng() * ls.length)].replace(/\{(\w)\}/g, (_, v) => vars && vars[v] || '');
 };
 function squad(d, m) {
+  if (isPuppyBowl(d.topic)) return puppySquad(d, m);
   const rows = m.team.map((t, i) => t ? {
     name: d.items[t.itemId].name,
     role: roleOf(d.items[t.itemId], d.rules.slots[i]),
@@ -23578,11 +23579,12 @@ function poisson(rng, lambda) {
   } while (p > L && k < 20);
   return k - 1;
 }
-function expectedGoals(st, home) {
+function expectedGoals(st, home, delta) {
   return [0, 1].map(i => {
     const o = st[1 - i];
     let x = 1.3 * Math.pow(st[i].att / o.def, 1.7) * Math.pow(st[i].mid / o.mid, 0.5) * Math.pow(68 / Math.max(30, o.gk), 0.6);
     if (home === i) x += 0.15;
+    if (delta) x += delta[i] || 0;
     return clamp(x, 0.2, 3.2);
   });
 }
@@ -23619,7 +23621,7 @@ function simulateMatch(d, A, B, key, knockout, opts) {
   });
   const st = sq.map((s, i) => strength2(s, empty[i]));
   const home = opts && (opts.home === 0 || opts.home === 1) ? opts.home : null;
-  const xg = expectedGoals(st, home);
+  const xg = expectedGoals(st, home, opts && opts.xgDelta);
   const goals = xg.map(x => poisson(rng, x));
   const stoppage = 1 + Math.floor(rng() * 5);
   const seqs = [];
@@ -24266,7 +24268,7 @@ function championStory(d) {
   if (!games.length) return champ.name + ' was the only team with players, so they win by default.';
   const bits = [];
   const rec = finaleRecord(d, champ.id);
-  if (needsMatch(f.mode) && !isFootball(d.topic)) bits.push('Won ' + rec.won + ' of ' + rec.played + ' battle' + (rec.played === 1 ? '' : 's') + ', winning ' + rec.gf + ' rounds and losing ' + rec.ga + '.');else if (needsMatch(f.mode)) bits.push('Won ' + rec.won + ' of ' + rec.played + ' match' + (rec.played === 1 ? '' : 'es') + ', scoring ' + rec.gf + ' and conceding ' + rec.ga + '.');else bits.push('Won ' + rec.won + ' head-to-head vote' + (rec.won === 1 ? '' : 's') + '.');
+  if (needsMatch(f.mode) && !isFootball(d.topic) && !isPuppyBowl(d.topic)) bits.push('Won ' + rec.won + ' of ' + rec.played + ' battle' + (rec.played === 1 ? '' : 's') + ', winning ' + rec.gf + ' rounds and losing ' + rec.ga + '.');else if (needsMatch(f.mode)) bits.push('Won ' + rec.won + ' of ' + rec.played + ' match' + (rec.played === 1 ? '' : 'es') + ', scoring ' + rec.gf + ' and conceding ' + rec.ga + '.');else bits.push('Won ' + rec.won + ' head-to-head vote' + (rec.won === 1 ? '' : 's') + '.');
   if (isFootball(d.topic)) {
     const tr = teamRating(d, champ);
     const all = d.managers.filter(m => m.team.some(Boolean)).map(m => teamRating(d, m).rating).sort((a, b) => b - a);
@@ -24508,6 +24510,197 @@ function simulateMissions(d, A, B, key) {
     et: false,
     pens: null,
     events: []
+  };
+}
+const CUTE_EMOJI = [['polar bear', '🐻‍❄️'], ['red panda', '🦊'], ['panda', '🐼'], ['fox', '🦊'], ['koala', '🐨'], ['sloth', '🦥'], ['otter', '🦦'], ['seal', '🦭'], ['sea lion', '🦭'], ['penguin', '🐧'], ['puffin', '🐧'], ['owl', '🦉'], ['bunny', '🐰'], ['rabbit', '🐰'], ['hamster', '🐹'], ['guinea pig', '🐹'], ['chinchilla', '🐭'], ['mouse', '🐭'], ['dormouse', '🐭'], ['jerboa', '🐭'], ['pika', '🐭'], ['hedgehog', '🦔'], ['chipmunk', '🐿️'], ['marmot', '🐿️'], ['squirrel', '🐿️'], ['lion', '🦁'], ['tiger', '🐯'], ['leopard', '🐆'], ['cat', '🐱'], ['kitten', '🐱'], ['puppy', '🐶'], ['dog', '🐶'], ['corgi', '🐶'], ['pug', '🐶'], ['samoyed', '🐶'], ['pomeranian', '🐶'], ['shiba', '🐶'], ['bulldog', '🐶'], ['elephant', '🐘'], ['hippo', '🦛'], ['giraffe', '🦒'], ['goat', '🐐'], ['lamb', '🐑'], ['alpaca', '🦙'], ['piglet', '🐷'], ['pig', '🐷'], ['calf', '🐮'], ['foal', '🐴'], ['pony', '🐴'], ['horse', '🐴'], ['fawn', '🦌'], ['duck', '🐥'], ['chick', '🐥'], ['tit', '🐦'], ['parrot', '🦜'], ['budgie', '🦜'], ['cockatiel', '🦜'], ['canary', '🐤'], ['octopus', '🐙'], ['beluga', '🐳'], ['whale', '🐳'], ['axolotl', '🦎'], ['gecko', '🦎'], ['dragon', '🦎'], ['capybara', '🦫'], ['meerkat', '🦦'], ['ermine', '🦦'], ['ferret', '🦦'], ['marmoset', '🐒'], ['loris', '🐒'], ['sugar glider', '🐿️'], ['wombat', '🐨'], ['turtle', '🐢'], ['snake', '🐍'], ['fish', '🐟'], ['koi', '🐟'], ['betta', '🐟'], ['crab', '🦀'], ['tarantula', '🕷️'], ['rat', '🐀'], ['gerbil', '🐭'], ['chicken', '🐔'], ['bear', '🐻']];
+function cuteEmoji(item, topic) {
+  if (item.emoji) return item.emoji;
+  const n = String(item.name || '').toLowerCase();
+  const hit = CUTE_EMOJI.find(([k]) => n.includes(k));
+  if (hit) return hit[1];
+  return topic && topic.id === 't-dogbreeds' ? '🐶' : topic && topic.id === 't-catbreeds' ? '🐱' : '🐾';
+}
+const isPuppyBowl = topic => !!topic && topic.layout !== 'pitch' && battleKindId(topic) === 'cute';
+function puppyRow(d, t, slot) {
+  const item = d.items[t.itemId];
+  const s = itemStats(d.topic, item) || {
+    vals: [5, 5, 5, 5]
+  };
+  const [F, T, U, C] = s.vals;
+  const a = v => clamp(Math.round(v), 20, 99);
+  const attrs = {
+    PAC: a(38 + T * 4.2 + U * 1.6),
+    SHO: a(36 + U * 3.6 + C * 1.8 + T),
+    PAS: a(38 + C * 3.6 + F * 1.2),
+    DRI: a(36 + T * 3.8 + C * 1.6),
+    DEF: a(32 + F * 4.6 + C),
+    PHY: a(40 + F * 3.4 - T * 1.2)
+  };
+  const ovr = a((attrs.PAC + attrs.SHO + attrs.PAS + attrs.DRI + attrs.DEF + attrs.PHY) / 6);
+  return {
+    name: item.name,
+    itemId: item.id,
+    emoji: cuteEmoji(item, d.topic),
+    price: t.price || 0,
+    cute: {
+      F,
+      T,
+      U,
+      C
+    },
+    r: {
+      ovr,
+      attrs,
+      estimated: true
+    },
+    role: 'MID'
+  };
+}
+function puppySquad(d, m) {
+  const rows = m.team.map((t, i) => t && d.items[t.itemId] ? puppyRow(d, t, d.rules.slots[i]) : null).filter(Boolean);
+  if (!rows.length) return rows;
+  const by = k => rows.slice().sort((x, y) => y.r.attrs[k] - x.r.attrs[k] || (x.name < y.name ? -1 : 1));
+  const gk = by('DEF')[0];
+  gk.role = 'GK';
+  const fwd = by('SHO').find(p => p !== gk);
+  if (fwd) fwd.role = 'FWD';
+  const def = by('DEF').find(p => p.role === 'MID');
+  if (def && rows.length >= 4) def.role = 'DEF';
+  return rows;
+}
+const PUPPY_MOMENTS = {
+  zoomies: {
+    emoji: '💨',
+    banner: 'ZOOMIES!',
+    stat: 'T',
+    good: true,
+    xg: 0.35,
+    line: '{p} gets the zoomies and tears down the wing!'
+  },
+  steal: {
+    emoji: '🐾',
+    banner: 'SNEAKY!',
+    stat: 'T',
+    good: true,
+    xg: 0.2,
+    line: 'Tiny {p} slips between legs and steals the ball!'
+  },
+  bounce: {
+    emoji: '🎾',
+    banner: 'LUCKY BOUNCE!',
+    stat: 'U',
+    good: true,
+    xg: 0.25,
+    line: 'It bounces off {p}’s bottom… towards goal!'
+  },
+  crowd: {
+    emoji: '🥰',
+    banner: 'AWWW!',
+    stat: 'C',
+    good: true,
+    xg: 0.15,
+    line: 'The crowd melts for {p} — the team is buzzing!'
+  },
+  butterfly: {
+    emoji: '🦋',
+    banner: 'BUTTERFLY!',
+    stat: 'U',
+    good: false,
+    xg: -0.3,
+    line: '{p} spots a butterfly and forgets about the ball…'
+  },
+  nap: {
+    emoji: '💤',
+    banner: 'NAP TIME!',
+    stat: 'F',
+    good: false,
+    xg: 0,
+    oppXg: 0.4,
+    line: 'Keeper {p} curls up for a nap…'
+  }
+};
+function rollPuppyMoments(rng, sq) {
+  const out = [];
+  [0, 1].forEach(i => {
+    const team = sq[i];
+    if (!team.length) return;
+    const best = k => team.slice().sort((x, y) => y.cute[k] - x.cute[k])[0];
+    const avg = k => team.reduce((n, p) => n + p.cute[k], 0) / team.length;
+    const gk = team.find(p => p.role === 'GK');
+    const tries = [['zoomies', best('T'), 0.12 + avg('T') * 0.035], ['steal', best('T'), 0.05 + avg('T') * 0.025], ['bounce', best('U'), 0.06 + avg('U') * 0.03], ['crowd', best('C'), 0.05 + avg('C') * 0.03], ['butterfly', best('U'), 0.06 + avg('U') * 0.035], ['nap', gk || team[0], 0.04 + ((gk || team[0]).cute.F + (10 - (gk || team[0]).cute.T)) * 0.012]];
+    let n = 0;
+    tries.sort(() => rng() - 0.5).forEach(([k, p, prob]) => {
+      if (n < 2 && rng() < prob) {
+        out.push({
+          kind: k,
+          team: i,
+          player: p.name
+        });
+        n++;
+      }
+    });
+  });
+  return out;
+}
+function simulatePuppyBowl(d, A, B, key, knockout) {
+  const rng = seeded(d.seed, 'puppy', key, A.id, B.id);
+  const sq = [puppySquad(d, A), puppySquad(d, B)];
+  const moments = rollPuppyMoments(rng, sq);
+  const delta = [0, 0];
+  moments.forEach(m => {
+    const M = PUPPY_MOMENTS[m.kind];
+    delta[m.team] += M.xg;
+    if (M.oppXg) delta[1 - m.team] += M.oppXg;
+  });
+  const match = simulateMatch(d, A, B, key, knockout !== false, {
+    xgDelta: delta
+  });
+  if (match.forfeit) return {
+    ...match,
+    puppy: true,
+    moments: []
+  };
+  const used = new Set();
+  const evs = match.events.slice();
+  const pinned = [];
+  moments.forEach(m => {
+    const M = PUPPY_MOMENTS[m.kind];
+    const want = m.kind === 'nap' ? e => e.type === 'goal' && e.team === 1 - m.team : M.good ? e => e.type === 'goal' && e.team === m.team : e => e.type === 'chance' && e.team === m.team;
+    const fallback = m.kind === 'nap' ? e => e.type === 'chance' && e.team === 1 - m.team : M.good ? e => e.type === 'chance' && e.team === m.team : e => e.type === 'tackle' && e.team === 1 - m.team;
+    const involves = e => e.player === m.player || e.seq != null && match.seqs[e.seq] && match.seqs[e.seq].chain.includes(m.player);
+    let k = evs.findIndex((e, j) => !used.has(j) && want(e) && (m.kind === 'nap' || involves(e)));
+    if (k < 0) k = evs.findIndex((e, j) => !used.has(j) && want(e));
+    let outcome = M.good ? 'goal' : m.kind === 'nap' ? 'conceded' : 'chance lost';
+    if (k < 0) {
+      k = evs.findIndex((e, j) => !used.has(j) && fallback(e));
+      outcome = M.good ? 'chance' : m.kind === 'nap' ? 'close call' : 'lost the ball';
+    }
+    if (k < 0) return;
+    used.add(k);
+    const target = evs[k];
+    pinned.push({
+      at: k,
+      ev: {
+        min: target.min,
+        type: 'cute',
+        kind: m.kind,
+        team: m.team,
+        player: m.player,
+        outcome,
+        emoji: M.emoji,
+        banner: M.banner,
+        good: M.good,
+        text: M.emoji + ' ' + M.line.replace('{p}', m.player)
+      }
+    });
+  });
+  pinned.sort((a, b) => b.at - a.at).forEach(p => evs.splice(p.at, 0, p.ev));
+  return {
+    ...match,
+    events: evs,
+    puppy: true,
+    moments: pinned.map(p => p.ev).reverse(),
+    xgDelta: delta
   };
 }
 const SHOW_JUDGES = [{
@@ -27537,7 +27730,7 @@ function TopicEditor({
   }, "Fun battles (Battles finale)"), React.createElement(Seg, {
     label: "Fun battle style",
     value: topic.battle || 'none',
-    options: [['none', 'Off'], ['fight', '⚔️ Fight'], ['powers', '💥 Powers'], ['survival', '🧟 Survival'], ['cute', '🥰 Cuteness'], ['weird', '🤡 Silly']],
+    options: [['none', 'Off'], ['fight', '⚔️ Fight'], ['powers', '💥 Powers'], ['survival', '🧟 Survival'], ['cute', '🥰 Puppy Bowl'], ['weird', '🤡 Silly']],
     onChange: v => set({
       battle: v === 'none' ? '' : v
     })
@@ -34438,6 +34631,12 @@ class Boundary extends React.Component {
 }
 if (window.__DN_TEST__) window.__DN = {
   simStats: {
+    simulatePuppyBowl,
+    puppySquad,
+    rollPuppyMoments,
+    PUPPY_MOMENTS,
+    isPuppyBowl,
+    matchReport,
     itemStats,
     statTotal,
     STAT_SETS,
@@ -35725,7 +35924,12 @@ function MatchSummary({
     style: {
       margin: 0
     }
-  }, "\u2139\uFE0F ", n)), incomplete.map(t => React.createElement("p", {
+  }, "\u2139\uFE0F ", n)), !match.forfeit && React.createElement(MatchReport, {
+    d: d,
+    A: A,
+    B: B,
+    match: match
+  }), incomplete.map(t => React.createElement("p", {
     key: t.id,
     className: "hint",
     style: {
@@ -35736,7 +35940,7 @@ function MatchSummary({
     style: {
       margin: 0
     }
-  }, "A game simulation from the drafted squads and their estimated ", eraWord(d.topic), " numbers. It doesn\u2019t predict real results."));
+  }, match.puppy ? 'A Puppy Bowl from the drafted animals’ estimated Fluffy, Tiny, Funny and Charm stats — the cute moments come from those stats too. Just for fun.' : 'A game simulation from the drafted squads and their estimated ' + eraWord(d.topic) + ' numbers. It doesn’t predict real results.'));
 }
 function MatchVote({
   d,
@@ -36285,7 +36489,9 @@ function FriendlySheet({
     setGame({
       A: teamOf(d, a),
       B: teamOf(d, b),
-      match: bk ? simulateFor(d, teamOf(d, a), teamOf(d, b), key) : simulateMatch(d, teamOf(d, a), teamOf(d, b), key, false),
+      match: bk ? simulateFor(d, teamOf(d, a), teamOf(d, b), key, {
+        knockout: false
+      }) : simulateMatch(d, teamOf(d, a), teamOf(d, b), key, false),
       k
     });
   };
@@ -36470,6 +36676,7 @@ function lineupOf(d, m) {
     const line = rows.filter(p => p.role === role);
     line.forEach((p, k) => out.push({
       name: p.name,
+      em: p.emoji || null,
       role,
       ovr: p.r.ovr,
       pac: p.r.attrs.PAC,
@@ -36488,6 +36695,7 @@ function lineupOf(d, m) {
 function matchScript(match) {
   const beats = [];
   let t = 0;
+  let pendingCute = null;
   const add = b => {
     b.t0 = t;
     t += b.dur;
@@ -36529,11 +36737,15 @@ function matchScript(match) {
       last.show.push(k);
       return;
     }
+    if (e.type === 'cute') {
+      pendingCute = k;
+      return;
+    }
     if (e.seq == null) return;
     const q = match.seqs[e.seq];
     const n = q.chain.length;
     const tail = (q.kind === 'goal' ? 3.6 : q.kind === 'tackle' || q.kind === 'intercept' ? 1.2 : 1.8) * TS;
-    add({
+    const sb = add({
       type: 'seq',
       dur: IN + n * SEG + tail,
       min: q.min,
@@ -36542,6 +36754,11 @@ function matchScript(match) {
       show: [k],
       reveal: IN + n * SEG + (q.kind === 'goal' ? 0.7 : q.kind === 'tackle' || q.kind === 'intercept' ? 0.5 : 0.6) * TS
     });
+    if (pendingCute != null) {
+      sb.cuteK = pendingCute;
+      sb.cute = match.events[pendingCute];
+      pendingCute = null;
+    }
     if (q.kind === 'goal') add({
       type: 'restart',
       dur: 2.4,
@@ -36852,6 +37069,9 @@ function matchFrame(script, L, t) {
 }
 function revealedEvents(script, t) {
   const out = [];
+  script.beats.forEach(b => {
+    if (b.cuteK != null && t >= b.t0 + 0.3) out.push(b.cuteK);
+  });
   script.beats.forEach(b => b.show.forEach((k, j) => {
     if (t >= b.t0 + (j === 0 ? b.reveal * (b.type === 'seq' || b.type === 'pen' ? 1 : b.dur) : b.reveal)) out.push(k);
   }));
@@ -36906,7 +37126,7 @@ function PitchMatch({
           audio.say(callLine('goal', {
             who: e.player
           }), 2, d.id + ':' + label + ':g' + k);
-        } else if (e.type === 'half' || e.type === 'full') audio.play('whistle');else if (e.type === 'red') audio.play('buzzer');else if (e.type === 'pen') audio.play(e.scored ? 'bid' : 'buzzer');
+        } else if (e.type === 'half' || e.type === 'full') audio.play('whistle');else if (e.type === 'red') audio.play('buzzer');else if (e.type === 'pen') audio.play(e.scored ? 'bid' : 'buzzer');else if (e.type === 'cute') audio.play(e.good ? 'card' : 'buzzer');
       });
     }
     lastShown.current = shown.length;
@@ -36917,7 +37137,7 @@ function PitchMatch({
   const score = done ? match.score : [goalsShown.filter(e => e.team === 0).length, goalsShown.filter(e => e.team === 1).length];
   const penEv = shown.map(k => match.events[k]).filter(e => e.type === 'pen');
   const pens = done ? match.pens : penEv.length ? penEv[penEv.length - 1].pens : null;
-  const keyTypes = ['goal', 'red', 'yellow', 'half', 'full', 'et', 'pens', 'pen', 'note', 'kickoff'];
+  const keyTypes = ['goal', 'red', 'yellow', 'half', 'full', 'et', 'pens', 'pen', 'note', 'kickoff', 'cute'];
   const feed = shown.map(k => match.events[k]).filter(e => commentary || keyTypes.includes(e.type));
   const feedRef = useRef(null);
   useEffect(() => {
@@ -36932,7 +37152,8 @@ function PitchMatch({
   const clock = done ? match.pens ? 'FT · pens' : match.et ? 'AET' : 'FT' : fr.beat.type === 'half' ? 'HT' : fr.min > 90 && !fr.beat.et && fr.beat.type !== 'et' && fr.beat.type !== 'pens' && fr.beat.type !== 'pen' ? '90+' + Math.min(stop, fr.min - 90) + '′' : fr.beat.type === 'pen' || fr.beat.type === 'pens' ? 'PENS' : fr.min + '′' + (fr.beat.et ? ' ET' : '');
   const trA = isFootball(d.topic) ? teamRating(d, A).rating : null,
     trB = isFootball(d.topic) ? teamRating(d, B).rating : null;
-  const bannerNow = fr.banner || (fr.beat.type === 'half' ? 'HALF-TIME' : fr.beat.type === 'et' ? 'EXTRA TIME' : fr.beat.type === 'pens' ? 'PENALTIES' : fr.beat.type === 'full' && !done ? 'FULL-TIME' : null);
+  const cuteNow = fr.beat.cute && t - fr.beat.t0 < IN + 1.4 && !done ? fr.beat.cute : null;
+  const bannerNow = cuteNow && cuteNow.banner || fr.banner || (fr.beat.type === 'half' ? 'HALF-TIME' : fr.beat.type === 'et' ? 'EXTRA TIME' : fr.beat.type === 'pens' ? 'PENALTIES' : fr.beat.type === 'full' && !done ? 'FULL-TIME' : null);
   const short = n => {
     const w = n.split(' ');
     const s2 = w[w.length - 1];
@@ -37048,11 +37269,15 @@ function PitchMatch({
       key: team + '-' + i,
       transform: 'translate(' + p.x.toFixed(2) + ' ' + p.y.toFixed(2) + ')'
     }, React.createElement("circle", {
-      r: cel ? 2.6 : 2.1,
+      r: cel ? 2.6 : pl.em ? 2.4 : 2.1,
       fill: pl.role === 'GK' ? '#ffd23f' : colors[team].fill,
       stroke: isHolder || cel ? '#fff' : 'rgba(0,0,0,.55)',
       strokeWidth: isHolder || cel ? 0.6 : 0.35
-    }), React.createElement("text", {
+    }), pl.em ? React.createElement("text", {
+      y: "1.1",
+      textAnchor: "middle",
+      fontSize: "3"
+    }, pl.em) : React.createElement("text", {
       y: "0.9",
       textAnchor: "middle",
       fontSize: "2.3",
@@ -37077,9 +37302,9 @@ function PitchMatch({
     x: PITCH.w / 2,
     y: PITCH.h / 2 + 3,
     textAnchor: "middle",
-    fontSize: bannerNow === 'GOAL!' ? 11 : 7,
+    fontSize: bannerNow === 'GOAL!' ? 11 : cuteNow && bannerNow === cuteNow.banner ? 6.5 : 7,
     fontWeight: "900",
-    fill: bannerNow === 'GOAL!' ? '#ffc83d' : '#fff',
+    fill: bannerNow === 'GOAL!' ? '#ffc83d' : cuteNow && bannerNow === cuteNow.banner ? cuteNow.good ? '#7cf2b0' : '#ff9ab0' : '#fff',
     stroke: "#0f0c21",
     strokeWidth: "0.6",
     paintOrder: "stroke",
@@ -37126,6 +37351,98 @@ function PitchMatch({
 }
 function MatchView(props) {
   return props.match && props.match.v === 'show' ? React.createElement(ShowView, props) : props.match && props.match.v === 'mission' ? React.createElement(MissionView, props) : props.match && props.match.v === 'survival' ? React.createElement(SurvivalView, props) : props.match && props.match.v === 'arena' ? React.createElement(ArenaView, props) : props.match && props.match.v === 'battle' ? React.createElement(BattleView, props) : props.match && props.match.v === 2 ? React.createElement(PitchMatch, props) : React.createElement(MatchPlayer, props);
+}
+function matchReport(d, A, B, match) {
+  const teams = [A, B];
+  const price = (t, name) => {
+    const x = t.team.find(e => e && d.items[e.itemId] && d.items[e.itemId].name === name);
+    return x ? x.price || 0 : 0;
+  };
+  const pts = {};
+  const add = (team, name, n, why) => {
+    if (!name) return;
+    const k = team + '|' + name;
+    pts[k] = pts[k] || {
+      team,
+      name,
+      n: 0,
+      why: []
+    };
+    pts[k].n += n;
+    if (why) pts[k].why.push(why);
+  };
+  match.events.forEach(e => {
+    if (e.type === 'goal') {
+      add(e.team, e.player, 3, 'goal');
+      if (e.assist) add(e.team, e.assist, 2, 'assist');
+    } else if (e.type === 'chance' && /save/i.test(e.text) && match.seqs[e.seq]) add(1 - e.team, match.seqs[e.seq].keeper, 1, 'save');else if (e.type === 'tackle') add(e.team, e.player, 0.5, 'tackle');else if (e.type === 'cute' && e.good) add(e.team, e.player, 1, 'cute');
+  });
+  const all = Object.values(pts).sort((x, y) => y.n - x.n);
+  const W = match.winner;
+  const mvp = all.find(p => W == null || p.team === W) || all[0] || null;
+  let turning = null;
+  if (W != null) {
+    const goals = match.events.filter(e => e.type === 'goal');
+    for (let k = goals.length - 1; k >= 0; k--) {
+      const g = goals[k];
+      if (g.team !== W) break;
+      const before = k ? goals[k - 1].score : [0, 0];
+      if (before[W] <= before[1 - W]) {
+        turning = g;
+        break;
+      }
+    }
+    if (!turning && match.pens) turning = {
+      pens: true
+    };
+  }
+  const rows = [0, 1].flatMap(i => teams[i].team.filter(Boolean).map(e => {
+    const it = d.items[e.itemId];
+    if (!it) return null;
+    const p = pts[i + '|' + it.name];
+    return {
+      team: i,
+      name: it.name,
+      price: e.price || 0,
+      n: p ? p.n : 0
+    };
+  }).filter(Boolean));
+  const best = rows.filter(r => r.n > 0).sort((x, y) => y.n / Math.max(1, y.price) - x.n / Math.max(1, x.price))[0] || null;
+  const flop = rows.filter(r => r.price >= 2 && r.n === 0).sort((x, y) => y.price - x.price)[0] || null;
+  return {
+    mvp,
+    turning,
+    best,
+    flop,
+    priceOf: price
+  };
+}
+function MatchReport({
+  d,
+  A,
+  B,
+  match
+}) {
+  const R = matchReport(d, A, B, match);
+  const T = i => i === 0 ? A : B;
+  const why = p => {
+    const c = k => p.why.filter(x => x === k).length;
+    const bits = [['goal', 'goal'], ['assist', 'assist'], ['save', 'save'], ['cute', 'cute moment']].map(([k, w]) => c(k) ? c(k) + ' ' + w + (c(k) > 1 ? 's' : '') : null).filter(Boolean);
+    return bits.join(', ') || 'kept things ticking';
+  };
+  return React.createElement("div", {
+    className: "mreport"
+  }, React.createElement("h4", null, "\uD83D\uDCCB Match report"), R.mvp && React.createElement("p", {
+    className: "small"
+  }, React.createElement("b", null, "\u2B50 MVP:"), " ", R.mvp.name, " (", T(R.mvp.team).name, ") \u2014 ", why(R.mvp), "."), R.turning && React.createElement("p", {
+    className: "small"
+  }, React.createElement("b", null, "\uD83D\uDD04 Turning point:"), " ", R.turning.pens ? 'the penalty shoot-out.' : R.turning.player + '’s goal at ' + R.turning.min + '′ put ' + T(R.turning.team).name + ' ahead for good.'), R.best && React.createElement("p", {
+    className: "small"
+  }, React.createElement("b", null, "\uD83D\uDCB0 Best buy:"), " ", R.best.name, " \u2014 $", R.best.price, " for ", T(R.best.team).name, "."), R.flop && React.createElement("p", {
+    className: "small"
+  }, React.createElement("b", null, "\uD83D\uDCC9 Quiet day:"), " ", R.flop.name, " cost $", R.flop.price, " and didn\u2019t get on the scoresheet."), match.puppy && match.moments && match.moments.length > 0 && React.createElement("p", {
+    className: "small"
+  }, React.createElement("b", null, "\uD83D\uDC3E Cute moments:"), " ", match.moments.map(m => m.emoji + ' ' + m.player + ' (' + T(m.team).name + ') → ' + m.outcome).join(' · ')));
 }
 function MissionCell({
   d,
