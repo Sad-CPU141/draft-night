@@ -312,5 +312,42 @@ module.exports = async function sportsTests({ ok, boot, btn, click, sleep }) {
     ok(live && /Line score/.test(X.d.body.textContent) && /Player of the game/.test(X.d.body.textContent), 'the diamond plays the game and ends with a line score and the player of the game');
     X.w.close();
   }
+  // Golf cup.
+  {
+    const S = DN.sports; const t = T('t-golf'); const d = dOf(t);
+    const pickT = (id, names) => ({ id, name: id, team: names.map((n) => ({ itemId: t.items.find((i) => i.name === n).id, price: 4 })) });
+    const stars = pickT('A', ['Tiger Woods', 'Jack Nicklaus', 'Rory McIlroy', 'Scottie Scheffler']);
+    const close = pickT('B', ['Ben Hogan', 'Seve Ballesteros', 'Phil Mickelson', 'Annika Sörenstam']);
+    const g = S.simulateGolf(d, stars, close, 'g1');
+    ok(F.battleKind(t).name === 'Golf cup' && g.v === 'golf' && JSON.stringify(g) === JSON.stringify(S.simulateGolf(d, stars, close, 'g1')) && g.score[0] !== g.score[1] && g.matches.length >= 6, 'Golfers play a Ryder Cup-style match (2 fourballs, 4 singles) that always has a winner and replays exactly (' + g.score.join('–') + ')');
+    // Round scoring for one player, and match-play rules.
+    const tiger = { name: 'Tiger Woods', ...S.golfRating(t.items.find((i) => i.name === 'Tiger Woods')) };
+    let tot = 0, rng0 = 1; const rng = () => { rng0 = (rng0 * 16807) % 2147483647; return rng0 / 2147483647; };
+    for (let k = 0; k < 100; k++) S.GOLF_COURSE.forEach((h, i) => { tot += S.golfHole(rng, tiger, h, { wind: 1, pressure: false, key: 'r' + k + i }).strokes; });
+    ok(tot / 100 > 66 && tot / 100 < 73, 'a great player shoots like a tour pro (' + (tot / 100).toFixed(1) + ' on a par-72 course)');
+    let legal = true, kinds = new Set(), po = 0, halves = 0;
+    for (let k = 0; k < 120; k++) {
+      const m = S.simulateGolf({ ...d, seed: 'gf' + k }, stars, close, 'k'); if (m.how === 'playoff') po++;
+      m.matches.forEach((mm) => {
+        if (mm.result.w == null) halves++;
+        let up = 0; mm.holes.forEach((h, i) => { const b = h.best.map((x) => x.strokes); const w = b[0] < b[1] ? 0 : b[1] < b[0] ? 1 : null; if (w !== h.w) legal = false; up += w === 0 ? 1 : w === 1 ? -1 : 0; if (up !== h.up) legal = false; if (mm.format !== 'playoff' && i < mm.holes.length - 1 && Math.abs(up) > 18 - (i + 1)) legal = false; h.notes.forEach((x) => x && kinds.add(x)); });
+        if (mm.format !== 'playoff' && mm.holes.length < 18 && Math.abs(up) <= 18 - mm.holes.length) legal = false;
+      });
+      if (Math.abs(m.score[0] + m.score[1] - (m.how === 'playoff' ? 7 : 6)) > 0.01) legal = false;
+    }
+    ok(legal, 'match play rules hold: lower score wins the hole, matches end when the lead is bigger than the holes left, six points in all');
+    ok(['ace', 'chipin', 'eagle', 'bomb', 'water', '3putt'].every((x) => kinds.has(x)) && po > 3 && halves > 10, 'rounds have holes-in-one, chip-ins, eagles, long putts, water and three-putts; matches get halved; level cups go to a playoff');
+    let framesOK = true; S.golfScript(g).beats.filter((b) => b.type === 'hole').forEach((b) => { for (let u = 0; u < b.dur; u += 0.25) { const f = S.golfFrame(b, u); f.balls.forEach((x) => { if (x && (!isFinite(x.x) || !isFinite(x.y))) framesOK = false; }); } });
+    ok(framesOK, 'every shown hole animates without errors');
+    const fill = (topic, n2, seed) => { const ms = [...Array(n2)].map((_, i) => ({ id: 'm' + i, name: ['Lions', 'Sharks', 'Owls'][i], color: DN.COLORS[i], emoji: 'x', human: true })); let dd = DN.createDraft(topic, ms, { ...DN.DEFAULT_RULES, slots: topic.slots, finale: { mode: 'sim', speed: 'normal' } }, { seed }); let gg = 0, rr = 0; while (!DN.isDraftOver(dd) && gg++ < 800) { if (dd.phase === 'auction') { const m = dd.managers.find((x, kk) => (kk + rr++) % 2 === 0 && DN.canBid(dd, x, DN.nextAmount(dd))) || dd.managers.find((x) => DN.canBid(dd, x, DN.nextAmount(dd))); dd = m ? DN.sell(DN.placeBid(dd, m.id, DN.nextAmount(dd))) : DN.skipItem(dd); } else if (dd.phase === 'freepick') { const cp = DN.currentPicker(dd); dd = DN.freePick(dd, dd.leftover.find((x) => DN.canTake(dd, cp.m, x))); } else break; } return dd; };
+    const raw = { ...fill(t, 3, 'golfui'), mode: 'local', createdAt: Date.now(), history: [] };
+    const X = await boot({ idb: false, speed: 0.05, storage: { dn_current_v1: JSON.stringify(raw) } });
+    await click(X.w, btn(X.d, 'Resume draft')); await click(X.w, btn(X.d, 'Start the finale')); await click(X.w, btn(X.d, 'First tee')); await sleep(500);
+    const live = !!X.d.querySelector('.golfsvg');
+    await click(X.w, btn(X.d, 'Next match')); await sleep(150);
+    await click(X.w, btn(X.d, 'Skip to result')); await sleep(150);
+    ok(live && /The cup/.test(X.d.body.textContent) && /Star of the day/.test(X.d.body.textContent), 'the course plays the cup and ends with every match result and a cup report');
+    X.w.close();
+  }
   P.w.close();
 };

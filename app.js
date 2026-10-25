@@ -1,4 +1,4 @@
-/* Draft Night 286e770263 — built from src/ by build.js. Edit src/, not this file. */
+/* Draft Night 08e93d0521 — built from src/ by build.js. Edit src/, not this file. */
 "use strict";
 (function(){
 function _extends() { return _extends = Object.assign ? Object.assign.bind() : function (n) { for (var e = 1; e < arguments.length; e++) { var t = arguments[e]; for (var r in t) ({}).hasOwnProperty.call(t, r) && (n[r] = t[r]); } return n; }, _extends.apply(null, arguments); }
@@ -664,7 +664,8 @@ const STARTER_BATTLE = {
   't-nhl': 'nhl',
   't-crk': 'cricket',
   't-mlb': 'mlb',
-  't-mlbl': 'mlb'
+  't-mlbl': 'mlb',
+  't-golf': 'golf'
 };
 function starterTopics() {
   const v3 = [...sportsTopicsV3(), ...foodTopicsV3(), ...entTopicsV3(), ...travelTopicsV3(), ...animalTopicsV3(), ...styleTopicsV3(), ...funTopicsV3()];
@@ -24307,6 +24308,15 @@ const BATTLE_KINDS = {
     upset: ['Who knew? {w} beats {l} when it counts!', 'Surprise hero: {w}!'],
     noshow: ['{w} wins the night — the other team had nothing.']
   },
+  golf: {
+    name: 'Golf cup',
+    start: 'First tee',
+    emoji: '⛳',
+    round: 'Match',
+    win: [''],
+    upset: [''],
+    noshow: ['{w} wins by walkover.']
+  },
   mlb: {
     name: 'Baseball game',
     start: 'Play ball',
@@ -24410,6 +24420,7 @@ function simulateFor(d, A, B, key, opts) {
   if (k === 'nhl') return simulateHockey(d, A, B, key);
   if (k === 'cricket') return simulateCricket(d, A, B, key);
   if (k === 'mlb') return simulateBaseball(d, A, B, key);
+  if (k === 'golf') return simulateGolf(d, A, B, key);
   if (k === 'survival') return simulateSurvival(d, A, B, key);
   if (k === 'powers' || k === 'weird') return simulateMissions(d, A, B, key);
   if (k === 'cute') return simulatePuppyBowl(d, A, B, key, opts && opts.knockout === false ? false : true);
@@ -24422,6 +24433,7 @@ function simWhy(w, mt) {
     const f = mt.final[mt.winner];
     return w.name + (f.rescued ? ' got rescued' : ' survived ' + ws + ' day' + (ws === 1 ? '' : 's')) + (ws !== ls ? ' (the others lasted ' + ls + ')' : mt.how === 'rescue' ? ', and got rescued first' : mt.how === 'shape' ? ', level on days but in better shape' : ' and won the last night') + '.';
   }
+  if (mt.v === 'golf') return w.name + ' won the cup ' + golfPts(mt.score[mt.winner]) + '–' + golfPts(mt.score[1 - mt.winner]) + (mt.how === 'playoff' ? ' in a sudden-death playoff' : '') + '.';
   if (mt.v === 'mlb') return w.name + ' won ' + mt.score[mt.winner] + '–' + mt.score[1 - mt.winner] + (mt.walkoff ? ' on a walk-off' : '') + (mt.innings > 9 ? ' in ' + mt.innings + ' innings' : '') + '.';
   if (mt.v === 'cricket') return crkResultLine(mt, mt.winner === 0 ? w : {
     name: 'the others'
@@ -24447,7 +24459,7 @@ function simWhy(w, mt) {
   if (mt.v === 'mission') return w.name + ' won ' + mt.score[mt.winner] + ' of ' + mt.missions.length + ' missions.';
   return w.name + ' won the ' + (BATTLE_KINDS[mt.kind] || BATTLE_KINDS.fight).name.toLowerCase() + ' ' + mt.score[mt.winner] + '–' + mt.score[1 - mt.winner] + (mt.sudden ? ' in sudden death' : '') + '.';
 }
-const isSimResult = mt => !!mt && (mt.v === 'mlb' || mt.v === 'cricket' || mt.v === 'nhl' || mt.v === 'nfl' || mt.v === 'tennis' || mt.v === 'gp' || mt.v === 'card' || mt.v === 'hoops' || mt.v === 'battle' || mt.v === 'arena' || mt.v === 'survival' || mt.v === 'mission' || mt.v === 'show');
+const isSimResult = mt => !!mt && (mt.v === 'golf' || mt.v === 'mlb' || mt.v === 'cricket' || mt.v === 'nhl' || mt.v === 'nfl' || mt.v === 'tennis' || mt.v === 'gp' || mt.v === 'card' || mt.v === 'hoops' || mt.v === 'battle' || mt.v === 'arena' || mt.v === 'survival' || mt.v === 'mission' || mt.v === 'show');
 function battleDuel(rng, kind, a, b, maxP) {
   const fill = (lines, w, l) => lines[Math.floor(rng() * lines.length)].replace('{w}', w).replace('{l}', l);
   if (!a || !b) {
@@ -27612,6 +27624,461 @@ function goldenBoot(d) {
     player: top[0].slice(top[0].indexOf('|') + 1),
     goals: top[1]
   } : null;
+}
+const GOLF_ATTRS = ['DRV', 'ACC', 'IRN', 'SHT', 'PUT', 'MEN'];
+const GOLF_ATTR_NAMES = {
+  DRV: 'Driving distance',
+  ACC: 'Accuracy',
+  IRN: 'Iron play',
+  SHT: 'Short game',
+  PUT: 'Putting',
+  MEN: 'Nerve'
+};
+const GOLF_PROFILE_SRC = `
+Tiger Woods|99|MEN+6 IRN+3
+Jack Nicklaus|98|MEN+5
+Arnold Palmer|93|
+Rory McIlroy|95|DRV+7 PUT-3
+Scottie Scheffler|96|IRN+5 PUT-2
+Phil Mickelson|93|SHT+7 ACC-4
+Gary Player|94|SHT+3
+Seve Ballesteros|95|SHT+8 ACC-6
+Jon Rahm|94|
+Brooks Koepka|93|MEN+4 DRV+3
+Dustin Johnson|91|DRV+7
+Jordan Spieth|91|PUT+6 SHT+4 DRV-4
+Bryson DeChambeau|92|DRV+10 ACC-4
+Xander Schauffele|92|
+Justin Rose|89|
+Ben Hogan|97|ACC+6 IRN+5
+Sam Snead|95|
+Bobby Jones|95|
+Nick Faldo|93|ACC+4 MEN+3
+Ernie Els|92|
+Vijay Singh|91|
+Annika Sörenstam|95|ACC+5
+Nelly Korda|90|
+Lydia Ko|90|PUT+3
+Collin Morikawa|91|IRN+6 PUT-3
+Tommy Fleetwood|89|
+Ludvig Åberg|89|
+Hideki Matsuyama|90|IRN+4
+Shane Lowry|88|SHT+3
+Tom Watson|94|
+Lee Trevino|93|ACC+4
+Greg Norman|92|DRV+4
+Fred Couples|89|
+Payne Stewart|90|
+Walter Hagen|93|
+Byron Nelson|95|
+Gene Sarazen|92|
+Colin Montgomerie|89|ACC+4
+Sergio García|89|IRN+4 PUT-4
+Pádraig Harrington|89|
+Adam Scott|89|
+Jason Day|89|
+Justin Thomas|90|
+Patrick Cantlay|89|PUT+3
+Viktor Hovland|88|
+Cameron Smith|89|PUT+5
+Luke Donald|88|SHT+4
+Lorena Ochoa|92|
+Inbee Park|92|PUT+6
+Karrie Webb|92|
+Se Ri Pak|90|
+Babe Didrikson Zaharias|92|`;
+const GOLF_PROFILE = {};
+GOLF_PROFILE_SRC.trim().split('\n').forEach(line => {
+  const [name, ovr, tw] = line.split('|');
+  const tweak = {};
+  (tw || '').split(' ').filter(Boolean).forEach(t => {
+    const m = t.match(/^([A-Z]+)([+-]\d+)$/);
+    if (m) tweak[m[1]] = +m[2];
+  });
+  GOLF_PROFILE[name.toLowerCase()] = {
+    ovr: +ovr,
+    tweak
+  };
+});
+function golfRating(item) {
+  const prof = GOLF_PROFILE[String(item.name || '').toLowerCase()];
+  const fixed = validRating(item.rating);
+  const ovr = fixed ? clamp(Math.round(+item.rating), 1, 99) : prof ? prof.ovr : clamp(Math.round(76 + itemFame(item) * 18 + (unit('golfo', item.name) - 0.5) * 6), 70, 94);
+  const tw = prof ? prof.tweak : {};
+  const attrs = {};
+  GOLF_ATTRS.forEach(a => {
+    attrs[a] = clamp(Math.round(ovr + (tw[a] || 0) + (unit('golfa', item.name, a) - 0.5) * 6), 50, 99);
+  });
+  return {
+    ovr,
+    attrs,
+    estimated: !fixed
+  };
+}
+const GOLF_COURSE = [[4, 420], [4, 445], [3, 185], [5, 560], [4, 400], [4, 470], [3, 210], [4, 430], [5, 590], [4, 410], [4, 455], [3, 160], [5, 545], [4, 440], [4, 480], [3, 200], [4, 425], [5, 575]];
+function golfHole(rng, P, hole, ctx) {
+  const A = P.attrs;
+  const [par, len] = hole;
+  const press = ctx.pressure ? (A.MEN - 85) / 400 : 0;
+  const gauss = () => {
+    let u = 0;
+    for (let i = 0; i < 4; i++) u += rng();
+    return (u - 2) / 0.58;
+  };
+  const shots = [];
+  let strokes = 0;
+  let left = len;
+  let lie = 'tee';
+  let onGreen = false;
+  let feet = 0;
+  let holed = false;
+  const wind = ctx.wind;
+  while (!holed && strokes < 10) {
+    if (!onGreen) {
+      strokes++;
+      const from = left;
+      const fromLie = lie;
+      if (left > 240 && lie !== 'bunker') {
+        const dist = Math.min(left - 20, 285 + (A.DRV - 85) * 2.4 + gauss() * 14 - wind * 8 - (lie === 'rough' ? 25 : 0));
+        const fw = clamp(0.64 + (A.ACC - 85) / 150 - wind * 0.06 + press, 0.3, 0.88);
+        const r = rng();
+        left = Math.max(5, left - dist);
+        lie = r < fw ? 'fairway' : r < fw + (1 - fw) * 0.72 ? 'rough' : r < fw + (1 - fw) * 0.92 ? 'bunker' : 'water';
+        shots.push({
+          k: 'drive',
+          from,
+          to: left,
+          lie,
+          x: (unit('gx', ctx.key, strokes) - 0.5) * (lie === 'fairway' ? 0.4 : 1.2)
+        });
+        if (lie === 'water') {
+          strokes++;
+          lie = 'rough';
+          shots.push({
+            k: 'penalty',
+            from: left,
+            to: left,
+            lie
+          });
+        }
+        continue;
+      }
+      const lieF = {
+        tee: 1,
+        fairway: 1,
+        rough: 1.55,
+        bunker: 1.9,
+        water: 1.6
+      }[lie];
+      const near = left < 40;
+      const skill = near ? A.SHT : A.IRN;
+      const base = near ? 0.1 * left + 2 : left * 0.085 + 6;
+      const prox = Math.max(0.5, base * lieF * (1.12 - (skill - 80) / 160) * Math.exp(gauss() * 0.45) * (1 + wind * 0.08) - press * 30);
+      const miss = !near && prox > 38 && rng() < 0.75;
+      const inP = near ? clamp(0.035 + (A.SHT - 85) / 500, 0.01, 0.08) * (lie === 'bunker' ? 0.6 : 1) : par === 3 && fromLie === 'tee' ? 1 / 380 * (1 + (A.IRN - 85) / 40) : clamp(0.006 + (A.IRN - 85) / 4000, 0.002, 0.012);
+      if (rng() < inP) {
+        holed = true;
+        shots.push({
+          k: par === 3 && fromLie === 'tee' ? 'ace' : near ? 'chipin' : 'holeout',
+          from,
+          to: 0,
+          lie: 'hole'
+        });
+        break;
+      }
+      if (miss) {
+        left = 8 + rng() * 25;
+        lie = rng() < 0.3 ? 'bunker' : 'rough';
+        shots.push({
+          k: 'approach',
+          from,
+          to: left,
+          lie,
+          missed: true,
+          x: (rng() - 0.5) * 0.8
+        });
+        continue;
+      }
+      onGreen = true;
+      feet = prox;
+      lie = 'green';
+      shots.push({
+        k: near ? fromLie === 'bunker' ? 'bunker' : 'chip' : 'approach',
+        from,
+        to: Math.round(feet),
+        lie: 'green',
+        ft: Math.round(feet),
+        x: (rng() - 0.5) * 0.3
+      });
+      continue;
+    }
+    strokes++;
+    const d = feet;
+    const make = clamp(d <= 1.5 ? 0.995 : 1 / (1 + Math.pow(d / 7.5, 1.9)), 0.02, 0.995);
+    const p = clamp(make * (1 + (A.PUT - 85) / 140) + press * 0.6, 0.01, 0.995);
+    if (rng() < p) {
+      holed = true;
+      shots.push({
+        k: 'putt',
+        ft: Math.round(d),
+        made: true
+      });
+      break;
+    }
+    const next = Math.max(0.8, d * (0.08 + rng() * 0.14) + (d > 30 ? 2 : 0));
+    shots.push({
+      k: 'putt',
+      ft: Math.round(d),
+      made: false,
+      left: Math.round(next * 10) / 10
+    });
+    feet = next;
+  }
+  return {
+    strokes,
+    shots
+  };
+}
+const golfScoreName = (strokes, par) => {
+  const d = strokes - par;
+  return strokes === 1 ? 'Hole-in-one' : d <= -3 ? 'Albatross' : d === -2 ? 'Eagle' : d === -1 ? 'Birdie' : d === 0 ? 'Par' : d === 1 ? 'Bogey' : d === 2 ? 'Double bogey' : '+' + d;
+};
+function golfMatch(rng, sides, cfg) {
+  const holes = [];
+  let up = 0;
+  const wind = cfg.wind;
+  let n = 0;
+  let result = null;
+  const course = cfg.playoff ? GOLF_COURSE.slice(15).concat(GOLF_COURSE) : GOLF_COURSE;
+  for (let h = 0; h < course.length; h++) {
+    const hole = course[h];
+    n++;
+    const left = 18 - h;
+    const pressure = cfg.playoff || h >= 15 || Math.abs(up) >= left - 1;
+    const res = sides.map((ps, s) => ps.map((p, j) => ({
+      p: p.name,
+      ...golfHole(rng, p, hole, {
+        wind,
+        pressure,
+        key: cfg.key + ':' + h + ':' + s + ':' + j
+      })
+    })));
+    const best = res.map(r => r.reduce((b, x) => x.strokes < b.strokes ? x : b, r[0]));
+    const w = best[0].strokes < best[1].strokes ? 0 : best[1].strokes < best[0].strokes ? 1 : null;
+    if (w === 0) up++;else if (w === 1) up--;
+    const flag = x => x.shots.some(s => s.k === 'ace') ? 'ace' : x.shots.some(s => s.k === 'chipin' || s.k === 'holeout') ? 'chipin' : x.strokes <= hole[0] - 2 ? 'eagle' : x.shots.some(s => s.k === 'putt' && s.made && s.ft >= 25) ? 'bomb' : x.shots.filter(s => s.k === 'putt').length >= 3 ? '3putt' : x.shots.some(s => s.k === 'penalty') ? 'water' : null;
+    const notes = best.map(flag);
+    const left2 = 18 - (h + 1);
+    holes.push({
+      n: h + 1,
+      par: hole[0],
+      len: hole[1],
+      sc: res.map(r => r.map(x => x.strokes)),
+      best: best.map(b => ({
+        p: b.p,
+        strokes: b.strokes,
+        shots: b.shots
+      })),
+      w,
+      up,
+      notes
+    });
+    if (cfg.playoff) {
+      if (w != null) {
+        result = {
+          w,
+          how: 'playoff',
+          hole: h + 1
+        };
+        break;
+      }
+      if (h >= 8) {
+        result = {
+          w: rng() < 0.5 ? 0 : 1,
+          how: 'playoff',
+          hole: h + 1
+        };
+        break;
+      }
+      continue;
+    }
+    if (Math.abs(up) > left2) {
+      result = {
+        w: up > 0 ? 0 : 1,
+        how: Math.abs(up) + (left2 ? '&' + left2 : ' up'),
+        hole: h + 1
+      };
+      break;
+    }
+  }
+  if (!result) result = up === 0 ? {
+    w: null,
+    how: 'halved',
+    hole: 18
+  } : {
+    w: up > 0 ? 0 : 1,
+    how: Math.abs(up) + ' up',
+    hole: 18
+  };
+  holes.forEach((hl, i) => {
+    hl.hl = cfg.playoff || i === holes.length - 1 || hl.notes.some(x => x === 'ace' || x === 'chipin' || x === 'eagle' || x === 'bomb') || hl.w != null && hl.n >= 14 && Math.abs(hl.up) <= 2 || hl.notes.some(x => x === 'water') && hl.w != null;
+  });
+  holes.forEach(hl => {
+    if (!hl.hl) hl.best = hl.best.map(b => ({
+      p: b.p,
+      strokes: b.strokes
+    }));
+  });
+  return {
+    holes,
+    result
+  };
+}
+function simulateGolf(d, A, B, key) {
+  const rng = seeded(d.seed, 'golf', key, A.id, B.id);
+  const sq = [A, B].map(m => m.team.map(x => {
+    const it = x && d.items[x.itemId];
+    return it ? {
+      name: it.name,
+      itemId: it.id,
+      price: x.price || 0,
+      ...golfRating(it)
+    } : null;
+  }));
+  const wind = Math.round(rng() * 3 * 10) / 10;
+  const matches = [];
+  const pts = [0, 0];
+  const add = m => {
+    if (m.result.w == null) {
+      pts[0] += 0.5;
+      pts[1] += 0.5;
+    } else pts[m.result.w] += 1;
+    m.pts = [...pts];
+    matches.push(m);
+  };
+  [[0, 1], [2, 3]].forEach((pair, k) => {
+    const pa = pair.map(i => sq[0][i]).filter(Boolean),
+      pb = pair.map(i => sq[1][i]).filter(Boolean);
+    if (!pa.length && !pb.length) return;
+    if (!pa.length || !pb.length) {
+      add({
+        label: 'Fourball ' + (k + 1),
+        format: 'fourball',
+        a: pa.map(golfView),
+        b: pb.map(golfView),
+        holes: [],
+        result: {
+          w: pa.length ? 0 : 1,
+          how: 'walkover',
+          hole: 0
+        }
+      });
+      return;
+    }
+    const m = golfMatch(rng, [pa, pb], {
+      wind,
+      key: key + 'fb' + k
+    });
+    add({
+      label: 'Fourball ' + (k + 1),
+      format: 'fourball',
+      a: pa.map(golfView),
+      b: pb.map(golfView),
+      ...m
+    });
+  });
+  for (let i = 0; i < 4; i++) {
+    const a = sq[0][i],
+      b = sq[1][i];
+    if (!a && !b) continue;
+    if (!a || !b) {
+      add({
+        label: 'Singles ' + (i + 1),
+        format: 'singles',
+        a: a ? [golfView(a)] : [],
+        b: b ? [golfView(b)] : [],
+        holes: [],
+        result: {
+          w: a ? 0 : 1,
+          how: 'walkover',
+          hole: 0
+        }
+      });
+      continue;
+    }
+    const m = golfMatch(rng, [[a], [b]], {
+      wind,
+      key: key + 's' + i
+    });
+    add({
+      label: 'Singles ' + (i + 1),
+      format: 'singles',
+      a: [golfView(a)],
+      b: [golfView(b)],
+      ...m
+    });
+  }
+  let how = 'points';
+  if (pts[0] === pts[1]) {
+    const best = s => sq[s].filter(Boolean).sort((x, y) => y.price - x.price || y.ovr - x.ovr)[0];
+    const a = best(0),
+      b = best(1);
+    if (a && b) {
+      const m = golfMatch(rng, [[a], [b]], {
+        wind,
+        key: key + 'po',
+        playoff: true
+      });
+      m.holes.forEach(h => {
+        h.hl = true;
+      });
+      const res = {
+        label: 'Sudden-death playoff',
+        format: 'playoff',
+        a: [golfView(a)],
+        b: [golfView(b)],
+        ...m
+      };
+      pts[m.result.w] += 1;
+      res.pts = [...pts];
+      matches.push(res);
+      how = 'playoff';
+    } else {
+      pts[a ? 0 : 1] += 1;
+    }
+  }
+  const winner = pts[0] > pts[1] ? 0 : 1;
+  return {
+    v: 'golf',
+    kind: 'golf',
+    wind,
+    matches,
+    score: pts,
+    winner,
+    how,
+    sudden: how === 'playoff',
+    et: false,
+    pens: null,
+    events: []
+  };
+}
+function golfView(p) {
+  return {
+    name: p.name,
+    itemId: p.itemId,
+    price: p.price,
+    ovr: p.ovr
+  };
+}
+const golfPts = x => x % 1 ? (Math.floor(x) ? Math.floor(x) : '') + '½' : String(x);
+const golfStatus = (up, names) => up === 0 ? 'All square' : (up > 0 ? names[0] : names[1]) + ' ' + Math.abs(up) + ' UP';
+function golfLine(m) {
+  const nm = side => (side === 0 ? m.a : m.b).map(p => p.name).join(' & ');
+  const verb = (side, one, many) => (side === 0 ? m.a : m.b).length > 1 ? many : one;
+  if (m.result.how === 'walkover') return nm(m.result.w) + ' ' + verb(m.result.w, 'wins', 'win') + ' by walkover.';
+  if (m.result.w == null) return nm(0) + ' and ' + nm(1) + ' halve the match.';
+  if (m.result.how === 'playoff') return nm(m.result.w) + ' ' + verb(m.result.w, 'wins', 'win') + ' the playoff on the ' + m.result.hole + ordinalSuffix(m.result.hole) + ' extra hole.';
+  return nm(m.result.w) + ' beat ' + nm(1 - m.result.w) + ' ' + m.result.how + '.';
 }
 const NHL_ATTRS = {
   S: ['SHT', 'PAS', 'SKT', 'DEF', 'PHY'],
@@ -32935,7 +33402,7 @@ function TopicEditor({
   }, "Fun battles (Battles finale)"), React.createElement(Seg, {
     label: "Fun battle style",
     value: topic.battle || 'none',
-    options: [['none', 'Off'], ['fight', '⚔️ Fight'], ['powers', '💥 Powers'], ['survival', '🧟 Survival'], ['cute', '🥰 Puppy Bowl'], ['weird', '🤡 Silly'], ['combat', '🥊 Fight night'], ['f1', '🏎️ Grand Prix'], ['tennis', '🎾 Tennis'], ['nfl', '🏈 American football'], ['nhl', '🏒 Ice hockey'], ['cricket', '🏏 Cricket'], ['mlb', '⚾ Baseball'], ['basketball', '🏀 Basketball']],
+    options: [['none', 'Off'], ['fight', '⚔️ Fight'], ['powers', '💥 Powers'], ['survival', '🧟 Survival'], ['cute', '🥰 Puppy Bowl'], ['weird', '🤡 Silly'], ['combat', '🥊 Fight night'], ['f1', '🏎️ Grand Prix'], ['tennis', '🎾 Tennis'], ['nfl', '🏈 American football'], ['nhl', '🏒 Ice hockey'], ['cricket', '🏏 Cricket'], ['mlb', '⚾ Baseball'], ['golf', '⛳ Golf'], ['basketball', '🏀 Basketball']],
     onChange: v => set({
       battle: v === 'none' ? '' : v
     })
@@ -35103,6 +35570,9 @@ function ItemCard({
     item: item,
     topic: d.topic
   }) : battleKindId(d.topic) === 'mlb' ? React.createElement(MLBChip, {
+    item: item,
+    topic: d.topic
+  }) : battleKindId(d.topic) === 'golf' ? React.createElement(GolfChip, {
     item: item,
     topic: d.topic
   }) : hasBattle(d.topic) && React.createElement(StatChip, {
@@ -39912,7 +40382,14 @@ if (window.__DN_TEST__) window.__DN = {
     mlbRating,
     mlbScript,
     mlbFrame,
-    mlbReport
+    mlbReport,
+    simulateGolf,
+    golfRating,
+    golfHole,
+    golfScript,
+    golfFrame,
+    golfLine,
+    GOLF_COURSE
   },
   simStats: {
     simulatePuppyBowl,
@@ -43679,6 +44156,12 @@ function MatchSummary({
   B,
   match
 }) {
+  if (match.v === 'golf') return React.createElement(GolfSummary, {
+    d: d,
+    A: A,
+    B: B,
+    match: match
+  });
   if (match.v === 'mlb') return React.createElement(MLBSummary, {
     d: d,
     A: A,
@@ -45221,7 +45704,7 @@ function PitchMatch({
   }));
 }
 function MatchView(props) {
-  return props.match && props.match.v === 'mlb' ? React.createElement(DiamondView, props) : props.match && props.match.v === 'cricket' ? React.createElement(CricketView, props) : props.match && props.match.v === 'nhl' ? React.createElement(RinkView, props) : props.match && props.match.v === 'nfl' ? React.createElement(GridironView, props) : props.match && props.match.v === 'tennis' ? React.createElement(TennisView, props) : props.match && props.match.v === 'gp' ? React.createElement(TrackView, props) : props.match && props.match.v === 'card' ? React.createElement(RingView, props) : props.match && props.match.v === 'hoops' ? React.createElement(CourtView, props) : props.match && props.match.v === 'show' ? React.createElement(ShowView, props) : props.match && props.match.v === 'mission' ? React.createElement(MissionView, props) : props.match && props.match.v === 'survival' ? React.createElement(SurvivalView, props) : props.match && props.match.v === 'arena' ? React.createElement(ArenaView, props) : props.match && props.match.v === 'battle' ? React.createElement(BattleView, props) : props.match && props.match.v === 2 ? React.createElement(PitchMatch, props) : React.createElement(MatchPlayer, props);
+  return props.match && props.match.v === 'golf' ? React.createElement(GolfView, props) : props.match && props.match.v === 'mlb' ? React.createElement(DiamondView, props) : props.match && props.match.v === 'cricket' ? React.createElement(CricketView, props) : props.match && props.match.v === 'nhl' ? React.createElement(RinkView, props) : props.match && props.match.v === 'nfl' ? React.createElement(GridironView, props) : props.match && props.match.v === 'tennis' ? React.createElement(TennisView, props) : props.match && props.match.v === 'gp' ? React.createElement(TrackView, props) : props.match && props.match.v === 'card' ? React.createElement(RingView, props) : props.match && props.match.v === 'hoops' ? React.createElement(CourtView, props) : props.match && props.match.v === 'show' ? React.createElement(ShowView, props) : props.match && props.match.v === 'mission' ? React.createElement(MissionView, props) : props.match && props.match.v === 'survival' ? React.createElement(SurvivalView, props) : props.match && props.match.v === 'arena' ? React.createElement(ArenaView, props) : props.match && props.match.v === 'battle' ? React.createElement(BattleView, props) : props.match && props.match.v === 2 ? React.createElement(PitchMatch, props) : React.createElement(MatchPlayer, props);
 }
 function matchReport(d, A, B, match) {
   const teams = [A, B];
@@ -45314,6 +45797,647 @@ function MatchReport({
   }, React.createElement("b", null, "\uD83D\uDCC9 Quiet day:"), " ", R.flop.name, " cost $", R.flop.price, " and didn\u2019t get on the scoresheet."), match.puppy && match.moments && match.moments.length > 0 && React.createElement("p", {
     className: "small"
   }, React.createElement("b", null, "\uD83D\uDC3E Cute moments:"), " ", match.moments.map(m => m.emoji + ' ' + m.player + ' (' + T(m.team).name + ') → ' + m.outcome).join(' · ')));
+}
+const GH = {
+  teeY: 57,
+  greenY: 9,
+  cx: 50
+};
+function golfScript(match) {
+  const beats = [];
+  let t = 0;
+  const add = b => {
+    b.t0 = t;
+    t += b.dur;
+    beats.push(b);
+    return b;
+  };
+  add({
+    type: 'intro',
+    dur: 2.6
+  });
+  match.matches.forEach((m, mi) => {
+    add({
+      type: 'first',
+      dur: 2.4,
+      mi
+    });
+    let roll = [];
+    const flush = () => {
+      if (!roll.length) return;
+      add({
+        type: 'roll',
+        dur: Math.min(2.6, 0.4 + roll.length * 0.22),
+        mi,
+        holes: roll
+      });
+      roll = [];
+    };
+    m.holes.forEach(h => {
+      if (!h.hl) {
+        roll.push(h);
+        return;
+      }
+      flush();
+      const n = Math.max(...h.best.map(b => (b.shots || []).length));
+      add({
+        type: 'hole',
+        dur: 1.4 + n * 2 * 0.62 + 1.8,
+        mi,
+        h,
+        n
+      });
+    });
+    flush();
+    add({
+      type: 'result',
+      dur: 2.8,
+      mi
+    });
+  });
+  add({
+    type: 'final',
+    dur: 2.8
+  });
+  return {
+    beats,
+    total: t
+  };
+}
+const golfSpot = (shot, side, len) => {
+  if (!shot) return {
+    x: GH.cx + (side ? 1.5 : -1.5),
+    y: GH.teeY
+  };
+  if (shot.lie === 'hole' || shot.made) return {
+    x: GH.cx,
+    y: GH.greenY
+  };
+  if (shot.k === 'putt') {
+    const ft = shot.left != null ? shot.left : 0;
+    return {
+      x: GH.cx + (side ? 1 : -1) * Math.min(5, ft / 6),
+      y: GH.greenY + Math.min(4, ft / 8)
+    };
+  }
+  if (shot.lie === 'green') {
+    const ft = shot.ft != null ? shot.ft : 10;
+    return {
+      x: GH.cx + (side ? 1 : -1) * Math.min(6, ft / 5),
+      y: GH.greenY + Math.min(5, ft / 7)
+    };
+  }
+  const f = Math.max(0, Math.min(1, shot.to / len));
+  const bend = Math.sin(f * Math.PI) * 9;
+  return {
+    x: GH.cx + bend + (shot.x || 0) * 14 + (shot.lie === 'water' ? 16 : 0),
+    y: GH.greenY + f * (GH.teeY - GH.greenY)
+  };
+};
+function golfFrame(beat, u) {
+  const out = {
+    balls: [null, null],
+    banner: null,
+    active: null
+  };
+  if (beat.type !== 'hole') return out;
+  const h = beat.h;
+  const per = 0.62;
+  const t0 = 1.0;
+  const step = Math.floor((u - t0) / per);
+  const kk = (u - t0) / per % 1;
+  [0, 1].forEach(side => {
+    const shots = h.best[side].shots || [];
+    let spot = golfSpot(null, side, h.len);
+    let h2 = 0;
+    let doneN = 0;
+    for (let i = 0; i < shots.length; i++) {
+      const at = 2 * i + side;
+      if (step > at) {
+        spot = golfSpot(shots[i], side, h.len);
+        doneN = i + 1;
+      } else if (step === at) {
+        const from = i ? golfSpot(shots[i - 1], side, h.len) : spot;
+        const to = golfSpot(shots[i], side, h.len);
+        const putt = shots[i].k === 'putt';
+        spot = {
+          x: from.x + (to.x - from.x) * easeC(kk),
+          y: from.y + (to.y - from.y) * easeC(kk)
+        };
+        h2 = putt ? 0 : Math.sin(kk * Math.PI) * (shots[i].k === 'drive' ? 8 : 5);
+        out.active = side;
+        if (kk > 0.75) {
+          const s = shots[i];
+          out.banner = s.k === 'ace' ? 'HOLE-IN-ONE!!' : s.k === 'chipin' ? 'CHIP-IN!' : s.k === 'holeout' ? 'HOLED IT!' : s.lie === 'water' ? 'IN THE WATER!' : s.lie === 'bunker' ? 'BUNKER' : s.k === 'putt' && s.made ? s.ft >= 25 ? 'FROM ' + s.ft + ' FEET!' : h.best[side].strokes < h.par ? h.par - h.best[side].strokes >= 2 ? 'EAGLE!' : 'BIRDIE!' : 'IN!' : s.k === 'putt' ? 'JUST MISSES' : null;
+        }
+        doneN = i;
+        break;
+      }
+    }
+    const holed = doneN >= shots.length && shots.length > 0;
+    out.balls[side] = {
+      ...spot,
+      h: h2,
+      holed
+    };
+  });
+  const lastStep = Math.max(h.best[0].shots ? h.best[0].shots.length * 2 - 2 : 0, h.best[1].shots ? h.best[1].shots.length * 2 - 1 : 0);
+  if (step > lastStep) out.banner = h.w == null ? 'HALVED' : h.best[h.w].p.split(' ').slice(-1)[0].toUpperCase() + ' WINS THE HOLE';
+  return out;
+}
+function GolfView({
+  d,
+  A,
+  B,
+  match,
+  speed,
+  onDone,
+  label
+}) {
+  const script = useMemo(() => golfScript(match), [match]);
+  const base = speed === 'fast' ? 2 : 1;
+  const [t, setT] = useState(speed === 'instant' ? script.total : 0);
+  const [playing, setPlaying] = useState(speed !== 'instant');
+  const [mult, setMult] = useState(1);
+  const done = t >= script.total;
+  const fired = useRef(false);
+  useEffect(() => {
+    if (!playing || done) return undefined;
+    let raf;
+    let last = performance.now();
+    const tick = now => {
+      const dt = Math.min(0.1, (now - last) / 1000);
+      last = now;
+      setT(x => Math.min(script.total, x + dt * base * mult / Math.max(0.001, GAME_SPEED)));
+      raf = requestAnimationFrame(tick);
+    };
+    raf = requestAnimationFrame(tick);
+    return () => cancelAnimationFrame(raf);
+  }, [playing, done, mult, base]);
+  useEffect(() => {
+    if (done && !fired.current) {
+      fired.current = true;
+      audio.play('fanfare');
+      onDone && onDone();
+    }
+  }, [done]);
+  const bi = Math.max(0, script.beats.findIndex(b => t < b.t0 + b.dur));
+  const beat = done ? script.beats[script.beats.length - 1] : script.beats[bi];
+  const u = done ? beat.dur : t - beat.t0;
+  const T = i => i === 0 ? A : B;
+  const mi = beat.mi != null ? beat.mi : match.matches.length - 1;
+  const m = match.matches[Math.max(0, mi)];
+  const fr = golfFrame(beat, u);
+  let holeNow = null;
+  if (beat.type === 'hole') holeNow = u > beat.dur - 1.6 ? beat.h : m.holes[beat.h.n - 2] || null;else if (beat.type === 'roll') holeNow = beat.holes[Math.min(beat.holes.length - 1, Math.floor(u / beat.dur * beat.holes.length))];else if (beat.type === 'result' || beat.type === 'final' || done) holeNow = m.holes[m.holes.length - 1] || null;
+  const up = holeNow ? holeNow.up : 0;
+  const thru = holeNow ? holeNow.n : 0;
+  const nm = side => (side === 0 ? m.a : m.b).map(p => p.name.split(' ').slice(-1)[0]).join(' & ');
+  const statusTxt = m.result.how === 'walkover' ? 'Walkover' : (up === 0 ? 'All square' : nm(up > 0 ? 0 : 1) + ' ' + Math.abs(up) + ' UP') + (thru ? ' thru ' + thru : '');
+  const decided = k => k < mi || k === mi && beat.type === 'result' && u > 0.6 || beat.type === 'final' || done;
+  const pts = [0, 1].map(s => match.matches.reduce((n, x, k) => n + (decided(k) ? x.result.w == null ? 0.5 : x.result.w === s ? 1 : 0 : 0), 0));
+  const colors = [A.color, B.color];
+  const hole = beat.type === 'hole' ? beat.h : null;
+  const banner = done ? null : beat.type === 'intro' ? 'DRAFT NIGHT CUP' : beat.type === 'first' ? m.label.toUpperCase() : beat.type === 'result' ? m.result.w == null ? 'MATCH HALVED' : nm(m.result.w).toUpperCase().slice(0, 18) + ' WIN' + ((m.result.w === 0 ? m.a : m.b).length > 1 ? '' : 'S') : beat.type === 'final' ? 'FINAL' : fr.banner;
+  const lastBeat = useRef(-1);
+  useEffect(() => {
+    if (!playing || done || bi === lastBeat.current) return;
+    lastBeat.current = bi;
+    if (beat.type === 'result') audio.play('cheer');
+  }, [bi]);
+  const said = useRef({});
+  useEffect(() => {
+    if (!playing || done || !fr.banner || said.current[bi + fr.banner]) return;
+    said.current[bi + fr.banner] = true;
+    if (/HOLE-IN-ONE|CHIP-IN|EAGLE|FEET|HOLED/.test(fr.banner)) {
+      audio.play('cheer');
+    } else if (/BIRDIE|IN!/.test(fr.banner)) audio.play('bid');else if (/WATER/.test(fr.banner)) audio.play('buzzer');
+  }, [t]);
+  const feed = [];
+  script.beats.forEach((b, k2) => {
+    if (!done && b.t0 + b.dur * 0.8 > t) return;
+    const mm = match.matches[b.mi];
+    const who = side => (side === 0 ? mm.a : mm.b).map(p => p.name).join(' & ');
+    if (b.type === 'first') feed.push({
+      k: k2,
+      tag: mm.format === 'fourball' ? 'FB' : mm.format === 'playoff' ? 'PO' : 'S',
+      text: mm.label + ': ' + who(0) + ' vs ' + who(1),
+      half: true
+    });else if (b.type === 'hole') {
+      const h = b.h;
+      const sh = h.best.map(x => x.p + ' ' + golfScoreName(x.strokes, h.par).toLowerCase());
+      const note = h.notes.map((x, s) => x === 'ace' ? h.best[s].p + ' makes a HOLE-IN-ONE! ' : x === 'chipin' ? h.best[s].p + ' holes out from off the green! ' : x === 'eagle' ? h.best[s].p + ' eagles! ' : x === 'bomb' ? h.best[s].p + ' drains a long putt! ' : x === 'water' ? h.best[s].p + ' finds the water. ' : '').join('');
+      feed.push({
+        k: k2,
+        tag: 'H' + h.n,
+        team: h.w,
+        big: h.notes.some(x => x === 'ace' || x === 'chipin' || x === 'eagle'),
+        text: note + (h.w == null ? 'Halved (' + sh.join(', ') + ').' : who(h.w) + ' win the hole (' + sh.join(' v ') + '). ' + golfStatus(h.up, [who(0), who(1)]) + '.')
+      });
+    } else if (b.type === 'result') feed.push({
+      k: k2,
+      tag: '⛳',
+      team: mm.result.w,
+      big: true,
+      text: golfLine(mm) + ' Cup: ' + golfPts(mm.pts[0]) + '–' + golfPts(mm.pts[1]) + '.'
+    });
+  });
+  const feedRef = useRef(null);
+  useEffect(() => {
+    const f = feedRef.current;
+    if (f) f.scrollTop = f.scrollHeight;
+  }, [feed.length]);
+  const showMatchBoard = beat.type !== 'intro' && beat.type !== 'final' && !done;
+  return React.createElement("div", {
+    className: "matchview golfview"
+  }, React.createElement("div", {
+    className: "scoreboard"
+  }, React.createElement("div", {
+    className: "sb-team"
+  }, React.createElement(Badge, {
+    m: A
+  }), React.createElement("span", {
+    className: "sb-n"
+  }, A.name)), React.createElement("div", {
+    className: "sb-mid"
+  }, React.createElement("span", {
+    className: "sb-score num",
+    "aria-live": "polite"
+  }, golfPts(pts[0]), "\u2013", golfPts(pts[1])), React.createElement("span", {
+    className: "sb-clock num"
+  }, done || beat.type === 'final' ? 'FINAL' : beat.type === 'intro' ? 'FIRST TEE' : m.label.toUpperCase())), React.createElement("div", {
+    className: "sb-team"
+  }, React.createElement(Badge, {
+    m: B
+  }), React.createElement("span", {
+    className: "sb-n"
+  }, B.name))), React.createElement("div", {
+    className: "boutbar small"
+  }, showMatchBoard ? React.createElement(React.Fragment, null, React.createElement("b", null, nm(0)), " ", React.createElement("span", {
+    className: "muted"
+  }, "vs"), " ", React.createElement("b", null, nm(1)), " ", React.createElement("span", {
+    className: "muted"
+  }, "\xB7 ", statusTxt)) : React.createElement("span", {
+    className: "muted"
+  }, "Match play \xB7 wind ", match.wind < 1 ? 'calm' : match.wind < 2 ? 'breezy' : 'strong'), hole && React.createElement("span", {
+    className: "boutstats"
+  }, "Hole ", hole.n, " \xB7 par ", hole.par, " \xB7 ", hole.len, " yards")), React.createElement("div", {
+    className: "pitchwrap"
+  }, React.createElement("svg", {
+    className: "pitchsvg golfsvg",
+    viewBox: "0 0 100 64",
+    role: "img",
+    "aria-label": 'Golf: ' + m.label + ', ' + statusTxt
+  }, React.createElement("rect", {
+    x: "0",
+    y: "0",
+    width: "100",
+    height: "64",
+    fill: "#2f7a31"
+  }), Array.from({
+    length: 14
+  }, (_, i) => React.createElement("circle", {
+    key: i,
+    cx: unit('tree', i) < 0.5 ? 4 + unit('tx', i) * 14 : 82 + unit('tx', i) * 14,
+    cy: 4 + unit('ty', i) * 56,
+    r: 2.4 + unit('tr', i) * 1.6,
+    fill: "#1f5a23"
+  })), React.createElement("path", {
+    d: 'M' + (GH.cx - 6) + ' ' + GH.teeY + ' C ' + (GH.cx + 4) + ' 44, ' + (GH.cx + 16) + ' 30, ' + (GH.cx + 2) + ' ' + (GH.greenY + 6) + ' L ' + (GH.cx + 12) + ' ' + (GH.greenY + 8) + ' C ' + (GH.cx + 26) + ' 30, ' + (GH.cx + 16) + ' 44, ' + (GH.cx + 6) + ' ' + GH.teeY + ' Z',
+    fill: "#5fb44c"
+  }), Array.from({
+    length: 7
+  }, (_, i) => React.createElement("rect", {
+    key: i,
+    x: "30",
+    y: 14 + i * 6,
+    width: "40",
+    height: "3",
+    fill: "rgba(255,255,255,.04)"
+  })), (!hole || hole.par !== 3) && React.createElement("ellipse", {
+    cx: GH.cx + 26,
+    cy: "32",
+    rx: "6",
+    ry: "4",
+    fill: "#3d8fd1",
+    stroke: "#2a6fa8",
+    strokeWidth: "0.4"
+  }), React.createElement("ellipse", {
+    cx: GH.cx - 7,
+    cy: GH.greenY + 5,
+    rx: "3.6",
+    ry: "2.2",
+    fill: "#e8d6a0"
+  }), React.createElement("ellipse", {
+    cx: GH.cx + 16,
+    cy: "38",
+    rx: "3",
+    ry: "1.8",
+    fill: "#e8d6a0"
+  }), React.createElement("ellipse", {
+    cx: GH.cx,
+    cy: GH.greenY,
+    rx: "9",
+    ry: "5.5",
+    fill: "#7fd06a",
+    stroke: "#4e9a3c",
+    strokeWidth: "0.4"
+  }), React.createElement("circle", {
+    cx: GH.cx,
+    cy: GH.greenY,
+    r: "0.55",
+    fill: "#111"
+  }), React.createElement("line", {
+    x1: GH.cx,
+    y1: GH.greenY,
+    x2: GH.cx,
+    y2: GH.greenY - 5,
+    stroke: "#fff",
+    strokeWidth: "0.25"
+  }), React.createElement("path", {
+    d: 'M' + GH.cx + ' ' + (GH.greenY - 5) + ' L' + (GH.cx + 3) + ' ' + (GH.greenY - 4.2) + ' L' + GH.cx + ' ' + (GH.greenY - 3.4) + ' Z',
+    fill: "#e2463b"
+  }), React.createElement("rect", {
+    x: GH.cx - 4,
+    y: GH.teeY - 1,
+    width: "8",
+    height: "3",
+    rx: "0.8",
+    fill: "#7fd06a"
+  }), hole && fr.balls.map((b, s) => b && !b.holed ? React.createElement("g", {
+    key: s
+  }, React.createElement("ellipse", {
+    cx: b.x,
+    cy: b.y + 0.3,
+    rx: "0.6",
+    ry: "0.3",
+    fill: "rgba(0,0,0,.3)"
+  }), React.createElement("circle", {
+    cx: b.x,
+    cy: b.y - (b.h || 0) * 0.45,
+    r: 0.75 + (b.h || 0) * 0.04,
+    fill: "#fff",
+    stroke: colors[s],
+    strokeWidth: "0.45"
+  })) : null), hole && [0, 1].map(s => React.createElement("text", {
+    key: s,
+    x: s === 0 ? 4 : 96,
+    y: "60",
+    textAnchor: s === 0 ? 'start' : 'end',
+    fontSize: "2.6",
+    fontWeight: "800",
+    fill: colors[s],
+    stroke: "#0f0c21",
+    strokeWidth: "0.4",
+    paintOrder: "stroke"
+  }, hole.best[s].p.split(' ').slice(-1)[0], fr.balls[s] && fr.balls[s].holed ? ' · ' + hole.best[s].strokes : '')), (beat.type === 'intro' || beat.type === 'first') && React.createElement("g", null, React.createElement("rect", {
+    x: "0",
+    y: "0",
+    width: "100",
+    height: "64",
+    fill: "rgba(15,12,33,.55)"
+  }), beat.type === 'intro' && match.matches.map((mm, k2) => React.createElement("text", {
+    key: k2,
+    x: "50",
+    y: 24 + k2 * 4.6,
+    textAnchor: "middle",
+    fontSize: "2.8",
+    fontWeight: "700",
+    fill: "#fff"
+  }, mm.label, ": ", mm.a.map(p => p.name.split(' ').slice(-1)[0]).join('/') || '—', " v ", mm.b.map(p => p.name.split(' ').slice(-1)[0]).join('/') || '—')), beat.type === 'first' && [0, 1].map(s => React.createElement("g", {
+    key: s,
+    transform: 'translate(' + (s === 0 ? 25 : 75) + ' 30)'
+  }, (s === 0 ? m.a : m.b).map((p, k3) => React.createElement("text", {
+    key: k3,
+    y: k3 * 5,
+    textAnchor: "middle",
+    fontSize: "3.6",
+    fontWeight: "900",
+    fill: colors[s],
+    stroke: "#0f0c21",
+    strokeWidth: "0.5",
+    paintOrder: "stroke"
+  }, p.name.toUpperCase().slice(0, 18))))), beat.type === 'first' && React.createElement("text", {
+    x: "50",
+    y: "31",
+    textAnchor: "middle",
+    fontSize: "5",
+    fontWeight: "900",
+    fill: "#ffc83d"
+  }, "VS")), (done || beat.type === 'final') && React.createElement("g", null, React.createElement("rect", {
+    x: "0",
+    y: "0",
+    width: "100",
+    height: "64",
+    fill: "rgba(15,12,33,.6)"
+  }), React.createElement("text", {
+    x: "50",
+    y: "26",
+    textAnchor: "middle",
+    fontSize: "7",
+    fontWeight: "900",
+    fill: colors[match.winner],
+    stroke: "#0f0c21",
+    strokeWidth: "0.6",
+    paintOrder: "stroke"
+  }, T(match.winner).name.toUpperCase().slice(0, 16), " WIN"), React.createElement("text", {
+    x: "50",
+    y: "35",
+    textAnchor: "middle",
+    fontSize: "5",
+    fontWeight: "900",
+    fill: "#ffc83d"
+  }, golfPts(match.score[0]), "\u2013", golfPts(match.score[1]))), banner && React.createElement("text", {
+    x: "50",
+    y: beat.type === 'first' ? 16 : 32,
+    textAnchor: "middle",
+    fontSize: banner.length > 18 ? 4.2 : banner.length > 14 ? 5 : 6.5,
+    fontWeight: "900",
+    fill: /HOLE-IN|CHIP|EAGLE|BIRDIE|FEET|HOLED|WIN/.test(banner) ? '#ffc83d' : '#fff',
+    stroke: "#0f0c21",
+    strokeWidth: "0.6",
+    paintOrder: "stroke",
+    className: "pbanner"
+  }, banner))), React.createElement("div", {
+    className: "mctrl",
+    role: "group",
+    "aria-label": "Match controls"
+  }, !done && React.createElement("button", {
+    className: "btn btn-sm",
+    onClick: () => setPlaying(x => !x),
+    "aria-label": playing ? 'Pause' : 'Play'
+  }, playing ? '⏸ Pause' : '▶ Play'), !done && [1, 2, 4].map(x => React.createElement("button", {
+    key: x,
+    className: 'btn btn-sm' + (mult === x ? ' btn-gold' : ''),
+    "aria-pressed": mult === x,
+    onClick: () => setMult(x)
+  }, x, "\xD7")), !done && React.createElement("button", {
+    className: "btn btn-sm btn-ghost",
+    onClick: () => {
+      const nb = script.beats.find(b => b.type === 'first' && b.t0 > t + 0.01);
+      setT(nb ? nb.t0 : script.total);
+    }
+  }, "Next match"), !done && React.createElement("button", {
+    className: "btn btn-sm btn-ghost",
+    onClick: () => setT(script.total)
+  }, "Skip to result"), done && React.createElement("button", {
+    className: "btn btn-sm",
+    onClick: () => {
+      fired.current = true;
+      said.current = {};
+      setT(0);
+      setPlaying(true);
+    }
+  }, "\u21BA Watch again")), React.createElement("div", {
+    className: "mfeed",
+    ref: feedRef,
+    "aria-live": "polite"
+  }, feed.map(e => React.createElement("p", {
+    key: e.k,
+    className: 'mev ' + (e.big ? 'goal' : e.half ? 'half' : '') + (e.team != null ? ' t' + e.team : '')
+  }, React.createElement("span", {
+    className: "mm num"
+  }, e.tag), React.createElement("span", null, e.big ? '⛳ ' : '', e.text)))), done && React.createElement(GolfSummary, {
+    d: d,
+    A: A,
+    B: B,
+    match: match
+  }));
+}
+function golfReport(d, A, B, match) {
+  const tally = {};
+  match.matches.forEach(m => m.holes.forEach(h => h.best.forEach((b, s) => {
+    const k = s + '|' + b.p;
+    tally[k] = tally[k] || {
+      team: s,
+      name: b.p,
+      bird: 0,
+      eag: 0,
+      won: 0,
+      special: []
+    };
+    const dd = b.strokes - h.par;
+    if (dd === -1) tally[k].bird++;
+    if (dd <= -2) tally[k].eag++;
+    if (h.w === s) tally[k].won++;
+    if (h.notes[s] === 'ace') tally[k].special.push('a hole-in-one on the ' + h.n + ordinalSuffix(h.n));
+    if (h.notes[s] === 'chipin') tally[k].special.push('a chip-in on the ' + h.n + ordinalSuffix(h.n));
+  })));
+  const list = Object.values(tally).map(x => ({
+    ...x,
+    v: x.bird * 2 + x.eag * 5 + x.won * 1.5 + x.special.length * 4
+  }));
+  const star = list.filter(x => x.team === match.winner).sort((a, b) => b.v - a.v)[0] || null;
+  const ppl = match.matches.filter(m => m.format === 'singles').flatMap(m => [0, 1].map(s => ({
+    s,
+    m,
+    p: (s === 0 ? m.a : m.b)[0]
+  }))).filter(x => x.p);
+  const best = ppl.filter(x => x.m.result.w === x.s).sort((a, b) => a.p.price - b.p.price)[0] || null;
+  const flop = ppl.filter(x => x.m.result.w === 1 - x.s).sort((a, b) => b.p.price - a.p.price)[0] || null;
+  const specials = list.flatMap(x => x.special.map(s => x.name + ': ' + s));
+  return {
+    star,
+    best,
+    flop,
+    specials
+  };
+}
+function GolfSummary({
+  d,
+  A,
+  B,
+  match
+}) {
+  const R = golfReport(d, A, B, match);
+  const T = i => i === 0 ? A : B;
+  return React.createElement("div", {
+    className: "board msummary"
+  }, React.createElement("h3", null, "\u26F3 The cup"), React.createElement("p", {
+    className: "small",
+    style: {
+      margin: 0
+    }
+  }, React.createElement("b", null, A.name, " ", golfPts(match.score[0]), "\u2013", golfPts(match.score[1]), " ", B.name), match.how === 'playoff' ? ' · decided in a sudden-death playoff' : ''), React.createElement("div", {
+    className: "fightcard"
+  }, match.matches.map((m, k) => React.createElement("div", {
+    key: k,
+    className: 'fc-row' + (m.format === 'playoff' ? ' main' : '')
+  }, React.createElement("span", {
+    className: "fc-tag"
+  }, m.label), React.createElement("span", {
+    className: "fc-line small"
+  }, golfLine(m))))), React.createElement("div", {
+    className: "mreport"
+  }, React.createElement("h4", null, "\uD83D\uDCCB Cup report"), R.star && React.createElement("p", {
+    className: "small"
+  }, React.createElement("b", null, "\u2B50 Star of the day:"), " ", R.star.name, " (", T(R.star.team).name, ") \u2014 ", R.star.bird, " birdie", R.star.bird === 1 ? '' : 's', R.star.eag ? ', ' + R.star.eag + ' eagle' + (R.star.eag === 1 ? '' : 's') : '', ", ", R.star.won, " hole", R.star.won === 1 ? '' : 's', " won."), R.specials.length > 0 && React.createElement("p", {
+    className: "small"
+  }, React.createElement("b", null, "\u2728 Shots of the day:"), " ", R.specials.join(' · '), "."), R.best && React.createElement("p", {
+    className: "small"
+  }, React.createElement("b", null, "\uD83D\uDCB0 Best buy:"), " ", R.best.p.name, " cost $", R.best.p.price, " and won their singles."), R.flop && React.createElement("p", {
+    className: "small"
+  }, React.createElement("b", null, "\uD83D\uDCC9 Tough day:"), " ", R.flop.p.name, " cost $", R.flop.p.price, " and lost their singles.")), React.createElement("p", {
+    className: "hint",
+    style: {
+      margin: 0
+    }
+  }, "Every shot simulated from Draft Night\u2019s estimated Prime numbers (not official ratings). Pound-for-pound: everyone plays the same tees."));
+}
+function GolfChip({
+  item,
+  topic
+}) {
+  const [open, setOpen] = useState(false);
+  if (!numbersShown()) return null;
+  const r = golfRating(item);
+  return React.createElement(React.Fragment, null, React.createElement("button", {
+    type: "button",
+    className: "ratingchip",
+    onClick: () => setOpen(true),
+    "aria-label": 'Prime ' + r.ovr + ', estimated. Show details'
+  }, "Prime ", React.createElement("b", {
+    className: "num"
+  }, r.ovr), " est."), open && ReactDOM.createPortal(React.createElement(Sheet, {
+    center: true,
+    onClose: () => setOpen(false)
+  }, React.createElement("div", {
+    className: "ratingcard"
+  }, React.createElement("div", {
+    className: "rc-top"
+  }, React.createElement("span", {
+    className: "rc-ovr num"
+  }, React.createElement("small", {
+    className: "rc-era"
+  }, "Prime"), r.ovr), React.createElement("span", {
+    className: "rc-role"
+  }, "GOLF"), React.createElement("span", {
+    className: "rc-name"
+  }, item.name)), React.createElement("div", {
+    className: "rc-attrs"
+  }, GOLF_ATTRS.map(a => React.createElement("div", {
+    key: a,
+    className: "rc-attr"
+  }, React.createElement("span", {
+    className: "k",
+    title: GOLF_ATTR_NAMES[a]
+  }, a), React.createElement("span", {
+    className: "bar"
+  }, React.createElement("i", {
+    style: {
+      width: r.attrs[a] + '%'
+    }
+  })), React.createElement("span", {
+    className: "v num"
+  }, r.attrs[a])))), React.createElement("p", {
+    className: "hint",
+    style: {
+      margin: 0
+    }
+  }, "Prime: how good they were at their peak (for current players, their best so far). ", GOLF_ATTRS.map(a => a + ' ' + GOLF_ATTR_NAMES[a].toLowerCase()).join(' · '), ". Draft Night estimate, not an official rating.")), React.createElement("button", {
+    className: "btn btn-ghost",
+    onClick: () => setOpen(false)
+  }, "Close")), document.body));
 }
 const GF = {
   w: 120,
