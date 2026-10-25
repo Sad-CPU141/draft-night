@@ -75,6 +75,8 @@ const audio = (() => {
     trade: (t) => { tone('triangle', 660, 0, t, 0.2, 0.2); tone('triangle', 990, 0, t + 0.14, 0.3, 0.2); },
     fanfare: (t) => [392, 523, 659, 784, 1047].forEach((f, i) => tone('square', f, 0, t + i * 0.12, i === 4 ? 0.6 : 0.16, 0.08)),
     whistle: (t) => { tone('sine', 2100, 2300, t, 0.25, 0.18); tone('sine', 2100, 2300, t + 0.32, 0.5, 0.18); },
+    bell: (t) => { [1180, 2410, 3560].forEach((f, i) => tone('sine', f, 0, t, 1.4 - i * 0.3, 0.16 / (i + 1))); [1180, 2410].forEach((f, i) => tone('sine', f, 0, t + 0.45, 1.1, 0.12 / (i + 1))); },
+    punch: (t) => { noise(t, 0.09, 0.7, 'lowpass', 700); tone('sine', 120, 55, t, 0.12, 0.5); },
     big: (t) => { SFX.gavel(t); [392, 494, 587, 784].forEach((f, i) => tone('sawtooth', f, 0, t + 0.3 + i * 0.07, 0.5, 0.06)); },
   };
   function play(name) {

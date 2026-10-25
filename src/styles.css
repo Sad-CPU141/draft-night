@@ -63,7 +63,7 @@ textarea.input{min-height:140px;resize:vertical;line-height:1.45}
 .hint{font-size:14px;color:var(--muted);margin:0}
 .warn{font-size:14px;color:var(--danger);margin:0;font-weight:600}
 
-.seg{display:flex;background:var(--stage);border:2px solid var(--line);border-radius:14px;padding:3px;gap:3px}
+.seg{display:flex;flex-wrap:wrap;background:var(--stage);border:2px solid var(--line);border-radius:14px;padding:3px;gap:3px}
 .seg button{flex:1;min-height:42px;border:0;border-radius:10px;background:transparent;font-family:var(--cond);font-weight:800;font-size:16px;letter-spacing:.03em;color:var(--muted)}
 .seg button[aria-pressed="true"]{background:var(--gold);color:var(--gold-ink)}
 .toggle{display:flex;align-items:center;gap:14px;width:100%;text-align:left;background:var(--stage);border:2px solid var(--line);border-radius:14px;padding:12px 14px}
@@ -718,3 +718,12 @@ html[data-motion="reduce"] *,html[data-motion="reduce"] *::before,html[data-moti
 .qtable{border-collapse:collapse;width:100%}
 .qtable th,.qtable td{padding:3px 6px;text-align:center;border-bottom:1px solid var(--line)}
 .qtable td:first-child,.qtable th:first-child{text-align:left;max-width:120px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+/* Fight night */
+.ringsvg{background:#141026}
+.boutbar{display:flex;flex-wrap:wrap;gap:4px 6px;align-items:baseline;justify-content:center;text-align:center;line-height:1.35}
+.boutbar .boutstats{flex-basis:100%;color:var(--muted)}
+.fightcard{display:flex;flex-direction:column;gap:6px}
+.fc-row{display:flex;flex-direction:column;gap:1px;padding:6px 8px;border:2px solid var(--line);border-radius:12px;background:var(--panel)}
+.fc-row.main{border-color:var(--gold)}
+.fc-tag{font-family:var(--cond);font-weight:800;font-size:12px;letter-spacing:.06em;text-transform:uppercase;color:var(--muted)}
+.rc-name small{font-weight:600;opacity:.75}

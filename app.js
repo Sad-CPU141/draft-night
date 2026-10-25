@@ -1,4 +1,4 @@
-/* Draft Night 629d2e8932 — built from src/ by build.js. Edit src/, not this file. */
+/* Draft Night f8433c0cd3 — built from src/ by build.js. Edit src/, not this file. */
 "use strict";
 (function(){
 function _extends() { return _extends = Object.assign ? Object.assign.bind() : function (n) { for (var e = 1; e < arguments.length; e++) { var t = arguments[e]; for (var r in t) ({}).hasOwnProperty.call(t, r) && (n[r] = t[r]); } return n; }, _extends.apply(null, arguments); }
@@ -654,7 +654,8 @@ const STARTER_BATTLE = {
   't-dogbreeds': 'cute',
   't-catbreeds': 'cute',
   't-nba': 'basketball',
-  't-nbal': 'basketball'
+  't-nbal': 'basketball',
+  't-fight': 'combat'
 };
 function starterTopics() {
   const v3 = [...sportsTopicsV3(), ...foodTopicsV3(), ...entTopicsV3(), ...travelTopicsV3(), ...animalTopicsV3(), ...styleTopicsV3(), ...funTopicsV3()];
@@ -23079,6 +23080,14 @@ const audio = (() => {
       tone('sine', 2100, 2300, t, 0.25, 0.18);
       tone('sine', 2100, 2300, t + 0.32, 0.5, 0.18);
     },
+    bell: t => {
+      [1180, 2410, 3560].forEach((f, i) => tone('sine', f, 0, t, 1.4 - i * 0.3, 0.16 / (i + 1)));
+      [1180, 2410].forEach((f, i) => tone('sine', f, 0, t + 0.45, 1.1, 0.12 / (i + 1)));
+    },
+    punch: t => {
+      noise(t, 0.09, 0.7, 'lowpass', 700);
+      tone('sine', 120, 55, t, 0.12, 0.5);
+    },
     big: t => {
       SFX.gavel(t);
       [392, 494, 587, 784].forEach((f, i) => tone('sawtooth', f, 0, t + 0.3 + i * 0.07, 0.5, 0.06));
@@ -23682,6 +23691,15 @@ const BATTLE_KINDS = {
     upset: ['Who knew? {w} beats {l} when it counts!', 'Surprise hero: {w}!'],
     noshow: ['{w} wins the night — the other team had nothing.']
   },
+  combat: {
+    name: 'Fight night',
+    start: 'Ring the bell',
+    emoji: '🥊',
+    round: 'Bout',
+    win: [''],
+    upset: [''],
+    noshow: ['{w} wins by walkover.']
+  },
   basketball: {
     name: 'Basketball game',
     start: 'Tip off',
@@ -23715,6 +23733,7 @@ function simulateFor(d, A, B, key, opts) {
   const k = battleKindId(d.topic);
   if (k === 'fight') return simulateArena(d, A, B, key);
   if (k === 'basketball') return simulateBasketball(d, A, B, key);
+  if (k === 'combat') return simulateFightCard(d, A, B, key);
   if (k === 'survival') return simulateSurvival(d, A, B, key);
   if (k === 'powers' || k === 'weird') return simulateMissions(d, A, B, key);
   if (k === 'cute') return simulatePuppyBowl(d, A, B, key, opts && opts.knockout === false ? false : true);
@@ -23727,12 +23746,17 @@ function simWhy(w, mt) {
     const f = mt.final[mt.winner];
     return w.name + (f.rescued ? ' got rescued' : ' survived ' + ws + ' day' + (ws === 1 ? '' : 's')) + (ws !== ls ? ' (the others lasted ' + ls + ')' : mt.how === 'rescue' ? ', and got rescued first' : mt.how === 'shape' ? ', level on days but in better shape' : ' and won the last night') + '.';
   }
+  if (mt.v === 'card') {
+    const ws = mt.score[mt.winner],
+      ls = mt.score[1 - mt.winner];
+    return mt.how === 'super' ? w.name + ' won the super fight to take the card ' + ws + '–' + ls + '.' : w.name + ' won the fight card ' + ws + '–' + ls + (mt.finishes[mt.winner] ? ' (' + mt.finishes[mt.winner] + ' stoppage' + (mt.finishes[mt.winner] === 1 ? '' : 's') + ')' : '') + '.';
+  }
   if (mt.v === 'hoops') return w.name + ' won ' + mt.score[mt.winner] + '–' + mt.score[1 - mt.winner] + (mt.ot ? ' after ' + (mt.ot > 1 ? mt.ot + ' overtimes' : 'overtime') : '') + '.';
   if (mt.v === 'show') return w.name + ' won the cuteness contest ' + mt.score[mt.winner] + '–' + mt.score[1 - mt.winner] + (mt.how === 'points' ? ' on total points' : mt.how === 'crowd' ? ' — the crowd decided' : '') + '.';
   if (mt.v === 'mission') return w.name + ' won ' + mt.score[mt.winner] + ' of ' + mt.missions.length + ' missions.';
   return w.name + ' won the ' + (BATTLE_KINDS[mt.kind] || BATTLE_KINDS.fight).name.toLowerCase() + ' ' + mt.score[mt.winner] + '–' + mt.score[1 - mt.winner] + (mt.sudden ? ' in sudden death' : '') + '.';
 }
-const isSimResult = mt => !!mt && (mt.v === 'hoops' || mt.v === 'battle' || mt.v === 'arena' || mt.v === 'survival' || mt.v === 'mission' || mt.v === 'show');
+const isSimResult = mt => !!mt && (mt.v === 'card' || mt.v === 'hoops' || mt.v === 'battle' || mt.v === 'arena' || mt.v === 'survival' || mt.v === 'mission' || mt.v === 'show');
 function battleDuel(rng, kind, a, b, maxP) {
   const fill = (lines, w, l) => lines[Math.floor(rng() * lines.length)].replace('{w}', w).replace('{l}', l);
   if (!a || !b) {
@@ -23831,6 +23855,1133 @@ const battleRulesLine = topic => {
   const k = battleKind(topic);
   return k ? k.emoji + ' ' + k.name + 's: teams face off slot by slot. The pick the room paid more for has the edge (never more than 78%), and luck does the rest. Just for fun — not a real prediction.' : '';
 };
+const FIGHT_ATTRS = ['POW', 'SPD', 'TEC', 'DEF', 'CHN', 'CRD', 'WRS', 'SUB'];
+const FIGHT_ATTR_NAMES = {
+  POW: 'Power',
+  SPD: 'Speed',
+  TEC: 'Technique',
+  DEF: 'Defence',
+  CHN: 'Chin',
+  CRD: 'Cardio',
+  WRS: 'Wrestling',
+  SUB: 'Submissions'
+};
+const FIGHT_STYLES = {
+  puncher: {
+    word: 'Knockout puncher',
+    agg: 1.15,
+    td: 0.03,
+    POW: 7,
+    SPD: -2,
+    TEC: -4,
+    DEF: -6,
+    CHN: 0,
+    CRD: -4,
+    WRS: -12,
+    SUB: -14
+  },
+  boxer: {
+    word: 'Slick boxer',
+    agg: 0.9,
+    td: 0.03,
+    POW: -4,
+    SPD: 3,
+    TEC: 6,
+    DEF: 4,
+    CHN: 0,
+    CRD: 2,
+    WRS: -10,
+    SUB: -12
+  },
+  defence: {
+    word: 'Defensive genius',
+    agg: 0.75,
+    td: 0.03,
+    POW: -8,
+    SPD: 2,
+    TEC: 6,
+    DEF: 9,
+    CHN: 0,
+    CRD: 2,
+    WRS: -10,
+    SUB: -12
+  },
+  pressure: {
+    word: 'Pressure fighter',
+    agg: 1.3,
+    td: 0.05,
+    POW: 1,
+    SPD: -1,
+    TEC: -2,
+    DEF: -5,
+    CHN: 4,
+    CRD: 6,
+    WRS: -6,
+    SUB: -12
+  },
+  counter: {
+    word: 'Counter-puncher',
+    agg: 0.85,
+    td: 0.03,
+    POW: 2,
+    SPD: 0,
+    TEC: 5,
+    DEF: 5,
+    CHN: 0,
+    CRD: -1,
+    WRS: -10,
+    SUB: -12
+  },
+  wrestler: {
+    word: 'Wrestler',
+    agg: 1.1,
+    td: 0.3,
+    POW: -3,
+    SPD: -3,
+    TEC: -6,
+    DEF: -3,
+    CHN: 1,
+    CRD: 6,
+    WRS: 9,
+    SUB: 1
+  },
+  grappler: {
+    word: 'Submission artist',
+    agg: 1.0,
+    td: 0.24,
+    POW: -5,
+    SPD: -2,
+    TEC: -5,
+    DEF: -3,
+    CHN: 0,
+    CRD: 2,
+    WRS: 3,
+    SUB: 9
+  },
+  striker: {
+    word: 'Striker',
+    agg: 1.0,
+    td: 0.04,
+    POW: 2,
+    SPD: 2,
+    TEC: 5,
+    DEF: 2,
+    CHN: 0,
+    CRD: 0,
+    WRS: -12,
+    SUB: -12
+  },
+  allround: {
+    word: 'All-rounder',
+    agg: 1.05,
+    td: 0.14,
+    POW: 0,
+    SPD: 0,
+    TEC: 0,
+    DEF: 0,
+    CHN: 0,
+    CRD: 1,
+    WRS: -1,
+    SUB: -2
+  },
+  brawler: {
+    word: 'Brawler',
+    agg: 1.35,
+    td: 0.04,
+    POW: 5,
+    SPD: -1,
+    TEC: -5,
+    DEF: -9,
+    CHN: 5,
+    CRD: 0,
+    WRS: -12,
+    SUB: -15
+  }
+};
+const FIGHT_PROFILE_SRC = `
+Muhammad Ali|97|boxer|SPD+6 CHN+7 CRD+4
+Mike Tyson|94|puncher|SPD+5 DEF+6 CRD-2
+Floyd Mayweather|96|defence|DEF+5 POW-2
+Manny Pacquiao|94|pressure|SPD+7 POW+2
+Canelo Álvarez|92|counter|CHN+5
+Tyson Fury|92|boxer|CHN+6 POW+2
+Anthony Joshua|88|puncher|TEC+3 CHN-4
+Oleksandr Usyk|94|boxer|CRD+3
+Naoya Inoue|94|puncher|TEC+6 SPD+3
+Terence Crawford|94|counter|TEC+2
+Sugar Ray Leonard|95|boxer|SPD+4 POW+3
+Lennox Lewis|93|boxer|POW+8 CHN-2
+Prince Naseem Hamed|89|puncher|SPD+4 DEF-2
+Gervonta Davis|89|counter|POW+6
+Amir Khan|84|boxer|SPD+8 CHN-14
+Joe Frazier|92|pressure|POW+5
+George Foreman|92|puncher|POW+5 CHN+5
+Sugar Ray Robinson|98|boxer|POW+6
+Marvin Hagler|93|pressure|CHN+4
+Thomas Hearns|91|puncher|TEC+4 CHN-6
+Roberto Durán|93|pressure|TEC+5
+Julio César Chávez|92|pressure|CHN+3
+Oscar De La Hoya|90|boxer|POW+2
+Evander Holyfield|92|pressure|TEC+3 CHN+2
+Bernard Hopkins|92|defence|CRD+4
+Wladimir Klitschko|91|boxer|POW+8 CHN-8
+Vitali Klitschko|91|puncher|CHN+8 TEC+2
+Deontay Wilder|87|puncher|POW+12 TEC-6
+Joe Calzaghe|91|pressure|SPD+4 POW-4
+Gennady Golovkin|92|pressure|POW+6 CHN+5
+Vasiliy Lomachenko|92|boxer|TEC+3 SPD+2
+Dmitry Bivol|90|boxer|DEF+2
+Artur Beterbiev|91|puncher|POW+3 CHN+4
+Shakur Stevenson|89|defence|TEC+2
+Katie Taylor|89|pressure|SPD+3
+Claressa Shields|90|boxer|POW+2
+Khabib Nurmagomedov|96|wrestler|WRS+5 CRD+3
+Conor McGregor|89|striker|POW+8 CRD-8
+Jon Jones|97|allround|TEC+4 WRS+3
+Georges St-Pierre|96|wrestler|TEC+5 SPD+2
+Anderson Silva|95|striker|TEC+3 SPD+3 SUB+6
+Islam Makhachev|95|grappler|WRS+4
+Israel Adesanya|92|striker|DEF+3
+Alex Pereira|91|striker|POW+10
+Francis Ngannou|91|puncher|POW+12
+Khamzat Chimaev|90|wrestler|POW+5
+Ilia Topuria|93|striker|POW+6 SUB+14
+Daniel Cormier|93|wrestler|POW+3
+Ronda Rousey|87|grappler|SUB+6 DEF-6
+Amanda Nunes|94|striker|POW+4 WRS+10 SUB+10
+Valentina Shevchenko|93|allround|TEC+4
+Chuck Liddell|87|puncher|WRS+16
+Randy Couture|87|wrestler|CHN+2
+Matt Hughes|88|wrestler|POW+2
+B.J. Penn|89|grappler|TEC+6
+Cain Velasquez|92|wrestler|CRD+6 POW+3
+Stipe Miocic|91|allround|POW+3
+Max Holloway|92|striker|CRD+8 CHN+6 POW-4
+Alexander Volkanovski|94|allround|CRD+3
+Dustin Poirier|90|striker|CHN+3 SUB+10
+Justin Gaethje|88|brawler|WRS+12
+Charles Oliveira|91|grappler|SUB+4 TEC+4
+Kamaru Usman|92|wrestler|POW+3
+Leon Edwards|89|striker|WRS+8
+José Aldo|92|striker|WRS+10
+Dominick Cruz|89|allround|SPD+6 DEF+5
+Henry Cejudo|89|wrestler|SPD+3
+Demetrious Johnson|95|allround|SPD+6 CRD+4
+Merab Dvalishvili|91|wrestler|CRD+8 POW-4
+Sean O'Malley|87|striker|SPD+4
+Tom Aspinall|90|allround|SPD+6
+Dricus du Plessis|89|brawler|WRS+12 CRD+4
+Zhang Weili|91|striker|WRS+8`;
+const FIGHT_PROFILE = {};
+FIGHT_PROFILE_SRC.trim().split('\n').forEach(line => {
+  const [name, ovr, style, tw] = line.split('|');
+  const tweak = {};
+  (tw || '').split(' ').filter(Boolean).forEach(t => {
+    const m = t.match(/^([A-Z]+)([+-]\d+)$/);
+    if (m) tweak[m[1]] = +m[2];
+  });
+  FIGHT_PROFILE[name.toLowerCase()] = {
+    ovr: +ovr,
+    style,
+    tweak
+  };
+});
+const fightDisc = s => /UFC|MMA|CAGE|OCTAGON/.test(norm(s)) ? 'mma' : /BOX/.test(norm(s)) ? 'box' : null;
+function fightRating(item, slot) {
+  const prof = FIGHT_PROFILE[String(item.name || '').toLowerCase()];
+  const disc = fightDisc(item.pos) || fightDisc(slot) || 'box';
+  const d = (item.desc || '') + ' ' + item.name;
+  const fixed = validRating(item.rating);
+  const style = prof ? prof.style : /knock|power|bomb|hands of stone|puncher/i.test(d) ? 'puncher' : /wrestl/i.test(d) ? 'wrestler' : /jiu|bjj|submission|judo/i.test(d) ? 'grappler' : disc === 'mma' ? 'allround' : 'boxer';
+  const ovr = fixed ? clamp(Math.round(+item.rating), 1, 99) : prof ? prof.ovr : clamp(Math.round(72 + itemFame(item) * 22 + (unit('fovr', item.name) - 0.5) * 6), 60, 95);
+  const S = FIGHT_STYLES[style];
+  const tw = prof ? prof.tweak : {};
+  const attrs = {};
+  FIGHT_ATTRS.forEach(a => {
+    if (disc === 'box' && (a === 'WRS' || a === 'SUB')) {
+      attrs[a] = clamp(Math.round(30 + unit('fgr', item.name, a) * 18), 20, 60);
+      return;
+    }
+    attrs[a] = clamp(Math.round(ovr + S[a] + (tw[a] || 0) + (unit('fattr', item.name, a) - 0.5) * 6), 25, 99);
+  });
+  return {
+    ovr,
+    attrs,
+    style,
+    styleWord: S.word,
+    disc,
+    estimated: !fixed
+  };
+}
+function fightSquad(d, m) {
+  return m.team.map((t, i) => {
+    if (!t || !d.items[t.itemId]) return null;
+    const item = d.items[t.itemId];
+    return {
+      name: item.name,
+      itemId: item.id,
+      price: t.price || 0,
+      slot: d.rules.slots[i],
+      k: i,
+      ...fightRating(item, d.rules.slots[i])
+    };
+  });
+}
+const FIGHT_LINES = {
+  jab: ['{a} snaps out the jab.', '{a} pops the jab — {b}’s head goes back.', 'Double jab from {a}.'],
+  power: ['{a} lands a big right hand!', 'Huge left hook from {a}!', '{a} digs an uppercut through the guard!', '{a} cracks {b} with an overhand right!'],
+  body: ['{a} rips a hook to the body.', '{a} goes downstairs — that one hurt.', 'Body shot from {a}, {b} winces.'],
+  combo: ['{a} unloads a {n}-punch combination!', 'Flurry from {a}: {n} punches, most of them land!', '{a} puts it together — {n} shots in a row!'],
+  counter: ['{b} misses and {a} makes them pay with a counter!', 'Beautiful counter from {a}!', '{a} slips and fires back — perfect timing!'],
+  legkick: ['{a} chops the lead leg.', 'Thudding leg kick from {a}.', '{a} kicks the calf — {b} limps.'],
+  bodykick: ['{a} whips a kick to the body!', 'Big body kick from {a}!'],
+  headkick: ['HEAD KICK from {a}!', '{a} throws the head kick — it lands flush!'],
+  knee: ['{a} drives a knee up the middle!', 'Knee in the clinch from {a}!'],
+  spin: ['Spinning back fist from {a}!', '{a} with a spinning wheel kick!', 'Spinning elbow from {a}!'],
+  rock: ['{b} is HURT! Legs gone!', '{b} is wobbling!', '{b} is in big trouble!'],
+  kd: ['{b} goes DOWN!', 'DOWN GOES {B}!', '{b} hits the canvas!'],
+  up: ['{b} beats the count at {n}.', '{b} is up at {n} — can they survive?', 'Up at {n}! {b} says they’re fine.'],
+  ko: ['{b} can’t beat the count. KNOCKOUT!', 'It’s all over! {a} knocks out {b}!', 'Lights out. {a} wins by knockout!'],
+  tko: ['The referee jumps in — it’s stopped!', 'The referee has seen enough. {a} wins!', '{b} is defenceless — the referee waves it off!'],
+  td: ['{a} shoots — TAKEDOWN!', '{a} changes levels and slams {b} to the mat!', 'Double-leg from {a}, {b} goes down!'],
+  tdstuff: ['{a} shoots, {b} sprawls and stuffs it.', '{b} defends the takedown beautifully.'],
+  gnp: ['{a} rains down ground and pound!', 'Elbows from the top — {a} is all over {b}!', '{a} postures up and drops heavy shots!'],
+  subatt: ['{a} locks in a {s}… {b} escapes!', '{a} goes for the {s} — so close!', 'Tight {s} from {a}, but {b} survives!'],
+  sub: ['{a} locks in the {s}… {b} TAPS!', 'TAP! TAP! {a} wins by {s}!', 'The {s} is deep — {b} has to tap!'],
+  sweep: ['{a} sweeps and ends up on top!', 'Great scramble from {a}!'],
+  standup: ['{a} gets back to the feet.', '{a} works back up to standing.'],
+  cut: ['{b} is cut over the eye.', 'Blood! {b} is cut.']
+};
+const fightLine = (rng, k, v) => {
+  const ls = FIGHT_LINES[k];
+  return ls[Math.floor(rng() * ls.length)].replace('{a}', v.a || '').replace('{b}', v.b || '').replace('{B}', String(v.b || '').toUpperCase()).replace('{n}', v.n != null ? v.n : '').replace('{s}', v.s || '');
+};
+const SUB_NAMES = {
+  top: ['arm-triangle choke', 'kimura', 'americana', 'armbar'],
+  back: ['rear-naked choke', 'rear-naked choke', 'body-triangle choke'],
+  bottom: ['triangle choke', 'armbar', 'guillotine choke'],
+  front: ['guillotine choke', "d'arce choke"]
+};
+const fightClock = s => Math.floor(s / 60) + ':' + String(Math.floor(s % 60)).padStart(2, '0');
+const METHOD_WORD = {
+  KO: 'KO',
+  TKO: 'TKO',
+  SUB: 'Submission',
+  DEC: 'Decision',
+  RTD: 'TKO (corner stoppage)',
+  DOC: 'TKO (doctor stoppage)',
+  DRAW: 'Draw',
+  WO: 'Walkover'
+};
+function fightBout(rng, a, b, rules) {
+  const disc = rules.disc;
+  const R = rules.rounds;
+  const len = disc === 'mma' ? 300 : 180;
+  const F = [a, b].map(x => ({
+    ...x,
+    dmg: 0,
+    body: 0,
+    legs: 0,
+    sta: 100,
+    rocked: 0,
+    kds: 0,
+    cut: 0,
+    form: (rng() - 0.5) * 0.08,
+    A: x.attrs
+  }));
+  F.forEach(f => {
+    if (f.disc !== disc) f.offSport = true;
+  });
+  const st = (f, k) => {
+    let v = f.A[k];
+    if (f.offSport && disc === 'box' && k !== 'CHN' && k !== 'CRD') v -= 7;
+    if (f.offSport && disc === 'mma' && k === 'DEF') v -= 6;
+    if (k === 'SPD') v -= f.legs * 0.25;
+    return v;
+  };
+  const rounds = [];
+  const events = [];
+  let end = null;
+  let pos = {
+    g: null
+  };
+  const tot = [0, 1].map(() => ({
+    thrown: 0,
+    landed: 0,
+    power: 0,
+    kd: 0,
+    td: 0,
+    tda: 0,
+    ctrl: 0,
+    subs: 0
+  }));
+  for (let r = 1; r <= R && !end; r++) {
+    const rs = [0, 1].map(() => ({
+      thrown: 0,
+      landed: 0,
+      power: 0,
+      kd: 0,
+      td: 0,
+      tda: 0,
+      ctrl: 0,
+      subs: 0,
+      rocked: 0,
+      dmgDealt: 0
+    }));
+    const rev = [];
+    let t = 0;
+    pos = {
+      g: null
+    };
+    const push = e => {
+      e.r = r;
+      e.t = Math.min(len - 1, Math.round(t));
+      e.pos = e.pos || null;
+      rev.push(e);
+      events.push(e);
+      return e;
+    };
+    const fatigue = f => (100 - f.sta) / 100;
+    const hurt = (D, amount, head) => {
+      const chin = 1.65 - st(D, 'CHN') / 100;
+      const v = amount * (head ? chin : 0.7);
+      if (head) D.dmg += v;else {
+        D.body += v;
+        D.sta -= v * 1.4;
+      }
+      return v;
+    };
+    const bigShot = (s, v, kind, ev) => {
+      const A = F[s],
+        D = F[1 - s];
+      const pKD = clamp(0.004 + v * 0.012 + D.dmg / 1300 + (D.rocked ? 0.12 : 0) - (st(D, 'CHN') - 82) / 900 + (kind === 'headkick' || kind === 'spin' ? 0.07 : 0) + Math.max(0, st(A, 'POW') - 88) / 250, 0, 0.6);
+      const x = rng();
+      if (x < pKD) {
+        D.kds++;
+        rs[s].kd++;
+        tot[s].kd++;
+        D.rocked = 2;
+        ev.kind = 'kd';
+        ev.text += ' ' + fightLine(rng, 'kd', {
+          b: D.name
+        });
+        if (disc === 'box') {
+          const thisRound = rs[s].kd;
+          const pUp = clamp(0.93 - D.dmg / 260 - (D.kds - 1) * 0.1 - (thisRound - 1) * 0.15 + (st(D, 'CHN') - 82) / 180 - (kind === 'power' && v > 5 ? 0.12 : 0), 0.12, 0.97);
+          if (thisRound >= 3) {
+            end = {
+              w: s,
+              method: 'TKO',
+              r,
+              t
+            };
+            ev.kind = 'tko';
+            ev.up = false;
+            ev.text += ' Third knockdown of the round — it’s over!';
+            return;
+          }
+          if (rng() < pUp) {
+            const n = 3 + Math.floor(rng() * 6);
+            ev.count = n;
+            ev.up = true;
+            ev.text += ' ' + fightLine(rng, 'up', {
+              b: D.name,
+              n
+            });
+          } else {
+            ev.kind = 'ko';
+            ev.count = 10;
+            ev.up = false;
+            end = {
+              w: s,
+              method: 'KO',
+              r,
+              t
+            };
+            ev.text += ' ' + fightLine(rng, 'ko', {
+              a: A.name,
+              b: D.name
+            });
+          }
+        } else {
+          const pFin = clamp(0.32 + D.dmg / 280 + (A.attrs.POW - 85) / 100 - (st(D, 'CHN') - 85) / 120, 0.15, 0.85);
+          if (rng() < pFin) {
+            ev.kind = 'ko';
+            ev.up = false;
+            end = {
+              w: s,
+              method: rng() < 0.45 ? 'KO' : 'TKO',
+              r,
+              t
+            };
+            ev.text += ' ' + (end.method === 'KO' ? 'Out cold! ' + A.name + ' wins by knockout!' : A.name + ' follows up and the referee stops it!');
+          } else {
+            ev.up = true;
+            pos = {
+              g: {
+                top: s,
+                kind: 'top'
+              }
+            };
+            ev.text += ' ' + A.name + ' jumps on top, but ' + D.name + ' survives.';
+          }
+        }
+        return;
+      }
+      if (x < pKD * 3.2 || v > 6.5) {
+        D.rocked = 2;
+        rs[s].rocked++;
+        ev.kind = 'rock';
+        ev.text += ' ' + fightLine(rng, 'rock', {
+          b: D.name
+        });
+      }
+      if (D.rocked && D.dmg > 34 + (st(D, 'CHN') - 80) * 0.8 && rng() < 0.3) {
+        ev.kind = 'tko';
+        end = {
+          w: s,
+          method: 'TKO',
+          r,
+          t
+        };
+        ev.text += ' ' + fightLine(rng, 'tko', {
+          a: A.name,
+          b: D.name
+        });
+      }
+    };
+    const strike = (s, counterOf) => {
+      const A = F[s],
+        D = F[1 - s];
+      const sty = FIGHT_STYLES[A.style];
+      const w = disc === 'box' ? {
+        jab: 38 + (A.style === 'boxer' || A.style === 'defence' ? 14 : 0),
+        power: 26 + (A.style === 'puncher' ? 12 : 0) + (D.rocked ? 25 : 0),
+        body: 12 + (A.style === 'pressure' ? 8 : 0),
+        combo: 14 + (A.style === 'pressure' || A.style === 'brawler' ? 10 : 0) + (D.rocked ? 22 : 0)
+      } : {
+        jab: 22,
+        power: 22 + (D.rocked ? 25 : 0),
+        body: 6,
+        combo: 12 + (D.rocked ? 20 : 0),
+        legkick: 14 + (A.style === 'striker' ? 6 : 0),
+        bodykick: 7,
+        headkick: 2.5 + (A.style === 'striker' ? 2.5 : 0),
+        knee: 3,
+        spin: A.style === 'striker' ? 1.6 : 0.5
+      };
+      if (counterOf) {
+        w.jab = 0;
+        w.combo = 0;
+        w.body = 0;
+        w.legkick = 0;
+        w.bodykick = 0;
+        w.knee = 0;
+        w.spin = 0;
+        w.headkick = disc === 'mma' ? 2 : 0;
+      }
+      const keys = Object.keys(w).filter(k => w[k] > 0);
+      const type = weighted(rng, keys, k => w[k]);
+      const n = type === 'jab' ? 1 + Math.floor(rng() * 3) : type === 'combo' ? 3 + Math.floor(rng() * 4) : type === 'power' || type === 'body' ? 1 + (rng() < 0.4 ? 1 : 0) : 1;
+      const base = {
+        jab: 0.3,
+        power: 0.32,
+        body: 0.4,
+        combo: 0.3,
+        legkick: 0.62,
+        bodykick: 0.5,
+        headkick: 0.2,
+        knee: 0.42,
+        spin: 0.2
+      }[type];
+      const acc = clamp(base + (st(A, 'TEC') - st(D, 'DEF')) / 220 + (st(A, 'SPD') - st(D, 'SPD')) / 420 - fatigue(A) * 0.12 + fatigue(D) * 0.08 + (D.rocked ? 0.16 : 0) + A.form + (counterOf ? 0.12 : 0), 0.06, 0.8);
+      let landed = 0;
+      for (let i = 0; i < n; i++) if (rng() < acc) landed++;
+      rs[s].thrown += n;
+      rs[s].landed += landed;
+      tot[s].thrown += n;
+      tot[s].landed += landed;
+      const cost = {
+        jab: 0.35,
+        power: 0.9,
+        body: 0.9,
+        combo: 1.6,
+        legkick: 1.0,
+        bodykick: 1.3,
+        headkick: 1.6,
+        knee: 1.2,
+        spin: 2
+      }[type];
+      A.sta -= cost * (1.35 - st(A, 'CRD') / 100) * 1.3;
+      const mult = {
+        jab: 0.3,
+        power: 1.55,
+        body: 1.0,
+        combo: 0.55,
+        legkick: 0.45,
+        bodykick: 1.0,
+        headkick: 2.7,
+        knee: 1.25,
+        spin: 2.2
+      }[type];
+      const powF = Math.pow(st(A, 'POW') / 82, 3) * (0.72 + A.sta / 360);
+      let v = 0;
+      let biggest = 0;
+      for (let i = 0; i < landed; i++) {
+        const one = mult * powF * (0.45 + rng() * 0.8);
+        biggest = Math.max(biggest, one);
+        v += hurt(D, one, type !== 'body' && type !== 'legkick' && type !== 'bodykick');
+      }
+      if (type === 'legkick') D.legs += landed * 1.2 * powF;
+      const isPower = type !== 'jab' && type !== 'legkick';
+      if (isPower) {
+        rs[s].power += landed;
+        tot[s].power += landed;
+      }
+      rs[s].dmgDealt += v;
+      if (!landed) {
+        if (!counterOf && rng() < clamp((st(D, 'DEF') + st(D, 'TEC') - 160) / 160 + (D.style === 'counter' || D.style === 'defence' ? 0.12 : 0), 0, 0.3)) return strike(1 - s, {
+          by: A.name,
+          type
+        });
+        return null;
+      }
+      const head = type !== 'body' && type !== 'legkick' && type !== 'bodykick';
+      const ev = {
+        kind: 'land',
+        s,
+        type,
+        n,
+        landed,
+        v: Math.round(v * 10) / 10,
+        counter: !!counterOf,
+        a: A.name,
+        b: D.name,
+        text: counterOf ? fightLine(rng, 'counter', {
+          a: A.name,
+          b: D.name
+        }) : fightLine(rng, type, {
+          a: A.name,
+          b: D.name,
+          n: landed
+        })
+      };
+      if (head && (isPower || type === 'headkick') && biggest > 1.1) bigShot(s, biggest * (type === 'combo' ? 1.2 : 1), type, ev);else if (type === 'body' && v > 3.2 && rng() < 0.12) {
+        D.kds++;
+        rs[s].kd++;
+        tot[s].kd++;
+        ev.kind = 'kd';
+        ev.text += ' ' + D.name + ' takes a knee from the body shot!';
+        if (disc === 'box' && rng() < clamp(0.25 + D.body / 120 - st(D, 'CRD') / 300, 0.05, 0.6)) {
+          ev.kind = 'ko';
+          ev.count = 10;
+          ev.up = false;
+          end = {
+            w: s,
+            method: 'KO',
+            r,
+            t
+          };
+          ev.text += ' Counted out!';
+        } else {
+          ev.up = true;
+          ev.count = 6 + Math.floor(rng() * 3);
+        }
+      }
+      if (head && isPower && landed && !D.cut && rng() < 0.004) {
+        D.cut = 1;
+        push({
+          kind: 'cut',
+          s,
+          a: A.name,
+          b: D.name,
+          text: fightLine(rng, 'cut', {
+            b: D.name
+          })
+        });
+      }
+      const big = ev.kind !== 'land' || ev.counter || biggest > 3.1 || type === 'combo' && landed >= 4 || type === 'headkick' || type === 'spin';
+      ev.hl = big;
+      ev.big = ev.kind === 'ko' || ev.kind === 'tko' || ev.kind === 'kd';
+      return push(ev);
+    };
+    const ground = () => {
+      const s = pos.g.top;
+      const T = F[s],
+        Bt = F[1 - s];
+      rs[s].ctrl += 12;
+      tot[s].ctrl += 12;
+      const x = rng();
+      const escape = clamp(0.16 + (st(Bt, 'WRS') - st(T, 'WRS')) / 140 + (Bt.sta - T.sta) / 600, 0.05, 0.45);
+      if (x < escape) {
+        if (rng() < 0.3 && st(Bt, 'WRS') + st(Bt, 'SUB') > st(T, 'WRS') + st(T, 'SUB')) {
+          pos = {
+            g: {
+              top: 1 - s,
+              kind: 'top'
+            }
+          };
+          return push({
+            kind: 'sweep',
+            s: 1 - s,
+            a: Bt.name,
+            b: T.name,
+            text: fightLine(rng, 'sweep', {
+              a: Bt.name
+            }),
+            hl: rng() < 0.5
+          });
+        }
+        pos = {
+          g: null
+        };
+        return push({
+          kind: 'standup',
+          s: 1 - s,
+          a: Bt.name,
+          b: T.name,
+          text: fightLine(rng, 'standup', {
+            a: Bt.name
+          }),
+          hl: false
+        });
+      }
+      if (x < escape + 0.08 * (st(Bt, 'SUB') / 85) && st(Bt, 'SUB') > 70) return subTry(1 - s, 'bottom');
+      const subW = (st(T, 'SUB') - 65) / 320 + (T.style === 'grappler' ? 0.07 : 0) + (Bt.rocked ? 0.05 : 0);
+      if (rng() < clamp(subW, 0.04, 0.4)) return subTry(s, rng() < 0.4 ? 'back' : 'top');
+      const n = 2 + Math.floor(rng() * 5);
+      const acc = clamp(0.5 + (st(T, 'WRS') - st(Bt, 'WRS')) / 200 + (Bt.rocked ? 0.15 : 0), 0.25, 0.85);
+      let landed = 0;
+      for (let i = 0; i < n; i++) if (rng() < acc) landed++;
+      rs[s].thrown += n;
+      rs[s].landed += landed;
+      rs[s].power += landed;
+      tot[s].thrown += n;
+      tot[s].landed += landed;
+      tot[s].power += landed;
+      let v = 0;
+      for (let i = 0; i < landed; i++) v += hurt(Bt, 0.6 * Math.pow(st(T, 'POW') / 80, 2) * (0.5 + rng()), true);
+      rs[s].dmgDealt += v;
+      T.sta -= 1.2 * (1.35 - st(T, 'CRD') / 100);
+      const ev = {
+        kind: 'gnp',
+        s,
+        n,
+        landed,
+        a: T.name,
+        b: Bt.name,
+        text: fightLine(rng, 'gnp', {
+          a: T.name,
+          b: Bt.name
+        }),
+        pos: {
+          top: s,
+          kind: pos.g.kind
+        }
+      };
+      if ((Bt.rocked || Bt.dmg > 45) && landed >= 3 && rng() < clamp(0.1 + Bt.dmg / 260, 0.1, 0.55)) {
+        ev.kind = 'tko';
+        end = {
+          w: s,
+          method: 'TKO',
+          r,
+          t
+        };
+        ev.text += ' ' + fightLine(rng, 'tko', {
+          a: T.name,
+          b: Bt.name
+        });
+      }
+      ev.hl = ev.kind === 'tko' || landed >= 5;
+      ev.big = ev.kind === 'tko';
+      return push(ev);
+    };
+    const subTry = (s, from) => {
+      const A = F[s],
+        D = F[1 - s];
+      const sname = pickOf(rng, SUB_NAMES[from]);
+      rs[s].subs++;
+      tot[s].subs++;
+      const pTap = clamp(0.03 + (st(A, 'SUB') - st(D, 'SUB') * 0.55 - st(D, 'WRS') * 0.45) / 170 + fatigue(D) * 0.2 + D.dmg / 500 + (from === 'back' ? 0.06 : 0), 0.02, 0.45);
+      const ev = {
+        kind: 'subatt',
+        s,
+        sub: sname,
+        from,
+        a: A.name,
+        b: D.name,
+        pos: {
+          top: from === 'bottom' ? 1 - s : s,
+          kind: from === 'back' ? 'back' : 'top'
+        }
+      };
+      A.sta -= 2.5 * (1.35 - st(A, 'CRD') / 100);
+      D.sta -= 2;
+      if (rng() < pTap) {
+        ev.kind = 'sub';
+        end = {
+          w: s,
+          method: 'SUB',
+          r,
+          t,
+          sub: sname
+        };
+        ev.text = fightLine(rng, 'sub', {
+          a: A.name,
+          b: D.name,
+          s: sname
+        });
+      } else {
+        ev.text = fightLine(rng, 'subatt', {
+          a: A.name,
+          b: D.name,
+          s: sname
+        });
+        if (from === 'bottom' && rng() < 0.5) pos = {
+          g: null
+        };
+      }
+      ev.hl = true;
+      ev.big = ev.kind === 'sub';
+      return push(ev);
+    };
+    const takedown = s => {
+      const A = F[s],
+        D = F[1 - s];
+      rs[s].tda++;
+      tot[s].tda++;
+      const p = clamp(0.36 + (st(A, 'WRS') - st(D, 'WRS')) / 95 + (D.rocked ? 0.2 : 0) - fatigue(A) * 0.2 + fatigue(D) * 0.15, 0.05, 0.88);
+      A.sta -= 3 * (1.35 - st(A, 'CRD') / 100);
+      D.sta -= 1.2;
+      if (rng() < p) {
+        rs[s].td++;
+        tot[s].td++;
+        pos = {
+          g: {
+            top: s,
+            kind: rng() < 0.15 + (st(A, 'WRS') - st(D, 'WRS')) / 200 ? 'back' : 'top'
+          }
+        };
+        return push({
+          kind: 'td',
+          s,
+          a: A.name,
+          b: D.name,
+          text: fightLine(rng, 'td', {
+            a: A.name,
+            b: D.name
+          }),
+          hl: rng() < 0.55
+        });
+      }
+      if (st(D, 'SUB') > 82 && rng() < 0.12) return subTry(1 - s, 'front');
+      return push({
+        kind: 'tdstuff',
+        s,
+        a: A.name,
+        b: D.name,
+        text: fightLine(rng, 'tdstuff', {
+          a: A.name,
+          b: D.name
+        }),
+        hl: false
+      });
+    };
+    while (!end) {
+      const gap = pos.g ? 11 + rng() * 9 : (disc === 'box' ? 5 : 6) + rng() * 9;
+      if (t + gap >= len) break;
+      t += gap;
+      F.forEach(f => {
+        if (f.rocked > 0) f.rocked -= 0.5;
+        f.sta = Math.min(100, f.sta + 0.25);
+      });
+      if (pos.g) {
+        ground();
+        continue;
+      }
+      const init = (f, o) => (st(f, 'SPD') * 0.45 + st(f, 'TEC') * 0.2 + 35 * FIGHT_STYLES[f.style].agg) * (0.55 + f.sta / 220) * (o.rocked ? 1.6 : 1) * (f.rocked ? 0.55 : 1);
+      const ia = init(F[0], F[1]),
+        ib = init(F[1], F[0]);
+      const s = rng() < ia / (ia + ib) ? 0 : 1;
+      if (disc === 'mma') {
+        const tdW = FIGHT_STYLES[F[s].style].td * (st(F[s], 'WRS') / 85) * (F[1 - s].rocked ? 1.8 : 1) * (st(F[s], 'WRS') > st(F[1 - s], 'WRS') ? 1.3 : 0.7);
+        if (rng() < tdW) {
+          takedown(s);
+          continue;
+        }
+      }
+      strike(s);
+    }
+    const roundPts = k => {
+      const x = rs[k];
+      return x.landed * 0.5 + x.power * 0.7 + x.kd * 7 + x.rocked * 2.5 + x.dmgDealt * 0.35 + x.td * 2.2 + x.ctrl / 30 + x.subs * 1.5;
+    };
+    let judge = null;
+    if (!end) {
+      const P = [roundPts(0), roundPts(1)];
+      judge = [0, 1, 2].map(j => {
+        const taste = 1 + (unit('judge', j, r, a.name, b.name) - 0.5) * 0.25;
+        const pa = P[0] * (j === 1 ? taste : 1) + (rng() - 0.5) * 2.4,
+          pb = P[1] * (j === 2 ? taste : 1) + (rng() - 0.5) * 2.4;
+        if (Math.abs(pa - pb) < 0.25) return [10, 10];
+        const wn = pa > pb ? 0 : 1;
+        const sc = [0, 0];
+        sc[wn] = 10;
+        const kdDiff = rs[wn].kd - rs[1 - wn].kd;
+        sc[1 - wn] = kdDiff >= 2 ? 8 : kdDiff === 1 || Math.abs(pa - pb) > 22 ? 8 : 9;
+        if (rs[1 - wn].kd > rs[wn].kd) sc[1 - wn] = 9;
+        return sc;
+      });
+      push({
+        kind: 'bell',
+        s: null,
+        text: 'End of round ' + r + '.',
+        judge,
+        rs: rs.map(x => ({
+          landed: x.landed,
+          thrown: x.thrown,
+          kd: x.kd,
+          td: x.td
+        }))
+      });
+    }
+    rounds.push({
+      r,
+      rs,
+      judge,
+      end: end ? {
+        ...end,
+        t: Math.round(end.t)
+      } : null
+    });
+    if (end) break;
+    F.forEach((f, k) => {
+      f.sta = Math.min(100, f.sta + 16 * (st(f, 'CRD') / 90));
+      f.dmg *= 0.9;
+      f.rocked = 0;
+      if (f.cut) {
+        f.cut++;
+        f.dmg += 1.5;
+      }
+    });
+    for (let k = 0; k < 2 && !end; k++) {
+      const f = F[k];
+      if (f.cut >= 5 && rng() < 0.04) end = {
+        w: 1 - k,
+        method: 'DOC',
+        r,
+        t: len
+      };else if (f.dmg > 68 && disc === 'box' && rng() < 0.3) end = {
+        w: 1 - k,
+        method: 'RTD',
+        r,
+        t: len
+      };
+      if (end) {
+        const ev = {
+          kind: end.method === 'DOC' ? 'doc' : 'rtd',
+          s: 1 - k,
+          a: F[1 - k].name,
+          b: f.name,
+          text: end.method === 'DOC' ? 'The doctor stops it — ' + f.name + '’s cut is too bad to carry on.' : f.name + '’s corner throws in the towel!',
+          hl: true,
+          big: true
+        };
+        ev.r = r;
+        ev.t = len;
+        events.push(ev);
+        rev.push(ev);
+        rounds[rounds.length - 1].end = {
+          ...end
+        };
+      }
+    }
+  }
+  let winner,
+    method,
+    cards = null,
+    decision = null;
+  if (end) {
+    winner = end.w;
+    method = end.method;
+  } else {
+    cards = [0, 1, 2].map(j => [0, 1].map(k => rounds.reduce((n, rd) => n + rd.judge[j][k], 0)));
+    const votes = cards.map(c => c[0] > c[1] ? 0 : c[1] > c[0] ? 1 : null);
+    const v0 = votes.filter(x => x === 0).length,
+      v1 = votes.filter(x => x === 1).length;
+    if (v0 >= 2 || v1 >= 2) {
+      winner = v0 >= 2 ? 0 : 1;
+      method = 'DEC';
+      const loserVotes = winner === 0 ? v1 : v0;
+      decision = loserVotes === 1 ? 'SD' : v0 + v1 === 3 ? 'UD' : 'MD';
+    } else {
+      winner = null;
+      method = 'DRAW';
+      decision = v0 === 1 && v1 === 1 ? 'SDRAW' : v0 + v1 === 1 ? 'MDRAW' : 'DRAW';
+    }
+  }
+  const last = rounds[rounds.length - 1];
+  return {
+    disc,
+    R,
+    len,
+    winner,
+    method,
+    decision,
+    cards,
+    sub: end && end.sub,
+    endRound: last.r,
+    endTime: end ? Math.round(end.t) : len,
+    rounds: rounds.map(rd => ({
+      r: rd.r,
+      judge: rd.judge,
+      rs: rd.rs.map(x => ({
+        landed: x.landed,
+        thrown: x.thrown,
+        power: x.power,
+        kd: x.kd,
+        td: x.td,
+        tda: x.tda,
+        ctrl: x.ctrl,
+        subs: x.subs
+      }))
+    })),
+    events,
+    tot
+  };
+}
+const fighterView = f => f ? {
+  name: f.name,
+  itemId: f.itemId,
+  price: f.price,
+  ovr: f.ovr,
+  style: f.style,
+  styleWord: f.styleWord,
+  disc: f.disc
+} : null;
+function boutLine(b) {
+  if (!b.a || !b.b) return (b.a || b.b).name + ' wins by walkover.';
+  if (b.winner == null) return b.a.name + ' and ' + b.b.name + ' fight to a ' + (b.decision === 'SDRAW' ? 'split draw' : b.decision === 'MDRAW' ? 'majority draw' : 'draw') + ' (' + b.cards.map(c => c[0] + '–' + c[1]).join(', ') + ').';
+  const W = b.winner === 0 ? b.a : b.b,
+    L = b.winner === 0 ? b.b : b.a;
+  if (b.method === 'DEC' && b.decision === 'SV') return W.name + ' beats ' + L.name + ' in a sudden-victory round after a drawn fight.';
+  if (b.method === 'DEC') return W.name + ' beats ' + L.name + ' by ' + {
+    UD: 'unanimous',
+    SD: 'split',
+    MD: 'majority'
+  }[b.decision] + ' decision (' + b.cards.map(c => Math.max(c[0], c[1]) + '–' + Math.min(c[0], c[1])).join(', ') + ').';
+  return W.name + ' beats ' + L.name + ' by ' + (b.method === 'SUB' ? b.sub || 'submission' : METHOD_WORD[b.method]) + ' in round ' + b.endRound + (b.method === 'RTD' || b.method === 'DOC' ? '' : ' (' + fightClock(b.endTime) + ')') + '.';
+}
+const boutShort = b => b.winner == null ? b.a && b.b ? 'Draw' : 'Walkover' : b.method === 'DEC' ? b.decision === 'SV' ? 'Sudden victory' : b.decision + ' decision' : b.method === 'SUB' ? 'Sub (' + (b.sub || '') + ') R' + b.endRound : (b.method === 'RTD' || b.method === 'DOC' ? 'TKO' : b.method) + ' R' + b.endRound + (b.method === 'RTD' || b.method === 'DOC' ? '' : ' ' + fightClock(b.endTime));
+function simulateFightCard(d, A, B, key) {
+  const rng = seeded(d.seed, 'fight', key, A.id, B.id);
+  const sq = [fightSquad(d, A), fightSquad(d, B)];
+  const slots = d.rules.slots;
+  const bouts = [];
+  const score = [0, 0];
+  const finishes = [0, 0];
+  const n = slots.length;
+  for (let k = 0; k < n; k++) {
+    const a = sq[0][k],
+      b = sq[1][k];
+    if (!a && !b) continue;
+    const disc = fightDisc(slots[k]) || (a || b).disc;
+    const main = k === n - 1;
+    const rules = {
+      disc,
+      rounds: disc === 'box' ? 12 : main ? 5 : 3
+    };
+    let bout;
+    if (!a || !b) bout = {
+      disc,
+      R: rules.rounds,
+      winner: a ? 0 : 1,
+      method: 'WO',
+      rounds: [],
+      events: [],
+      tot: null,
+      endRound: 0,
+      endTime: 0
+    };else bout = fightBout(rng, a, b, rules);
+    bout.k = k;
+    bout.slot = slots[k];
+    bout.main = main;
+    bout.a = fighterView(a);
+    bout.b = fighterView(b);
+    if (bout.winner != null) {
+      score[bout.winner]++;
+      if (bout.method !== 'DEC' && bout.method !== 'WO') finishes[bout.winner]++;
+    }
+    bout.score = [...score];
+    bouts.push(bout);
+  }
+  let superFight = null;
+  let how = 'bouts';
+  if (score[0] === score[1]) {
+    const best = (s, disc) => sq[s].filter(f => f && (!disc || f.disc === disc)).sort((x, y) => y.price - x.price || y.ovr - x.ovr || (x.name < y.name ? -1 : 1))[0] || null;
+    const pair = disc => {
+      const x = best(0, disc),
+        y = best(1, disc);
+      return x && y ? {
+        a: x,
+        b: y,
+        disc,
+        cost: x.price + y.price
+      } : null;
+    };
+    const opts = [pair('box'), pair('mma')].filter(Boolean).sort((x, y) => y.cost - x.cost || (x.disc === 'mma' ? -1 : 1));
+    const pick = opts[0] || (best(0) && best(1) ? {
+      a: best(0),
+      b: best(1),
+      disc: best(0).disc === 'mma' || best(1).disc === 'mma' ? 'mma' : 'box'
+    } : null);
+    const a = pick ? pick.a : best(0),
+      b = pick ? pick.b : best(1);
+    if (a && b) {
+      const disc = pick.disc;
+      let bout = fightBout(rng, a, b, {
+        disc,
+        rounds: 5
+      });
+      if (bout.winner == null) {
+        const L = bout.tot.map(x => x.landed + x.kd * 10 + x.td * 3);
+        bout.winner = L[0] !== L[1] ? L[0] > L[1] ? 0 : 1 : rng() < 0.5 ? 0 : 1;
+        bout.method = 'DEC';
+        bout.decision = 'SV';
+        bout.sudden = true;
+      }
+      bout.k = n;
+      bout.slot = 'Super fight';
+      bout.main = true;
+      bout.superFight = true;
+      bout.a = fighterView(a);
+      bout.b = fighterView(b);
+      score[bout.winner]++;
+      bout.score = [...score];
+      superFight = bout;
+      bouts.push(bout);
+      how = 'super';
+    } else {
+      const w = a ? 0 : 1;
+      score[w]++;
+      how = 'walkover';
+    }
+  }
+  const winner = score[0] > score[1] ? 0 : 1;
+  return {
+    v: 'card',
+    kind: 'combat',
+    bouts,
+    score,
+    finishes,
+    winner,
+    how,
+    sudden: !!superFight,
+    et: false,
+    pens: null,
+    events: []
+  };
+}
 const isFootball = topic => !!topic && (topic.layout === 'pitch' || topic.sport === 'football');
 const ATTRS = ['PAC', 'SHO', 'PAS', 'DRI', 'DEF', 'PHY'];
 const ROLE_SHAPE = {
@@ -28183,7 +29334,7 @@ function TopicEditor({
   }, "Fun battles (Battles finale)"), React.createElement(Seg, {
     label: "Fun battle style",
     value: topic.battle || 'none',
-    options: [['none', 'Off'], ['fight', '⚔️ Fight'], ['powers', '💥 Powers'], ['survival', '🧟 Survival'], ['cute', '🥰 Puppy Bowl'], ['weird', '🤡 Silly']],
+    options: [['none', 'Off'], ['fight', '⚔️ Fight'], ['powers', '💥 Powers'], ['survival', '🧟 Survival'], ['cute', '🥰 Puppy Bowl'], ['weird', '🤡 Silly'], ['combat', '🥊 Fight night'], ['basketball', '🏀 Basketball']],
     onChange: v => set({
       battle: v === 'none' ? '' : v
     })
@@ -30330,6 +31481,9 @@ function ItemCard({
     item: item,
     topic: d.topic
   }), battleKindId(d.topic) === 'basketball' ? React.createElement(HoopsChip, {
+    item: item,
+    topic: d.topic
+  }) : battleKindId(d.topic) === 'combat' ? React.createElement(FightChip, {
     item: item,
     topic: d.topic
   }) : hasBattle(d.topic) && React.createElement(StatChip, {
@@ -35092,7 +36246,15 @@ if (window.__DN_TEST__) window.__DN = {
     ROLE_BY_NAME,
     simulateBasketball,
     hoopsRating,
-    hoopsSquad
+    hoopsSquad,
+    simulateFightCard,
+    fightBout,
+    fightRating,
+    fightSquad,
+    fightScript,
+    fightFrame,
+    boutLine,
+    fightReport
   },
   simStats: {
     simulatePuppyBowl,
@@ -37211,6 +38373,12 @@ function MatchSummary({
   B,
   match
 }) {
+  if (match.v === 'card') return React.createElement(FightSummary, {
+    d: d,
+    A: A,
+    B: B,
+    match: match
+  });
   if (match.v === 'hoops') return React.createElement(HoopsSummary, {
     d: d,
     A: A,
@@ -38711,7 +39879,7 @@ function PitchMatch({
   }));
 }
 function MatchView(props) {
-  return props.match && props.match.v === 'hoops' ? React.createElement(CourtView, props) : props.match && props.match.v === 'show' ? React.createElement(ShowView, props) : props.match && props.match.v === 'mission' ? React.createElement(MissionView, props) : props.match && props.match.v === 'survival' ? React.createElement(SurvivalView, props) : props.match && props.match.v === 'arena' ? React.createElement(ArenaView, props) : props.match && props.match.v === 'battle' ? React.createElement(BattleView, props) : props.match && props.match.v === 2 ? React.createElement(PitchMatch, props) : React.createElement(MatchPlayer, props);
+  return props.match && props.match.v === 'card' ? React.createElement(RingView, props) : props.match && props.match.v === 'hoops' ? React.createElement(CourtView, props) : props.match && props.match.v === 'show' ? React.createElement(ShowView, props) : props.match && props.match.v === 'mission' ? React.createElement(MissionView, props) : props.match && props.match.v === 'survival' ? React.createElement(SurvivalView, props) : props.match && props.match.v === 'arena' ? React.createElement(ArenaView, props) : props.match && props.match.v === 'battle' ? React.createElement(BattleView, props) : props.match && props.match.v === 2 ? React.createElement(PitchMatch, props) : React.createElement(MatchPlayer, props);
 }
 function matchReport(d, A, B, match) {
   const teams = [A, B];
@@ -39007,6 +40175,1424 @@ function MissionSummary({
       margin: 0
     }
   }, "Each stage tests one stat (Draft Night\u2019s estimates) plus luck", match.silly ? ', and the Chaos stat can flip a result' : '', ". Just for fun."));
+}
+const RING_FLOOR = 44;
+const lerpN = (a, b, u) => a + (b - a) * Math.max(0, Math.min(1, u));
+const easeF = u => {
+  const v = Math.max(0, Math.min(1, u));
+  return v * v * (3 - 2 * v);
+};
+const EX_DUR = {
+  land: 2.3,
+  counter: 2.6,
+  rock: 3,
+  kd: 4.6,
+  ko: 5,
+  tko: 3.8,
+  td: 2.8,
+  tdstuff: 2.2,
+  gnp: 2.8,
+  subatt: 3.2,
+  sub: 4.2,
+  sweep: 2.2,
+  standup: 1.8,
+  rtd: 3,
+  doc: 3
+};
+const exKind = e => e.kind === 'land' && e.counter ? 'counter' : e.kind;
+function fightScript(match) {
+  const beats = [];
+  let t = 0;
+  const add = b => {
+    b.t0 = t;
+    t += b.dur;
+    beats.push(b);
+    return b;
+  };
+  add({
+    type: 'intro',
+    dur: 2.6,
+    bi: 0
+  });
+  match.bouts.forEach((b, bi) => {
+    add({
+      type: 'walk',
+      dur: 2.8,
+      bi
+    });
+    if (b.method === 'WO') {
+      add({
+        type: 'result',
+        dur: 2.4,
+        bi
+      });
+      return;
+    }
+    b.rounds.forEach(rd => {
+      const r = rd.r;
+      const seen = {};
+      let hl = b.events.filter(e => e.r === r && e.hl && e.kind !== 'bell' && e.kind !== 'rtd' && e.kind !== 'doc').filter(e => {
+        if (e.big || e.kind !== 'subatt' && e.kind !== 'gnp' && e.kind !== 'sweep') return true;
+        if (seen[e.kind]) return false;
+        seen[e.kind] = 1;
+        return true;
+      });
+      const cap = b.disc === 'box' ? 3 : 4;
+      if (hl.length > cap) {
+        const must = hl.filter(e => e.big);
+        const rest = hl.filter(e => !e.big).sort((x, y) => (y.v || 0) - (x.v || 0)).slice(0, Math.max(0, cap - must.length));
+        hl = hl.filter(e => must.includes(e) || rest.includes(e));
+      }
+      add({
+        type: 'rstart',
+        dur: 1.3,
+        bi,
+        r
+      });
+      hl.forEach(e => add({
+        type: 'ex',
+        dur: EX_DUR[exKind(e)] || 2.4,
+        bi,
+        r,
+        e
+      }));
+      const bell = b.events.find(e => e.r === r && e.kind === 'bell');
+      if (bell) add({
+        type: 'rend',
+        dur: 2,
+        bi,
+        r,
+        e: bell
+      });
+      const late = b.events.find(e => e.r === r && (e.kind === 'rtd' || e.kind === 'doc'));
+      if (late) add({
+        type: 'ex',
+        dur: EX_DUR[late.kind],
+        bi,
+        r,
+        e: late
+      });
+    });
+    add({
+      type: 'result',
+      dur: 3.4,
+      bi
+    });
+  });
+  add({
+    type: 'final',
+    dur: 2.8,
+    bi: match.bouts.length - 1
+  });
+  return {
+    beats,
+    total: t
+  };
+}
+function neutralPose() {
+  return {
+    lean: 6,
+    crouch: 0.2
+  };
+}
+function fightFrame(beat, u) {
+  const P = [neutralPose(), neutralPose()];
+  const X = [38, 62];
+  const out = {
+    x: X,
+    pose: P,
+    ref: {
+      x: 88,
+      count: null,
+      wave: false,
+      between: false
+    },
+    banner: null,
+    impact: null,
+    ground: null
+  };
+  const sway = k => Math.sin(u * 5 + k * 2.1) * 1.2;
+  if (beat.type === 'intro' || beat.type === 'final' || beat.type === 'walk') {
+    X[0] = 18;
+    X[1] = 82;
+    return out;
+  }
+  if (beat.type === 'rstart') {
+    const k = easeF(u / beat.dur);
+    X[0] = lerpN(18, 38, k);
+    X[1] = lerpN(82, 62, k);
+    out.ref.x = lerpN(50, 88, k);
+    out.banner = 'ROUND ' + beat.r;
+    return out;
+  }
+  if (beat.type === 'rend') {
+    const k = easeF(u / 0.9);
+    X[0] = lerpN(40, 16, k);
+    X[1] = lerpN(60, 84, k);
+    out.ref.x = lerpN(88, 50, k);
+    return out;
+  }
+  if (beat.type === 'result') {
+    X[0] = 40;
+    X[1] = 60;
+    out.ref.x = 50;
+    return out;
+  }
+  const e = beat.e;
+  const s = e.s == null ? 0 : e.s;
+  const o = 1 - s;
+  const dir = s === 0 ? 1 : -1;
+  const kind = exKind(e);
+  X[0] = 38 + sway(0);
+  X[1] = 62 + sway(1);
+  if (e.kind === 'gnp' || e.kind === 'subatt' || e.kind === 'sub' || e.kind === 'sweep' || e.kind === 'standup') {
+    let top = e.pos ? e.pos.top : s;
+    if (e.kind === 'sweep' || e.kind === 'standup') top = o;
+    let bot = 1 - top;
+    const bx = top === 0 ? 58 : 42;
+    const lieDir = bot === 0 ? 1 : -1;
+    const kneelX = bx - lieDir * 9;
+    X[bot] = bx;
+    X[top] = kneelX;
+    P[bot] = {
+      lie: 1,
+      lean: 0
+    };
+    P[top] = {
+      kneel: 1,
+      lean: 34
+    };
+    if (e.kind === 'gnp') {
+      P[top].gnp = Math.abs(Math.sin(u * 9));
+      if (Math.sin(u * 9) > 0.9) out.impact = {
+        x: bx - lieDir * 18,
+        y: RING_FLOOR - 2
+      };
+      out.banner = u > 0.6 ? e.kind === 'gnp' && /stop/i.test(e.text) ? 'STOPPED!' : 'GROUND & POUND' : null;
+      if (/referee/i.test(e.text) && u > beat.dur - 1.4) {
+        out.ref.x = (X[0] + X[1]) / 2;
+        out.ref.between = true;
+        out.banner = 'STOPPED!';
+      }
+    } else if (e.kind === 'subatt' || e.kind === 'sub') {
+      P[top].lean = 60;
+      P[top].squeeze = 0.5 + 0.5 * Math.sin(u * 3);
+      const nm = String(e.sub || '').toUpperCase();
+      out.banner = u < 1.4 ? nm + '!' : e.kind === 'sub' ? u < beat.dur - 1.2 ? 'TAP! TAP!' : 'SUBMISSION!' : 'ESCAPES!';
+      if (e.kind === 'sub' && u > 1.4) {
+        P[bot].tap = Math.abs(Math.sin(u * 14));
+        out.ref.x = (X[0] + X[1]) / 2 + 4;
+        if (u > beat.dur - 1.2) out.ref.between = true;
+      }
+      if (e.kind === 'subatt' && u > 1.6) {
+        P[top].squeeze = 0;
+        P[bot].lean = 0;
+      }
+    } else if (e.kind === 'sweep') {
+      const k = easeF((u - 0.4) / 1.0);
+      if (k > 0.5) {
+        const nb = 1 - bot;
+        P[nb] = {
+          lie: 1
+        };
+        P[bot] = {
+          kneel: 1,
+          lean: 34
+        };
+        X[nb] = bx;
+        X[bot] = kneelX;
+        bot = nb;
+      }
+      out.banner = k > 0.4 ? 'SWEEP!' : null;
+    } else if (e.kind === 'standup') {
+      const k = easeF(u / 1.2);
+      P[bot] = {
+        lie: 1 - k,
+        lean: 0,
+        crouch: 0.4 * (1 - k)
+      };
+      P[top] = {
+        kneel: k < 0.6 ? 1 : 0,
+        lean: lerpN(34, 6, k)
+      };
+      X[bot] = lerpN(bx, bot === 0 ? 38 : 62, k);
+      X[top] = lerpN(kneelX, top === 0 ? 38 : 62, k);
+    }
+    return out;
+  }
+  if (kind === 'rtd' || kind === 'doc') {
+    X[0] = 16;
+    X[1] = 84;
+    P[o] = {
+      lean: -2,
+      crouch: 0.5
+    };
+    out.banner = kind === 'rtd' ? 'TOWEL IN!' : 'DOCTOR STOPS IT';
+    if (u > 1.2) P[s].raise = 1;
+    return out;
+  }
+  const A = 0.7;
+  const close = easeF(u / A);
+  X[s] = lerpN(X[s], X[o] - dir * 12.5, close);
+  P[s] = {
+    lean: 10,
+    crouch: 0.25 + Math.abs(Math.sin(u * 7)) * 0.08
+  };
+  P[o] = {
+    lean: 4,
+    crouch: 0.2
+  };
+  const hitAt = k => {
+    out.impact = {
+      x: X[o] - dir * 0.5,
+      y: RING_FLOOR - 21.5 + (e.type === 'body' || e.type === 'bodykick' ? 7 : e.type === 'legkick' ? 16 : 0),
+      k
+    };
+  };
+  if (kind === 'td' || kind === 'tdstuff') {
+    const k = easeF((u - 0.5) / 0.8);
+    P[s] = {
+      lean: lerpN(10, 55, k),
+      crouch: lerpN(0.25, 1, k)
+    };
+    X[s] = lerpN(X[s], X[o] - dir * 6, k);
+    if (kind === 'td') {
+      const f = easeF((u - 1.1) / 0.7);
+      if (u > 1.1) {
+        P[o] = {
+          fall: f,
+          lean: -10
+        };
+        X[o] = X[o] + dir * f * 3;
+      }
+      if (u > 1.8) {
+        P[o] = {
+          lie: 1
+        };
+        P[s] = {
+          kneel: 1,
+          lean: 34
+        };
+        X[s] = X[o] - dir * 9;
+      }
+      out.banner = u > 1.1 ? 'TAKEDOWN!' : null;
+    } else {
+      if (u > 1.0) {
+        P[o] = {
+          lean: 50,
+          crouch: 0.9
+        };
+        out.banner = 'STUFFED!';
+      }
+      if (u > 1.6) {
+        const b2 = easeF((u - 1.6) / 0.5);
+        P[s] = {
+          lean: lerpN(55, 10, b2),
+          crouch: 0.4
+        };
+        X[s] = lerpN(X[o] - dir * 6, X[o] - dir * 13, b2);
+      }
+    }
+    return out;
+  }
+  let strikeStart = 0.7;
+  if (kind === 'counter') {
+    const miss = (u - 0.6) / 0.45;
+    if (miss > 0 && miss < 1) {
+      P[o] = {
+        lean: 16,
+        rear: Math.sin(miss * Math.PI),
+        punch: 'cross'
+      };
+      P[s] = {
+        lean: -14,
+        crouch: 0.55
+      };
+    }
+    strikeStart = 1.05;
+  }
+  const kick = e.type === 'legkick' ? 'leg' : e.type === 'bodykick' ? 'body' : e.type === 'headkick' || e.type === 'spin' && /kick/i.test(e.text) ? 'head' : null;
+  const sk = (u - strikeStart) / (e.type === 'combo' ? 0.9 : 0.42);
+  if (sk > 0 && sk < 1) {
+    if (kick) P[s] = {
+      lean: -12,
+      kick,
+      kickExt: Math.sin(sk * Math.PI)
+    };else if (e.type === 'combo') {
+      const n = Math.max(3, e.n || 3);
+      const ph = sk * n;
+      const i = Math.floor(ph);
+      const v = Math.sin((ph - i) * Math.PI);
+      const arm = i % 2 === 0 ? 'lead' : 'rear';
+      P[s] = {
+        lean: 14,
+        crouch: 0.3,
+        [arm]: v,
+        punch: i % 3 === 2 ? arm === 'lead' ? 'hook' : 'upper' : arm === 'lead' ? 'jab' : 'cross'
+      };
+      if (v > 0.85) hitAt(sk);
+      P[o] = {
+        lean: -4,
+        cover: 1
+      };
+    } else {
+      const pt = e.type === 'jab' ? 'jab' : e.type === 'body' ? 'body' : e.type === 'knee' ? 'knee' : e.type === 'spin' ? 'hook' : /hook/i.test(e.text) ? 'hook' : /uppercut/i.test(e.text) ? 'upper' : 'cross';
+      const arm = pt === 'jab' || pt === 'hook' ? 'lead' : 'rear';
+      P[s] = {
+        lean: pt === 'body' ? 24 : 16,
+        crouch: pt === 'body' ? 0.55 : 0.3,
+        [arm]: Math.sin(sk * Math.PI),
+        punch: pt,
+        knee: pt === 'knee' ? Math.sin(sk * Math.PI) : 0
+      };
+    }
+    if (!kick && e.type !== 'combo' && sk > 0.45 && sk < 0.75) hitAt(sk);
+    if (kick && sk > 0.45 && sk < 0.75) hitAt(sk);
+  }
+  const after = u - (strikeStart + (e.type === 'combo' ? 0.9 : 0.42) * 0.55);
+  if (after > 0) {
+    const snap = Math.max(0, 1 - after / 0.5);
+    P[o] = {
+      ...P[o],
+      lean: -18 * snap + 2
+    };
+    if (after < 0.45) out.flash = true;
+    const backK = easeF((after - 0.6) / 0.6);
+    if (kind === 'land' || kind === 'counter') {
+      X[s] = lerpN(X[s], s === 0 ? 38 : 62, backK);
+    }
+    if (kind === 'rock') {
+      P[o] = {
+        lean: Math.sin(after * 6) * 14,
+        crouch: 0.45 + Math.sin(after * 4) * 0.15,
+        wobble: Math.sin(after * 9)
+      };
+      X[o] += Math.sin(after * 3) * 1.5;
+      out.banner = after > 0.3 ? 'HURT!' : null;
+    }
+    if (kind === 'kd' || kind === 'ko') {
+      const fall = easeF(after / 0.55);
+      const cnt = e.count || 0;
+      const countStart = 1.0,
+        step = (beat.dur - countStart - (e.up ? 1.0 : 0.9)) / Math.max(1, cnt);
+      const c = Math.floor((after - countStart) / step) + 1;
+      const counting = after > countStart && c <= cnt;
+      const rising = e.up && after > countStart + cnt * step;
+      P[o] = {
+        fall: rising ? 1 - easeF((after - countStart - cnt * step) / 0.6) : fall,
+        lean: -8
+      };
+      X[s] = lerpN(X[s], s === 0 ? 30 : 70, easeF((after - 0.4) / 0.6));
+      P[s] = {
+        lean: 4,
+        crouch: 0.1
+      };
+      if (e.pos === null && e.up && /jumps on top/.test(e.text)) {}
+      if (counting || rising || !e.up && after > countStart) out.ref = {
+        x: X[o] - dir * 4,
+        count: counting ? Math.min(c, cnt) : !e.up ? 10 : null,
+        wave: !e.up && c > cnt,
+        between: false
+      };
+      out.banner = after < 0.3 ? null : !e.up && (c > cnt || !cnt) ? 'KNOCKOUT!' : rising ? 'BACK UP!' : kind === 'kd' ? 'DOWN!' : 'DOWN!';
+      if (!e.up && after > countStart + cnt * step) P[s] = {
+        raise: 1
+      };
+      if (/jumps on top/.test(e.text) && after > 1.2) {
+        P[o] = {
+          lie: 1
+        };
+        P[s] = {
+          kneel: 1,
+          lean: 34
+        };
+        X[s] = X[o] - dir * 9;
+        out.ref.count = null;
+        out.banner = 'SURVIVES!';
+      }
+    }
+    if (kind === 'tko') {
+      P[o] = {
+        lean: -6,
+        crouch: 0.6,
+        cover: 1,
+        wobble: Math.sin(after * 9)
+      };
+      if (after > 0.6) {
+        out.ref = {
+          x: (X[0] + X[1]) / 2,
+          count: null,
+          between: true
+        };
+        out.banner = 'STOPPED!';
+      }
+      if (after > 1.4) P[s] = {
+        raise: 1
+      };
+      if (/Third knockdown/.test(e.text)) P[o] = {
+        fall: easeF(after / 0.5)
+      };
+    }
+  }
+  return out;
+}
+function FighterFig({
+  x,
+  face,
+  p,
+  color,
+  mma,
+  name,
+  isRef
+}) {
+  const pz = p || {};
+  const kneel = pz.kneel;
+  const c = pz.crouch || 0;
+  const hipY = kneel ? -6.2 : -11 + c * 2.4;
+  const ln = (pz.lean || 0) * Math.PI / 180;
+  const H = {
+    x: 0,
+    y: hipY
+  };
+  const S = {
+    x: H.x + Math.sin(ln) * 8.2,
+    y: H.y - Math.cos(ln) * 8.2
+  };
+  const Hd = {
+    x: S.x + Math.sin(ln) * 3.1 + 0.4,
+    y: S.y - Math.cos(ln) * 3.1
+  };
+  const legs = [];
+  if (kneel) {
+    legs.push([H, {
+      x: 2.8,
+      y: -0.8
+    }, {
+      x: -1.2,
+      y: -0.4
+    }]);
+    legs.push([H, {
+      x: -1.6,
+      y: -0.8
+    }, {
+      x: -5,
+      y: -0.3
+    }]);
+  } else if (pz.kick) {
+    const tgt = pz.kick === 'leg' ? {
+      x: 8.5,
+      y: -4
+    } : pz.kick === 'body' ? {
+      x: 9.5,
+      y: -12
+    } : {
+      x: 8.5,
+      y: -20
+    };
+    const ft = {
+      x: lerpN(3.6, tgt.x, pz.kickExt || 0),
+      y: lerpN(0, tgt.y, pz.kickExt || 0)
+    };
+    legs.push([H, {
+      x: -1,
+      y: hipY / 2
+    }, {
+      x: -2.4,
+      y: 0
+    }]);
+    legs.push([H, {
+      x: (H.x + ft.x) / 2 + 0.5,
+      y: (H.y + ft.y) / 2 - 1
+    }, ft]);
+  } else {
+    const kn = pz.knee || 0;
+    legs.push([H, {
+      x: -1.4,
+      y: hipY / 2
+    }, {
+      x: -3.4,
+      y: 0
+    }]);
+    legs.push([H, {
+      x: 2.2 + c + kn * 3,
+      y: hipY / 2 - kn * 4
+    }, {
+      x: 3.6 + kn * 1,
+      y: -kn * 5
+    }]);
+  }
+  const guardL = pz.cover ? {
+    x: S.x + 2.6,
+    y: S.y - 2.6
+  } : {
+    x: S.x + 3.3,
+    y: S.y - 0.6
+  };
+  const guardR = pz.cover ? {
+    x: S.x + 2.1,
+    y: S.y - 1.6
+  } : {
+    x: S.x + 2.2,
+    y: S.y + 0.4
+  };
+  const T = {
+    jab: {
+      x: S.x + 9.5,
+      y: S.y - 0.6
+    },
+    cross: {
+      x: S.x + 9.8,
+      y: S.y - 0.4
+    },
+    hook: {
+      x: S.x + 6.8,
+      y: S.y - 1.6
+    },
+    upper: {
+      x: S.x + 6.2,
+      y: S.y - 3.8
+    },
+    body: {
+      x: S.x + 7.6,
+      y: S.y + 4.4
+    },
+    knee: {
+      x: S.x + 4,
+      y: S.y + 2
+    }
+  };
+  let hL = guardL,
+    hR = guardR;
+  if (pz.raise) {
+    hL = {
+      x: S.x + 1.5,
+      y: S.y - 7.5
+    };
+    hR = {
+      x: S.x - 1.5,
+      y: S.y - 7.5
+    };
+  } else if (pz.gnp != null && kneel) {
+    hR = {
+      x: lerpN(S.x + 2, S.x + 5, pz.gnp),
+      y: lerpN(S.y - 2, S.y + 7, pz.gnp)
+    };
+    hL = {
+      x: S.x + 4,
+      y: S.y + 4
+    };
+  } else if (pz.squeeze != null && kneel) {
+    hL = {
+      x: S.x + 4 + pz.squeeze,
+      y: S.y + 3
+    };
+    hR = {
+      x: S.x + 3,
+      y: S.y + 3.5
+    };
+  } else {
+    if (pz.lead) hL = {
+      x: lerpN(guardL.x, (T[pz.punch] || T.jab).x, pz.lead),
+      y: lerpN(guardL.y, (T[pz.punch] || T.jab).y, pz.lead)
+    };
+    if (pz.rear) hR = {
+      x: lerpN(guardR.x, (T[pz.punch] || T.cross).x, pz.rear),
+      y: lerpN(guardR.y, (T[pz.punch] || T.cross).y, pz.rear)
+    };
+  }
+  if (pz.tap) hL = {
+    x: S.x + 3,
+    y: S.y + 1 + pz.tap * 2
+  };
+  const elbow = (h, up) => ({
+    x: (S.x + h.x) / 2 - 0.3,
+    y: (S.y + h.y) / 2 + (up ? -1.4 : 1.5)
+  });
+  const rot = pz.lie ? -90 * pz.lie : pz.fall ? -88 * pz.fall : 0;
+  const lift = pz.lie || pz.fall ? -1.4 * (pz.lie || pz.fall) : 0;
+  const line = pts => 'M' + pts.map(q => q.x.toFixed(2) + ' ' + q.y.toFixed(2)).join(' L');
+  const dark = 'rgba(15,12,33,.85)';
+  const glove = isRef ? null : mma ? 1.05 : 1.6;
+  const wob = pz.wobble ? ' rotate(' + (pz.wobble * 3).toFixed(1) + ')' : '';
+  return React.createElement("g", {
+    transform: 'translate(' + x.toFixed(2) + ' ' + RING_FLOOR + ') scale(' + face + ' 1)'
+  }, React.createElement("ellipse", {
+    cx: "0",
+    cy: "0.4",
+    rx: pz.lie ? 12 : 5.5,
+    ry: "0.9",
+    fill: "rgba(0,0,0,.28)"
+  }), React.createElement("g", {
+    transform: 'translate(0 ' + lift.toFixed(2) + ') rotate(' + rot.toFixed(1) + ')' + wob
+  }, React.createElement("path", {
+    d: line(legs[0]),
+    stroke: color,
+    strokeWidth: "2.3",
+    strokeLinecap: "round",
+    strokeLinejoin: "round",
+    fill: "none",
+    opacity: ".78"
+  }), React.createElement("path", {
+    d: line([S, elbow(hR, pz.punch === 'upper'), hR]),
+    stroke: color,
+    strokeWidth: "1.9",
+    strokeLinecap: "round",
+    strokeLinejoin: "round",
+    fill: "none",
+    opacity: ".78"
+  }), glove && React.createElement("circle", {
+    cx: hR.x,
+    cy: hR.y,
+    r: glove,
+    fill: mma ? '#1d1d24' : '#f4f1ea',
+    stroke: dark,
+    strokeWidth: ".35"
+  }), React.createElement("path", {
+    d: line([H, S]),
+    stroke: color,
+    strokeWidth: "4.4",
+    strokeLinecap: "round",
+    fill: "none"
+  }), React.createElement("path", {
+    d: line([H, S]),
+    stroke: "rgba(255,255,255,.18)",
+    strokeWidth: "1.2",
+    strokeLinecap: "round",
+    fill: "none",
+    transform: "translate(-0.9 0)"
+  }), !isRef && React.createElement("rect", {
+    x: H.x - 2.4,
+    y: H.y - 1.2,
+    width: "4.8",
+    height: "3.4",
+    rx: "1",
+    fill: "#1d1d24",
+    transform: 'rotate(' + (-(pz.lean || 0) * 0.3).toFixed(1) + ' ' + H.x + ' ' + H.y + ')'
+  }), !isRef && React.createElement("rect", {
+    x: H.x - 2.4,
+    y: H.y - 1.4,
+    width: "4.8",
+    height: "0.8",
+    fill: color
+  }), isRef && React.createElement("rect", {
+    x: H.x - 2.3,
+    y: H.y - 1,
+    width: "4.6",
+    height: "2.6",
+    rx: "0.8",
+    fill: "#1d1d24"
+  }), React.createElement("circle", {
+    cx: Hd.x,
+    cy: Hd.y,
+    r: "2.6",
+    fill: color,
+    stroke: dark,
+    strokeWidth: ".4"
+  }), React.createElement("path", {
+    d: line(legs[1]),
+    stroke: color,
+    strokeWidth: "2.3",
+    strokeLinecap: "round",
+    strokeLinejoin: "round",
+    fill: "none"
+  }), React.createElement("path", {
+    d: line([S, elbow(hL, pz.punch === 'hook'), hL]),
+    stroke: color,
+    strokeWidth: "1.9",
+    strokeLinecap: "round",
+    strokeLinejoin: "round",
+    fill: "none"
+  }), glove && React.createElement("circle", {
+    cx: hL.x,
+    cy: hL.y,
+    r: glove,
+    fill: mma ? '#1d1d24' : '#f4f1ea',
+    stroke: dark,
+    strokeWidth: ".35"
+  })), name && !pz.lie && React.createElement("text", {
+    transform: 'scale(' + face + ' 1)',
+    x: "0",
+    y: pz.fall ? -6 : hipY - 17,
+    textAnchor: "middle",
+    fontSize: "2.6",
+    fontWeight: "800",
+    fill: "#fff",
+    stroke: "#0f0c21",
+    strokeWidth: "0.5",
+    paintOrder: "stroke"
+  }, name));
+}
+function RingStage({
+  mma,
+  t,
+  children
+}) {
+  const crowd = useMemo(() => Array.from({
+    length: 70
+  }, (_, i) => ({
+    x: unit('cx', i) * 100,
+    y: 3 + unit('cy', i) * 13,
+    r: 0.7 + unit('cr', i) * 0.6,
+    c: ['#3a335c', '#4a3f6b', '#2d2849', '#56497a'][i % 4]
+  })), []);
+  return React.createElement(React.Fragment, null, React.createElement("defs", null, React.createElement("radialGradient", {
+    id: "ringspot",
+    cx: "50%",
+    cy: "40%",
+    r: "60%"
+  }, React.createElement("stop", {
+    offset: "0",
+    stopColor: "rgba(255,244,214,.35)"
+  }), React.createElement("stop", {
+    offset: "1",
+    stopColor: "rgba(255,244,214,0)"
+  })), React.createElement("pattern", {
+    id: "cagelink",
+    width: "2.4",
+    height: "2.4",
+    patternUnits: "userSpaceOnUse",
+    patternTransform: "rotate(45)"
+  }, React.createElement("rect", {
+    width: "2.4",
+    height: "2.4",
+    fill: "none",
+    stroke: "rgba(200,205,215,.35)",
+    strokeWidth: "0.25"
+  }))), React.createElement("rect", {
+    x: "0",
+    y: "0",
+    width: "100",
+    height: "56",
+    fill: "#141026"
+  }), crowd.map((p, i) => React.createElement("circle", {
+    key: i,
+    cx: p.x,
+    cy: p.y,
+    r: p.r,
+    fill: p.c,
+    opacity: 0.6 + 0.4 * Math.sin(t * 2 + i)
+  })), crowd.slice(0, 6).map((p, i) => Math.sin(t * 3.3 + i * 7) > 0.97 ? React.createElement("circle", {
+    key: 'f' + i,
+    cx: p.x,
+    cy: p.y,
+    r: "0.9",
+    fill: "#fff"
+  }) : null), React.createElement("rect", {
+    x: "0",
+    y: "0",
+    width: "100",
+    height: "56",
+    fill: "url(#ringspot)"
+  }), mma ? React.createElement("g", null, React.createElement("rect", {
+    x: "3",
+    y: "14",
+    width: "94",
+    height: RING_FLOOR - 14,
+    fill: "url(#cagelink)"
+  }), [3, 26, 50, 74, 97].map(x => React.createElement("rect", {
+    key: x,
+    x: x - 0.6,
+    y: "13",
+    width: "1.2",
+    height: RING_FLOOR - 13,
+    fill: "#22232b"
+  })), React.createElement("rect", {
+    x: "3",
+    y: "13",
+    width: "94",
+    height: "1.2",
+    fill: "#22232b"
+  }), React.createElement("path", {
+    d: 'M4 ' + RING_FLOOR + ' L96 ' + RING_FLOOR + ' L100 52 L0 52 Z',
+    fill: "#e4e2dc"
+  }), React.createElement("ellipse", {
+    cx: "50",
+    cy: "48",
+    rx: "13",
+    ry: "2.6",
+    fill: "none",
+    stroke: "rgba(226,70,59,.55)",
+    strokeWidth: "0.5"
+  }), React.createElement("text", {
+    x: "50",
+    y: "49",
+    textAnchor: "middle",
+    fontSize: "2.4",
+    fontWeight: "900",
+    fill: "rgba(226,70,59,.55)",
+    letterSpacing: ".3"
+  }, "DRAFT NIGHT"), React.createElement("rect", {
+    x: "0",
+    y: "52",
+    width: "100",
+    height: "4",
+    fill: "#22232b"
+  })) : React.createElement("g", null, React.createElement("path", {
+    d: 'M6 ' + RING_FLOOR + ' L94 ' + RING_FLOOR + ' L100 52 L0 52 Z',
+    fill: "#e9e4d8"
+  }), React.createElement("path", {
+    d: 'M6 ' + RING_FLOOR + ' L94 ' + RING_FLOOR,
+    stroke: "rgba(0,0,0,.12)",
+    strokeWidth: "0.4"
+  }), React.createElement("text", {
+    x: "50",
+    y: "49.4",
+    textAnchor: "middle",
+    fontSize: "2.6",
+    fontWeight: "900",
+    fill: "rgba(31,59,143,.35)",
+    letterSpacing: ".4"
+  }, "DRAFT NIGHT"), React.createElement("rect", {
+    x: "0",
+    y: "52",
+    width: "100",
+    height: "4",
+    fill: "#1f3b8f"
+  }), [6, 94].map(x => React.createElement("rect", {
+    key: x,
+    x: x - 0.8,
+    y: "20",
+    width: "1.6",
+    height: RING_FLOOR - 20,
+    fill: "#c9c2b2",
+    stroke: "rgba(0,0,0,.3)",
+    strokeWidth: ".2"
+  })), [23, 29, 35].map((y, i) => React.createElement("line", {
+    key: y,
+    x1: "6",
+    y1: y,
+    x2: "94",
+    y2: y,
+    stroke: ['#e2463b', '#f4f1ea', '#3d6be2'][i],
+    strokeWidth: "0.55",
+    opacity: ".9"
+  }))), children, !mma && React.createElement("g", {
+    opacity: ".85"
+  }, [31, 38].map((y, i) => React.createElement("line", {
+    key: y,
+    x1: "0",
+    y1: y + 6,
+    x2: "100",
+    y2: y + 6,
+    stroke: ['#e2463b', '#3d6be2'][i],
+    strokeWidth: "0.6",
+    opacity: ".55"
+  })), React.createElement("rect", {
+    x: "-0.4",
+    y: "26",
+    width: "1.8",
+    height: "26",
+    fill: "#c9c2b2"
+  }), React.createElement("rect", {
+    x: "98.6",
+    y: "26",
+    width: "1.8",
+    height: "26",
+    fill: "#c9c2b2"
+  })));
+}
+function RingView({
+  d,
+  A,
+  B,
+  match,
+  speed,
+  commentary,
+  onDone,
+  label
+}) {
+  const script = useMemo(() => fightScript(match), [match]);
+  const base = speed === 'fast' ? 2 : 1;
+  const [t, setT] = useState(speed === 'instant' ? script.total : 0);
+  const [playing, setPlaying] = useState(speed !== 'instant');
+  const [mult, setMult] = useState(1);
+  const done = t >= script.total;
+  const fired = useRef(false);
+  const reduced = reducedMotion();
+  useEffect(() => {
+    if (!playing || done) return undefined;
+    let raf;
+    let last = performance.now();
+    const tick = now => {
+      const dt = Math.min(0.1, (now - last) / 1000);
+      last = now;
+      setT(x => Math.min(script.total, x + dt * base * mult / Math.max(0.001, GAME_SPEED)));
+      raf = requestAnimationFrame(tick);
+    };
+    raf = requestAnimationFrame(tick);
+    return () => cancelAnimationFrame(raf);
+  }, [playing, done, mult, base]);
+  useEffect(() => {
+    if (done && !fired.current) {
+      fired.current = true;
+      audio.play('bell');
+      onDone && onDone();
+    }
+  }, [done]);
+  const bi = Math.max(0, script.beats.findIndex(b => t < b.t0 + b.dur));
+  const beat = done ? script.beats[script.beats.length - 1] : script.beats[bi];
+  const u = done ? beat.dur : t - beat.t0;
+  const uq = reduced && !done ? Math.floor(u / 0.5) * 0.5 : u;
+  const bout = match.bouts[Math.min(match.bouts.length - 1, beat.bi)];
+  const mma = bout.disc === 'mma';
+  const fr = fightFrame(beat, uq);
+  const decided = k => k < beat.bi || k === beat.bi && beat.type === 'result' && u > 0.8 || beat.type === 'final' || done;
+  const cardScore = [0, 1].map(s => match.bouts.filter((b, k) => decided(k) && b.winner === s).length);
+  const roundsDone = bout.rounds.filter(rd => rd.r < (beat.r || 0) || rd.r === beat.r && beat.type === 'rend' && u > 0.6 || beat.type === 'result' || beat.type === 'final' || done);
+  const sumOf = (k, s) => roundsDone.reduce((n, rd) => n + rd.rs[s][k], 0);
+  const clock = beat.type === 'ex' ? fightClock(beat.e.t) : beat.type === 'rend' ? fightClock(bout.len || 180) : '0:00';
+  const status = done || beat.type === 'final' ? 'FINAL' : beat.type === 'intro' ? 'FIGHT NIGHT' : beat.type === 'walk' ? bout.superFight ? 'SUPER FIGHT' : bout.main ? 'MAIN EVENT' : 'BOUT ' + (beat.bi + 1) : beat.type === 'result' ? 'RESULT' : 'R' + beat.r + ' ' + clock;
+  const sides = [bout.a, bout.b];
+  const colors = [A.color, B.color];
+  const short = n => {
+    if (!n) return '';
+    const w = n.split(' ');
+    const s2 = w[w.length - 1];
+    return s2.length > 11 ? s2.slice(0, 10) + '.' : s2;
+  };
+  const lastBeat = useRef(-1);
+  useEffect(() => {
+    if (!playing || done || bi === lastBeat.current) return;
+    lastBeat.current = bi;
+    if (beat.type === 'rstart' || beat.type === 'rend') audio.play('bell');
+    if (beat.type === 'walk') audio.play('drumroll');
+    if (beat.type === 'result') audio.play('cheer');
+  }, [bi]);
+  const hitRef = useRef(null);
+  const said = useRef({});
+  useEffect(() => {
+    if (!playing || done || !fr.impact) return;
+    const key = bi + ':' + Math.round(u * 4);
+    if (hitRef.current === key) return;
+    hitRef.current = key;
+    audio.play('punch');
+    if (beat.type === 'ex' && (beat.e.kind === 'ko' || beat.e.kind === 'kd') && !said.current[bi]) {
+      said.current[bi] = true;
+      audio.say((beat.e.kind === 'ko' ? 'Down goes ' : 'Down goes ') + beat.e.b + '!', 2, d.id + ':' + label + ':f' + bi);
+    }
+  }, [t]);
+  const feed = [];
+  script.beats.forEach((b, k) => {
+    if (!done && b.t0 + Math.min(b.dur * 0.55, 1.4) > t) return;
+    const bo = match.bouts[b.bi];
+    if (b.type === 'walk') feed.push({
+      k,
+      tag: bo.superFight ? 'SUPER' : bo.main ? 'MAIN' : 'B' + (b.bi + 1),
+      text: (bo.superFight ? 'Super fight: ' : (bo.disc === 'mma' ? '🥋 ' : '🥊 ') + (bo.disc === 'mma' ? 'UFC' : 'Boxing') + ', ' + bo.R + ' rounds: ') + (bo.a ? bo.a.name : '—') + ' vs ' + (bo.b ? bo.b.name : '—'),
+      half: true
+    });else if (b.type === 'ex') feed.push({
+      k,
+      tag: 'R' + b.r,
+      text: b.e.text,
+      team: b.e.s,
+      big: b.e.big
+    });else if (b.type === 'rend' && b.e.judge) {
+      const rs = b.e.rs;
+      const j = b.e.judge;
+      const w0 = j.filter(x => x[0] > x[1]).length,
+        w1 = j.filter(x => x[1] > x[0]).length;
+      const who = w0 > w1 ? bo.a.name : w1 > w0 ? bo.b.name : null;
+      feed.push({
+        k,
+        tag: 'R' + b.r,
+        text: 'End of round ' + b.r + ': ' + short(bo.a.name) + ' landed ' + rs[0].landed + ', ' + short(bo.b.name) + ' ' + rs[1].landed + (rs[0].td + rs[1].td ? ' · takedowns ' + rs[0].td + '–' + rs[1].td : '') + '. Judges: ' + j.map(x => x[0] + '–' + x[1]).join(', ') + (who ? ' (' + who + ')' : ''),
+        run: true
+      });
+    } else if (b.type === 'result') feed.push({
+      k,
+      tag: '🏆',
+      text: boutLine(bo),
+      team: bo.winner,
+      big: true
+    });
+  });
+  const feedRef = useRef(null);
+  useEffect(() => {
+    const f = feedRef.current;
+    if (f) f.scrollTop = f.scrollHeight;
+  }, [feed.length]);
+  const nextBout = () => {
+    const nb = script.beats.find(b => b.type === 'walk' && b.t0 > t + 0.01);
+    setT(nb ? nb.t0 : script.total);
+  };
+  const resultText = beat.type === 'result' ? bout.winner == null ? 'DRAW' : (bout.winner === 0 ? bout.a : bout.b).name.toUpperCase() : null;
+  if (beat.type === 'result' && bout.winner != null) {
+    fr.pose[bout.winner] = {
+      raise: 1
+    };
+    fr.ref = {
+      x: 50,
+      count: null,
+      raiseFor: bout.winner
+    };
+  }
+  const bannerNow = done ? null : beat.type === 'intro' ? 'FIGHT NIGHT' : beat.type === 'walk' ? bout.superFight ? 'SUPER FIGHT' : bout.main ? 'MAIN EVENT' : 'BOUT ' + (beat.bi + 1) : beat.type === 'rend' && u > 0.5 ? 'END OF ROUND ' + beat.r : beat.type === 'final' ? 'FINAL' : fr.banner;
+  const refPose = fr.ref.raiseFor != null ? {
+    raise: 0
+  } : fr.ref.wave ? {
+    lead: Math.abs(Math.sin(u * 8)),
+    punch: 'hook',
+    lean: 0
+  } : fr.ref.between ? {
+    lead: 1,
+    rear: 1,
+    punch: 'jab',
+    lean: 4
+  } : {
+    lean: 0
+  };
+  return React.createElement("div", {
+    className: "matchview ringview"
+  }, React.createElement("div", {
+    className: "scoreboard"
+  }, React.createElement("div", {
+    className: "sb-team"
+  }, React.createElement(Badge, {
+    m: A
+  }), React.createElement("span", {
+    className: "sb-n"
+  }, A.name)), React.createElement("div", {
+    className: "sb-mid"
+  }, React.createElement("span", {
+    className: "sb-score num",
+    "aria-live": "polite"
+  }, cardScore[0], "\u2013", cardScore[1]), React.createElement("span", {
+    className: "sb-clock num"
+  }, status)), React.createElement("div", {
+    className: "sb-team"
+  }, React.createElement(Badge, {
+    m: B
+  }), React.createElement("span", {
+    className: "sb-n"
+  }, B.name))), React.createElement("div", {
+    className: "boutbar small"
+  }, React.createElement("b", null, bout.a ? bout.a.name : '—'), " ", React.createElement("span", {
+    className: "muted"
+  }, "vs"), " ", React.createElement("b", null, bout.b ? bout.b.name : '—'), " ", React.createElement("span", {
+    className: "muted"
+  }, "\xB7 ", mma ? 'UFC' : 'Boxing', " \xB7 ", bout.R, " rounds", bout.main && !bout.superFight ? ' · main event' : ''), bout.method !== 'WO' && React.createElement("span", {
+    className: "num boutstats"
+  }, " Landed ", sumOf('landed', 0), "\u2013", sumOf('landed', 1), " \xB7 Knockdowns ", sumOf('kd', 0), "\u2013", sumOf('kd', 1), mma ? ' · Takedowns ' + sumOf('td', 0) + '–' + sumOf('td', 1) : '')), React.createElement("div", {
+    className: "pitchwrap"
+  }, React.createElement("svg", {
+    className: "pitchsvg ringsvg",
+    viewBox: "0 0 100 56",
+    role: "img",
+    "aria-label": 'Fight: ' + (bout.a ? bout.a.name : '') + ' versus ' + (bout.b ? bout.b.name : '') + ', ' + status
+  }, React.createElement(RingStage, {
+    mma: mma,
+    t: t
+  }, beat.type !== 'intro' && beat.type !== 'final' && (() => {
+    const rp = refPose;
+    return React.createElement("g", {
+      opacity: ".95"
+    }, React.createElement(FighterFig, {
+      x: fr.ref.x,
+      face: fr.ref.x > 50 ? -1 : 1,
+      p: rp,
+      color: "#cfd6e4",
+      isRef: true,
+      name: null,
+      mma: true
+    }));
+  })(), [0, 1].map(s => sides[s] && beat.type !== 'intro' && beat.type !== 'final' ? React.createElement(FighterFig, {
+    key: s,
+    x: fr.x[s],
+    face: s === 0 ? 1 : -1,
+    p: fr.pose[s],
+    color: colors[s],
+    mma: mma,
+    name: short(sides[s].name)
+  }) : null), fr.impact && React.createElement("g", {
+    transform: 'translate(' + fr.impact.x.toFixed(2) + ' ' + fr.impact.y.toFixed(2) + ')'
+  }, React.createElement("path", {
+    d: "M0 -3.2 L0.9 -0.9 L3.2 0 L0.9 0.9 L0 3.2 L-0.9 0.9 L-3.2 0 L-0.9 -0.9 Z",
+    fill: "#ffd23d",
+    stroke: "#fff",
+    strokeWidth: ".3"
+  })), fr.ref.count != null && React.createElement("text", {
+    x: fr.ref.x + (fr.ref.x > 50 ? 6 : -6),
+    y: "27",
+    textAnchor: "middle",
+    fontSize: "7",
+    fontWeight: "900",
+    fill: "#fff",
+    stroke: "#0f0c21",
+    strokeWidth: "0.6",
+    paintOrder: "stroke",
+    className: "pbanner"
+  }, fr.ref.count)), (beat.type === 'intro' || beat.type === 'walk') && React.createElement("g", null, React.createElement("rect", {
+    x: "0",
+    y: "0",
+    width: "100",
+    height: "56",
+    fill: "rgba(15,12,33,.55)"
+  }), beat.type === 'walk' && bout.a && bout.b && [0, 1].map(s => {
+    const f = sides[s];
+    const k = easeF(u / 0.8);
+    return React.createElement("g", {
+      key: s,
+      transform: 'translate(' + (s === 0 ? lerpN(-30, 22, k) : lerpN(130, 78, k)) + ' 30)'
+    }, React.createElement("text", {
+      textAnchor: "middle",
+      fontSize: "4.2",
+      fontWeight: "900",
+      fill: colors[s],
+      stroke: "#0f0c21",
+      strokeWidth: "0.5",
+      paintOrder: "stroke"
+    }, f.name.toUpperCase().slice(0, 18)), React.createElement("text", {
+      y: "5",
+      textAnchor: "middle",
+      fontSize: "2.6",
+      fontWeight: "700",
+      fill: "#fff"
+    }, f.styleWord, numbersShown() ? ' · ' + eraWord(d.topic) + ' ' + f.ovr + ' est.' : ''));
+  }), beat.type === 'walk' && React.createElement("text", {
+    x: "50",
+    y: "31",
+    textAnchor: "middle",
+    fontSize: "5",
+    fontWeight: "900",
+    fill: "#ffc83d"
+  }, "VS"), beat.type === 'intro' && match.bouts.map((b, k) => React.createElement("text", {
+    key: k,
+    x: "50",
+    y: 26 + k * 4.4,
+    textAnchor: "middle",
+    fontSize: "2.8",
+    fontWeight: "700",
+    fill: "#fff"
+  }, b.superFight ? '' : (b.disc === 'mma' ? 'UFC' : 'BOXING') + ' · ', b.a ? short(b.a.name) : '—', " vs ", b.b ? short(b.b.name) : '—')).filter((_, k) => !match.bouts[k].superFight)), beat.type === 'result' && React.createElement("g", null, React.createElement("rect", {
+    x: "0",
+    y: "0",
+    width: "100",
+    height: "14",
+    fill: "rgba(15,12,33,.7)"
+  }), React.createElement("text", {
+    x: "50",
+    y: "7",
+    textAnchor: "middle",
+    fontSize: "4.6",
+    fontWeight: "900",
+    fill: "#ffc83d",
+    stroke: "#0f0c21",
+    strokeWidth: "0.5",
+    paintOrder: "stroke"
+  }, resultText), React.createElement("text", {
+    x: "50",
+    y: "11.6",
+    textAnchor: "middle",
+    fontSize: "2.8",
+    fontWeight: "700",
+    fill: "#fff"
+  }, boutShort(bout))), (done || beat.type === 'final') && React.createElement("g", null, React.createElement("rect", {
+    x: "0",
+    y: "0",
+    width: "100",
+    height: "56",
+    fill: "rgba(15,12,33,.6)"
+  }), React.createElement("text", {
+    x: "50",
+    y: "22",
+    textAnchor: "middle",
+    fontSize: "3.4",
+    fontWeight: "800",
+    fill: "#fff"
+  }, "FIGHT CARD"), React.createElement("text", {
+    x: "50",
+    y: "32",
+    textAnchor: "middle",
+    fontSize: "7",
+    fontWeight: "900",
+    fill: match.winner === 0 ? A.color : B.color,
+    stroke: "#0f0c21",
+    strokeWidth: "0.6",
+    paintOrder: "stroke"
+  }, (match.winner === 0 ? A : B).name.toUpperCase().slice(0, 16), " WIN"), React.createElement("text", {
+    x: "50",
+    y: "40",
+    textAnchor: "middle",
+    fontSize: "5",
+    fontWeight: "900",
+    fill: "#ffc83d",
+    className: "num"
+  }, match.score[0], "\u2013", match.score[1])), bannerNow && beat.type !== 'result' && React.createElement("text", {
+    x: "50",
+    y: beat.type === 'walk' ? 15 : 12,
+    textAnchor: "middle",
+    fontSize: bannerNow.length > 13 ? 5.2 : 7,
+    fontWeight: "900",
+    fill: /KNOCK|DOWN|STOPPED|TAP|SUBMISSION|HURT|TOWEL|DOCTOR/.test(bannerNow) ? '#ffc83d' : '#fff',
+    stroke: "#0f0c21",
+    strokeWidth: "0.6",
+    paintOrder: "stroke",
+    className: "pbanner"
+  }, bannerNow))), React.createElement("div", {
+    className: "mctrl",
+    role: "group",
+    "aria-label": "Fight controls"
+  }, !done && React.createElement("button", {
+    className: "btn btn-sm",
+    onClick: () => setPlaying(x => !x),
+    "aria-label": playing ? 'Pause' : 'Play'
+  }, playing ? '⏸ Pause' : '▶ Play'), !done && [1, 2, 4].map(x => React.createElement("button", {
+    key: x,
+    className: 'btn btn-sm' + (mult === x ? ' btn-gold' : ''),
+    "aria-pressed": mult === x,
+    onClick: () => setMult(x)
+  }, x, "\xD7")), !done && React.createElement("button", {
+    className: "btn btn-sm btn-ghost",
+    onClick: nextBout
+  }, "Next bout"), !done && React.createElement("button", {
+    className: "btn btn-sm btn-ghost",
+    onClick: () => setT(script.total)
+  }, "Skip to result"), done && React.createElement("button", {
+    className: "btn btn-sm",
+    onClick: () => {
+      fired.current = true;
+      said.current = {};
+      setT(0);
+      setPlaying(true);
+    }
+  }, "\u21BA Watch again")), React.createElement("div", {
+    className: "mfeed",
+    ref: feedRef,
+    "aria-live": "polite"
+  }, feed.map(e => React.createElement("p", {
+    key: e.k,
+    className: 'mev ' + (e.big ? 'goal' : e.half ? 'half' : '') + (e.team != null ? ' t' + e.team : '')
+  }, React.createElement("span", {
+    className: "mm num"
+  }, e.tag), React.createElement("span", null, e.big ? '💥 ' : e.run ? '🔔 ' : '', e.text)))), done && React.createElement(FightSummary, {
+    d: d,
+    A: A,
+    B: B,
+    match: match
+  }));
+}
+function fightReport(d, A, B, match) {
+  const T = [A, B];
+  const real = match.bouts.filter(b => b.method !== 'WO');
+  const action = b => b.events.filter(e => e.kind === 'kd' || e.kind === 'rock' || e.kind === 'subatt').length * 2 + b.events.filter(e => e.counter).length + (b.method === 'DEC' && b.cards ? 3 - Math.min(3, Math.abs(b.cards[0][0] - b.cards[0][1])) : 0) + (b.endRound >= 3 && b.method !== 'DEC' ? 2 : 0);
+  const fotn = real.slice().sort((x, y) => action(y) - action(x))[0] || null;
+  const fin = real.filter(b => b.winner != null && b.method !== 'DEC');
+  const potn = fin.slice().sort((x, y) => (x.endRound - 1) * x.len + x.endTime - ((y.endRound - 1) * y.len + y.endTime))[0] || null;
+  const fighters = match.bouts.flatMap(b => [0, 1].map(s => ({
+    s,
+    f: s === 0 ? b.a : b.b,
+    won: b.winner === s,
+    b
+  }))).filter(x => x.f);
+  const best = fighters.filter(x => x.won).sort((x, y) => x.f.price - y.f.price)[0] || null;
+  const flop = fighters.filter(x => !x.won && x.b.winner != null).sort((x, y) => y.f.price - x.f.price)[0] || null;
+  return {
+    fotn,
+    potn,
+    best,
+    flop,
+    T
+  };
+}
+function FightSummary({
+  d,
+  A,
+  B,
+  match
+}) {
+  const R = fightReport(d, A, B, match);
+  const T = i => i === 0 ? A : B;
+  return React.createElement("div", {
+    className: "board msummary"
+  }, React.createElement("h3", null, "\uD83E\uDD4A Fight card"), React.createElement("p", {
+    className: "small",
+    style: {
+      margin: 0
+    }
+  }, React.createElement("b", null, A.name, " ", match.score[0], "\u2013", match.score[1], " ", B.name), match.how === 'super' ? ' · decided by the super fight' : ''), React.createElement("div", {
+    className: "fightcard"
+  }, match.bouts.map((b, k) => React.createElement("div", {
+    key: k,
+    className: 'fc-row' + (b.main ? ' main' : '')
+  }, React.createElement("span", {
+    className: "fc-tag"
+  }, b.superFight ? '⭐ Super fight' : (b.main ? 'Main event · ' : '') + (b.disc === 'mma' ? 'UFC' : 'Boxing')), React.createElement("span", {
+    className: "fc-line small"
+  }, boutLine(b)), b.tot && React.createElement("span", {
+    className: "fc-stats small muted num"
+  }, "Landed ", b.tot[0].landed, "\u2013", b.tot[1].landed, " \xB7 KD ", b.tot[0].kd, "\u2013", b.tot[1].kd, b.disc === 'mma' ? ' · TD ' + b.tot[0].td + '–' + b.tot[1].td : '')))), React.createElement("div", {
+    className: "mreport"
+  }, React.createElement("h4", null, "\uD83D\uDCCB Fight report"), R.fotn && React.createElement("p", {
+    className: "small"
+  }, React.createElement("b", null, "\uD83D\uDD25 Fight of the Night:"), " ", R.fotn.a.name, " vs ", R.fotn.b.name, " (", boutShort(R.fotn), ")."), R.potn && React.createElement("p", {
+    className: "small"
+  }, React.createElement("b", null, "\u26A1 Performance of the Night:"), " ", (R.potn.winner === 0 ? R.potn.a : R.potn.b).name, " \u2014 ", R.potn.method === 'SUB' ? R.potn.sub : METHOD_WORD[R.potn.method], " in round ", R.potn.endRound, R.potn.method === 'RTD' || R.potn.method === 'DOC' ? '' : ' (' + fightClock(R.potn.endTime) + ')', "."), R.best && React.createElement("p", {
+    className: "small"
+  }, React.createElement("b", null, "\uD83D\uDCB0 Best buy:"), " ", R.best.f.name, " cost $", R.best.f.price, " and won for ", T(R.best.s).name, "."), R.flop && React.createElement("p", {
+    className: "small"
+  }, React.createElement("b", null, "\uD83D\uDCC9 Rough night:"), " ", R.flop.f.name, " cost $", R.flop.f.price, " and lost.")), React.createElement("p", {
+    className: "hint",
+    style: {
+      margin: 0
+    }
+  }, "Dream fights, pound-for-pound (no weight classes), simulated from Draft Night\u2019s estimated ", eraWord(d.topic), " numbers \u2014 not official ratings. Anyone can get caught, so upsets happen."));
+}
+function FightChip({
+  item,
+  topic
+}) {
+  const [open, setOpen] = useState(false);
+  if (!numbersShown()) return null;
+  const r = fightRating(item, item.pos);
+  const era = eraWord(topic);
+  const keys = r.disc === 'box' ? FIGHT_ATTRS.filter(a => a !== 'WRS' && a !== 'SUB') : FIGHT_ATTRS;
+  return React.createElement(React.Fragment, null, React.createElement("button", {
+    type: "button",
+    className: "ratingchip",
+    onClick: () => setOpen(true),
+    "aria-label": era + ' ' + r.ovr + ', estimated. Show details'
+  }, era, " ", React.createElement("b", {
+    className: "num"
+  }, r.ovr), " est."), open && ReactDOM.createPortal(React.createElement(Sheet, {
+    center: true,
+    onClose: () => setOpen(false)
+  }, React.createElement("div", {
+    className: "ratingcard"
+  }, React.createElement("div", {
+    className: "rc-top"
+  }, React.createElement("span", {
+    className: "rc-ovr num"
+  }, React.createElement("small", {
+    className: "rc-era"
+  }, era), r.ovr), React.createElement("span", {
+    className: "rc-role"
+  }, r.disc === 'mma' ? 'UFC' : 'BOX'), React.createElement("span", {
+    className: "rc-name"
+  }, item.name, React.createElement("br", null), React.createElement("small", null, r.styleWord))), React.createElement("div", {
+    className: "rc-attrs"
+  }, keys.map(a => React.createElement("div", {
+    key: a,
+    className: "rc-attr"
+  }, React.createElement("span", {
+    className: "k",
+    title: FIGHT_ATTR_NAMES[a]
+  }, a), React.createElement("span", {
+    className: "bar"
+  }, React.createElement("i", {
+    style: {
+      width: r.attrs[a] + '%'
+    }
+  })), React.createElement("span", {
+    className: "v num"
+  }, r.attrs[a])))), React.createElement("p", {
+    className: "hint",
+    style: {
+      margin: 0
+    }
+  }, era === 'Now' ? 'Now: how good they are today. ' : 'Prime: how good they were at their peak. ', "Draft Night estimate from fighting style and achievements, not an official rating.")), React.createElement("button", {
+    className: "btn btn-ghost",
+    onClick: () => setOpen(false)
+  }, "Close")), document.body));
 }
 function ShowAct({
   d,
