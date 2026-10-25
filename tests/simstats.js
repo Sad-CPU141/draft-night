@@ -3,7 +3,7 @@ module.exports = async function simStatsTests({ ok, boot, btn, click, sleep }) {
   console.log('Simulation stats');
   const P = await boot({ idb: false });
   const { DN } = P; const S = DN.simStats; const F = DN.finale;
-  const ts = DN.starterTopics().filter((t) => F.hasBattle(t) && F.battleKind(t).name !== 'Basketball game' && F.battleKind(t).name !== 'Fight night' && F.battleKind(t).name !== 'Grand Prix' && F.battleKind(t).name !== 'Tennis tie' && F.battleKind(t).name !== 'NFL game');
+  const ts = DN.starterTopics().filter((t) => F.hasBattle(t) && F.battleKind(t).name !== 'Basketball game' && F.battleKind(t).name !== 'Fight night' && F.battleKind(t).name !== 'Grand Prix' && F.battleKind(t).name !== 'Tennis tie' && F.battleKind(t).name !== 'NFL game' && F.battleKind(t).name !== 'Hockey game');
   const missing = []; let n = 0;
   ts.forEach((t) => t.items.forEach((i) => { n++; const s = S.itemStats(t, i); if (!s || !s.listed) missing.push(t.id + ': ' + i.name); }));
   ok(!missing.length, 'every item in the ' + ts.length + ' simulation topics has hand-made stats (' + n + ' items)' + (missing.length ? ' — missing: ' + missing.slice(0, 8).join(', ') : ''));

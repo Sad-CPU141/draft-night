@@ -1,4 +1,4 @@
-/* Draft Night 5577940119 — built from src/ by build.js. Edit src/, not this file. */
+/* Draft Night 9783b571b6 — built from src/ by build.js. Edit src/, not this file. */
 "use strict";
 (function(){
 function _extends() { return _extends = Object.assign ? Object.assign.bind() : function (n) { for (var e = 1; e < arguments.length; e++) { var t = arguments[e]; for (var r in t) ({}).hasOwnProperty.call(t, r) && (n[r] = t[r]); } return n; }, _extends.apply(null, arguments); }
@@ -658,7 +658,8 @@ const STARTER_BATTLE = {
   't-fight': 'combat',
   't-f1': 'f1',
   't-ten': 'tennis',
-  't-nfl': 'nfl'
+  't-nfl': 'nfl',
+  't-nhl': 'nhl'
 };
 function starterTopics() {
   const v3 = [...sportsTopicsV3(), ...foodTopicsV3(), ...entTopicsV3(), ...travelTopicsV3(), ...animalTopicsV3(), ...styleTopicsV3(), ...funTopicsV3()];
@@ -23694,6 +23695,15 @@ const BATTLE_KINDS = {
     upset: ['Who knew? {w} beats {l} when it counts!', 'Surprise hero: {w}!'],
     noshow: ['{w} wins the night — the other team had nothing.']
   },
+  nhl: {
+    name: 'Hockey game',
+    start: 'Puck drop',
+    emoji: '🏒',
+    round: 'Period',
+    win: [''],
+    upset: [''],
+    noshow: ['{w} wins by forfeit.']
+  },
   nfl: {
     name: 'NFL game',
     start: 'Kick off',
@@ -23767,6 +23777,7 @@ function simulateFor(d, A, B, key, opts) {
   if (k === 'f1') return simulateGrandPrix(d, A, B, key);
   if (k === 'tennis') return simulateTennisTie(d, A, B, key);
   if (k === 'nfl') return simulateNFL(d, A, B, key);
+  if (k === 'nhl') return simulateHockey(d, A, B, key);
   if (k === 'survival') return simulateSurvival(d, A, B, key);
   if (k === 'powers' || k === 'weird') return simulateMissions(d, A, B, key);
   if (k === 'cute') return simulatePuppyBowl(d, A, B, key, opts && opts.knockout === false ? false : true);
@@ -23779,6 +23790,7 @@ function simWhy(w, mt) {
     const f = mt.final[mt.winner];
     return w.name + (f.rescued ? ' got rescued' : ' survived ' + ws + ' day' + (ws === 1 ? '' : 's')) + (ws !== ls ? ' (the others lasted ' + ls + ')' : mt.how === 'rescue' ? ', and got rescued first' : mt.how === 'shape' ? ', level on days but in better shape' : ' and won the last night') + '.';
   }
+  if (mt.v === 'nhl') return w.name + ' won ' + mt.score[mt.winner] + '–' + mt.score[1 - mt.winner] + (mt.so ? ' in a shootout' : mt.ot ? ' in overtime' : '') + '.';
   if (mt.v === 'nfl') return w.name + ' won ' + mt.score[mt.winner] + '–' + mt.score[1 - mt.winner] + (mt.ot ? ' in overtime' : '') + '.';
   if (mt.v === 'tennis') return w.name + ' won the tie ' + mt.score[mt.winner] + '–' + mt.score[1 - mt.winner] + (mt.how === 'doubles' ? ' in the mixed doubles decider' : '') + '.';
   if (mt.v === 'gp') {
@@ -23797,7 +23809,7 @@ function simWhy(w, mt) {
   if (mt.v === 'mission') return w.name + ' won ' + mt.score[mt.winner] + ' of ' + mt.missions.length + ' missions.';
   return w.name + ' won the ' + (BATTLE_KINDS[mt.kind] || BATTLE_KINDS.fight).name.toLowerCase() + ' ' + mt.score[mt.winner] + '–' + mt.score[1 - mt.winner] + (mt.sudden ? ' in sudden death' : '') + '.';
 }
-const isSimResult = mt => !!mt && (mt.v === 'nfl' || mt.v === 'tennis' || mt.v === 'gp' || mt.v === 'card' || mt.v === 'hoops' || mt.v === 'battle' || mt.v === 'arena' || mt.v === 'survival' || mt.v === 'mission' || mt.v === 'show');
+const isSimResult = mt => !!mt && (mt.v === 'nhl' || mt.v === 'nfl' || mt.v === 'tennis' || mt.v === 'gp' || mt.v === 'card' || mt.v === 'hoops' || mt.v === 'battle' || mt.v === 'arena' || mt.v === 'survival' || mt.v === 'mission' || mt.v === 'show');
 function battleDuel(rng, kind, a, b, maxP) {
   const fill = (lines, w, l) => lines[Math.floor(rng() * lines.length)].replace('{w}', w).replace('{l}', l);
   if (!a || !b) {
@@ -26519,6 +26531,587 @@ function goldenBoot(d) {
     goals: top[1]
   } : null;
 }
+const NHL_ATTRS = {
+  S: ['SHT', 'PAS', 'SKT', 'DEF', 'PHY'],
+  G: ['REF', 'POS', 'REB', 'GLV']
+};
+const NHL_ATTR_NAMES = {
+  SHT: 'Shooting',
+  PAS: 'Playmaking',
+  SKT: 'Skating',
+  DEF: 'Defence',
+  PHY: 'Physical',
+  REF: 'Reflexes',
+  POS: 'Positioning',
+  REB: 'Rebound control',
+  GLV: 'Glove hand'
+};
+const NHL_PROFILE_SRC = `
+Connor Hellebuyck|93|
+Igor Shesterkin|92|REF+3
+Andrei Vasilevskiy|91|GLV+3
+Juuse Saros|88|
+Jake Oettinger|87|
+Sergei Bobrovsky|87|
+Ilya Sorokin|89|
+Jeremy Swayman|86|
+Thatcher Demko|86|
+Linus Ullmark|86|
+Cale Makar|94|SKT+5 PAS+3
+Quinn Hughes|92|PAS+5 SKT+3 PHY-6
+Adam Fox|90|PAS+4
+Victor Hedman|90|DEF+3 PHY+3
+Roman Josi|89|SHT+2
+Miro Heiskanen|89|SKT+3 DEF+3
+Rasmus Dahlin|89|PHY+3
+Zach Werenski|89|SHT+3
+Evan Bouchard|87|SHT+5 DEF-4
+Erik Karlsson|89|PAS+5 DEF-4
+Lane Hutson|86|PAS+4 PHY-8
+Moritz Seider|87|DEF+4 PHY+5
+Charlie McAvoy|88|PHY+4
+Connor McDavid|98|SKT+6 PAS+4
+Nathan MacKinnon|96|SKT+4 SHT+2
+Auston Matthews|95|SHT+6
+Leon Draisaitl|95|SHT+3 PAS+3
+Nikita Kucherov|95|PAS+6
+David Pastrňák|93|SHT+6
+Sidney Crosby|93|PAS+3 DEF+3
+Alex Ovechkin|91|SHT+8 SKT-4 PHY+4
+Mitch Marner|90|PAS+6 PHY-5
+William Nylander|89|SHT+3 SKT+3
+Matthew Tkachuk|90|PHY+7
+Jack Hughes|90|SKT+5
+Kirill Kaprizov|92|SHT+3
+Macklin Celebrini|86|
+Connor Bedard|86|SHT+3
+Jack Eichel|90|
+Brad Marchand|87|PHY+4
+Steven Stamkos|88|SHT+5
+Brayden Point|89|
+Aleksander Barkov|91|DEF+6`;
+const NHL_PROFILE = {};
+NHL_PROFILE_SRC.trim().split('\n').forEach(line => {
+  const [name, ovr, tw] = line.split('|');
+  const tweak = {};
+  (tw || '').split(' ').filter(Boolean).forEach(t => {
+    const m = t.match(/^([A-Z]+)([+-]\d+)$/);
+    if (m) tweak[m[1]] = +m[2];
+  });
+  NHL_PROFILE[name.toLowerCase()] = {
+    ovr: +ovr,
+    tweak
+  };
+});
+const nhlRole = (item, slot) => {
+  const p = norm(item && item.pos || slot || '');
+  return p === 'G' ? 'G' : p === 'D' ? 'D' : 'F';
+};
+const NHL_SHAPE = {
+  F: {
+    SHT: 2,
+    PAS: 1,
+    SKT: 1,
+    DEF: -6,
+    PHY: -2
+  },
+  D: {
+    SHT: -6,
+    PAS: 0,
+    SKT: -1,
+    DEF: 5,
+    PHY: 2
+  }
+};
+function nhlRating(item, slot) {
+  const prof = NHL_PROFILE[String(item.name || '').toLowerCase()];
+  const fixed = validRating(item.rating);
+  const ovr = fixed ? clamp(Math.round(+item.rating), 1, 99) : prof ? prof.ovr : clamp(Math.round(74 + itemFame(item) * 20 + (unit('nhlo', item.name) - 0.5) * 6), 66, 93);
+  const role = nhlRole(item, slot);
+  const tw = prof ? prof.tweak : {};
+  const attrs = {};
+  const keys = role === 'G' ? NHL_ATTRS.G : NHL_ATTRS.S;
+  const d = (item.desc || '') + ' ';
+  const tilt = {
+    SHT: /sniper|goals/i.test(d) ? 5 : 0,
+    PAS: /playmaker/i.test(d) ? 5 : 0
+  };
+  keys.forEach(a => {
+    attrs[a] = clamp(Math.round(ovr + (role === 'G' ? 0 : NHL_SHAPE[role][a]) + (tw[a] || 0) + (tilt[a] || 0) + (unit('nhla', item.name, a) - 0.5) * 6), 40, 99);
+  });
+  return {
+    ovr,
+    attrs,
+    role,
+    estimated: !fixed
+  };
+}
+const NHL_DEPTH = 80;
+const NHL_LINES = {
+  goal: {
+    wrist: ['{p} snaps a wrist shot past {g}!', '{p} picks the corner — GOAL!'],
+    snap: ['{p} with a quick snapshot — it’s in!'],
+    slap: ['{p} winds up and BLASTS it in from the point!'],
+    onetimer: ['{a} feeds {p} for the one-timer — SCORES!', 'One-timer from {p}! What a pass from {a}!'],
+    deflect: ['{p} tips it in front of the net!', 'Deflection by {p} — GOAL!'],
+    rebound: ['{p} buries the rebound!', '{p} pounces on the loose puck — GOAL!'],
+    breakaway: ['{p} is in alone… dekes… SCORES!', 'Breakaway! {p} beats {g} five-hole!'],
+    empty: ['{p} hits the empty net!']
+  },
+  save: {
+    glove: ['Glove save by {g}!', '{g} snags it with the glove!'],
+    pad: ['Pad save from {g}!', '{g} kicks it out with the pad.'],
+    blocker: ['Blocker save by {g}.', '{g} turns it aside with the blocker.'],
+    big: ['WHAT A SAVE by {g}!', '{g} robs {p}!', 'Highway robbery — {g} says no to {p}!']
+  },
+  block: ['{b} blocks the shot.', 'Big block from {b}!'],
+  miss: ['{p} fires wide.', '{p} misses the net.'],
+  post: ['{p} rings it off the post!', 'Off the crossbar from {p}!'],
+  hit: ['{b} lays a big hit on {p}!', 'BOOM! {b} flattens {p} along the boards!'],
+  pen: ['{p} goes to the box for {r}. Power play!']
+};
+const nhlLine = (rng, ls, v) => ls[Math.floor(rng() * ls.length)].replace('{p}', v.p || '').replace('{g}', v.g || '').replace('{a}', v.a || '').replace('{b}', v.b || '').replace('{r}', v.r || '');
+const NHL_PENS = ['tripping', 'hooking', 'slashing', 'high-sticking', 'interference', 'holding', 'roughing'];
+function simulateHockey(d, A, B, key) {
+  const rng = seeded(d.seed, 'nhl', key, A.id, B.id);
+  const gauss = () => {
+    let u = 0;
+    for (let i = 0; i < 4; i++) u += rng();
+    return (u - 2) / 0.58;
+  };
+  const sq = [A, B].map(m => m.team.map((x, k) => {
+    const it = x && d.items[x.itemId];
+    return it ? {
+      name: it.name,
+      itemId: it.id,
+      price: x.price || 0,
+      ...nhlRating(it, d.rules.slots[k])
+    } : null;
+  }).filter(Boolean));
+  const team = sq.map((s, i) => {
+    const G = s.find(p => p.role === 'G') || {
+      name: 'Backup goalie',
+      itemId: null,
+      ovr: 78,
+      role: 'G',
+      attrs: {
+        REF: 78,
+        POS: 78,
+        REB: 78,
+        GLV: 78
+      },
+      backup: true
+    };
+    const skaters = s.filter(p => p.role !== 'G');
+    const avg = k => skaters.length ? (skaters.reduce((n, p) => n + p.attrs[k], 0) + NHL_DEPTH * (5 - Math.min(5, skaters.length)) * 0) / skaters.length : NHL_DEPTH;
+    const blend = k => avg(k) * 0.4 + NHL_DEPTH * 0.6;
+    return {
+      G,
+      skaters,
+      off: blend('SHT') * 0.5 + blend('PAS') * 0.3 + blend('SKT') * 0.2,
+      def: blend('DEF') * 0.6 + blend('SKT') * 0.2 + blend('PHY') * 0.2,
+      gk: (G.attrs.REF + G.attrs.POS + G.attrs.GLV) / 3
+    };
+  });
+  const form = [gauss() * 0.016, gauss() * 0.016];
+  const gForm = [gauss() * 0.02, gauss() * 0.02];
+  const score = [0, 0];
+  const ev = [];
+  const shots = [0, 0];
+  const box = sq.map(s => Object.fromEntries(s.map(p => [p.name, {
+    g: 0,
+    a: 0,
+    sog: 0,
+    hits: 0,
+    blk: 0,
+    pim: 0,
+    sv: 0,
+    ga: 0
+  }])));
+  const bx = (s, n) => box[s][n] || null;
+  let period = 1,
+    clock = 1200,
+    pp = null;
+  let ot = false,
+    so = null;
+  let pulled = [false, false];
+  const push = e => {
+    e.per = period;
+    e.clk = Math.max(0, Math.round(clock));
+    e.score = [...score];
+    e.i = ev.length;
+    ev.push(e);
+    return e;
+  };
+  const onIce = (s, role, w) => {
+    const pool = team[s].skaters.filter(p => !role || p.role === role);
+    const toi = p => p.role === 'D' ? 0.44 : 0.38;
+    const pick = pool.filter(p => rng() < toi(p));
+    return pick.length ? weighted(rng, pick, w) : null;
+  };
+  const shooterW = p => p.attrs.SHT * (p.role === 'F' ? 1.6 : 0.6);
+  const attack = (s, sit) => {
+    const o = 1 - s;
+    const G = team[o].G;
+    const isPP = pp && pp.team === s;
+    const isSH = pp && pp.team === o;
+    const emptyNet = pulled[o];
+    const shooter = onIce(s, null, shooterW);
+    const passer = rng() < 0.7 ? onIce(s, null, p => p.attrs.PAS) : null;
+    const pn = shooter ? shooter.name : null;
+    const an = passer && passer !== shooter ? passer.name : null;
+    const sht = shooter ? shooter.attrs.SHT : NHL_DEPTH - 2;
+    const rush = sit === 'ot' ? 0.25 : 0.1;
+    const type = emptyNet ? 'empty' : weighted(rng, [['wrist', 4], ['snap', 2.2], ['slap', shooter && shooter.role === 'D' ? 2.5 : 0.8], ['onetimer', an ? 1.6 + (isPP ? 1.5 : 0) : 0.2], ['deflect', 1], ['breakaway', (shooter ? (shooter.attrs.SKT - 80) / 15 : 0) + rush * 8]], x => Math.max(0.05, x[1]))[0];
+    const blocker = rng() < 0.45 ? onIce(o, 'D', p => p.attrs.DEF) : null;
+    const x = rng();
+    if (!emptyNet && type !== 'breakaway' && x < 0.22) {
+      if (blocker) bx(o, blocker.name).blk++;
+      return push({
+        kind: 'block',
+        s,
+        p: pn,
+        b: blocker ? blocker.name : null,
+        text: blocker ? nhlLine(rng, NHL_LINES.block, {
+          b: blocker.name
+        }) : 'Shot blocked.',
+        hl: false
+      });
+    }
+    if (x < (emptyNet ? 0.3 : 0.45)) {
+      if (rng() < 0.08) return push({
+        kind: 'post',
+        s,
+        p: pn,
+        text: nhlLine(rng, NHL_LINES.post, {
+          p: pn || 'A depth player'
+        }),
+        hl: !!pn
+      });
+      return push({
+        kind: 'miss',
+        s,
+        p: pn,
+        text: nhlLine(rng, NHL_LINES.miss, {
+          p: pn || (s === 0 ? A : B).name
+        }),
+        hl: false
+      });
+    }
+    shots[s]++;
+    if (pn) bx(s, pn).sog++;
+    const typeB = {
+      wrist: 0,
+      snap: 0.01,
+      slap: -0.015,
+      onetimer: 0.045,
+      deflect: 0.04,
+      rebound: 0.1,
+      breakaway: 0.14,
+      empty: 0.6
+    }[type];
+    const pGoal = clamp(0.066 + (sht - team[o].gk) / 340 + typeB + (isPP ? 0.035 : 0) - (isSH ? 0.03 : 0) + form[s] - gForm[o] + (sit === 'ot' ? 0.03 : 0), 0.02, emptyNet ? 0.85 : 0.5);
+    if (rng() < pGoal) {
+      score[s]++;
+      if (pn) bx(s, pn).g++;
+      if (an) bx(s, an).a++;
+      if (!G.backup && !emptyNet && bx(o, G.name)) bx(o, G.name).ga++;
+      const e = push({
+        kind: 'goal',
+        s,
+        p: pn,
+        a: an,
+        g: G.name,
+        type,
+        pp: isPP,
+        sh: isSH,
+        text: (pn ? nhlLine(rng, NHL_LINES.goal[type], {
+          p: pn,
+          g: G.name,
+          a: an || 'a teammate'
+        }) : (s === 0 ? A : B).name + '’s depth line scores!') + (isPP ? ' Power-play goal!' : isSH ? ' Shorthanded!' : ''),
+        hl: true,
+        big: true
+      });
+      if (isPP) pp = null;
+      return e;
+    }
+    if (!G.backup && bx(o, G.name)) bx(o, G.name).sv++;
+    const big = type === 'breakaway' || type === 'onetimer' || pGoal > 0.17 && rng() < 0.5;
+    const how = weighted(rng, [['glove', G.attrs.GLV / 30], ['pad', 2.6], ['blocker', 1.6]], z => z[1])[0];
+    const e = push({
+      kind: 'save',
+      s,
+      p: pn,
+      g: G.name,
+      type,
+      how,
+      big,
+      text: (pn ? big ? nhlLine(rng, NHL_LINES.save.big, {
+        g: G.name,
+        p: pn
+      }) : nhlLine(rng, NHL_LINES.save[how], {
+        g: G.name
+      }) : nhlLine(rng, NHL_LINES.save[how], {
+        g: G.name
+      })) + (type === 'breakaway' && pn ? ' ' + pn + ' was in alone!' : ''),
+      hl: big && !!pn
+    });
+    if (rng() < clamp(0.2 - (G.attrs.REB - 85) / 150, 0.06, 0.32)) {
+      clock -= 3;
+      return attackRebound(s);
+    }
+    return e;
+  };
+  const attackRebound = s => {
+    const o = 1 - s;
+    const G = team[o].G;
+    const shooter = onIce(s, 'F', shooterW);
+    const pn = shooter ? shooter.name : null;
+    shots[s]++;
+    if (pn) bx(s, pn).sog++;
+    const p = clamp(0.2 + ((shooter ? shooter.attrs.SHT : 78) - team[o].gk) / 250 - (G.attrs.REF - 85) / 300, 0.08, 0.4);
+    if (rng() < p) {
+      score[s]++;
+      if (pn) bx(s, pn).g++;
+      if (!G.backup && bx(o, G.name)) bx(o, G.name).ga++;
+      return push({
+        kind: 'goal',
+        s,
+        p: pn,
+        g: G.name,
+        type: 'rebound',
+        text: pn ? nhlLine(rng, NHL_LINES.goal.rebound, {
+          p: pn
+        }) : 'The rebound is knocked in!',
+        hl: true,
+        big: true
+      });
+    }
+    if (!G.backup && bx(o, G.name)) bx(o, G.name).sv++;
+    return push({
+      kind: 'save',
+      s,
+      p: pn,
+      g: G.name,
+      type: 'rebound',
+      how: 'pad',
+      big: true,
+      text: G.name + ' scrambles across to stop the rebound' + (pn ? ' from ' + pn : '') + '!',
+      hl: !!pn
+    });
+  };
+  const playPeriod = (len, sit) => {
+    clock = len;
+    while (clock > 0) {
+      clock -= 14 + rng() * 22;
+      if (clock <= 0) break;
+      if (pp) {
+        pp.left -= 40;
+        if (pp.left <= 0) {
+          push({
+            kind: 'ppend',
+            s: pp.team,
+            text: 'The penalty is killed.',
+            hl: false
+          });
+          pp = null;
+        }
+      }
+      if (period === 3 && sit !== 'ot') {
+        [0, 1].forEach(s => {
+          const behind = score[1 - s] - score[s];
+          const want = clock < 150 && behind >= 1 && behind <= 2;
+          if (want && !pulled[s]) {
+            pulled[s] = true;
+            push({
+              kind: 'pull',
+              s,
+              text: (s === 0 ? A : B).name + ' pull their goalie for an extra attacker!',
+              hl: true
+            });
+          }
+          if (!want) pulled[s] = false;
+        });
+      }
+      const w = s => team[s].off + (pp && pp.team === s ? 9 : pp ? -9 : 0) + (pulled[s] ? 6 : 0) - team[1 - s].def * 0.3;
+      const s = rng() < w(0) / (w(0) + w(1)) ? 0 : 1;
+      const o = 1 - s;
+      const r = rng();
+      if (r < 0.022 && !pp) {
+        const culprit = onIce(o, null, p => p.attrs.PHY) || null;
+        const reason = pickOf(rng, NHL_PENS);
+        if (culprit) bx(o, culprit.name).pim += 2;
+        pp = {
+          team: s,
+          left: 120
+        };
+        push({
+          kind: 'pen',
+          s,
+          p: culprit ? culprit.name : null,
+          text: culprit ? nhlLine(rng, NHL_LINES.pen, {
+            p: culprit.name,
+            r: reason
+          }) : (o === 0 ? A : B).name + ' take a penalty for ' + reason + '. Power play!',
+          hl: !!culprit
+        });
+        continue;
+      }
+      if (r < 0.09) {
+        const hitter = onIce(o, null, p => p.attrs.PHY);
+        const victim = onIce(s, null, () => 1);
+        if (hitter && victim) {
+          bx(o, hitter.name).hits++;
+          push({
+            kind: 'hit',
+            s: o,
+            b: hitter.name,
+            p: victim.name,
+            text: nhlLine(rng, NHL_LINES.hit, {
+              b: hitter.name,
+              p: victim.name
+            }),
+            hl: rng() < 0.25
+          });
+        }
+        continue;
+      }
+      if (r < 0.4 + (sit === 'ot' ? -0.2 : 0)) continue;
+      attack(s, sit);
+      if (sit === 'ot' && score[0] !== score[1]) return;
+      if (period === 3 && pulled[s] && rng() < 0.12) {
+        const e = attack(o, 'en');
+        if (e) e.hl = true;
+      }
+    }
+  };
+  for (period = 1; period <= 3; period++) {
+    playPeriod(1200, 'reg');
+    pp = null;
+    pulled = [false, false];
+    if (period < 3) push({
+      kind: 'pend',
+      s: null,
+      text: 'End of period ' + period + ': ' + score[0] + '–' + score[1] + '.',
+      hl: false
+    });
+  }
+  period = 3;
+  if (score[0] === score[1]) {
+    period = 4;
+    ot = true;
+    push({
+      kind: 'ot',
+      s: null,
+      text: 'Overtime! Five minutes of 3-on-3, next goal wins.',
+      hl: true
+    });
+    playPeriod(300, 'ot');
+    if (score[0] === score[1]) {
+      period = 5;
+      clock = 0;
+      push({
+        kind: 'so',
+        s: null,
+        text: 'Shootout!',
+        hl: true
+      });
+      const order = s => {
+        const fs = team[s].skaters.slice().sort((x, y) => (y.role === 'F') - (x.role === 'F') || y.attrs.SHT - x.attrs.SHT);
+        return fs.length ? fs : [{
+          name: 'Depth shooter',
+          attrs: {
+            SHT: 78,
+            SKT: 78
+          }
+        }];
+      };
+      const O = [order(0), order(1)];
+      const made = [0, 0];
+      const rounds = [];
+      for (let r = 0; r < 20; r++) {
+        const res = [0, 1].map(s => {
+          const sh = O[s][r % O[s].length];
+          const G = team[1 - s].G;
+          const p = clamp(0.33 + (sh.attrs.SHT + (sh.attrs.SKT || 80) * 0.5 - G.attrs.REF * 1.5) / 220, 0.15, 0.6);
+          const g = rng() < p;
+          if (g) made[s]++;
+          return {
+            p: sh.name,
+            g,
+            goalie: G.name
+          };
+        });
+        rounds.push(res);
+        res.forEach((x, s) => push({
+          kind: 'soshot',
+          s,
+          p: x.p,
+          g: x.goalie,
+          scored: x.g,
+          round: r + 1,
+          text: x.p + (x.g ? ' SCORES in the shootout!' : ' is stopped by ' + x.goalie + '.'),
+          hl: true,
+          big: x.g
+        }));
+        if (r >= 2 && made[0] !== made[1]) break;
+        if (r < 2) {
+          const left = 2 - r;
+          if (made[0] > made[1] + left || made[1] > made[0] + left) break;
+        }
+      }
+      if (made[0] === made[1]) made[rng() < 0.5 ? 0 : 1]++;
+      const w = made[0] > made[1] ? 0 : 1;
+      score[w]++;
+      so = {
+        made,
+        rounds: rounds.length,
+        winner: w
+      };
+      push({
+        kind: 'sowin',
+        s: w,
+        text: (w === 0 ? A : B).name + ' win the shootout ' + made[w] + '–' + made[1 - w] + '!',
+        hl: true,
+        big: true
+      });
+    }
+  }
+  const winner = score[0] > score[1] ? 0 : 1;
+  ev.forEach(e => {
+    if (e.per === 3 && e.clk <= 120 && Math.abs(e.score[0] - e.score[1]) <= 1 && (e.kind === 'save' || e.kind === 'goal' || e.kind === 'post')) e.hl = true;
+  });
+  const periods = [1, 2, 3, 4].map(p => {
+    const last = ev.filter(e => e.per <= p && e.kind !== 'sowin').pop();
+    return last ? last.score : [0, 0];
+  });
+  const per = periods.map((x, k) => [x[0] - (k ? periods[k - 1][0] : 0), x[1] - (k ? periods[k - 1][1] : 0)]).slice(0, ot ? 4 : 3);
+  return {
+    v: 'nhl',
+    kind: 'nhl',
+    score: [...score],
+    winner,
+    ot,
+    so,
+    shots,
+    periods: per,
+    plays: ev,
+    events: [],
+    box,
+    lineups: sq.map(s => s.map(p => ({
+      name: p.name,
+      itemId: p.itemId,
+      role: p.role,
+      ovr: p.ovr
+    }))),
+    et: ot,
+    pens: null,
+    sudden: !!so
+  };
+}
+const nhlPerName = p => p <= 3 ? 'P' + p : p === 4 ? 'OT' : 'SO';
+const nhlClock = s => Math.floor(s / 60) + ':' + String(s % 60).padStart(2, '0');
 const MISSION_STATS = {
   A: {
     k: 0,
@@ -31260,7 +31853,7 @@ function TopicEditor({
   }, "Fun battles (Battles finale)"), React.createElement(Seg, {
     label: "Fun battle style",
     value: topic.battle || 'none',
-    options: [['none', 'Off'], ['fight', '⚔️ Fight'], ['powers', '💥 Powers'], ['survival', '🧟 Survival'], ['cute', '🥰 Puppy Bowl'], ['weird', '🤡 Silly'], ['combat', '🥊 Fight night'], ['f1', '🏎️ Grand Prix'], ['tennis', '🎾 Tennis'], ['nfl', '🏈 American football'], ['basketball', '🏀 Basketball']],
+    options: [['none', 'Off'], ['fight', '⚔️ Fight'], ['powers', '💥 Powers'], ['survival', '🧟 Survival'], ['cute', '🥰 Puppy Bowl'], ['weird', '🤡 Silly'], ['combat', '🥊 Fight night'], ['f1', '🏎️ Grand Prix'], ['tennis', '🎾 Tennis'], ['nfl', '🏈 American football'], ['nhl', '🏒 Ice hockey'], ['basketball', '🏀 Basketball']],
     onChange: v => set({
       battle: v === 'none' ? '' : v
     })
@@ -33419,6 +34012,9 @@ function ItemCard({
     item: item,
     topic: d.topic
   }) : battleKindId(d.topic) === 'nfl' ? React.createElement(NFLChip, {
+    item: item,
+    topic: d.topic
+  }) : battleKindId(d.topic) === 'nhl' ? React.createElement(NHLChip, {
     item: item,
     topic: d.topic
   }) : hasBattle(d.topic) && React.createElement(StatChip, {
@@ -38212,7 +38808,12 @@ if (window.__DN_TEST__) window.__DN = {
     nflScript,
     nflFrame,
     nflReport,
-    nflEraOf
+    nflEraOf,
+    simulateHockey,
+    nhlRating,
+    rinkScript,
+    rinkFrame,
+    nhlReport
   },
   simStats: {
     simulatePuppyBowl,
@@ -40331,6 +40932,12 @@ function MatchSummary({
   B,
   match
 }) {
+  if (match.v === 'nhl') return React.createElement(NHLSummary, {
+    d: d,
+    A: A,
+    B: B,
+    match: match
+  });
   if (match.v === 'nfl') return React.createElement(NFLSummary, {
     d: d,
     A: A,
@@ -41855,7 +42462,7 @@ function PitchMatch({
   }));
 }
 function MatchView(props) {
-  return props.match && props.match.v === 'nfl' ? React.createElement(GridironView, props) : props.match && props.match.v === 'tennis' ? React.createElement(TennisView, props) : props.match && props.match.v === 'gp' ? React.createElement(TrackView, props) : props.match && props.match.v === 'card' ? React.createElement(RingView, props) : props.match && props.match.v === 'hoops' ? React.createElement(CourtView, props) : props.match && props.match.v === 'show' ? React.createElement(ShowView, props) : props.match && props.match.v === 'mission' ? React.createElement(MissionView, props) : props.match && props.match.v === 'survival' ? React.createElement(SurvivalView, props) : props.match && props.match.v === 'arena' ? React.createElement(ArenaView, props) : props.match && props.match.v === 'battle' ? React.createElement(BattleView, props) : props.match && props.match.v === 2 ? React.createElement(PitchMatch, props) : React.createElement(MatchPlayer, props);
+  return props.match && props.match.v === 'nhl' ? React.createElement(RinkView, props) : props.match && props.match.v === 'nfl' ? React.createElement(GridironView, props) : props.match && props.match.v === 'tennis' ? React.createElement(TennisView, props) : props.match && props.match.v === 'gp' ? React.createElement(TrackView, props) : props.match && props.match.v === 'card' ? React.createElement(RingView, props) : props.match && props.match.v === 'hoops' ? React.createElement(CourtView, props) : props.match && props.match.v === 'show' ? React.createElement(ShowView, props) : props.match && props.match.v === 'mission' ? React.createElement(MissionView, props) : props.match && props.match.v === 'survival' ? React.createElement(SurvivalView, props) : props.match && props.match.v === 'arena' ? React.createElement(ArenaView, props) : props.match && props.match.v === 'battle' ? React.createElement(BattleView, props) : props.match && props.match.v === 2 ? React.createElement(PitchMatch, props) : React.createElement(MatchPlayer, props);
 }
 function matchReport(d, A, B, match) {
   const teams = [A, B];
@@ -44459,6 +45066,773 @@ function FightChip({
       margin: 0
     }
   }, era === 'Now' ? 'Now: how good they are today. ' : 'Prime: how good they were at their peak. ', "Draft Night estimate from fighting style and achievements, not an official rating.")), React.createElement("button", {
+    className: "btn btn-ghost",
+    onClick: () => setOpen(false)
+  }, "Close")), document.body));
+}
+const RK = {
+  w: 100,
+  h: 42.5,
+  net: [{
+    x: 5.5,
+    y: 21.25
+  }, {
+    x: 94.5,
+    y: 21.25
+  }]
+};
+const lerpR = (a, b, u) => ({
+  x: a.x + (b.x - a.x) * Math.max(0, Math.min(1, u)),
+  y: a.y + (b.y - a.y) * Math.max(0, Math.min(1, u))
+});
+const RINK_DUR = {
+  goal: 4.2,
+  save: 3.6,
+  post: 3.2,
+  hit: 2.4,
+  pen: 2.4,
+  pull: 2.2,
+  soshot: 3,
+  sowin: 2.6,
+  ot: 2.2,
+  so: 2.2
+};
+function rinkScript(match) {
+  const beats = [];
+  let t = 0;
+  const add = b => {
+    b.t0 = t;
+    t += b.dur;
+    beats.push(b);
+    return b;
+  };
+  add({
+    type: 'intro',
+    dur: 2.4
+  });
+  let roll = [];
+  const flush = () => {
+    if (!roll.length) return;
+    add({
+      type: 'shift',
+      dur: Math.min(2.2, 0.5 + roll.length * 0.1),
+      evs: roll
+    });
+    roll = [];
+  };
+  match.plays.forEach(e => {
+    if (e.kind === 'pend') {
+      flush();
+      add({
+        type: 'pend',
+        dur: 2.2,
+        e
+      });
+      return;
+    }
+    if (e.hl) {
+      flush();
+      add({
+        type: 'ev',
+        dur: RINK_DUR[e.kind] || 2.6,
+        e
+      });
+    } else roll.push(e);
+  });
+  flush();
+  add({
+    type: 'final',
+    dur: 2.8
+  });
+  return {
+    beats,
+    total: t
+  };
+}
+const rflip = (s, p) => s === 0 ? p : {
+  x: RK.w - p.x,
+  y: p.y
+};
+function rinkFrame(beat, u, L) {
+  const homes = (s, mode) => {
+    const at = (x, y) => rflip(s, {
+      x,
+      y
+    });
+    const att = mode === 'att';
+    const def2 = mode === 'def';
+    return L[s].map(p => {
+      const i = L[s].filter(q => q.role === p.role).indexOf(p);
+      if (p.role === 'G') return at(6.5, 21.25);
+      if (p.role === 'D') return att ? at(64, i === 0 ? 12 : 30) : def2 ? at(20, i === 0 ? 15 : 28) : at(34, i === 0 ? 13 : 30);
+      return att ? at([80, 76, 84][i % 3], [10, 21, 32][i % 3]) : def2 ? at([28, 18, 26][i % 3], [10, 21, 32][i % 3]) : at(i % 3 === 1 ? 48.5 : 44, [8, 21.25, 34.5][i % 3]);
+    });
+  };
+  const P = [homes(0, 'neutral'), homes(1, 'neutral')];
+  const out = {
+    P,
+    puck: {
+      x: 50,
+      y: 21.25
+    },
+    banner: null,
+    flash: null,
+    lit: null
+  };
+  if (beat.type !== 'ev') return out;
+  const e = beat.e;
+  const s = e.s == null ? 0 : e.s;
+  const o = 1 - s;
+  const k = (a, b) => Math.max(0, Math.min(1, (u - a) / (b - a)));
+  const idx = (side, name) => L[side].findIndex(p => p.name === name);
+  if (e.kind === 'ot' || e.kind === 'so') {
+    out.banner = e.kind === 'ot' ? 'OVERTIME' : 'SHOOTOUT';
+    return out;
+  }
+  if (e.kind === 'pen') {
+    out.banner = 'PENALTY';
+    out.flash = P[o][Math.max(0, idx(o, e.p))];
+    return out;
+  }
+  if (e.kind === 'pull') {
+    const gi = L[s].findIndex(p => p.role === 'G');
+    if (gi >= 0) P[s][gi] = lerpR(rflip(s, {
+      x: 6.5,
+      y: 21.25
+    }), rflip(s, {
+      x: 2,
+      y: 41
+    }), k(0.2, 1.4));
+    out.banner = 'EMPTY NET';
+    return out;
+  }
+  if (e.kind === 'sowin') {
+    out.banner = 'SHOOTOUT WIN!';
+    return out;
+  }
+  if (e.kind === 'hit') {
+    const hi = Math.max(0, idx(s, e.b)),
+      vi = Math.max(0, idx(o, e.p));
+    const wall = rflip(s, {
+      x: 60,
+      y: 1.5
+    });
+    P[o][vi] = lerpR(P[o][vi], wall, k(0, 1.0));
+    P[s][hi] = lerpR(P[s][hi], {
+      x: wall.x - (s === 0 ? 2 : -2),
+      y: 3.5
+    }, k(0.2, 1.1));
+    out.puck = {
+      ...P[o][vi]
+    };
+    if (u > 1.1) {
+      out.banner = 'BIG HIT!';
+      out.flash = wall;
+    }
+    return out;
+  }
+  const net = s === 0 ? RK.net[1] : RK.net[0];
+  const att = homes(s, 'att'),
+    dfn = homes(o, 'def');
+  if (e.kind === 'soshot') {
+    const si = Math.max(0, idx(s, e.p));
+    P[s] = P[s].map((p, i) => i === si ? lerpR(rflip(s, {
+      x: 50,
+      y: 21.25
+    }), rflip(s, {
+      x: 86,
+      y: 19
+    }), k(0.2, 1.9)) : rflip(s, {
+      x: 42 - i,
+      y: 39
+    }));
+    P[o] = P[o].map((p, i) => L[o][i].role === 'G' ? rflip(s, {
+      x: 93.5 - k(0.8, 1.7) * 2,
+      y: 21.25 + Math.sin(u * 4) * 1.5
+    }) : rflip(s, {
+      x: 58 + i,
+      y: 3
+    }));
+    out.puck = u < 1.9 ? {
+      ...P[s][si],
+      x: P[s][si].x + (s === 0 ? 1 : -1)
+    } : lerpR(P[s][si], e.scored ? net : {
+      x: net.x - (s === 0 ? 3 : -3),
+      y: net.y + 4
+    }, k(1.9, 2.3));
+    if (u > 2.3) {
+      out.banner = e.scored ? 'SCORES!' : 'SAVED!';
+      if (e.scored) out.lit = net;
+    }
+    return out;
+  }
+  const rushK = easeC(k(0, 1.2));
+  P[s] = P[s].map((p, i) => lerpR(p, att[i], rushK));
+  P[o] = P[o].map((p, i) => lerpR(p, dfn[i], rushK));
+  const si = Math.max(0, idx(s, e.p));
+  const ai = e.a ? idx(s, e.a) : -1;
+  const shooter = P[s][si] || P[s][1];
+  const passer = ai >= 0 ? P[s][ai] : P[s][(si + 1) % P[s].length];
+  if (e.type === 'breakaway') {
+    P[s][si] = lerpR(rflip(s, {
+      x: 45,
+      y: 21
+    }), rflip(s, {
+      x: 82,
+      y: 19
+    }), easeC(k(0, 1.8)));
+  }
+  const shotT = e.type === 'breakaway' ? 1.8 : 1.7;
+  if (u < 1.2) out.puck = {
+    x: passer.x + (s === 0 ? 1 : -1),
+    y: passer.y
+  };else if (u < shotT) out.puck = e.type === 'breakaway' ? {
+    x: P[s][si].x + (s === 0 ? 1 : -1),
+    y: P[s][si].y
+  } : lerpR(passer, shooter, k(1.2, shotT));else {
+    const kk = k(shotT, shotT + 0.32);
+    const goal = e.kind === 'goal';
+    const target = goal ? {
+      x: net.x + (s === 0 ? 1.2 : -1.2),
+      y: net.y + (unit('pk', e.i) - 0.5) * 2.2
+    } : e.kind === 'post' ? {
+      x: net.x - (s === 0 ? 0.3 : -0.3),
+      y: net.y + 1.8
+    } : {
+      x: net.x - (s === 0 ? 1.6 : -1.6),
+      y: net.y + (unit('sv', e.i) - 0.5) * 2
+    };
+    out.puck = lerpR(P[s][si] || shooter, target, kk);
+    const gi = L[o].findIndex(p => p.role === 'G');
+    if (gi >= 0 && e.type !== 'empty') P[o][gi] = lerpR(rflip(s, {
+      x: 93.5,
+      y: 21.25
+    }), {
+      x: target.x - (s === 0 ? 1.4 : -1.4),
+      y: target.y
+    }, k(shotT - 0.1, shotT + 0.3));
+    if (gi >= 0 && e.type === 'empty') P[o][gi] = rflip(s, {
+      x: 2,
+      y: 41
+    });
+    if (kk >= 1) {
+      if (goal) {
+        out.banner = e.type === 'empty' ? 'EMPTY NET!' : 'GOAL!';
+        out.lit = net;
+        P[s][si] = lerpR(P[s][si], rflip(s, {
+          x: 70,
+          y: 8
+        }), k(shotT + 0.6, shotT + 1.6));
+      } else if (e.kind === 'post') {
+        out.banner = 'OFF THE POST!';
+        out.puck = lerpR(target, {
+          x: target.x - (s === 0 ? 6 : -6),
+          y: target.y + 6
+        }, k(shotT + 0.32, shotT + 0.9));
+      } else {
+        out.banner = e.big ? 'WHAT A SAVE!' : 'SAVE!';
+        out.puck = e.how === 'glove' ? {
+          ...P[o][gi]
+        } : lerpR(target, {
+          x: target.x - (s === 0 ? 4 : -4),
+          y: target.y + 3
+        }, k(shotT + 0.32, shotT + 0.8));
+      }
+    }
+  }
+  if (u < 1.6 && e.type === 'onetimer') out.banner = null;
+  return out;
+}
+function RinkView({
+  d,
+  A,
+  B,
+  match,
+  speed,
+  onDone,
+  label
+}) {
+  const script = useMemo(() => rinkScript(match), [match]);
+  const base = speed === 'fast' ? 2 : 1;
+  const [t, setT] = useState(speed === 'instant' ? script.total : 0);
+  const [playing, setPlaying] = useState(speed !== 'instant');
+  const [mult, setMult] = useState(1);
+  const done = t >= script.total;
+  const fired = useRef(false);
+  useEffect(() => {
+    if (!playing || done) return undefined;
+    let raf;
+    let last = performance.now();
+    const tick = now => {
+      const dt = Math.min(0.1, (now - last) / 1000);
+      last = now;
+      setT(x => Math.min(script.total, x + dt * base * mult / Math.max(0.001, GAME_SPEED)));
+      raf = requestAnimationFrame(tick);
+    };
+    raf = requestAnimationFrame(tick);
+    return () => cancelAnimationFrame(raf);
+  }, [playing, done, mult, base]);
+  useEffect(() => {
+    if (done && !fired.current) {
+      fired.current = true;
+      audio.play('buzzer');
+      onDone && onDone();
+    }
+  }, [done]);
+  const bi = Math.max(0, script.beats.findIndex(b => t < b.t0 + b.dur));
+  const beat = done ? script.beats[script.beats.length - 1] : script.beats[bi];
+  const u = done ? beat.dur : t - beat.t0;
+  const L = match.lineups;
+  const fr = rinkFrame(beat, u, L);
+  const evNow = beat.type === 'ev' ? beat.e : beat.type === 'shift' ? beat.evs[Math.min(beat.evs.length - 1, Math.floor(u / beat.dur * beat.evs.length))] : beat.type === 'pend' ? beat.e : null;
+  const prevScore = e => {
+    const p = match.plays[e.i - 1];
+    return p ? p.score : [0, 0];
+  };
+  const score = done || beat.type === 'final' ? match.score : evNow ? beat.type === 'ev' && evNow.kind === 'goal' && u < 2.1 ? prevScore(evNow) : evNow.score : [0, 0];
+  const per = evNow ? evNow.per : 1;
+  const status = done || beat.type === 'final' ? match.so ? 'FINAL/SO' : match.ot ? 'FINAL/OT' : 'FINAL' : beat.type === 'intro' ? 'PUCK DROP' : beat.type === 'pend' ? 'END ' + nhlPerName(evNow.per) : per >= 5 ? 'SHOOTOUT' : nhlPerName(per) + ' ' + nhlClock(evNow ? evNow.clk : 1200);
+  const shotsNow = [0, 1].map(s => match.plays.filter(e => e.i <= (evNow ? evNow.i : -1) && e.s === s && (e.kind === 'goal' || e.kind === 'save') && e.per <= 4).length);
+  const colors = [A.color, B.color];
+  const short = n => {
+    const w = String(n || '').split(' ');
+    return w[w.length - 1].slice(0, 10);
+  };
+  const banner = done ? null : beat.type === 'intro' ? 'PUCK DROP' : beat.type === 'pend' ? 'END OF ' + nhlPerName(beat.e.per) : beat.type === 'final' ? 'FINAL' : fr.banner;
+  const lastBeat = useRef(-1);
+  useEffect(() => {
+    if (!playing || done || bi === lastBeat.current) return;
+    lastBeat.current = bi;
+    if (beat.type === 'pend' || beat.type === 'intro') audio.play('buzzer');
+  }, [bi]);
+  const said = useRef({});
+  useEffect(() => {
+    if (!playing || done || beat.type !== 'ev' || said.current[bi] || u < 2.1) return;
+    said.current[bi] = true;
+    const e = beat.e;
+    if (e.kind === 'goal' || e.kind === 'soshot' && e.scored) {
+      audio.play('cheer');
+      if (e.p) audio.say('Goal, ' + e.p + '!', 2, d.id + ':' + label + ':g' + bi);
+    } else if (e.kind === 'save' || e.kind === 'post' || e.kind === 'hit') audio.play('card');
+  }, [t]);
+  const feed = [];
+  script.beats.forEach((b, k2) => {
+    if (!done && b.t0 + b.dur * 0.7 > t) return;
+    if (b.type === 'ev') feed.push({
+      k: k2,
+      per: b.e.per,
+      clk: b.e.clk,
+      team: b.e.s,
+      big: b.e.big || b.e.kind === 'goal',
+      text: b.e.text
+    });else if (b.type === 'pend') feed.push({
+      k: k2,
+      per: b.e.per,
+      text: b.e.text,
+      half: true
+    });
+  });
+  const feedRef = useRef(null);
+  useEffect(() => {
+    const f = feedRef.current;
+    if (f) f.scrollTop = f.scrollHeight;
+  }, [feed.length]);
+  const ppNow = (() => {
+    if (!evNow) return null;
+    let on = null;
+    for (const e of match.plays) {
+      if (e.i > evNow.i) break;
+      if (e.kind === 'pen') on = e.s;
+      if (e.kind === 'ppend' || e.kind === 'goal' && e.pp || e.kind === 'pend') on = null;
+    }
+    return on;
+  })();
+  return React.createElement("div", {
+    className: "matchview rinkview"
+  }, React.createElement("div", {
+    className: "scoreboard"
+  }, React.createElement("div", {
+    className: "sb-team"
+  }, React.createElement(Badge, {
+    m: A
+  }), React.createElement("span", {
+    className: "sb-n"
+  }, A.name)), React.createElement("div", {
+    className: "sb-mid"
+  }, React.createElement("span", {
+    className: "sb-score num",
+    "aria-live": "polite"
+  }, score[0], "\u2013", score[1]), React.createElement("span", {
+    className: "sb-clock num"
+  }, status)), React.createElement("div", {
+    className: "sb-team"
+  }, React.createElement(Badge, {
+    m: B
+  }), React.createElement("span", {
+    className: "sb-n"
+  }, B.name))), React.createElement("div", {
+    className: "boutbar small"
+  }, React.createElement("span", {
+    className: "muted"
+  }, "Shots on goal"), " ", React.createElement("b", {
+    className: "num"
+  }, shotsNow[0], "\u2013", shotsNow[1]), ppNow != null ? React.createElement("span", {
+    className: "muted"
+  }, " \xB7 \u26A1 ", (ppNow === 0 ? A : B).name, " power play") : null), React.createElement("div", {
+    className: "pitchwrap"
+  }, React.createElement("svg", {
+    className: "pitchsvg rinksvg",
+    viewBox: '-1 -1 ' + (RK.w + 2) + ' ' + (RK.h + 2),
+    role: "img",
+    "aria-label": 'Hockey rink: ' + A.name + ' ' + score[0] + ', ' + B.name + ' ' + score[1] + ', ' + status
+  }, React.createElement("rect", {
+    x: "-1",
+    y: "-1",
+    width: RK.w + 2,
+    height: RK.h + 2,
+    fill: "#1d2b44"
+  }), React.createElement("rect", {
+    x: "0",
+    y: "0",
+    width: RK.w,
+    height: RK.h,
+    rx: "12",
+    fill: "#eef4fa",
+    stroke: "#9fb0c4",
+    strokeWidth: "0.5"
+  }), React.createElement("line", {
+    x1: "50",
+    y1: "0",
+    x2: "50",
+    y2: RK.h,
+    stroke: "#e2463b",
+    strokeWidth: "0.6"
+  }), [35, 65].map(x => React.createElement("line", {
+    key: x,
+    x1: x,
+    y1: "0",
+    x2: x,
+    y2: RK.h,
+    stroke: "#3d6be2",
+    strokeWidth: "0.6"
+  })), [5.5, 94.5].map(x => React.createElement("line", {
+    key: x,
+    x1: x,
+    y1: "1.5",
+    x2: x,
+    y2: RK.h - 1.5,
+    stroke: "#e2463b",
+    strokeWidth: "0.25"
+  })), React.createElement("circle", {
+    cx: "50",
+    cy: RK.h / 2,
+    r: "7.5",
+    fill: "none",
+    stroke: "#3d6be2",
+    strokeWidth: "0.25"
+  }), React.createElement("circle", {
+    cx: "50",
+    cy: RK.h / 2,
+    r: "0.5",
+    fill: "#3d6be2"
+  }), [[16, 11], [16, 31.5], [84, 11], [84, 31.5]].map(([x, y], i) => React.createElement("g", {
+    key: i
+  }, React.createElement("circle", {
+    cx: x,
+    cy: y,
+    r: "7.5",
+    fill: "none",
+    stroke: "#e2463b",
+    strokeWidth: "0.25"
+  }), React.createElement("circle", {
+    cx: x,
+    cy: y,
+    r: "0.6",
+    fill: "#e2463b"
+  }))), [0, 1].map(k => {
+    const n = RK.net[k];
+    const lit = fr.lit && Math.abs(fr.lit.x - n.x) < 1;
+    return React.createElement("g", {
+      key: k
+    }, React.createElement("path", {
+      d: 'M' + n.x + ' ' + (n.y - 3) + ' A3 3 0 0 ' + (k === 0 ? 1 : 0) + ' ' + n.x + ' ' + (n.y + 3),
+      fill: "rgba(110,170,255,.35)",
+      stroke: "#e2463b",
+      strokeWidth: "0.25"
+    }), React.createElement("rect", {
+      x: k === 0 ? n.x - 1.8 : n.x,
+      y: n.y - 1.5,
+      width: "1.8",
+      height: "3",
+      fill: lit ? '#ff3b3b' : '#fff',
+      stroke: "#e2463b",
+      strokeWidth: "0.3"
+    }), lit && React.createElement("circle", {
+      cx: k === 0 ? n.x - 3 : n.x + 3,
+      cy: n.y - 3.5,
+      r: "1",
+      fill: "#ff3b3b"
+    }));
+  }), beat.type !== 'intro' && [0, 1].map(side => L[side].map((pl, i) => {
+    const p = fr.P[side][i];
+    if (!p) return null;
+    const g = pl.role === 'G';
+    return React.createElement("g", {
+      key: side + '-' + i,
+      transform: 'translate(' + p.x.toFixed(2) + ' ' + p.y.toFixed(2) + ')'
+    }, React.createElement("circle", {
+      r: g ? 1.8 : 1.5,
+      fill: colors[side],
+      stroke: g ? '#0f0c21' : 'rgba(0,0,0,.5)',
+      strokeWidth: g ? 0.5 : 0.25
+    }), g && React.createElement("rect", {
+      x: "-0.9",
+      y: "-0.9",
+      width: "1.8",
+      height: "1.8",
+      fill: "none",
+      stroke: "#fff",
+      strokeWidth: "0.25"
+    }), React.createElement("text", {
+      y: "-2.2",
+      textAnchor: "middle",
+      fontSize: "1.9",
+      fontWeight: "800",
+      fill: "#fff",
+      stroke: "#0f0c21",
+      strokeWidth: "0.45",
+      paintOrder: "stroke"
+    }, short(pl.name)));
+  })), React.createElement("circle", {
+    cx: fr.puck.x,
+    cy: fr.puck.y,
+    r: "0.6",
+    fill: "#0f0c21"
+  }), fr.flash && React.createElement("circle", {
+    cx: fr.flash.x,
+    cy: fr.flash.y,
+    r: "3",
+    fill: "none",
+    stroke: "#ffd23d",
+    strokeWidth: "0.5"
+  }), (done || beat.type === 'final') && React.createElement("g", null, React.createElement("rect", {
+    x: "-1",
+    y: "-1",
+    width: RK.w + 2,
+    height: RK.h + 2,
+    fill: "rgba(15,12,33,.55)"
+  }), React.createElement("text", {
+    x: "50",
+    y: "16",
+    textAnchor: "middle",
+    fontSize: "3.4",
+    fontWeight: "800",
+    fill: "#fff"
+  }, status), React.createElement("text", {
+    x: "50",
+    y: "25",
+    textAnchor: "middle",
+    fontSize: "6.5",
+    fontWeight: "900",
+    fill: colors[match.winner],
+    stroke: "#0f0c21",
+    strokeWidth: "0.6",
+    paintOrder: "stroke"
+  }, (match.winner === 0 ? A : B).name.toUpperCase().slice(0, 16), " WIN"), React.createElement("text", {
+    x: "50",
+    y: "33",
+    textAnchor: "middle",
+    fontSize: "5",
+    fontWeight: "900",
+    fill: "#ffc83d"
+  }, match.score[0], "\u2013", match.score[1])), banner && React.createElement("text", {
+    x: "50",
+    y: "12",
+    textAnchor: "middle",
+    fontSize: banner.length > 12 ? 5 : 6.5,
+    fontWeight: "900",
+    fill: /GOAL|SAVE|SCORES|HIT|POST|NET|WIN/.test(banner) ? '#ffc83d' : '#fff',
+    stroke: "#0f0c21",
+    strokeWidth: "0.6",
+    paintOrder: "stroke",
+    className: "pbanner"
+  }, banner))), React.createElement("div", {
+    className: "mctrl",
+    role: "group",
+    "aria-label": "Game controls"
+  }, !done && React.createElement("button", {
+    className: "btn btn-sm",
+    onClick: () => setPlaying(x => !x),
+    "aria-label": playing ? 'Pause' : 'Play'
+  }, playing ? '⏸ Pause' : '▶ Play'), !done && [1, 2, 4].map(x => React.createElement("button", {
+    key: x,
+    className: 'btn btn-sm' + (mult === x ? ' btn-gold' : ''),
+    "aria-pressed": mult === x,
+    onClick: () => setMult(x)
+  }, x, "\xD7")), !done && React.createElement("button", {
+    className: "btn btn-sm btn-ghost",
+    onClick: () => setT(script.total)
+  }, "Skip to result"), done && React.createElement("button", {
+    className: "btn btn-sm",
+    onClick: () => {
+      fired.current = true;
+      said.current = {};
+      setT(0);
+      setPlaying(true);
+    }
+  }, "\u21BA Watch again")), React.createElement("div", {
+    className: "mfeed",
+    ref: feedRef,
+    "aria-live": "polite"
+  }, feed.map(e => React.createElement("p", {
+    key: e.k,
+    className: 'mev ' + (e.big ? 'goal' : e.half ? 'half' : '') + (e.team != null ? ' t' + e.team : '')
+  }, React.createElement("span", {
+    className: "mm num"
+  }, nhlPerName(e.per)), React.createElement("span", null, e.big ? '🚨 ' : '', e.text, e.team != null ? React.createElement("small", null, " \xB7 ", (e.team === 0 ? A : B).name) : null)))), done && React.createElement(NHLSummary, {
+    d: d,
+    A: A,
+    B: B,
+    match: match
+  }));
+}
+function nhlReport(d, A, B, match) {
+  const T = [A, B];
+  const rows = [0, 1].flatMap(s => Object.entries(match.box[s]).map(([name, b]) => ({
+    team: s,
+    name,
+    ...b,
+    role: (match.lineups[s].find(x => x.name === name) || {}).role,
+    gs: b.g * 3 + b.a * 2 + b.sog * 0.2 + b.hits * 0.2 + b.blk * 0.3 + b.sv * 0.12 - b.ga * 0.6
+  })));
+  const stars = rows.slice().sort((x, y) => y.gs - x.gs || (y.team === match.winner) - (x.team === match.winner)).slice(0, 3);
+  const price = (s, name) => {
+    const e = T[s].team.find(x => x && d.items[x.itemId] && d.items[x.itemId].name === name);
+    return e ? e.price || 0 : 0;
+  };
+  const wp = rows.map(r => ({
+    ...r,
+    price: price(r.team, r.name)
+  }));
+  const best = wp.filter(r => r.gs > 1 && r.price > 0).sort((x, y) => y.gs / y.price - x.gs / x.price)[0] || null;
+  const flop = wp.filter(r => r.price >= 3 && r.role !== 'G' && r.g + r.a === 0).sort((x, y) => y.price - x.price)[0] || null;
+  let lead = 0,
+    gwg = null;
+  match.plays.forEach(e => {
+    if (e.kind !== 'goal') return;
+    const l = Math.sign(e.score[0] - e.score[1]);
+    if (l !== lead) {
+      if (l === (match.winner === 0 ? 1 : -1)) gwg = e;
+      lead = l;
+    }
+  });
+  return {
+    rows,
+    stars,
+    best,
+    flop,
+    gwg
+  };
+}
+const nhlStat = r => r.role === 'G' ? r.sv + ' saves' + (r.ga ? ', ' + r.ga + ' against' : ', shutout') : r.g + 'G ' + r.a + 'A' + (r.sog ? ', ' + r.sog + ' shots' : '') + (r.hits >= 2 ? ', ' + r.hits + ' hits' : '');
+function NHLSummary({
+  d,
+  A,
+  B,
+  match
+}) {
+  const R = nhlReport(d, A, B, match);
+  const T = i => i === 0 ? A : B;
+  return React.createElement("div", {
+    className: "board msummary"
+  }, React.createElement("h3", null, "\uD83C\uDFD2 Game summary"), React.createElement("p", {
+    className: "small",
+    style: {
+      margin: 0
+    }
+  }, React.createElement("b", null, A.name, " ", match.score[0], "\u2013", match.score[1], " ", B.name), match.so ? ' · shootout (' + match.so.made[0] + '–' + match.so.made[1] + ')' : match.ot ? ' · overtime' : '', " \xB7 shots ", match.shots[0], "\u2013", match.shots[1]), React.createElement("table", {
+    className: "qtable small"
+  }, React.createElement("thead", null, React.createElement("tr", null, React.createElement("th", null), match.periods.map((_, p) => React.createElement("th", {
+    key: p
+  }, nhlPerName(p + 1))), match.so && React.createElement("th", null, "SO"), React.createElement("th", null, "T"))), React.createElement("tbody", null, [0, 1].map(s => React.createElement("tr", {
+    key: s
+  }, React.createElement("td", null, T(s).name), match.periods.map((pp, p) => React.createElement("td", {
+    key: p,
+    className: "num"
+  }, pp[s])), match.so && React.createElement("td", {
+    className: "num"
+  }, match.so.winner === s ? 1 : 0), React.createElement("td", {
+    className: "num"
+  }, React.createElement("b", null, match.score[s])))))), React.createElement("div", {
+    className: "mreport"
+  }, React.createElement("h4", null, "\u2B50\u2B50\u2B50 Three stars"), R.stars.map((r, k) => React.createElement("p", {
+    key: r.name,
+    className: "small"
+  }, ['⭐', '⭐⭐', '⭐⭐⭐'][k], " ", r.name, " (", T(r.team).name, ") \u2014 ", nhlStat(r))), R.gwg && React.createElement("p", {
+    className: "small"
+  }, React.createElement("b", null, "\uD83D\uDEA8 Winning goal:"), " ", R.gwg.p || 'the depth line', ", ", nhlPerName(R.gwg.per), " ", nhlClock(R.gwg.clk), R.gwg.pp ? ' (power play)' : '', "."), R.best && React.createElement("p", {
+    className: "small"
+  }, React.createElement("b", null, "\uD83D\uDCB0 Best buy:"), " ", R.best.name, " \u2014 $", R.best.price, ": ", nhlStat(R.best), "."), R.flop && React.createElement("p", {
+    className: "small"
+  }, React.createElement("b", null, "\uD83D\uDCC9 Quiet night:"), " ", R.flop.name, " cost $", R.flop.price, " and didn\u2019t get a point.")), React.createElement("p", {
+    className: "hint",
+    style: {
+      margin: 0
+    }
+  }, "Simulated shift by shift from Draft Night\u2019s estimated Now numbers (not official ratings). Your six are the first unit; average depth lines play the rest of the game."));
+}
+function NHLChip({
+  item,
+  topic
+}) {
+  const [open, setOpen] = useState(false);
+  if (!numbersShown()) return null;
+  const r = nhlRating(item, item.pos);
+  const keys = r.role === 'G' ? NHL_ATTRS.G : NHL_ATTRS.S;
+  return React.createElement(React.Fragment, null, React.createElement("button", {
+    type: "button",
+    className: "ratingchip",
+    onClick: () => setOpen(true),
+    "aria-label": 'Now ' + r.ovr + ', estimated. Show details'
+  }, "Now ", React.createElement("b", {
+    className: "num"
+  }, r.ovr), " est."), open && ReactDOM.createPortal(React.createElement(Sheet, {
+    center: true,
+    onClose: () => setOpen(false)
+  }, React.createElement("div", {
+    className: "ratingcard"
+  }, React.createElement("div", {
+    className: "rc-top"
+  }, React.createElement("span", {
+    className: "rc-ovr num"
+  }, React.createElement("small", {
+    className: "rc-era"
+  }, "Now"), r.ovr), React.createElement("span", {
+    className: "rc-role"
+  }, r.role), React.createElement("span", {
+    className: "rc-name"
+  }, item.name)), React.createElement("div", {
+    className: "rc-attrs"
+  }, keys.map(a => React.createElement("div", {
+    key: a,
+    className: "rc-attr"
+  }, React.createElement("span", {
+    className: "k",
+    title: NHL_ATTR_NAMES[a]
+  }, a), React.createElement("span", {
+    className: "bar"
+  }, React.createElement("i", {
+    style: {
+      width: r.attrs[a] + '%'
+    }
+  })), React.createElement("span", {
+    className: "v num"
+  }, r.attrs[a])))), React.createElement("p", {
+    className: "hint",
+    style: {
+      margin: 0
+    }
+  }, "Now: how good they are today. ", keys.map(a => a + ' ' + NHL_ATTR_NAMES[a].toLowerCase()).join(' · '), ". Draft Night estimate, not an official rating.")), React.createElement("button", {
     className: "btn btn-ghost",
     onClick: () => setOpen(false)
   }, "Close")), document.body));

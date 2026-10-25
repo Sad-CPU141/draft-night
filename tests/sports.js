@@ -206,5 +206,37 @@ module.exports = async function sportsTests({ ok, boot, btn, click, sleep }) {
     ok(live && /Box score/.test(X.d.body.textContent) && /MVP/.test(X.d.body.textContent) && !!X.d.querySelector('.qtable'), 'the field plays the game and ends with a box score, quarter scores and an MVP');
     X.w.close();
   }
+  // Hockey game.
+  {
+    const S = DN.sports; const t = T('t-nhl'); const d = dOf(t);
+    const pickT = (id, names) => ({ id, name: id, team: names.map((n) => ({ itemId: t.items.find((i) => i.name === n).id, price: 4 })) });
+    const stars = pickT('A', ['Connor Hellebuyck', 'Cale Makar', 'Quinn Hughes', 'Connor McDavid', 'Nathan MacKinnon', 'Auston Matthews']);
+    const close = pickT('B', ['Igor Shesterkin', 'Adam Fox', 'Victor Hedman', 'Leon Draisaitl', 'Nikita Kucherov', 'David Pastrňák']);
+    const weak = pickT('C', ['Stuart Skinner', 'Darnell Nurse', 'Jared Spurgeon', 'Brad Marchand', 'William Nylander', 'Macklin Celebrini']);
+    const g = S.simulateHockey(d, stars, close, 'h1');
+    ok(F.battleKind(t).name === 'Hockey game' && g.v === 'nhl' && JSON.stringify(g) === JSON.stringify(S.simulateHockey(d, stars, close, 'h1')) && g.score[0] !== g.score[1], 'NHL Players play a full hockey game that always has a winner and replays exactly (' + g.score.join('–') + ')');
+    let goals = 0, sog = 0, n = 150, kinds = new Set(), ot = 0, so = 0, add = true, wins = 0;
+    for (let k = 0; k < n; k++) {
+      const m = S.simulateHockey({ ...d, seed: 'hk' + k }, stars, close, 'k'); goals += m.score[0] + m.score[1] - (m.so ? 1 : 0); sog += m.shots[0] + m.shots[1]; if (m.ot) ot++; if (m.so) so++;
+      m.plays.forEach((e) => kinds.add(e.kind + (e.type ? ':' + e.type : '')));
+      const per = [0, 1].map((s2) => m.periods.reduce((x, p) => x + p[s2], 0) + (m.so && m.so.winner === s2 ? 1 : 0)); if (per[0] !== m.score[0] || per[1] !== m.score[1]) add = false;
+      const boxG = [0, 1].map((s2) => Object.values(m.box[s2]).reduce((x, b) => x + b.g, 0)); if (boxG[0] > m.score[0] || boxG[1] > m.score[1]) add = false;
+    }
+    for (let k = 0; k < 80; k++) if (S.simulateHockey({ ...d, seed: 'hw' + k }, stars, weak, 'k').winner === 0) wins++;
+    ok(goals / n > 4 && goals / n < 8 && sog / n > 45 && sog / n < 75, 'scores and shots look like the NHL (' + (goals / n).toFixed(1) + ' goals and ' + Math.round(sog / n) + ' shots a game)');
+    ok(['goal:wrist', 'goal:onetimer', 'goal:rebound', 'save:breakaway', 'block', 'miss', 'post', 'hit', 'pen'].every((x) => kinds.has(x)) && ot > 5 && so > 0, 'games have every kind of goal and save, blocks, posts, hits, power plays, overtime and shootouts');
+    ok(add, 'the period scores and the box score add up to the final');
+    ok(wins > 50 && wins < 78, 'the stronger team usually wins, but not always (' + Math.round(wins / 0.8) + '%)');
+    let framesOK = true; S.rinkScript(g).beats.filter((b) => b.type === 'ev').forEach((b) => { for (let u = 0; u < b.dur; u += 0.3) { const f = S.rinkFrame(b, u, g.lineups); if (!f || !isFinite(f.puck.x) || !isFinite(f.puck.y)) framesOK = false; } });
+    ok(framesOK, 'every highlight animates without errors');
+    const fill = (topic, n2, seed) => { const ms = [...Array(n2)].map((_, i) => ({ id: 'm' + i, name: ['Lions', 'Sharks', 'Owls'][i], color: DN.COLORS[i], emoji: 'x', human: true })); let dd = DN.createDraft(topic, ms, { ...DN.DEFAULT_RULES, slots: topic.slots, finale: { mode: 'sim', speed: 'normal' } }, { seed }); let gg = 0, rr = 0; while (!DN.isDraftOver(dd) && gg++ < 800) { if (dd.phase === 'auction') { const m = dd.managers.find((x, k) => (k + rr++) % 2 === 0 && DN.canBid(dd, x, DN.nextAmount(dd))) || dd.managers.find((x) => DN.canBid(dd, x, DN.nextAmount(dd))); dd = m ? DN.sell(DN.placeBid(dd, m.id, DN.nextAmount(dd))) : DN.skipItem(dd); } else if (dd.phase === 'freepick') { const cp = DN.currentPicker(dd); dd = DN.freePick(dd, dd.leftover.find((x) => DN.canTake(dd, cp.m, x))); } else break; } return dd; };
+    const raw = { ...fill(t, 3, 'nhlui'), mode: 'local', createdAt: Date.now(), history: [] };
+    const X = await boot({ idb: false, speed: 0.05, storage: { dn_current_v1: JSON.stringify(raw) } });
+    await click(X.w, btn(X.d, 'Resume draft')); await click(X.w, btn(X.d, 'Start the finale')); await click(X.w, btn(X.d, 'Puck drop')); await sleep(500);
+    const live = !!X.d.querySelector('.rinksvg');
+    await click(X.w, btn(X.d, 'Skip to result')); await sleep(150);
+    ok(live && /Game summary/.test(X.d.body.textContent) && /Three stars/.test(X.d.body.textContent), 'the rink plays the game and ends with period scores and the three stars');
+    X.w.close();
+  }
   P.w.close();
 };
