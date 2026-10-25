@@ -1,4 +1,4 @@
-/* Draft Night 2814949800 — built from src/ by build.js. Edit src/, not this file. */
+/* Draft Night da52f1990c — built from src/ by build.js. Edit src/, not this file. */
 "use strict";
 (function(){
 function _extends() { return _extends = Object.assign ? Object.assign.bind() : function (n) { for (var e = 1; e < arguments.length; e++) { var t = arguments[e]; for (var r in t) ({}).hasOwnProperty.call(t, r) && (n[r] = t[r]); } return n; }, _extends.apply(null, arguments); }
@@ -666,7 +666,8 @@ const STARTER_BATTLE = {
   't-mlb': 'mlb',
   't-mlbl': 'mlb',
   't-golf': 'golf',
-  't-rugby': 'rugby'
+  't-rugby': 'rugby',
+  't-wwe': 'wwe'
 };
 function starterTopics() {
   const v3 = [...sportsTopicsV3(), ...foodTopicsV3(), ...entTopicsV3(), ...travelTopicsV3(), ...animalTopicsV3(), ...styleTopicsV3(), ...funTopicsV3()];
@@ -24309,6 +24310,15 @@ const BATTLE_KINDS = {
     upset: ['Who knew? {w} beats {l} when it counts!', 'Surprise hero: {w}!'],
     noshow: ['{w} wins the night — the other team had nothing.']
   },
+  wwe: {
+    name: 'Royal Rumble',
+    start: 'Ring the bell',
+    emoji: '🤼',
+    round: 'Entrant',
+    win: [''],
+    upset: [''],
+    noshow: ['{w} wins — the other team had nobody.']
+  },
   rugby: {
     name: 'Rugby match',
     start: 'Kick-off',
@@ -24432,6 +24442,7 @@ function simulateFor(d, A, B, key, opts) {
   if (k === 'mlb') return simulateBaseball(d, A, B, key);
   if (k === 'golf') return simulateGolf(d, A, B, key);
   if (k === 'rugby') return simulateRugby(d, A, B, key);
+  if (k === 'wwe') return simulateRumble(d, A, B, key);
   if (k === 'survival') return simulateSurvival(d, A, B, key);
   if (k === 'powers' || k === 'weird') return simulateMissions(d, A, B, key);
   if (k === 'cute') return simulatePuppyBowl(d, A, B, key, opts && opts.knockout === false ? false : true);
@@ -24444,6 +24455,7 @@ function simWhy(w, mt) {
     const f = mt.final[mt.winner];
     return w.name + (f.rescued ? ' got rescued' : ' survived ' + ws + ' day' + (ws === 1 ? '' : 's')) + (ws !== ls ? ' (the others lasted ' + ls + ')' : mt.how === 'rescue' ? ', and got rescued first' : mt.how === 'shape' ? ', level on days but in better shape' : ' and won the last night') + '.';
   }
+  if (mt.v === 'rumble') return mt.forfeit ? w.name + ' won — the other team had nobody.' : w.name + ' won the Royal Rumble ' + mt.score[mt.winner] + '–' + mt.score[1 - mt.winner] + ' on Rumble points (' + mt.winnerName + ' won the Rumble).';
   if (mt.v === 'rugby') {
     const tr = mt.plays.filter(e => e.kind === 'try' && e.s === mt.winner).length;
     return w.name + ' won ' + mt.score[mt.winner] + '–' + mt.score[1 - mt.winner] + (tr ? ' (' + tr + ' tr' + (tr === 1 ? 'y' : 'ies') + ')' : '') + (mt.golden ? ' in extra time' : '') + '.';
@@ -24474,7 +24486,7 @@ function simWhy(w, mt) {
   if (mt.v === 'mission') return w.name + ' won ' + mt.score[mt.winner] + ' of ' + mt.missions.length + ' missions.';
   return w.name + ' won the ' + (BATTLE_KINDS[mt.kind] || BATTLE_KINDS.fight).name.toLowerCase() + ' ' + mt.score[mt.winner] + '–' + mt.score[1 - mt.winner] + (mt.sudden ? ' in sudden death' : '') + '.';
 }
-const isSimResult = mt => !!mt && (mt.v === 'rugby' || mt.v === 'golf' || mt.v === 'mlb' || mt.v === 'cricket' || mt.v === 'nhl' || mt.v === 'nfl' || mt.v === 'tennis' || mt.v === 'gp' || mt.v === 'card' || mt.v === 'hoops' || mt.v === 'battle' || mt.v === 'arena' || mt.v === 'survival' || mt.v === 'mission' || mt.v === 'show');
+const isSimResult = mt => !!mt && (mt.v === 'rumble' || mt.v === 'rugby' || mt.v === 'golf' || mt.v === 'mlb' || mt.v === 'cricket' || mt.v === 'nhl' || mt.v === 'nfl' || mt.v === 'tennis' || mt.v === 'gp' || mt.v === 'card' || mt.v === 'hoops' || mt.v === 'battle' || mt.v === 'arena' || mt.v === 'survival' || mt.v === 'mission' || mt.v === 'show');
 function battleDuel(rng, kind, a, b, maxP) {
   const fill = (lines, w, l) => lines[Math.floor(rng() * lines.length)].replace('{w}', w).replace('{l}', l);
   if (!a || !b) {
@@ -30525,6 +30537,399 @@ function simulateRugby(d, A, B, key) {
   };
 }
 const rugbyMin = t => Math.min(80, Math.floor(t / 60) + 1) + (t >= 4800 ? '+' : '') + '′';
+const RUMBLE_FINISHERS = {
+  'the rock': 'Rock Bottom',
+  'john cena': 'Attitude Adjustment',
+  'stone cold steve austin': 'Stone Cold Stunner',
+  'the undertaker': 'Tombstone Piledriver',
+  'hulk hogan': 'Leg Drop',
+  'randy orton': 'RKO',
+  'triple h': 'Pedigree',
+  'shawn michaels': 'Sweet Chin Music',
+  'roman reigns': 'Spear',
+  'rey mysterio': '619',
+  'brock lesnar': 'F-5',
+  'cm punk': 'GTS',
+  'cody rhodes': 'Cross Rhodes',
+  'seth rollins': 'Stomp',
+  'becky lynch': 'Manhandle Slam',
+  'charlotte flair': 'Figure-Eight',
+  'rhea ripley': 'Riptide',
+  'bianca belair': 'KOD',
+  'ric flair': 'Figure-Four Leglock',
+  'randy savage': 'Flying Elbow Drop',
+  'bret hart': 'Sharpshooter',
+  'edge': 'Spear',
+  'kane': 'Chokeslam',
+  'batista': 'Batista Bomb',
+  'kurt angle': 'Angle Slam',
+  'eddie guerrero': 'Frog Splash',
+  'gunther': 'Powerbomb',
+  'kofi kingston': 'Trouble in Paradise',
+  'trish stratus': 'Chick Kick',
+  'drew mcintyre': 'Claymore',
+  'mick foley': 'Mandible Claw',
+  'chris jericho': 'Codebreaker',
+  'jeff hardy': 'Swanton Bomb',
+  'matt hardy': 'Twist of Fate',
+  'big show': 'Chokeslam',
+  'mark henry': 'World’s Strongest Slam',
+  'booker t': 'Scissors Kick',
+  'goldberg': 'Jackhammer',
+  'sting': 'Scorpion Death Drop',
+  'jake roberts': 'DDT',
+  'ultimate warrior': 'Gorilla Press Splash',
+  'dusty rhodes': 'Bionic Elbow',
+  'roddy piper': 'Sleeper Hold',
+  'razor ramon': 'Razor’s Edge',
+  'kevin nash': 'Jackknife Powerbomb',
+  'the miz': 'Skull-Crushing Finale',
+  'dolph ziggler': 'Zig Zag',
+  'aj styles': 'Phenomenal Forearm',
+  'sami zayn': 'Helluva Kick',
+  'kevin owens': 'Stunner',
+  'bray wyatt': 'Sister Abigail',
+  'jey uso': 'Uso Splash',
+  'jimmy uso': 'Uso Splash',
+  'solo sikoa': 'Samoan Spike',
+  'la knight': 'BFT',
+  'damian priest': 'South of Heaven',
+  'bobby lashley': 'Spear',
+  'braun strowman': 'Running Powerslam',
+  'finn bálor': 'Coup de Grâce',
+  'bayley': 'Rose Plant',
+  'asuka': 'Asuka Lock',
+  'liv morgan': 'Oblivion',
+  'iyo sky': 'Over the Moonsault',
+  'tiffany stratton': 'Prettiest Moonsault Ever',
+  'lita': 'Moonsault',
+  'bron breakker': 'Spear',
+  'dominik mysterio': 'Frog Splash',
+  'big e': 'Big Ending'
+};
+const RUMBLE_POWER = /Lesnar|Hogan|André|Big Show|Mark Henry|Strowman|Batista|Goldberg|Kane|Undertaker|Lashley|Breakker|Warrior|Reigns|Belair|Ripley|Sikoa|Nash|Chyna|Gunther|Big E|McIntyre|Rock|Cena/;
+const RUMBLE_FLYER = /Mysterio|Jeff Hardy|Kofi|Guerrero|Iyo|Lita|Tiffany|Liv Morgan|Shawn|Rollins|AJ Styles|Bálor|Savage|Ziggler|Trish|Edge/;
+const RUMBLE_TECH = /Bret|Angle|Gunther|Shawn|Triple H|Ric Flair|Punk|Jericho|Becky|Charlotte|Asuka|Bayley|Sami|Owens|Cody/;
+const RUMBLE_PROFILE = {
+  'the rock': 97,
+  'stone cold steve austin': 97,
+  'john cena': 96,
+  'the undertaker': 96,
+  'hulk hogan': 94,
+  'shawn michaels': 96,
+  'triple h': 94,
+  'randy orton': 93,
+  'roman reigns': 94,
+  'brock lesnar': 95,
+  'cm punk': 92,
+  'cody rhodes': 92,
+  'seth rollins': 91,
+  'rey mysterio': 91,
+  'becky lynch': 91,
+  'charlotte flair': 91,
+  'rhea ripley': 90,
+  'bianca belair': 89,
+  'ric flair': 94,
+  'randy savage': 93,
+  'andré the giant': 93,
+  'bret hart': 94,
+  'edge': 92,
+  'kane': 90,
+  'batista': 90,
+  'kurt angle': 93,
+  'eddie guerrero': 92,
+  'gunther': 91,
+  'kofi kingston': 87,
+  'trish stratus': 89,
+  'drew mcintyre': 90,
+  'logan paul': 85
+};
+const RUMBLE_ATTRS = ['STR', 'AGI', 'TEC', 'STA', 'CHA'];
+const RUMBLE_ATTR_NAMES = {
+  STR: 'Power',
+  AGI: 'Agility',
+  TEC: 'Technique',
+  STA: 'Stamina',
+  CHA: 'Crowd'
+};
+function rumbleRating(item) {
+  const n = String(item.name || '');
+  const fixed = validRating(item.rating);
+  const prof = RUMBLE_PROFILE[n.toLowerCase()];
+  const ovr = fixed ? clamp(Math.round(+item.rating), 1, 99) : prof || clamp(Math.round(78 + itemFame(item) * 16 + (unit('wwo', n) - 0.5) * 6), 72, 93);
+  const j = k => (unit('wwa', n, k) - 0.5) * 6;
+  const pw = RUMBLE_POWER.test(n),
+    fl = RUMBLE_FLYER.test(n),
+    te = RUMBLE_TECH.test(n);
+  const attrs = {
+    STR: ovr + (pw ? 7 : fl ? -8 : 0) + j(1),
+    AGI: ovr + (fl ? 8 : pw ? -7 : 0) + j(2),
+    TEC: ovr + (te ? 7 : pw ? -3 : 0) + j(3),
+    STA: ovr + j(4),
+    CHA: ovr + (/Rock|Austin|Cena|Hogan|Savage|Flair|Piper|Dusty|Cody|Punk|Knight|Miz|Jericho|Becky/.test(n) ? 6 : 0) + j(5)
+  };
+  Object.keys(attrs).forEach(k => {
+    attrs[k] = clamp(Math.round(attrs[k]), 40, 99);
+  });
+  return {
+    ovr,
+    attrs,
+    style: pw ? 'Powerhouse' : fl ? 'High-flyer' : te ? 'Technician' : 'Brawler',
+    finisher: RUMBLE_FINISHERS[n.toLowerCase()] || null,
+    estimated: !fixed
+  };
+}
+const RUMBLE_PTS = [10, 7, 5, 4, 3, 2, 1];
+const RUMBLE_MOVES = {
+  Powerhouse: ['a huge clothesline', 'a spinebuster', 'a gorilla press', 'a belly-to-belly suplex'],
+  'High-flyer': ['a springboard dropkick', 'a hurricanrana', 'a crossbody', 'a superkick'],
+  Technician: ['a German suplex', 'a crossface', 'a backbreaker', 'a neckbreaker'],
+  Brawler: ['a flurry of punches', 'a DDT', 'a running knee', 'a spear']
+};
+function simulateRumble(d, A, B, key) {
+  const rng = seeded(d.seed, 'rumble', key, A.id, B.id);
+  const drafted = new Set();
+  (d.managers || []).forEach(m => m.team.forEach(x => {
+    if (x) drafted.add(x.itemId);
+  }));
+  [A, B].forEach(m => m.team.forEach(x => {
+    if (x) drafted.add(x.itemId);
+  }));
+  const ents = [];
+  [A, B].forEach((m, team) => m.team.forEach(x => {
+    const it = x && d.items[x.itemId];
+    if (it) ents.push({
+      name: it.name,
+      itemId: it.id,
+      team,
+      price: x.price || 0,
+      desc: it.desc || '',
+      ...rumbleRating(it)
+    });
+  }));
+  if (!ents.some(e => e.team === 0) || !ents.some(e => e.team === 1)) {
+    const w = ents.some(e => e.team === 0) ? 0 : 1;
+    return {
+      v: 'rumble',
+      kind: 'wwe',
+      forfeit: true,
+      entrants: [],
+      plays: [],
+      score: w === 0 ? [1, 0] : [0, 1],
+      winner: w,
+      places: [],
+      et: false,
+      pens: null,
+      sudden: false,
+      events: []
+    };
+  }
+  const pool = Object.values(d.items).filter(it => !drafted.has(it.id)).sort((x, y) => unit('rf', d.seed, key, x.name) - unit('rf', d.seed, key, y.name)).slice(0, Math.max(0, 20 - ents.length));
+  pool.forEach(it => ents.push({
+    name: it.name,
+    itemId: it.id,
+    team: null,
+    price: 0,
+    desc: it.desc || '',
+    ...rumbleRating(it)
+  }));
+  const order = ents.map((e, i) => ({
+    i,
+    k: unit('ro', d.seed, key, e.name) + (e.team != null ? 0 : 0)
+  })).sort((x, y) => x.k - y.k).map(x => x.i);
+  const W = ents.map((e, i) => ({
+    ...e,
+    i,
+    n: order.indexOf(i) + 1,
+    dmg: 0,
+    sta: 100,
+    mom: 0,
+    inAt: null,
+    outAt: null,
+    elims: 0,
+    by: null
+  }));
+  const ev = [];
+  let t = 0;
+  const ring = [];
+  let nextIn = 0;
+  const out = [];
+  const push = e => {
+    e.t = Math.round(t);
+    e.i2 = ev.length;
+    ev.push(e);
+    return e;
+  };
+  const enter = () => {
+    const w = W[order[nextIn++]];
+    w.inAt = t;
+    ring.push(w);
+    push({
+      kind: 'enter',
+      w: w.i,
+      n: w.n,
+      text: '#' + w.n + ': ' + w.name + (w.desc ? ' — ' + w.desc : '') + '!',
+      hl: w.team != null || nextIn <= 2 || /Rock|Austin|Undertaker|Cena|Hogan/.test(w.name)
+    });
+  };
+  enter();
+  enter();
+  let guard = 0;
+  while ((ring.length > 1 || nextIn < W.length) && guard++ < 2000) {
+    t += 8 + rng() * 14;
+    if (nextIn < W.length && t >= nextIn * 62 - 62) {
+      enter();
+      continue;
+    }
+    if (ring.length < 2) {
+      if (nextIn < W.length) {
+        t = Math.max(t, nextIn * 62 - 62);
+        enter();
+      }
+      continue;
+    }
+    ring.forEach(w => {
+      w.sta = Math.max(20, w.sta - 0.9 * (1.4 - w.attrs.STA / 100));
+      w.mom *= 0.92;
+    });
+    const atk = weighted(rng, ring, w => (w.attrs.STR * 0.4 + w.attrs.AGI * 0.3 + w.attrs.TEC * 0.3) * (0.5 + w.sta / 200) * (1 + w.mom) * (w.team != null ? 1.15 : 1));
+    const foes = ring.filter(w => w !== atk && (atk.team == null || w.team !== atk.team));
+    const betray = foes.length === 0 || atk.team != null && rng() < 0.03;
+    const targets = betray ? ring.filter(w => w !== atk) : foes;
+    if (!targets.length) continue;
+    const tgt = weighted(rng, targets, w => 1 + w.dmg / 40 + (w.team != null ? 0.4 : 0));
+    const mate = atk.team != null ? ring.find(w => w !== atk && w.team === atk.team && w !== tgt) : null;
+    const r = rng();
+    if (r < 0.24 + (ring.length <= 3 ? 0.1 : 0)) {
+      const p = clamp(0.3 + (atk.attrs.STR - tgt.attrs.STR) / 160 + tgt.dmg / 140 - (tgt.attrs.AGI - 80) / 260 + atk.mom * 0.2 + (mate && rng() < 0.4 ? 0.15 : 0) - (ring.length <= 2 ? 0.08 : 0), 0.08, 0.82);
+      if (rng() < p) {
+        tgt.outAt = t;
+        tgt.by = atk.i;
+        atk.elims++;
+        ring.splice(ring.indexOf(tgt), 1);
+        out.push(tgt);
+        const dbl = mate && rng() < 0.3;
+        push({
+          kind: 'elim',
+          w: atk.i,
+          v: tgt.i,
+          mate: dbl ? mate.i : null,
+          betray: betray && atk.team != null && atk.team === tgt.team,
+          text: (betray && atk.team != null && atk.team === tgt.team ? 'BETRAYAL! ' : '') + (dbl ? atk.name + ' and ' + mate.name + ' team up to throw ' + tgt.name + ' out!' : atk.name + ' eliminates ' + tgt.name + '!') + ' (' + ring.length + ' left in the ring' + (nextIn < W.length ? ', ' + (W.length - nextIn) + ' still to come' : '') + ')',
+          hl: atk.team != null || tgt.team != null || ring.length <= 4
+        });
+      } else {
+        push({
+          kind: 'save',
+          w: atk.i,
+          v: tgt.i,
+          text: tgt.name + ' hangs on to the ropes! ' + (rng() < 0.5 ? 'Feet almost touched the floor!' : 'Somehow still in it!'),
+          hl: tgt.team != null && rng() < 0.4 || ring.length <= 3
+        });
+        if (rng() < 0.12 + (tgt.attrs.AGI - 85) / 200) {
+          atk.outAt = t;
+          atk.by = tgt.i;
+          tgt.elims++;
+          ring.splice(ring.indexOf(atk), 1);
+          out.push(atk);
+          push({
+            kind: 'elim',
+            w: tgt.i,
+            v: atk.i,
+            counter: true,
+            text: 'REVERSAL! ' + tgt.name + ' skins the cat and dumps ' + atk.name + ' out!',
+            hl: true
+          });
+        }
+      }
+      continue;
+    }
+    if (r < 0.34 && atk.finisher) {
+      tgt.dmg += 22;
+      atk.mom += 0.5;
+      push({
+        kind: 'finisher',
+        w: atk.i,
+        v: tgt.i,
+        move: atk.finisher,
+        text: atk.name + ' hits the ' + atk.finisher + ' on ' + tgt.name + '!',
+        hl: atk.team != null && rng() < 0.55
+      });
+      continue;
+    }
+    if (r < 0.4 && mate) {
+      tgt.dmg += 12;
+      push({
+        kind: 'double',
+        w: atk.i,
+        v: tgt.i,
+        mate: mate.i,
+        text: atk.name + ' and ' + mate.name + ' double-team ' + tgt.name + '.',
+        hl: false
+      });
+      continue;
+    }
+    tgt.dmg += 5 + rng() * 6;
+    atk.mom += 0.15;
+    push({
+      kind: 'move',
+      w: atk.i,
+      v: tgt.i,
+      text: atk.name + ' hits ' + pickOf(rng, RUMBLE_MOVES[atk.style]) + ' on ' + tgt.name + '.',
+      hl: false
+    });
+  }
+  const winnerW = ring[0] || W[order[order.length - 1]];
+  winnerW.outAt = null;
+  const places = [winnerW, ...out.slice().reverse()];
+  push({
+    kind: 'win',
+    w: winnerW.i,
+    text: winnerW.name + ' WINS THE ROYAL RUMBLE!',
+    hl: true,
+    big: true
+  });
+  const score = [0, 0];
+  places.forEach((w, k) => {
+    if (w.team != null) score[w.team] += RUMBLE_PTS[k] || 0;
+  });
+  W.forEach(w => {
+    if (w.team != null) score[w.team] += w.elims;
+  });
+  let winner;
+  if (score[0] !== score[1]) winner = score[0] > score[1] ? 0 : 1;else winner = (places.find(w => w.team != null) || {}).team || 0;
+  const iron = W.slice().sort((x, y) => (y.outAt == null ? t : y.outAt) - y.inAt - ((x.outAt == null ? t : x.outAt) - x.inAt))[0];
+  return {
+    v: 'rumble',
+    kind: 'wwe',
+    entrants: W.map(w => ({
+      name: w.name,
+      itemId: w.itemId,
+      team: w.team,
+      n: w.n,
+      finisher: w.finisher,
+      style: w.style,
+      ovr: w.ovr,
+      price: w.price,
+      inAt: Math.round(w.inAt),
+      outAt: w.outAt == null ? null : Math.round(w.outAt),
+      elims: w.elims,
+      by: w.by
+    })),
+    places: places.map(w => w.i),
+    plays: ev,
+    score,
+    winner,
+    winnerName: winnerW.name,
+    iron: iron.i,
+    end: Math.round(t),
+    et: false,
+    pens: null,
+    sudden: false,
+    events: []
+  };
+}
+const rumbleClock = s => Math.floor(s / 60) + ':' + String(s % 60).padStart(2, '0');
 const SHOW_JUDGES = [{
   name: 'Nana Fluff',
   emoji: '👵',
@@ -34075,7 +34480,7 @@ function TopicEditor({
   }, "Fun battles (Battles finale)"), React.createElement(Seg, {
     label: "Fun battle style",
     value: topic.battle || 'none',
-    options: [['none', 'Off'], ['fight', '⚔️ Fight'], ['powers', '💥 Powers'], ['survival', '🧟 Survival'], ['cute', '🥰 Puppy Bowl'], ['weird', '🤡 Silly'], ['combat', '🥊 Fight night'], ['f1', '🏎️ Grand Prix'], ['tennis', '🎾 Tennis'], ['nfl', '🏈 American football'], ['nhl', '🏒 Ice hockey'], ['cricket', '🏏 Cricket'], ['mlb', '⚾ Baseball'], ['golf', '⛳ Golf'], ['rugby', '🏉 Rugby'], ['basketball', '🏀 Basketball']],
+    options: [['none', 'Off'], ['fight', '⚔️ Fight'], ['powers', '💥 Powers'], ['survival', '🧟 Survival'], ['cute', '🥰 Puppy Bowl'], ['weird', '🤡 Silly'], ['combat', '🥊 Fight night'], ['f1', '🏎️ Grand Prix'], ['tennis', '🎾 Tennis'], ['nfl', '🏈 American football'], ['nhl', '🏒 Ice hockey'], ['cricket', '🏏 Cricket'], ['mlb', '⚾ Baseball'], ['golf', '⛳ Golf'], ['rugby', '🏉 Rugby'], ['wwe', '🤼 Royal Rumble'], ['basketball', '🏀 Basketball']],
     onChange: v => set({
       battle: v === 'none' ? '' : v
     })
@@ -36249,6 +36654,9 @@ function ItemCard({
     item: item,
     topic: d.topic
   }) : battleKindId(d.topic) === 'rugby' ? React.createElement(RugbyChip, {
+    item: item,
+    topic: d.topic
+  }) : battleKindId(d.topic) === 'wwe' ? React.createElement(RumbleChip, {
     item: item,
     topic: d.topic
   }) : hasBattle(d.topic) && React.createElement(StatChip, {
@@ -41070,7 +41478,12 @@ if (window.__DN_TEST__) window.__DN = {
     rugbyRating,
     rugbyScript,
     rugbyFrame,
-    rugbyReport
+    rugbyReport,
+    simulateRumble,
+    rumbleRating,
+    rumbleScript,
+    rumbleFrame,
+    rumbleReport
   },
   simStats: {
     simulatePuppyBowl,
@@ -44837,6 +45250,12 @@ function MatchSummary({
   B,
   match
 }) {
+  if (match.v === 'rumble') return React.createElement(RumbleSummary, {
+    d: d,
+    A: A,
+    B: B,
+    match: match
+  });
   if (match.v === 'rugby') return React.createElement(RugbySummary, {
     d: d,
     A: A,
@@ -46391,7 +46810,7 @@ function PitchMatch({
   }));
 }
 function MatchView(props) {
-  return props.match && props.match.v === 'rugby' ? React.createElement(RugbyView, props) : props.match && props.match.v === 'golf' ? React.createElement(GolfView, props) : props.match && props.match.v === 'mlb' ? React.createElement(DiamondView, props) : props.match && props.match.v === 'cricket' ? React.createElement(CricketView, props) : props.match && props.match.v === 'nhl' ? React.createElement(RinkView, props) : props.match && props.match.v === 'nfl' ? React.createElement(GridironView, props) : props.match && props.match.v === 'tennis' ? React.createElement(TennisView, props) : props.match && props.match.v === 'gp' ? React.createElement(TrackView, props) : props.match && props.match.v === 'card' ? React.createElement(RingView, props) : props.match && props.match.v === 'hoops' ? React.createElement(CourtView, props) : props.match && props.match.v === 'show' ? React.createElement(ShowView, props) : props.match && props.match.v === 'mission' ? React.createElement(MissionView, props) : props.match && props.match.v === 'survival' ? React.createElement(SurvivalView, props) : props.match && props.match.v === 'arena' ? React.createElement(ArenaView, props) : props.match && props.match.v === 'battle' ? React.createElement(BattleView, props) : props.match && props.match.v === 2 ? React.createElement(PitchMatch, props) : React.createElement(MatchPlayer, props);
+  return props.match && props.match.v === 'rumble' ? React.createElement(RumbleView, props) : props.match && props.match.v === 'rugby' ? React.createElement(RugbyView, props) : props.match && props.match.v === 'golf' ? React.createElement(GolfView, props) : props.match && props.match.v === 'mlb' ? React.createElement(DiamondView, props) : props.match && props.match.v === 'cricket' ? React.createElement(CricketView, props) : props.match && props.match.v === 'nhl' ? React.createElement(RinkView, props) : props.match && props.match.v === 'nfl' ? React.createElement(GridironView, props) : props.match && props.match.v === 'tennis' ? React.createElement(TennisView, props) : props.match && props.match.v === 'gp' ? React.createElement(TrackView, props) : props.match && props.match.v === 'card' ? React.createElement(RingView, props) : props.match && props.match.v === 'hoops' ? React.createElement(CourtView, props) : props.match && props.match.v === 'show' ? React.createElement(ShowView, props) : props.match && props.match.v === 'mission' ? React.createElement(MissionView, props) : props.match && props.match.v === 'survival' ? React.createElement(SurvivalView, props) : props.match && props.match.v === 'arena' ? React.createElement(ArenaView, props) : props.match && props.match.v === 'battle' ? React.createElement(BattleView, props) : props.match && props.match.v === 2 ? React.createElement(PitchMatch, props) : React.createElement(MatchPlayer, props);
 }
 function matchReport(d, A, B, match) {
   const teams = [A, B];
@@ -51098,6 +51517,581 @@ function RugbyChip({
       margin: 0
     }
   }, "Prime: how good they were at their peak (for current players, their best so far). ", RUGBY_ATTRS.map(a => a + ' ' + RUGBY_ATTR_NAMES[a].toLowerCase()).join(' · '), ". Draft Night estimate, not an official rating.")), React.createElement("button", {
+    className: "btn btn-ghost",
+    onClick: () => setOpen(false)
+  }, "Close")), document.body));
+}
+const RUMBLE_DUR = {
+  enter: 2.4,
+  elim: 3.2,
+  save: 2.6,
+  finisher: 2.8,
+  double: 2.4,
+  win: 3.4,
+  move: 2
+};
+function rumbleScript(match) {
+  const beats = [];
+  let t = 0;
+  const add = b => {
+    b.t0 = t;
+    t += b.dur;
+    beats.push(b);
+    return b;
+  };
+  add({
+    type: 'intro',
+    dur: 2.8
+  });
+  let roll = [];
+  const flush = () => {
+    if (!roll.length) return;
+    add({
+      type: 'roll',
+      dur: Math.min(2, 0.4 + roll.length * 0.06),
+      evs: roll
+    });
+    roll = [];
+  };
+  match.plays.forEach(e => {
+    if (e.hl) {
+      flush();
+      add({
+        type: 'ev',
+        dur: RUMBLE_DUR[e.kind] || 2.4,
+        e
+      });
+    } else roll.push(e);
+  });
+  flush();
+  add({
+    type: 'final',
+    dur: 3
+  });
+  return {
+    beats,
+    total: t
+  };
+}
+const rumbleRing = (match, t, incl) => match.entrants.map((w, i) => ({
+  ...w,
+  i
+})).filter(w => w.inAt <= t && (w.outAt == null || w.outAt > t || incl != null && w.i === incl)).sort((a, b) => a.inAt - b.inAt);
+function rumbleFrame(beat, u, match) {
+  const e = beat.e;
+  const t = e ? e.t : 0;
+  const ring = rumbleRing(match, t, e && e.kind === 'elim' ? e.v : null);
+  const shown = ring.length > 8 ? ring.filter(w => w.team != null || e && (w.i === e.w || w.i === e.v || w.i === e.mate)).concat(ring.filter(w => w.team == null && !(e && (w.i === e.w || w.i === e.v || w.i === e.mate)))).slice(0, 8) : ring;
+  const n = shown.length;
+  const figs = shown.map((w, k) => ({
+    i: w.i,
+    x: 16 + (n > 1 ? k / (n - 1) * 68 : 34),
+    face: k < n / 2 ? 1 : -1,
+    p: {
+      lean: 6,
+      crouch: 0.2
+    }
+  }));
+  const out = {
+    figs,
+    banner: null,
+    extra: ring.length - shown.length
+  };
+  if (!e || beat.type !== 'ev') return out;
+  const k = (a, b) => Math.max(0, Math.min(1, (u - a) / (b - a)));
+  const F = i => figs.find(f => f.i === i);
+  const a = F(e.w),
+    v = F(e.v);
+  if (a && v && e.kind !== 'enter' && e.kind !== 'win') {
+    const mid = (a.x + v.x) / 2;
+    const dirn = v.x > a.x ? 1 : -1;
+    a.x = a.x + (mid - 5 * dirn - a.x) * easeF(k(0, 0.7));
+    v.x = v.x + (mid + 5 * dirn - v.x) * easeF(k(0, 0.7));
+    a.face = dirn;
+    v.face = -dirn;
+  }
+  if (e.kind === 'enter') {
+    const f = F(e.w);
+    if (f) {
+      const home = f.x;
+      f.x = 108 + (home - 108) * easeF(k(0.2, 1.6));
+      f.face = -1;
+      f.p = {
+        lean: 12,
+        crouch: 0.3
+      };
+    }
+    out.banner = '#' + e.n + ' ' + (match.entrants[e.w].name || '').toUpperCase().slice(0, 16);
+  } else if (e.kind === 'elim' && a && v) {
+    const kk = k(0.9, 2.3);
+    const side = v.x >= 50 ? 1 : -1;
+    a.p = {
+      lean: 14,
+      rear: Math.sin(k(0.7, 1.1) * Math.PI),
+      punch: 'upper'
+    };
+    if (kk > 0) {
+      v.x = v.x + (side * 56 + 50 - v.x) * kk * 0.55;
+      v.y = -Math.sin(kk * Math.PI) * 14 + kk * kk * 12;
+      v.p = {
+        fall: Math.min(1, kk * 1.4),
+        lean: -20
+      };
+    }
+    if (u > 2.3) {
+      out.banner = e.betray ? 'BETRAYAL!' : e.counter ? 'REVERSAL!' : 'ELIMINATED!';
+      a.p = {
+        raise: 1
+      };
+    }
+    if (e.mate != null) {
+      const m2 = F(e.mate);
+      if (m2) {
+        m2.x = a.x - 4 * (v.x > a.x ? 1 : -1);
+        m2.p = {
+          lean: 14,
+          lead: Math.sin(k(0.7, 1.1) * Math.PI),
+          punch: 'jab'
+        };
+      }
+    }
+  } else if (e.kind === 'save' && v) {
+    const side = v.x >= 50 ? 1 : -1;
+    v.x = side > 0 ? 88 : 12;
+    v.y = -4 + Math.sin(u * 6) * 1.5;
+    v.p = {
+      lean: -35,
+      crouch: 0.4,
+      wobble: Math.sin(u * 9)
+    };
+    if (a) a.p = {
+      lean: 16,
+      lead: 1,
+      rear: 1,
+      punch: 'jab'
+    };
+    if (u > 1) out.banner = 'HANGS ON!';
+  } else if (e.kind === 'finisher' && a && v) {
+    const kk = k(0.8, 1.4);
+    a.p = {
+      lean: 18,
+      crouch: 0.4,
+      rear: Math.sin(kk * Math.PI),
+      punch: 'upper'
+    };
+    if (kk > 0.5) v.p = {
+      fall: easeF(k(1.1, 1.6))
+    };
+    if (u > 1.2) out.banner = String(e.move || '').toUpperCase() + '!';
+  } else if (e.kind === 'double' && a && v) {
+    const m2 = F(e.mate);
+    if (m2) {
+      m2.x = v.x + (v.x > a.x ? 5 : -5);
+      m2.face = v.x > a.x ? -1 : 1;
+      m2.p = {
+        lean: 14,
+        lead: Math.sin(k(0.6, 1) * Math.PI),
+        punch: 'jab'
+      };
+    }
+    a.p = {
+      lean: 14,
+      rear: Math.sin(k(0.7, 1.1) * Math.PI),
+      punch: 'cross'
+    };
+    if (u > 1.1) out.banner = 'DOUBLE TEAM!';
+  } else if (e.kind === 'win') {
+    const f = F(e.w);
+    if (f) {
+      f.x = 50;
+      f.p = {
+        raise: 1
+      };
+    }
+    out.banner = 'WINNER!';
+  }
+  return out;
+}
+function RumbleView({
+  d,
+  A,
+  B,
+  match,
+  speed,
+  onDone,
+  label
+}) {
+  const script = useMemo(() => rumbleScript(match), [match]);
+  const base = speed === 'fast' ? 2 : 1;
+  const [t, setT] = useState(speed === 'instant' ? script.total : 0);
+  const [playing, setPlaying] = useState(speed !== 'instant');
+  const [mult, setMult] = useState(1);
+  const done = t >= script.total;
+  const fired = useRef(false);
+  useEffect(() => {
+    if (!playing || done) return undefined;
+    let raf;
+    let last = performance.now();
+    const tick = now => {
+      const dt = Math.min(0.1, (now - last) / 1000);
+      last = now;
+      setT(x => Math.min(script.total, x + dt * base * mult / Math.max(0.001, GAME_SPEED)));
+      raf = requestAnimationFrame(tick);
+    };
+    raf = requestAnimationFrame(tick);
+    return () => cancelAnimationFrame(raf);
+  }, [playing, done, mult, base]);
+  useEffect(() => {
+    if (done && !fired.current) {
+      fired.current = true;
+      audio.play('bell');
+      onDone && onDone();
+    }
+  }, [done]);
+  const bi = Math.max(0, script.beats.findIndex(b => t < b.t0 + b.dur));
+  const beat = done ? script.beats[script.beats.length - 1] : script.beats[bi];
+  const u = done ? beat.dur : t - beat.t0;
+  const evNow = beat.type === 'ev' ? beat.e : beat.type === 'roll' ? beat.evs[Math.min(beat.evs.length - 1, Math.floor(u / beat.dur * beat.evs.length))] : null;
+  const fr = rumbleFrame(beat.type === 'roll' ? {
+    type: 'roll',
+    e: evNow
+  } : beat, u, match);
+  const tNow = evNow ? evNow.t : beat.type === 'final' || done ? match.end : 0;
+  const inRing = rumbleRing(match, tNow).length;
+  const toCome = match.entrants.filter(w => w.inAt > tNow).length;
+  const pts = [0, 1].map(s => match.entrants.reduce((n, w) => n + (w.team === s ? match.plays.filter(e => e.kind === 'elim' && e.w === match.entrants.indexOf(w) && e.t <= tNow).length : 0), 0));
+  const colors = [A.color, B.color];
+  const colorOf = w => w.team === 0 ? A.color : w.team === 1 ? B.color : '#8a8fa3';
+  const short = n => {
+    const w = String(n || '').split(' ');
+    return (w[0] === 'The' ? w[1] : w[w.length - 1]).slice(0, 10);
+  };
+  const banner = done ? null : beat.type === 'intro' ? 'ROYAL RUMBLE' : beat.type === 'final' ? 'FINAL' : fr.banner;
+  const lastBeat = useRef(-1);
+  useEffect(() => {
+    if (!playing || done || bi === lastBeat.current) return;
+    lastBeat.current = bi;
+    if (beat.type === 'ev') {
+      const e = beat.e;
+      if (e.kind === 'enter') audio.play('buzzer');
+      if (e.kind === 'win') {
+        audio.play('fanfare');
+        audio.say(match.winnerName + ' wins the Royal Rumble!', 2, d.id + ':' + label + ':w');
+      }
+    }
+  }, [bi]);
+  const said = useRef({});
+  useEffect(() => {
+    if (!playing || done || beat.type !== 'ev' || said.current[bi]) return;
+    const e = beat.e;
+    if (e.kind === 'elim' && u > 2.3 || e.kind === 'finisher' && u > 1.2) {
+      said.current[bi] = true;
+      audio.play(e.kind === 'elim' ? 'cheer' : 'punch');
+    }
+  }, [t]);
+  const feed = [];
+  script.beats.forEach((b, k2) => {
+    if (!done && b.t0 + b.dur * 0.8 > t) return;
+    if (b.type === 'ev') {
+      const w = match.entrants[b.e.w];
+      feed.push({
+        k: k2,
+        tag: rumbleClock(b.e.t),
+        team: w ? w.team : null,
+        big: b.e.kind === 'elim' || b.e.kind === 'win',
+        text: b.e.text
+      });
+    }
+  });
+  const feedRef = useRef(null);
+  useEffect(() => {
+    const f = feedRef.current;
+    if (f) f.scrollTop = f.scrollHeight;
+  }, [feed.length]);
+  const final = done || beat.type === 'final';
+  return React.createElement("div", {
+    className: "matchview rumbleview"
+  }, React.createElement("div", {
+    className: "scoreboard"
+  }, React.createElement("div", {
+    className: "sb-team"
+  }, React.createElement(Badge, {
+    m: A
+  }), React.createElement("span", {
+    className: "sb-n"
+  }, A.name)), React.createElement("div", {
+    className: "sb-mid"
+  }, React.createElement("span", {
+    className: "sb-score num",
+    "aria-live": "polite"
+  }, final ? match.score[0] + '–' + match.score[1] : pts[0] + '–' + pts[1]), React.createElement("span", {
+    className: "sb-clock num"
+  }, final ? 'RUMBLE POINTS' : 'ELIMINATIONS')), React.createElement("div", {
+    className: "sb-team"
+  }, React.createElement(Badge, {
+    m: B
+  }), React.createElement("span", {
+    className: "sb-n"
+  }, B.name))), React.createElement("div", {
+    className: "boutbar small"
+  }, React.createElement("span", {
+    className: "muted"
+  }, "\u23F1 ", rumbleClock(tNow), " \xB7 in the ring ", React.createElement("b", {
+    className: "num"
+  }, inRing), " \xB7 still to come ", React.createElement("b", {
+    className: "num"
+  }, toCome))), React.createElement("div", {
+    className: "pitchwrap"
+  }, React.createElement("svg", {
+    className: "pitchsvg ringsvg",
+    viewBox: "0 0 100 56",
+    role: "img",
+    "aria-label": 'Royal Rumble: ' + inRing + ' in the ring'
+  }, React.createElement(RingStage, {
+    mma: false,
+    t: t
+  }, beat.type !== 'intro' && fr.figs.map(f => {
+    const w = match.entrants[f.i];
+    return React.createElement("g", {
+      key: f.i,
+      transform: 'translate(0 ' + (f.y || 0).toFixed(2) + ')'
+    }, React.createElement(FighterFig, {
+      x: f.x,
+      face: f.face,
+      p: f.p,
+      color: colorOf(w),
+      name: short(w.name)
+    }));
+  }), fr.extra > 0 && React.createElement("text", {
+    x: "94",
+    y: "17",
+    textAnchor: "end",
+    fontSize: "2.6",
+    fontWeight: "800",
+    fill: "#fff"
+  }, "+", fr.extra, " more")), beat.type === 'intro' && React.createElement("g", null, React.createElement("rect", {
+    x: "0",
+    y: "0",
+    width: "100",
+    height: "56",
+    fill: "rgba(15,12,33,.55)"
+  }), React.createElement("text", {
+    x: "50",
+    y: "26",
+    textAnchor: "middle",
+    fontSize: "3.2",
+    fontWeight: "800",
+    fill: "#fff"
+  }, match.entrants.length, " superstars \xB7 over the top rope"), React.createElement("text", {
+    x: "50",
+    y: "32",
+    textAnchor: "middle",
+    fontSize: "2.6",
+    fill: "#fff"
+  }, A.name, " vs ", B.name, " \xB7 grey = undrafted")), final && React.createElement("g", null, React.createElement("rect", {
+    x: "0",
+    y: "0",
+    width: "100",
+    height: "56",
+    fill: "rgba(15,12,33,.6)"
+  }), React.createElement("text", {
+    x: "50",
+    y: "20",
+    textAnchor: "middle",
+    fontSize: "3.4",
+    fontWeight: "800",
+    fill: "#fff"
+  }, "RUMBLE WINNER: ", match.winnerName.toUpperCase().slice(0, 22)), React.createElement("text", {
+    x: "50",
+    y: "30",
+    textAnchor: "middle",
+    fontSize: "7",
+    fontWeight: "900",
+    fill: colors[match.winner],
+    stroke: "#0f0c21",
+    strokeWidth: "0.6",
+    paintOrder: "stroke"
+  }, (match.winner === 0 ? A : B).name.toUpperCase().slice(0, 16), " WIN"), React.createElement("text", {
+    x: "50",
+    y: "38",
+    textAnchor: "middle",
+    fontSize: "4.4",
+    fontWeight: "900",
+    fill: "#ffc83d"
+  }, match.score[0], "\u2013", match.score[1], " Rumble points")), banner && !final && React.createElement("text", {
+    x: "50",
+    y: "12",
+    textAnchor: "middle",
+    fontSize: banner.length > 16 ? 4.6 : 6.5,
+    fontWeight: "900",
+    fill: /ELIMINATED|BETRAYAL|REVERSAL|WINNER|!/.test(banner) ? '#ffc83d' : '#fff',
+    stroke: "#0f0c21",
+    strokeWidth: "0.6",
+    paintOrder: "stroke",
+    className: "pbanner"
+  }, banner))), React.createElement("div", {
+    className: "mctrl",
+    role: "group",
+    "aria-label": "Rumble controls"
+  }, !done && React.createElement("button", {
+    className: "btn btn-sm",
+    onClick: () => setPlaying(x => !x),
+    "aria-label": playing ? 'Pause' : 'Play'
+  }, playing ? '⏸ Pause' : '▶ Play'), !done && [1, 2, 4].map(x => React.createElement("button", {
+    key: x,
+    className: 'btn btn-sm' + (mult === x ? ' btn-gold' : ''),
+    "aria-pressed": mult === x,
+    onClick: () => setMult(x)
+  }, x, "\xD7")), !done && React.createElement("button", {
+    className: "btn btn-sm btn-ghost",
+    onClick: () => setT(script.total)
+  }, "Skip to result"), done && React.createElement("button", {
+    className: "btn btn-sm",
+    onClick: () => {
+      fired.current = true;
+      said.current = {};
+      setT(0);
+      setPlaying(true);
+    }
+  }, "\u21BA Watch again")), React.createElement("div", {
+    className: "mfeed",
+    ref: feedRef,
+    "aria-live": "polite"
+  }, feed.map(e => React.createElement("p", {
+    key: e.k,
+    className: 'mev ' + (e.big ? 'goal' : '') + (e.team != null ? ' t' + e.team : '')
+  }, React.createElement("span", {
+    className: "mm num"
+  }, e.tag), React.createElement("span", null, e.text)))), done && React.createElement(RumbleSummary, {
+    d: d,
+    A: A,
+    B: B,
+    match: match
+  }));
+}
+function rumbleReport(d, A, B, match) {
+  const E = match.entrants;
+  const most = E.slice().sort((a, b) => b.elims - a.elims)[0];
+  const iron = E[match.iron];
+  const team = E.filter(w => w.team != null).map(w => ({
+    ...w,
+    place: match.places.indexOf(E.indexOf(w)) + 1
+  }));
+  const best = team.filter(w => w.place <= 4 || w.elims >= 2).sort((a, b) => a.price - b.price)[0] || null;
+  const flop = team.filter(w => w.place > 10 && w.elims === 0).sort((a, b) => b.price - a.price)[0] || null;
+  return {
+    most,
+    iron,
+    team,
+    best,
+    flop
+  };
+}
+function RumbleSummary({
+  d,
+  A,
+  B,
+  match
+}) {
+  const R = rumbleReport(d, A, B, match);
+  const T = i => i === 0 ? A : B;
+  const E = match.entrants;
+  const ord = n => n + ordinalSuffix(n);
+  return React.createElement("div", {
+    className: "board msummary"
+  }, React.createElement("h3", null, "\uD83E\uDD3C Royal Rumble results"), React.createElement("p", {
+    className: "small",
+    style: {
+      margin: 0
+    }
+  }, React.createElement("b", null, A.name, " ", match.score[0], "\u2013", match.score[1], " ", B.name), " on Rumble points \xB7 winner: ", match.winnerName), React.createElement("p", {
+    className: "small",
+    style: {
+      margin: 0
+    }
+  }, "\uD83C\uDFC6 Final four: ", match.places.slice(0, 4).map((i, k) => k + 1 + '. ' + E[i].name + (E[i].team != null ? ' (' + T(E[i].team).name + ')' : '')).join(' · ')), React.createElement("table", {
+    className: "qtable small"
+  }, React.createElement("thead", null, React.createElement("tr", null, React.createElement("th", null, "Superstar"), React.createElement("th", null, "#"), React.createElement("th", null, "Place"), React.createElement("th", null, "Elims"))), React.createElement("tbody", null, R.team.sort((a, b) => a.place - b.place).map(w => React.createElement("tr", {
+    key: w.name
+  }, React.createElement("td", null, React.createElement("span", {
+    className: "tc",
+    style: {
+      background: T(w.team).color
+    }
+  }), " ", w.name), React.createElement("td", {
+    className: "num"
+  }, w.n), React.createElement("td", {
+    className: "num"
+  }, ord(w.place)), React.createElement("td", {
+    className: "num"
+  }, w.elims))))), React.createElement("div", {
+    className: "mreport"
+  }, React.createElement("h4", null, "\uD83D\uDCCB Rumble report"), R.most && React.createElement("p", {
+    className: "small"
+  }, React.createElement("b", null, "\uD83D\uDCAA Most eliminations:"), " ", R.most.name, " \u2014 ", R.most.elims, "."), R.iron && React.createElement("p", {
+    className: "small"
+  }, React.createElement("b", null, "\u23F1 Iron man:"), " ", R.iron.name, " lasted ", rumbleClock((R.iron.outAt == null ? match.end : R.iron.outAt) - R.iron.inAt), " after entering at #", R.iron.n, "."), R.best && React.createElement("p", {
+    className: "small"
+  }, React.createElement("b", null, "\uD83D\uDCB0 Best buy:"), " ", R.best.name, " cost $", R.best.price, ": ", ord(R.best.place), " place, ", R.best.elims, " elimination", R.best.elims === 1 ? '' : 's', "."), R.flop && React.createElement("p", {
+    className: "small"
+  }, React.createElement("b", null, "\uD83D\uDCC9 Early exit:"), " ", R.flop.name, " cost $", R.flop.price, " and went out in ", ord(R.flop.place), " place.")), React.createElement("p", {
+    className: "hint",
+    style: {
+      margin: 0
+    }
+  }, "Rumble points: 10 for the winner, then 7, 5, 4, 3, 2, 1, plus 1 per elimination. Grey superstars are undrafted and score for nobody. Simulated from Draft Night\u2019s estimated Prime numbers \u2014 not official, and very much sports entertainment."));
+}
+function RumbleChip({
+  item,
+  topic
+}) {
+  const [open, setOpen] = useState(false);
+  if (!numbersShown()) return null;
+  const r = rumbleRating(item);
+  return React.createElement(React.Fragment, null, React.createElement("button", {
+    type: "button",
+    className: "ratingchip",
+    onClick: () => setOpen(true),
+    "aria-label": 'Prime ' + r.ovr + ', estimated. Show details'
+  }, "Prime ", React.createElement("b", {
+    className: "num"
+  }, r.ovr), " est."), open && ReactDOM.createPortal(React.createElement(Sheet, {
+    center: true,
+    onClose: () => setOpen(false)
+  }, React.createElement("div", {
+    className: "ratingcard"
+  }, React.createElement("div", {
+    className: "rc-top"
+  }, React.createElement("span", {
+    className: "rc-ovr num"
+  }, React.createElement("small", {
+    className: "rc-era"
+  }, "Prime"), r.ovr), React.createElement("span", {
+    className: "rc-role"
+  }, "WWE"), React.createElement("span", {
+    className: "rc-name"
+  }, item.name, React.createElement("br", null), React.createElement("small", null, r.style, r.finisher ? ' · finisher: ' + r.finisher : ''))), React.createElement("div", {
+    className: "rc-attrs"
+  }, RUMBLE_ATTRS.map(a => React.createElement("div", {
+    key: a,
+    className: "rc-attr"
+  }, React.createElement("span", {
+    className: "k",
+    title: RUMBLE_ATTR_NAMES[a]
+  }, a), React.createElement("span", {
+    className: "bar"
+  }, React.createElement("i", {
+    style: {
+      width: r.attrs[a] + '%'
+    }
+  })), React.createElement("span", {
+    className: "v num"
+  }, r.attrs[a])))), React.createElement("p", {
+    className: "hint",
+    style: {
+      margin: 0
+    }
+  }, "Prime: at their peak. STR power \xB7 AGI agility \xB7 TEC technique \xB7 STA stamina \xB7 CHA crowd. Draft Night estimate, not an official rating.")), React.createElement("button", {
     className: "btn btn-ghost",
     onClick: () => setOpen(false)
   }, "Close")), document.body));

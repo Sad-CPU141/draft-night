@@ -381,5 +381,38 @@ module.exports = async function sportsTests({ ok, boot, btn, click, sleep }) {
     ok(live && /Match summary/.test(X.d.body.textContent) && /Player of the Match/.test(X.d.body.textContent), 'the pitch plays the match and ends with the try scorers and Player of the Match');
     X.w.close();
   }
+  // Royal Rumble.
+  {
+    const S = DN.sports; const t = T('t-wwe'); const d = dOf(t);
+    const pickT = (id, names) => ({ id, name: id, team: names.map((n) => ({ itemId: t.items.find((i) => i.name === n).id, price: 4 })) });
+    const legends = pickT('A', ['The Rock', 'Stone Cold Steve Austin', 'The Undertaker', 'Brock Lesnar']);
+    const others = pickT('B', ['John Cena', 'Hulk Hogan', 'Roman Reigns', 'Shawn Michaels']);
+    const g = S.simulateRumble(d, legends, others, 'w1');
+    ok(F.battleKind(t).name === 'Royal Rumble' && g.v === 'rumble' && JSON.stringify(g) === JSON.stringify(S.simulateRumble(d, legends, others, 'w1')) && g.entrants.length === 20 && g.winner != null && g.places.length === 20, 'WWE Superstars fight a 20-man Royal Rumble that replays exactly (' + g.winnerName + ' wins; ' + g.score.join('–') + ' Rumble points)');
+    let legal = true, kinds = new Set(), fillerWins = 0, bet = 0;
+    for (let k = 0; k < 120; k++) {
+      const m = S.simulateRumble({ ...d, seed: 'wr' + k }, legends, others, 'k');
+      const outs = m.entrants.filter((w) => w.outAt != null).length; if (outs !== 19 || m.places.length !== 20) legal = false;
+      const elims = m.plays.filter((e) => e.kind === 'elim').length; if (elims !== 19) legal = false;
+      m.entrants.forEach((w) => { if (w.outAt != null && w.outAt < w.inAt) legal = false; });
+      const pts = [0, 1].map((s2) => m.places.reduce((x, i, kk) => x + (m.entrants[i].team === s2 ? [10, 7, 5, 4, 3, 2, 1][kk] || 0 : 0), 0) + m.entrants.filter((w) => w.team === s2).reduce((x, w) => x + w.elims, 0));
+      if (pts[0] !== m.score[0] || pts[1] !== m.score[1]) legal = false;
+      if (m.entrants[m.places[0]].team == null) fillerWins++;
+      m.plays.forEach((e) => { kinds.add(e.kind); if (e.betray) bet++; });
+    }
+    ok(legal, 'everyone but the winner goes over the top rope, nobody is eliminated before they enter, and Rumble points add up');
+    ok(['enter', 'elim', 'save', 'finisher', 'double', 'win'].every((x) => kinds.has(x)) && bet > 0 && fillerWins > 5 && fillerWins < 90, 'Rumbles have entrances, finishers, double-teams, last-second saves, reversals, betrayals, and undrafted surprise winners');
+    const rk = S.rumbleRating(t.items.find((i) => i.name === 'Randy Orton')); ok(rk.finisher === 'RKO' && S.rumbleRating(t.items.find((i) => i.name === 'Rey Mysterio')).style === 'High-flyer', 'superstars use their real finishers (Orton hits the RKO) and styles');
+    let framesOK = true; S.rumbleScript(g).beats.filter((b) => b.type === 'ev').forEach((b) => { for (let u = 0; u < b.dur; u += 0.3) { const f = S.rumbleFrame(b, u, g); f.figs.forEach((x) => { if (!isFinite(x.x)) framesOK = false; }); } });
+    ok(framesOK, 'every highlight animates without errors');
+    const fill = (topic, n2, seed) => { const ms = [...Array(n2)].map((_, i) => ({ id: 'm' + i, name: ['Lions', 'Sharks', 'Owls'][i], color: DN.COLORS[i], emoji: 'x', human: true })); let dd = DN.createDraft(topic, ms, { ...DN.DEFAULT_RULES, slots: topic.slots, finale: { mode: 'sim', speed: 'normal' } }, { seed }); let gg = 0, rr = 0; while (!DN.isDraftOver(dd) && gg++ < 800) { if (dd.phase === 'auction') { const m = dd.managers.find((x, kk) => (kk + rr++) % 2 === 0 && DN.canBid(dd, x, DN.nextAmount(dd))) || dd.managers.find((x) => DN.canBid(dd, x, DN.nextAmount(dd))); dd = m ? DN.sell(DN.placeBid(dd, m.id, DN.nextAmount(dd))) : DN.skipItem(dd); } else if (dd.phase === 'freepick') { const cp = DN.currentPicker(dd); dd = DN.freePick(dd, dd.leftover.find((x) => DN.canTake(dd, cp.m, x))); } else break; } return dd; };
+    const raw = { ...fill(t, 3, 'wweui'), mode: 'local', createdAt: Date.now(), history: [] };
+    const X = await boot({ idb: false, speed: 0.05, storage: { dn_current_v1: JSON.stringify(raw) } });
+    await click(X.w, btn(X.d, 'Resume draft')); await click(X.w, btn(X.d, 'Start the finale')); await click(X.w, btn(X.d, 'Ring the bell')); await sleep(500);
+    const live = !!X.d.querySelector('.rumbleview .ringsvg');
+    await click(X.w, btn(X.d, 'Skip to result')); await sleep(150);
+    ok(live && /Royal Rumble results/.test(X.d.body.textContent) && /Iron man/.test(X.d.body.textContent), 'the ring plays the Rumble and ends with the final four, eliminations and the iron man');
+    X.w.close();
+  }
   P.w.close();
 };
