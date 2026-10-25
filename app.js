@@ -1,4 +1,4 @@
-/* Draft Night ce12892475 — built from src/ by build.js. Edit src/, not this file. */
+/* Draft Night 2fa708940a — built from src/ by build.js. Edit src/, not this file. */
 "use strict";
 (function(){
 function _extends() { return _extends = Object.assign ? Object.assign.bind() : function (n) { for (var e = 1; e < arguments.length; e++) { var t = arguments[e]; for (var r in t) ({}).hasOwnProperty.call(t, r) && (n[r] = t[r]); } return n; }, _extends.apply(null, arguments); }
@@ -619,7 +619,10 @@ function folderList(topics, includeDefaults) {
 const STARTER_ERA = {
   't-cf': 'now',
   't-pl': 'prime',
-  't-goat': 'prime'
+  't-goat': 'prime',
+  't-ucl': 'prime',
+  't-wonder': 'now',
+  't-wfoot': 'prime'
 };
 const STARTER_BATTLE = {
   't-ani': 'fight',
@@ -658,7 +661,10 @@ function starterTopics() {
   })).concat(v3.map(t => ({
     ...t,
     builtin: true
-  }))).map(withExtras).map(t => STARTER_ERA[t.id] ? {
+  }))).map(withExtras).map(t => STARTER_SPORT[t.id] ? {
+    ...t,
+    sport: STARTER_SPORT[t.id]
+  } : t).map(t => STARTER_ERA[t.id] ? {
     ...t,
     era: STARTER_ERA[t.id]
   } : STARTER_BATTLE[t.id] ? {
@@ -14565,6 +14571,52 @@ Queenstown
 `
 };
 const EXTRA_ITEMS = Object.assign({}, EXTRA_SPORTS, EXTRA_SPORTS2, EXTRA_FOOD, EXTRA_ENT, EXTRA_ANIMALS, EXTRA_FUN, EXTRA_TRAVEL, EXTRA_STYLE);
+const ROLE_CODES = {
+  G: 'GK',
+  D: 'DEF',
+  M: 'MID',
+  F: 'FWD'
+};
+const FOOTBALL_ROLES_SRC = `
+Cristiano Ronaldo F|Lionel Messi F|Paolo Maldini D|Karim Benzema F|Luka Modrić M|Toni Kroos M|Clarence Seedorf M|Alfredo Di Stéfano F|Raúl F|Iker Casillas G
+Xavi M|Andrés Iniesta M|Steven Gerrard M|Zinedine Zidane M|Ronaldinho F|Thierry Henry F|Andriy Shevchenko F|Filippo Inzaghi F|Kaká M|Robert Lewandowski F
+Thomas Müller F|Sergio Ramos D|Didier Drogba F|Frank Lampard M|Ryan Giggs M|Gerd Müller F|Johan Cruyff F|Franz Beckenbauer D|Kylian Mbappé F|Mohamed Salah F
+Gianluigi Buffon G|Manuel Neuer G|Marcelo D|Gareth Bale F|Vinícius Júnior F|Xabi Alonso M|Sergio Busquets M|Gerard Piqué D|Carles Puyol D|Dani Alves D
+Samuel Eto'o F|Arjen Robben F|Franck Ribéry F|Philipp Lahm D|Bastian Schweinsteiger M|Wayne Rooney F|Rio Ferdinand D|Nemanja Vidić D|Paul Scholes M|Peter Schmeichel G
+Ole Gunnar Solskjær F|Luís Figo F|Roberto Carlos D|Fernando Hierro D|Fernando Morientes F|Edwin van der Sar G|Marco van Basten F|Ruud Gullit M|Franco Baresi D|Alessandro Nesta D
+Andrea Pirlo M|Gennaro Gattuso M|Diego Milito F|Javier Zanetti D|Wesley Sneijder M|Neymar F|Luis Suárez F|Ousmane Dembélé F|Achraf Hakimi D|Kevin De Bruyne M
+Rodri M|Erling Haaland F|Virgil van Dijk D|Alisson G|Sadio Mané F|Casemiro M|Federico Valverde M|Thibaut Courtois G|Dani Carvajal D|Jude Bellingham M
+Eusébio F|Kenny Dalglish F|Ian Rush F
+Lamine Yamal F|Pau Cubarsí D|Gavi M|Désiré Doué F|Warren Zaïre-Emery M|João Neves M|Endrick F|Arda Güler M|Franco Mastantuono M|Estêvão F
+Kobbie Mainoo M|Alejandro Garnacho F|Ethan Nwaneri M|Myles Lewis-Skelly D|Archie Gray M|Lucas Bergvall M|Rico Lewis D|Kenan Yıldız F|Nico Paz M|Jobe Bellingham M
+Leny Yoro D|Jorrel Hato D|Mathys Tel F|Claudio Echeverri M|Adam Wharton M|Ayyoub Bouaddi M|Francesco Camarda F|Rodrigo Mora M|Geovany Quenda D|Dean Huijsen D
+Marc Guiu F|Eli Junior Kroupi F|Lennart Karl M|Savinho F|Aleksandar Pavlović M|Alejandro Balde D|Harry Amass D|Chido Obi F|Rio Ngumoha F|Max Dowman M
+Tyler Dibling F|Mikey Moore F|Roony Bardghji F|Luka Vušković D|Valentín Carboni M|Gonzalo García F|Ibrahim Mbaye F|Senny Mayulu M|Assan Ouédraogo M|Vitor Roque F
+Kendry Páez M|Jamie Gittens F|Rasmus Højlund F|Yan Diomande F|Cristhian Mosquera D|Kees Smit M
+Aitana Bonmatí M|Alexia Putellas M|Sam Kerr F|Marta F|Alex Morgan F|Megan Rapinoe F|Ada Hegerberg F|Lucy Bronze D|Vivianne Miedema F|Lauren James F
+Alessia Russo F|Lauren Hemp F|Chloe Kelly F|Leah Williamson D|Mary Earps G|Beth Mead F|Trinity Rodman F|Sophia Smith F|Mallory Swanson F|Caroline Graham Hansen F
+Wendie Renard D|Kadidiatou Diani F|Salma Paralluelo F|Khadija Shaw F|Christine Sinclair F|Pernille Harder F|Ewa Pajor F|Linda Caicedo F|Hinata Miyazawa M|Alexandra Popp F
+Mapi León D|Irene Paredes D|Patri Guijarro M|Olga Carmona D|Mariona Caldentey M|Keira Walsh M|Ella Toone M|Georgia Stanway M|Millie Bright D|Hannah Hampton G
+Alex Greenwood D|Jess Carter D|Lindsey Heaps M|Rose Lavelle M|Naomi Girma D|Alyssa Naeher G|Crystal Dunn D|Tobin Heath F|Carli Lloyd M|Abby Wambach F
+Mia Hamm F|Lena Oberdorf M|Giulia Gwinn D|Lea Schüller F|Klara Bühl F|Fridolina Rolfö F|Stina Blackstenius F|Kosovare Asllani M|Magdalena Eriksson D|Barbra Banda F
+Asisat Oshoala F|Steph Catley D|Mackenzie Arnold G|Caitlin Foord F|Ellie Carpenter D|Kadeisha Buchanan D|Jessie Fleming M|Ashley Lawrence D|Marie-Antoinette Katoto F|Eugénie Le Sommer F
+Grace Geyoro M|Selma Bacha D|Lieke Martens F|Jill Roord M|Daniëlle van de Donk M|Cristiana Girelli F|Yui Hasegawa M|Saki Kumagai D|Ji So-yun M|Wang Shuang F
+Debinha F|Tabitha Chawinga F
+`;
+const ROLE_BY_NAME = (() => {
+  const m = {};
+  FOOTBALL_ROLES_SRC.trim().split(/\n|\|/).forEach(x => {
+    const t = x.trim();
+    const i = t.lastIndexOf(' ');
+    if (i > 0) m[t.slice(0, i).toLowerCase()] = ROLE_CODES[t.slice(i + 1)];
+  });
+  return m;
+})();
+const STARTER_SPORT = {
+  't-ucl': 'football',
+  't-wonder': 'football',
+  't-wfoot': 'football'
+};
 const STATS_ANIMALS = `
 Aardvark=335324 L
 Aardwolf=245323 L
@@ -23384,7 +23436,7 @@ const battleRulesLine = topic => {
   const k = battleKind(topic);
   return k ? k.emoji + ' ' + k.name + 's: teams face off slot by slot. The pick the room paid more for has the edge (never more than 78%), and luck does the rest. Just for fun — not a real prediction.' : '';
 };
-const isFootball = topic => !!topic && topic.layout === 'pitch';
+const isFootball = topic => !!topic && (topic.layout === 'pitch' || topic.sport === 'football');
 const ATTRS = ['PAC', 'SHO', 'PAS', 'DRI', 'DEF', 'PHY'];
 const ROLE_SHAPE = {
   GK: {
@@ -23420,7 +23472,7 @@ const ROLE_SHAPE = {
     PHY: 0.82
   }
 };
-const roleOf = (item, slot) => ROW_OF[norm(item && item.pos)] || ROW_OF[norm(slot)] || 'MID';
+const roleOf = (item, slot) => ROW_OF[norm(item && item.pos)] || ROW_OF[norm(slot)] || item && ROLE_BY_NAME[String(item.name || '').toLowerCase()] || 'MID';
 function eraOf(topic) {
   if (topic && (topic.era === 'now' || topic.era === 'prime')) return topic.era;
   return topic && /\b(current|now|today|this season|20[2-3]\d)\b/i.test(topic.name || '') ? 'now' : 'prime';
@@ -23789,7 +23841,7 @@ function simulateMatch(d, A, B, key, knockout, opts) {
       });
     } else if (q.kind === 'save' || q.kind === 'miss' || q.kind === 'block') {
       shots[q.team]++;
-      const text = q.kind === 'save' ? 'Great save by ' + q.keeper + ' to deny ' + q.shooter + '!' : q.kind === 'miss' ? q.shooter + ' shoots… just wide!' : q.blocker + ' throws himself in front of ' + q.shooter + '’s shot!';
+      const text = q.kind === 'save' ? 'Great save by ' + q.keeper + ' to deny ' + q.shooter + '!' : q.kind === 'miss' ? q.shooter + ' shoots… just wide!' : q.blocker + ' throws everything in front of ' + q.shooter + '’s shot!';
       events.push({
         min: q.min,
         type: 'chance',
@@ -24867,6 +24919,9 @@ function packTopic(t, withPhotos) {
     ...(t.battle ? {
       bt: t.battle
     } : {}),
+    ...(t.sport ? {
+      sp: t.sport
+    } : {}),
     i: t.items.map(it => {
       const r = [it.name, it.pos || '', it.desc || '', it.emoji || '', it.imageUrl || '', it.wiki || '', it.kit || null, it.photosOff ? 1 : 0];
       if (withPhotos && it.photo) r.push(it.photo);
@@ -24932,6 +24987,9 @@ function unpackTopic(o) {
       } : {}),
       ...(typeof o.bt === 'string' && BATTLE_KINDS[o.bt] ? {
         battle: o.bt
+      } : {}),
+      ...(o.sp === 'football' ? {
+        sport: 'football'
       } : {}),
       kitShape: o.ks === 'tank' ? 'tank' : '',
       kitLabel: o.kl === 'initials' ? 'initials' : '',
@@ -32771,6 +32829,7 @@ function migrateTopics(stored) {
       ...t,
       era: t.era || s.era,
       battle: t.battle || s.battle,
+      sport: t.sport || s.sport,
       art: t.art || s.art,
       folder: t.folder || s.folder,
       kitShape: t.kitShape || s.kitShape,
@@ -34630,6 +34689,10 @@ class Boundary extends React.Component {
   }
 }
 if (window.__DN_TEST__) window.__DN = {
+  sports: {
+    roleOf,
+    ROLE_BY_NAME
+  },
   simStats: {
     simulatePuppyBowl,
     puppySquad,

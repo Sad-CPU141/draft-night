@@ -23,7 +23,8 @@
    happen. Knockout games go to extra time, then penalties.
    ============================================================ */
 
-const isFootball = (topic) => !!topic && topic.layout === 'pitch';
+// The football match: pitch topics, plus football topics with plain Pick slots (positions from 24-football-roles.js).
+const isFootball = (topic) => !!topic && (topic.layout === 'pitch' || topic.sport === 'football');
 const ATTRS = ['PAC', 'SHO', 'PAS', 'DRI', 'DEF', 'PHY'];
 const ROLE_SHAPE = {
   GK: { PAC: 0.55, SHO: 0.25, PAS: 0.65, DRI: 0.45, DEF: 1.02, PHY: 0.88 },
@@ -31,7 +32,7 @@ const ROLE_SHAPE = {
   MID: { PAC: 0.86, SHO: 0.84, PAS: 1.02, DRI: 0.97, DEF: 0.72, PHY: 0.82 },
   FWD: { PAC: 0.97, SHO: 1.03, PAS: 0.82, DRI: 0.98, DEF: 0.42, PHY: 0.82 },
 };
-const roleOf = (item, slot) => ROW_OF[norm(item && item.pos)] || ROW_OF[norm(slot)] || 'MID';
+const roleOf = (item, slot) => ROW_OF[norm(item && item.pos)] || ROW_OF[norm(slot)] || (item && ROLE_BY_NAME[String(item.name || '').toLowerCase()]) || 'MID';
 
 // "Now" (as they play today) or "Prime" (at their peak) — every player number says which.
 function eraOf(topic) {
@@ -226,7 +227,7 @@ function simulateMatch(d, A, B, key, knockout, opts) {
       events.push({ min: q.min, type: 'goal', team: q.team, player: q.shooter, assist: q.assist, score: [...run], seq: idx, text: pickLine(rng, 'goal', { p: q.shooter }) + (q.assist ? pickLine(rng, 'assist', { a: q.assist }) : '') });
     } else if (q.kind === 'save' || q.kind === 'miss' || q.kind === 'block') {
       shots[q.team]++;
-      const text = q.kind === 'save' ? 'Great save by ' + q.keeper + ' to deny ' + q.shooter + '!' : q.kind === 'miss' ? q.shooter + ' shoots… just wide!' : q.blocker + ' throws himself in front of ' + q.shooter + '’s shot!';
+      const text = q.kind === 'save' ? 'Great save by ' + q.keeper + ' to deny ' + q.shooter + '!' : q.kind === 'miss' ? q.shooter + ' shoots… just wide!' : q.blocker + ' throws everything in front of ' + q.shooter + '’s shot!';
       events.push({ min: q.min, type: 'chance', team: q.team, player: q.shooter, seq: idx, text });
     } else {
       const text = q.kind === 'tackle' ? 'Strong tackle from ' + q.tackler + ' to win it back.' : q.tackler + ' reads the pass and intercepts.';

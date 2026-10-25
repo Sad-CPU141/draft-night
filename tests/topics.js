@@ -52,7 +52,8 @@ module.exports = async function topicTests({ ok, boot, btn, click, sleep }) {
   }
   const pitch = ts.filter((t) => t.layout === 'pitch').map((t) => t.id).sort();
   ok(JSON.stringify(pitch) === JSON.stringify(['t-cf', 't-goat', 't-pl']), 'only the 3 football topics use the pitch, ratings and simulator (' + pitch.join(', ') + ')');
-  ok(ts.filter((t) => t.layout !== 'pitch').every((t) => !DN.finale.isFootball(t)), 'no other topic is treated as football');
+  const footy = ts.filter((t) => t.layout !== 'pitch' && DN.finale.isFootball(t)).map((t) => t.id).sort();
+  ok(JSON.stringify(footy) === JSON.stringify(['t-ucl', 't-wfoot', 't-wonder']), 'only Champions League Legends, Wonderkids and Women’s Football Stars also play the football match (' + footy.join(', ') + ')');
   ok(ts.every((t) => L.isBuiltIn(t)), 'every starter is marked built-in');
 
   console.log('Curated popularity');

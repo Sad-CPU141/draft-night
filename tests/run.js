@@ -1004,6 +1004,7 @@ async function tap(w, el) { el.dispatchEvent(new w.MouseEvent('pointerdown', { b
   await require('./scenes.js')({ ok, boot, btn, click, sleep });
   await require('./battles.js')({ ok, boot, btn, click, sleep });
   await require('./simstats.js')({ ok, boot, btn, click, sleep });
+  await require('./sports.js')({ ok, boot, btn, click, sleep });
 
   if (!process.env.SKIP_ONLINE) await require('./online.js')({ ok, boot, btn, click, sleep });
 
