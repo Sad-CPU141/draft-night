@@ -349,5 +349,37 @@ module.exports = async function sportsTests({ ok, boot, btn, click, sleep }) {
     ok(live && /The cup/.test(X.d.body.textContent) && /Star of the day/.test(X.d.body.textContent), 'the course plays the cup and ends with every match result and a cup report');
     X.w.close();
   }
+  // Rugby.
+  {
+    const S = DN.sports; const t = T('t-rugby'); const d = dOf(t);
+    const pickT = (id, names) => ({ id, name: id, team: names.map((n) => ({ itemId: t.items.find((i) => i.name === n).id, price: 4 })) });
+    const stars = pickT('A', ['Jonah Lomu', 'Richie McCaw', 'Dan Carter', 'Antoine Dupont', 'Martin Johnson']);
+    const close = pickT('B', ["Brian O'Driscoll", 'Jonny Wilkinson', 'Siya Kolisi', 'Gareth Edwards', 'Bryan Habana']);
+    const g = S.simulateRugby(d, stars, close, 'r1');
+    ok(F.battleKind(t).name === 'Rugby match' && g.v === 'rugby' && JSON.stringify(g) === JSON.stringify(S.simulateRugby(d, stars, close, 'r1')) && g.score[0] !== g.score[1], 'Rugby Players play an 80-minute match that always has a winner and replays exactly (' + g.score.join('–') + ')');
+    const posOK = t.items.every((i) => S.rugbyRating(i).pos) && S.rugbyRating(t.items.find((i) => i.name === 'Dan Carter')).pos === 'Fly-half' && S.rugbyRating(t.items.find((i) => i.name === 'Jonah Lomu')).pos === 'Wing' && g.xv[0].length === 15;
+    ok(posOK, 'every player has a real position (Carter at fly-half, Lomu on the wing) in a 15-man side');
+    let pts = 0, tries = 0, n = 150, kinds = new Set(), legal = true, et = 0;
+    for (let k = 0; k < n; k++) {
+      const m = S.simulateRugby({ ...d, seed: 'rg' + k }, stars, close, 'k'); pts += m.score[0] + m.score[1]; if (m.golden) et++;
+      m.plays.forEach((e) => { kinds.add(e.kind + (e.how ? ':' + e.how : '')); if (e.kind === 'try') tries++; });
+      // Every point is accounted for: tries 5, conversions 2, penalties and drop goals 3.
+      const calc = [0, 1].map((s2) => m.plays.filter((e) => e.s === s2).reduce((x, e) => x + (e.kind === 'try' ? 5 + (e.conv ? 2 : 0) : (e.kind === 'pen' || e.kind === 'drop') && e.good ? 3 : e.kind === 'kcwin' ? 1 : 0), 0));
+      if (calc[0] !== m.score[0] || calc[1] !== m.score[1]) legal = false;
+    }
+    ok(pts / n / 2 > 15 && pts / n / 2 < 42 && tries / n / 2 > 1.5, 'scores look like rugby (' + (pts / n / 2).toFixed(0) + ' points and ' + (tries / n / 2).toFixed(1) + ' tries a team)');
+    ok(['try:break', 'try:maul', 'try:close', 'pen', 'turnover', 'scrum', 'card', 'break', 'kick', 'lineout'].every((x) => kinds.has(x)), 'matches have tries from breaks, mauls and pick-and-go, penalties, turnovers, scrums, yellow cards and territory kicks');
+    ok(legal, 'every point adds up: 5 for a try, 2 for a conversion, 3 for a penalty or drop goal');
+    let framesOK = true; S.rugbyScript(g).beats.filter((b) => b.type === 'ev').forEach((b) => { for (let u = 0; u < b.dur; u += 0.3) { const f = S.rugbyFrame(b, u, g.xv); if (!f || (f.ball && (!isFinite(f.ball.x) || !isFinite(f.ball.y)))) framesOK = false; } });
+    ok(framesOK, 'every highlight animates without errors');
+    const fill = (topic, n2, seed) => { const ms = [...Array(n2)].map((_, i) => ({ id: 'm' + i, name: ['Lions', 'Sharks', 'Owls'][i], color: DN.COLORS[i], emoji: 'x', human: true })); let dd = DN.createDraft(topic, ms, { ...DN.DEFAULT_RULES, slots: topic.slots, finale: { mode: 'sim', speed: 'normal' } }, { seed }); let gg = 0, rr = 0; while (!DN.isDraftOver(dd) && gg++ < 800) { if (dd.phase === 'auction') { const m = dd.managers.find((x, kk) => (kk + rr++) % 2 === 0 && DN.canBid(dd, x, DN.nextAmount(dd))) || dd.managers.find((x) => DN.canBid(dd, x, DN.nextAmount(dd))); dd = m ? DN.sell(DN.placeBid(dd, m.id, DN.nextAmount(dd))) : DN.skipItem(dd); } else if (dd.phase === 'freepick') { const cp = DN.currentPicker(dd); dd = DN.freePick(dd, dd.leftover.find((x) => DN.canTake(dd, cp.m, x))); } else break; } return dd; };
+    const raw = { ...fill(t, 3, 'rugui'), mode: 'local', createdAt: Date.now(), history: [] };
+    const X = await boot({ idb: false, speed: 0.05, storage: { dn_current_v1: JSON.stringify(raw) } });
+    await click(X.w, btn(X.d, 'Resume draft')); await click(X.w, btn(X.d, 'Start the finale')); await click(X.w, btn(X.d, 'Kick-off')); await sleep(500);
+    const live = !!X.d.querySelector('.rugbysvg');
+    await click(X.w, btn(X.d, 'Skip to result')); await sleep(150);
+    ok(live && /Match summary/.test(X.d.body.textContent) && /Player of the Match/.test(X.d.body.textContent), 'the pitch plays the match and ends with the try scorers and Player of the Match');
+    X.w.close();
+  }
   P.w.close();
 };

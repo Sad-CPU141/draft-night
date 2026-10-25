@@ -1,4 +1,4 @@
-/* Draft Night 08e93d0521 — built from src/ by build.js. Edit src/, not this file. */
+/* Draft Night 2814949800 — built from src/ by build.js. Edit src/, not this file. */
 "use strict";
 (function(){
 function _extends() { return _extends = Object.assign ? Object.assign.bind() : function (n) { for (var e = 1; e < arguments.length; e++) { var t = arguments[e]; for (var r in t) ({}).hasOwnProperty.call(t, r) && (n[r] = t[r]); } return n; }, _extends.apply(null, arguments); }
@@ -665,7 +665,8 @@ const STARTER_BATTLE = {
   't-crk': 'cricket',
   't-mlb': 'mlb',
   't-mlbl': 'mlb',
-  't-golf': 'golf'
+  't-golf': 'golf',
+  't-rugby': 'rugby'
 };
 function starterTopics() {
   const v3 = [...sportsTopicsV3(), ...foodTopicsV3(), ...entTopicsV3(), ...travelTopicsV3(), ...animalTopicsV3(), ...styleTopicsV3(), ...funTopicsV3()];
@@ -24308,6 +24309,15 @@ const BATTLE_KINDS = {
     upset: ['Who knew? {w} beats {l} when it counts!', 'Surprise hero: {w}!'],
     noshow: ['{w} wins the night — the other team had nothing.']
   },
+  rugby: {
+    name: 'Rugby match',
+    start: 'Kick-off',
+    emoji: '🏉',
+    round: 'Half',
+    win: [''],
+    upset: [''],
+    noshow: ['{w} wins by forfeit.']
+  },
   golf: {
     name: 'Golf cup',
     start: 'First tee',
@@ -24421,6 +24431,7 @@ function simulateFor(d, A, B, key, opts) {
   if (k === 'cricket') return simulateCricket(d, A, B, key);
   if (k === 'mlb') return simulateBaseball(d, A, B, key);
   if (k === 'golf') return simulateGolf(d, A, B, key);
+  if (k === 'rugby') return simulateRugby(d, A, B, key);
   if (k === 'survival') return simulateSurvival(d, A, B, key);
   if (k === 'powers' || k === 'weird') return simulateMissions(d, A, B, key);
   if (k === 'cute') return simulatePuppyBowl(d, A, B, key, opts && opts.knockout === false ? false : true);
@@ -24432,6 +24443,10 @@ function simWhy(w, mt) {
       ls = mt.score[1 - mt.winner];
     const f = mt.final[mt.winner];
     return w.name + (f.rescued ? ' got rescued' : ' survived ' + ws + ' day' + (ws === 1 ? '' : 's')) + (ws !== ls ? ' (the others lasted ' + ls + ')' : mt.how === 'rescue' ? ', and got rescued first' : mt.how === 'shape' ? ', level on days but in better shape' : ' and won the last night') + '.';
+  }
+  if (mt.v === 'rugby') {
+    const tr = mt.plays.filter(e => e.kind === 'try' && e.s === mt.winner).length;
+    return w.name + ' won ' + mt.score[mt.winner] + '–' + mt.score[1 - mt.winner] + (tr ? ' (' + tr + ' tr' + (tr === 1 ? 'y' : 'ies') + ')' : '') + (mt.golden ? ' in extra time' : '') + '.';
   }
   if (mt.v === 'golf') return w.name + ' won the cup ' + golfPts(mt.score[mt.winner]) + '–' + golfPts(mt.score[1 - mt.winner]) + (mt.how === 'playoff' ? ' in a sudden-death playoff' : '') + '.';
   if (mt.v === 'mlb') return w.name + ' won ' + mt.score[mt.winner] + '–' + mt.score[1 - mt.winner] + (mt.walkoff ? ' on a walk-off' : '') + (mt.innings > 9 ? ' in ' + mt.innings + ' innings' : '') + '.';
@@ -24459,7 +24474,7 @@ function simWhy(w, mt) {
   if (mt.v === 'mission') return w.name + ' won ' + mt.score[mt.winner] + ' of ' + mt.missions.length + ' missions.';
   return w.name + ' won the ' + (BATTLE_KINDS[mt.kind] || BATTLE_KINDS.fight).name.toLowerCase() + ' ' + mt.score[mt.winner] + '–' + mt.score[1 - mt.winner] + (mt.sudden ? ' in sudden death' : '') + '.';
 }
-const isSimResult = mt => !!mt && (mt.v === 'golf' || mt.v === 'mlb' || mt.v === 'cricket' || mt.v === 'nhl' || mt.v === 'nfl' || mt.v === 'tennis' || mt.v === 'gp' || mt.v === 'card' || mt.v === 'hoops' || mt.v === 'battle' || mt.v === 'arena' || mt.v === 'survival' || mt.v === 'mission' || mt.v === 'show');
+const isSimResult = mt => !!mt && (mt.v === 'rugby' || mt.v === 'golf' || mt.v === 'mlb' || mt.v === 'cricket' || mt.v === 'nhl' || mt.v === 'nfl' || mt.v === 'tennis' || mt.v === 'gp' || mt.v === 'card' || mt.v === 'hoops' || mt.v === 'battle' || mt.v === 'arena' || mt.v === 'survival' || mt.v === 'mission' || mt.v === 'show');
 function battleDuel(rng, kind, a, b, maxP) {
   const fill = (lines, w, l) => lines[Math.floor(rng() * lines.length)].replace('{w}', w).replace('{l}', l);
   if (!a || !b) {
@@ -29852,6 +29867,664 @@ function simulatePuppyBowl(d, A, B, key, knockout) {
     xgDelta: delta
   };
 }
+const RUGBY_POS_SRC = `
+Prop|Tadhg Furlong,Ellis Genge,Jason Leonard
+Hooker|Sean Fitzpatrick,John Smit,Malcolm Marx
+Lock|Martin Johnson,Eben Etzebeth,Maro Itoje,Alun Wyn Jones,Brodie Retallick,Sam Whitelock,Victor Matfield,Paul O'Connell,John Eales,Colin Meads
+Back row|Richie McCaw,Siya Kolisi,David Pocock,Sergio Parisse,Ardie Savea,Pieter-Steph du Toit,Michael Hooper,Kieran Read,Zinzan Brooke,Schalk Burger,Duane Vermeulen,Caelan Doris,Sam Warburton,Lawrence Dallaglio,Thierry Dusautoir,Grégory Alldritt
+Scrum-half|Gareth Edwards,Antoine Dupont,George Gregan,Faf de Klerk,Aaron Smith,Will Genia,Agustín Pichot
+Fly-half|Waisale Serevi,Dan Carter,Jonny Wilkinson,Johnny Sexton,Beauden Barrett,Owen Farrell,Handré Pollard,Finn Russell,Ronan O'Gara,Marcus Smith,Michael Lynagh,Romain Ntamack
+Centre|Jean de Villiers,Ma'a Nonu,Brian O'Driscoll,Sonny Bill Williams,Damian de Allende,Bundee Aki,Jamie Roberts,Will Carling,Matt Giteau,Semi Radradra
+Wing|Jonah Lomu,Shane Williams,Cheslin Kolbe,Bryan Habana,Jason Robinson,Julian Savea,Will Jordan,Kurt-Lee Arendse,James Lowe,George North,Damian Penaud,Louis Bielle-Biarrey,David Campese
+Fullback|Jordie Barrett,Christian Cullen,Leigh Halfpenny,Stuart Hogg,Gavin Hastings,Serge Blanco,Thomas Ramos`;
+const RUGBY_POS = {};
+RUGBY_POS_SRC.trim().split('\n').forEach(line => {
+  const [pos, names] = line.split('|');
+  names.split(',').forEach(n => {
+    RUGBY_POS[n.trim().toLowerCase()] = pos;
+  });
+});
+const RUGBY_FWD = ['Prop', 'Hooker', 'Lock', 'Back row'];
+const RUGBY_ATTRS = ['PAC', 'PWR', 'HND', 'DEF', 'KCK', 'BRK', 'SET'];
+const RUGBY_ATTR_NAMES = {
+  PAC: 'Pace',
+  PWR: 'Power',
+  HND: 'Handling',
+  DEF: 'Tackling',
+  KCK: 'Kicking',
+  BRK: 'Breakdown',
+  SET: 'Set piece'
+};
+const RUGBY_SHAPE = {
+  Prop: {
+    PAC: -14,
+    PWR: 6,
+    HND: -8,
+    DEF: 2,
+    KCK: -30,
+    BRK: 0,
+    SET: 8
+  },
+  Hooker: {
+    PAC: -10,
+    PWR: 4,
+    HND: -4,
+    DEF: 2,
+    KCK: -30,
+    BRK: 2,
+    SET: 8
+  },
+  Lock: {
+    PAC: -10,
+    PWR: 5,
+    HND: -5,
+    DEF: 3,
+    KCK: -30,
+    BRK: 0,
+    SET: 8
+  },
+  'Back row': {
+    PAC: -4,
+    PWR: 4,
+    HND: 0,
+    DEF: 5,
+    KCK: -28,
+    BRK: 7,
+    SET: 2
+  },
+  'Scrum-half': {
+    PAC: 2,
+    PWR: -8,
+    HND: 6,
+    DEF: -2,
+    KCK: -2,
+    BRK: 0,
+    SET: -10
+  },
+  'Fly-half': {
+    PAC: -2,
+    PWR: -8,
+    HND: 4,
+    DEF: -4,
+    KCK: 8,
+    BRK: -6,
+    SET: -12
+  },
+  Centre: {
+    PAC: 2,
+    PWR: 2,
+    HND: 2,
+    DEF: 4,
+    KCK: -14,
+    BRK: 0,
+    SET: -12
+  },
+  Wing: {
+    PAC: 8,
+    PWR: -2,
+    HND: 0,
+    DEF: -4,
+    KCK: -18,
+    BRK: -8,
+    SET: -14
+  },
+  Fullback: {
+    PAC: 4,
+    PWR: -4,
+    HND: 2,
+    DEF: 0,
+    KCK: 2,
+    BRK: -6,
+    SET: -14
+  }
+};
+const RUGBY_PROFILE = {
+  'jonah lomu': [97, {
+    PAC: 6,
+    PWR: 10
+  }],
+  'richie mccaw': [98, {
+    BRK: 6
+  }],
+  'dan carter': [98, {
+    KCK: 6
+  }],
+  'jonny wilkinson': [95, {
+    KCK: 8,
+    DEF: 6
+  }],
+  "brian o'driscoll": [96, {}],
+  'antoine dupont': [98, {
+    PAC: 4
+  }],
+  'siya kolisi': [92, {}],
+  'johnny sexton': [94, {}],
+  'martin johnson': [94, {}],
+  'gareth edwards': [96, {}],
+  'shane williams': [92, {
+    PAC: 6
+  }],
+  'beauden barrett': [93, {
+    PAC: 6
+  }],
+  'cheslin kolbe': [93, {
+    PAC: 6
+  }],
+  'eben etzebeth': [93, {}],
+  'maro itoje': [93, {}],
+  'alun wyn jones': [92, {}],
+  'bryan habana': [93, {
+    PAC: 8
+  }],
+  'david pocock': [93, {
+    BRK: 8
+  }],
+  'george gregan': [91, {}],
+  'sergio parisse': [93, {}],
+  'owen farrell': [90, {
+    KCK: 4
+  }],
+  'ardie savea': [94, {}],
+  'handré pollard': [90, {
+    KCK: 6
+  }],
+  'pieter-steph du toit': [93, {}],
+  'finn russell': [90, {
+    HND: 6
+  }],
+  'faf de klerk': [89, {}],
+  'michael hooper': [91, {}],
+  'jason robinson': [92, {
+    PAC: 6
+  }]
+};
+function rugbyRating(item) {
+  const n = String(item.name || '');
+  const pos = RUGBY_POS[n.toLowerCase()] || (/scrum/i.test(item.desc || '') ? 'Scrum-half' : 'Centre');
+  const fixed = validRating(item.rating);
+  const prof = RUGBY_PROFILE[n.toLowerCase()];
+  const ovr = fixed ? clamp(Math.round(+item.rating), 1, 99) : prof ? prof[0] : clamp(Math.round(78 + itemFame(item) * 16 + (unit('rugo', n) - 0.5) * 6), 72, 94);
+  const tw = prof ? prof[1] : {};
+  const attrs = {};
+  RUGBY_ATTRS.forEach(a => {
+    attrs[a] = clamp(Math.round(ovr + RUGBY_SHAPE[pos][a] + (tw[a] || 0) + (unit('ruga', n, a) - 0.5) * 6), 30, 99);
+  });
+  return {
+    ovr,
+    attrs,
+    pos,
+    fwd: RUGBY_FWD.includes(pos),
+    estimated: !fixed
+  };
+}
+const RUGBY_AVG = 80;
+function rugbyXV(d, m) {
+  const ps = m.team.map(x => {
+    const it = x && d.items[x.itemId];
+    return it ? {
+      name: it.name,
+      itemId: it.id,
+      price: x.price || 0,
+      ...rugbyRating(it)
+    } : null;
+  }).filter(Boolean);
+  const avg = pos => {
+    const attrs = {};
+    RUGBY_ATTRS.forEach(a => {
+      attrs[a] = clamp(RUGBY_AVG + RUGBY_SHAPE[pos][a], 30, 99);
+    });
+    return {
+      name: pos,
+      itemId: null,
+      ovr: RUGBY_AVG,
+      attrs,
+      pos,
+      fwd: RUGBY_FWD.includes(pos),
+      avg: true
+    };
+  };
+  const want = ['Prop', 'Hooker', 'Prop', 'Lock', 'Lock', 'Back row', 'Back row', 'Back row', 'Scrum-half', 'Fly-half', 'Wing', 'Centre', 'Centre', 'Wing', 'Fullback'];
+  const xv = want.map(pos => {
+    const i = ps.findIndex(p => p.pos === pos);
+    return i >= 0 ? ps.splice(i, 1)[0] : null;
+  });
+  ps.forEach(p => {
+    const i = xv.findIndex((x, k) => !x && RUGBY_FWD.includes(want[k]) === p.fwd);
+    const j = i >= 0 ? i : xv.findIndex(x => !x);
+    if (j >= 0) xv[j] = p;
+  });
+  return xv.map((p, k) => p || avg(want[k]));
+}
+const RUGBY_LINES = {
+  try: ['{p} dives over in the corner — TRY!', '{p} crashes over from close range — TRY!', '{p} scores under the posts!', '{p} finishes it off — TRY!'],
+  break: ['{p} breaks the line!', 'What a step from {p}!', '{p} is through the gap!'],
+  turnover: ['{b} wins the turnover at the breakdown!', 'Jackal! {b} steals it!', '{b} rips the ball free!'],
+  tackle: ['Huge hit from {b} on {p}!', '{b} drives {p} back in the tackle!']
+};
+const rugbyLine = (rng, k, v) => {
+  const ls = RUGBY_LINES[k];
+  return ls[Math.floor(rng() * ls.length)].replace('{p}', v.p || '').replace('{b}', v.b || '');
+};
+function simulateRugby(d, A, B, key) {
+  const rng = seeded(d.seed, 'rugby', key, A.id, B.id);
+  const gauss = () => {
+    let u = 0;
+    for (let i = 0; i < 4; i++) u += rng();
+    return (u - 2) / 0.58;
+  };
+  const XV = [rugbyXV(d, A), rugbyXV(d, B)];
+  const avgOf = (s, k, f) => {
+    const ps = XV[s].filter(f || (() => true));
+    return ps.reduce((n, p) => n + p.attrs[k], 0) / ps.length;
+  };
+  const team = [0, 1].map(s => ({
+    atk: avgOf(s, 'PAC') * 0.35 + avgOf(s, 'PWR') * 0.3 + avgOf(s, 'HND') * 0.35,
+    def: avgOf(s, 'DEF'),
+    brk: avgOf(s, 'BRK', p => p.fwd),
+    set: avgOf(s, 'SET', p => p.fwd),
+    kicker: XV[s].slice().sort((a, b) => b.attrs.KCK - a.attrs.KCK)[0]
+  }));
+  const form = [gauss() * 0.02, gauss() * 0.02];
+  const score = [0, 0];
+  const ev = [];
+  const box = [0, 1].map(() => ({}));
+  const bx = (s, n) => box[s][n] = box[s][n] || {
+    tries: 0,
+    pts: 0,
+    carries: 0,
+    metres: 0,
+    breaks: 0,
+    tackles: 0,
+    turnovers: 0,
+    kicks: 0
+  };
+  let t = 0,
+    poss = rng() < 0.5 ? 0 : 1,
+    x = 50;
+  let half = 1;
+  let bin = [[], []];
+  let golden = false;
+  let over = false;
+  const push = e => {
+    e.t = Math.round(t);
+    e.score = [...score];
+    e.x = Math.round(x);
+    e.i = ev.length;
+    ev.push(e);
+    return e;
+  };
+  const min = () => Math.floor(t / 60) + 1;
+  const men = s => 15 - bin[s].filter(b => b > t).length;
+  const pickCarrier = (s, wide) => weighted(rng, XV[s], p => (wide ? (p.fwd ? 0.3 : 1.5) * p.attrs.PAC : (p.fwd ? 1.4 : 0.6) * p.attrs.PWR) * (p.avg ? 1 : 1.6));
+  const pickJackal = s => weighted(rng, XV[s].filter(p => p.fwd), p => Math.pow(p.attrs.BRK / 80, 4) * (p.avg ? 1 : 1.8));
+  const pickTackler = s => weighted(rng, XV[s], p => p.attrs.DEF * (p.fwd ? 1.2 : 0.9) * (p.avg ? 1 : 1.6));
+  const goalKick = (s, dist, angle, kind) => {
+    const k = team[s].kicker;
+    const p = clamp(0.98 - Math.max(0, dist - 22) / 55 - angle * 0.22 + (k.attrs.KCK - 85) / 120, 0.15, 0.98);
+    const good = rng() < p;
+    bx(s, k.name).kicks += good ? 1 : 0;
+    return {
+      good,
+      kicker: k.name
+    };
+  };
+  const tryScored = (s, p, how) => {
+    score[s] += 5;
+    bx(s, p.name).tries++;
+    bx(s, p.name).pts += 5;
+    const angle = rng();
+    const conv = goalKick(s, 22 + angle * 18, angle, 'conv');
+    if (conv.good) {
+      score[s] += 2;
+      bx(s, conv.kicker).pts += 2;
+    }
+    const e = push({
+      kind: 'try',
+      s,
+      p: p.name,
+      how,
+      conv: conv.good,
+      kicker: conv.kicker,
+      text: rugbyLine(rng, 'try', {
+        p: p.name
+      }) + ' ' + (conv.good ? conv.kicker + ' converts.' : conv.kicker + ' misses the conversion.'),
+      hl: true,
+      big: true
+    });
+    x = 50;
+    poss = 1 - s;
+    t += 60;
+    return e;
+  };
+  const endT = () => golden ? 5400 : half === 1 ? 2400 : 4800;
+  while (!over) {
+    if (t >= endT()) {
+      if (golden) break;
+      if (half === 1) {
+        half = 2;
+        t = 2400;
+        poss = 1 - poss;
+        x = 50;
+        push({
+          kind: 'ht',
+          s: null,
+          text: 'Half-time: ' + score[0] + '–' + score[1] + '.',
+          hl: false
+        });
+        continue;
+      }
+      if (score[0] !== score[1]) break;
+      golden = true;
+      t = 4800;
+      x = 50;
+      push({
+        kind: 'et',
+        s: null,
+        text: 'Level at full-time — golden-point extra time! Next score wins.',
+        hl: true
+      });
+      continue;
+    }
+    const s = poss,
+      o = 1 - s;
+    let phases = 0;
+    let ended = false;
+    while (!ended && t < endT()) {
+      phases++;
+      t += 11 + rng() * 14;
+      const wide = rng() < 0.45;
+      const C = pickCarrier(s, wide);
+      const short = men(o) < 15 ? 0.03 * (15 - men(o)) : 0;
+      const edge = (team[s].atk - team[o].def) / 100 + form[s] - form[o] + short - (men(s) < 15 ? 0.03 : 0);
+      bx(s, C.name).carries++;
+      const r = rng();
+      const pBreak = clamp(0.036 + (C.attrs.PAC - team[o].def) / 340 + edge * 0.2 + (wide ? 0.01 : 0), 0.01, 0.15);
+      if (r < pBreak) {
+        const gain = 15 + Math.floor(rng() * 45) + (C.attrs.PAC - 85) / 2;
+        bx(s, C.name).breaks++;
+        bx(s, C.name).metres += Math.round(gain);
+        const before = x;
+        x = Math.min(100, x + gain);
+        const reachP = clamp(0.35 + (C.attrs.PAC - team[o].def) / 120 + (x - 70) / 60, 0.1, 0.85);
+        if (x >= 100 || x > 80 && rng() < reachP) {
+          const finisher = rng() < 0.6 ? C : pickCarrier(s, true);
+          const e = tryScored(s, finisher, 'break');
+          e.from = Math.round(before);
+          e.breaker = C.name;
+          e.text = (finisher !== C ? rugbyLine(rng, 'break', {
+            p: C.name
+          }) + ' ' : '') + e.text;
+          ended = true;
+          if (golden) {
+            over = true;
+          }
+          break;
+        }
+        push({
+          kind: 'break',
+          s,
+          p: C.name,
+          from: Math.round(before),
+          text: rugbyLine(rng, 'break', {
+            p: C.name
+          }) + ' ' + Math.round(gain) + ' metres!',
+          hl: !C.avg,
+          big: false
+        });
+        continue;
+      }
+      const J = pickJackal(o);
+      const pTurn = clamp(0.055 + (J.attrs.BRK - avgOf(s, 'BRK', p => p.fwd)) / 300 - edge * 0.1 + phases * 0.003, 0.02, 0.14);
+      if (r < pBreak + pTurn) {
+        bx(o, J.name).turnovers++;
+        push({
+          kind: 'turnover',
+          s: o,
+          b: J.name,
+          text: rugbyLine(rng, 'turnover', {
+            b: J.name
+          }),
+          hl: !J.avg && rng() < 0.6
+        });
+        poss = o;
+        x = 100 - x;
+        ended = true;
+        break;
+      }
+      if (r < pBreak + pTurn + 0.028) {
+        const pen = rng() < clamp(0.22 + Math.abs(team[s].set - team[o].set) / 60, 0.1, 0.5) ? team[o].set >= team[s].set ? o : s : null;
+        push({
+          kind: 'scrum',
+          s: o,
+          p: C.name,
+          pen,
+          text: C.name + ' knocks on. Scrum' + (pen != null ? ' — ' + (pen === 0 ? A : B).name + ' win a scrum penalty!' : '.'),
+          hl: pen != null && rng() < 0.4
+        });
+        poss = o;
+        x = 100 - x;
+        if (pen === s) {
+          poss = s;
+          x = 100 - x;
+        }
+        ended = true;
+        break;
+      }
+      const pPen = 0.06;
+      if (r < pBreak + pTurn + 0.028 + pPen) {
+        const toAtk = rng() < 0.58 + edge * 0.5;
+        const ws = toAtk ? s : o;
+        const ls = 1 - ws;
+        let xx = toAtk ? x : 100 - x;
+        const yellow = rng() < 0.07 + (ws === s && x > 85 ? 0.12 : 0);
+        if (yellow) {
+          const culprit = pickTackler(ls);
+          bin[ls].push(t + 600);
+          push({
+            kind: 'card',
+            s: ls,
+            p: culprit.name,
+            text: 'YELLOW CARD! ' + culprit.name + ' is sent to the bin for ten minutes.',
+            hl: true
+          });
+        }
+        const late = t > 4200 || golden;
+        const diff = score[ws] - score[ls];
+        const dist = 100 - xx + 5;
+        const angle = rng() * 0.8;
+        const goForPosts = xx >= 55 && (xx < 88 || late || rng() < 0.55) && !(late && diff < -3 && xx > 80);
+        if (goForPosts) {
+          const k = goalKick(ws, dist, angle, 'pen');
+          if (k.good) {
+            score[ws] += 3;
+            bx(ws, k.kicker).pts += 3;
+          }
+          x = xx;
+          poss = ws;
+          push({
+            kind: 'pen',
+            s: ws,
+            p: k.kicker,
+            good: k.good,
+            dist: Math.round(dist),
+            text: k.kicker + ' kicks at goal from ' + Math.round(dist) + ' metres… ' + (k.good ? 'over!' : 'wide!'),
+            hl: k.good ? late || dist > 40 || golden : true,
+            big: k.good && (late || golden)
+          });
+          if (k.good && golden) {
+            over = true;
+            ended = true;
+            break;
+          }
+          poss = k.good ? ls : ls;
+          x = k.good ? 50 : 22;
+          ended = true;
+          break;
+        }
+        x = Math.min(95, xx + 25);
+        poss = ws;
+        const set = team[ws].set - team[ls].set;
+        const pMaul = clamp(0.22 + set / 60 + (x - 85) / 40, 0.08, 0.5);
+        if (x >= 88 && rng() < pMaul) {
+          const hook = XV[ws].find(p => p.pos === 'Hooker') || XV[ws][1];
+          const e = tryScored(ws, hook, 'maul');
+          e.text = 'Lineout, driving maul… ' + e.text;
+          if (golden) over = true;
+          ended = true;
+          break;
+        }
+        push({
+          kind: 'lineout',
+          s: ws,
+          text: (ws === 0 ? A : B).name + ' kick to the corner for a lineout.',
+          hl: false
+        });
+        ended = true;
+        break;
+      }
+      const fh = XV[s].find(p => p.pos === 'Fly-half');
+      if (fh && x > 62 && (t > 4500 || golden) && Math.abs(score[s] - score[o]) <= 2 && rng() < 0.08) {
+        const good = rng() < clamp(0.55 + (fh.attrs.KCK - 85) / 80 - (100 - x - 22) / 60, 0.15, 0.8);
+        if (good) {
+          score[s] += 3;
+          bx(s, fh.name).pts += 3;
+        }
+        push({
+          kind: 'drop',
+          s,
+          p: fh.name,
+          good,
+          text: fh.name + ' goes for the drop goal… ' + (good ? 'IT’S OVER!' : 'wide!'),
+          hl: true,
+          big: good
+        });
+        if (good && golden) {
+          over = true;
+        }
+        poss = o;
+        x = good ? 50 : 22;
+        ended = true;
+        break;
+      }
+      const gain = Math.max(-2, Math.round(2.5 + gauss() * 3 + edge * 8 + (C.attrs.PWR - 85) / 15));
+      bx(s, C.name).metres += gain;
+      x = Math.min(99, Math.max(1, x + gain));
+      const T2 = pickTackler(o);
+      bx(o, T2.name).tackles++;
+      if (!T2.avg && rng() < 0.04) push({
+        kind: 'tackle',
+        s: o,
+        b: T2.name,
+        p: C.name,
+        text: rugbyLine(rng, 'tackle', {
+          b: T2.name,
+          p: C.name
+        }),
+        hl: true
+      });
+      if (x >= 96 && rng() < 0.35 + edge) {
+        const e = tryScored(s, pickCarrier(s, false), 'close');
+        if (golden) over = true;
+        ended = true;
+        break;
+      }
+      if (x < 40 && phases >= 3 && rng() < 0.4) {
+        const kk = team[s].kicker;
+        const len = 25 + Math.floor(rng() * 25) + (kk.attrs.KCK - 85) / 2;
+        x = Math.min(95, x + len);
+        poss = o;
+        x = 100 - x;
+        push({
+          kind: 'kick',
+          s,
+          p: kk.name,
+          text: kk.name + ' kicks for territory (' + Math.round(len) + ' m).',
+          hl: false
+        });
+        ended = true;
+        break;
+      }
+      if (phases > 14) {
+        poss = o;
+        x = 100 - x;
+        push({
+          kind: 'held',
+          s: o,
+          text: 'Held up — turnover.',
+          hl: false
+        });
+        ended = true;
+        break;
+      }
+    }
+    if (over) break;
+  }
+  if (score[0] === score[1]) {
+    const order = s => XV[s].slice().sort((a, b) => b.attrs.KCK - a.attrs.KCK).slice(0, 5);
+    const made = [0, 0];
+    const kicks = [];
+    for (let r = 0; r < 10; r++) {
+      [0, 1].forEach(s => {
+        const k = order(s)[r % 5];
+        const g = rng() < clamp(0.72 + (k.attrs.KCK - 85) / 80, 0.2, 0.93);
+        if (g) made[s]++;
+        kicks.push({
+          s,
+          p: k.name,
+          g
+        });
+        push({
+          kind: 'kickcomp',
+          s,
+          p: k.name,
+          good: g,
+          text: k.name + (g ? ' slots it.' : ' misses!'),
+          hl: true
+        });
+      });
+      if (r >= 4 && made[0] !== made[1]) break;
+    }
+    if (made[0] === made[1]) made[rng() < 0.5 ? 0 : 1]++;
+    const w = made[0] > made[1] ? 0 : 1;
+    score[w] += 1;
+    push({
+      kind: 'kcwin',
+      s: w,
+      text: (w === 0 ? A : B).name + ' win the kicking competition ' + made[w] + '–' + made[1 - w] + '!',
+      hl: true,
+      big: true
+    });
+  }
+  ev.forEach(e => {
+    if (e.t > 4500 && Math.abs(e.score[0] - e.score[1]) <= 7 && ['try', 'pen', 'drop', 'turnover', 'break', 'card'].includes(e.kind)) e.hl = true;
+  });
+  const winner = score[0] > score[1] ? 0 : 1;
+  const ht = ev.find(e => e.kind === 'ht');
+  const halves = [ht ? ht.score : score, score];
+  return {
+    v: 'rugby',
+    kind: 'rugby',
+    score: [...score],
+    winner,
+    golden,
+    halves,
+    plays: ev,
+    box,
+    xv: XV.map(x2 => x2.map(p => ({
+      name: p.name,
+      itemId: p.itemId,
+      pos: p.pos,
+      fwd: p.fwd,
+      avg: !!p.avg,
+      ovr: p.ovr
+    }))),
+    et: golden,
+    pens: null,
+    sudden: golden,
+    events: []
+  };
+}
+const rugbyMin = t => Math.min(80, Math.floor(t / 60) + 1) + (t >= 4800 ? '+' : '') + '′';
 const SHOW_JUDGES = [{
   name: 'Nana Fluff',
   emoji: '👵',
@@ -33402,7 +34075,7 @@ function TopicEditor({
   }, "Fun battles (Battles finale)"), React.createElement(Seg, {
     label: "Fun battle style",
     value: topic.battle || 'none',
-    options: [['none', 'Off'], ['fight', '⚔️ Fight'], ['powers', '💥 Powers'], ['survival', '🧟 Survival'], ['cute', '🥰 Puppy Bowl'], ['weird', '🤡 Silly'], ['combat', '🥊 Fight night'], ['f1', '🏎️ Grand Prix'], ['tennis', '🎾 Tennis'], ['nfl', '🏈 American football'], ['nhl', '🏒 Ice hockey'], ['cricket', '🏏 Cricket'], ['mlb', '⚾ Baseball'], ['golf', '⛳ Golf'], ['basketball', '🏀 Basketball']],
+    options: [['none', 'Off'], ['fight', '⚔️ Fight'], ['powers', '💥 Powers'], ['survival', '🧟 Survival'], ['cute', '🥰 Puppy Bowl'], ['weird', '🤡 Silly'], ['combat', '🥊 Fight night'], ['f1', '🏎️ Grand Prix'], ['tennis', '🎾 Tennis'], ['nfl', '🏈 American football'], ['nhl', '🏒 Ice hockey'], ['cricket', '🏏 Cricket'], ['mlb', '⚾ Baseball'], ['golf', '⛳ Golf'], ['rugby', '🏉 Rugby'], ['basketball', '🏀 Basketball']],
     onChange: v => set({
       battle: v === 'none' ? '' : v
     })
@@ -35573,6 +36246,9 @@ function ItemCard({
     item: item,
     topic: d.topic
   }) : battleKindId(d.topic) === 'golf' ? React.createElement(GolfChip, {
+    item: item,
+    topic: d.topic
+  }) : battleKindId(d.topic) === 'rugby' ? React.createElement(RugbyChip, {
     item: item,
     topic: d.topic
   }) : hasBattle(d.topic) && React.createElement(StatChip, {
@@ -40389,7 +41065,12 @@ if (window.__DN_TEST__) window.__DN = {
     golfScript,
     golfFrame,
     golfLine,
-    GOLF_COURSE
+    GOLF_COURSE,
+    simulateRugby,
+    rugbyRating,
+    rugbyScript,
+    rugbyFrame,
+    rugbyReport
   },
   simStats: {
     simulatePuppyBowl,
@@ -44156,6 +44837,12 @@ function MatchSummary({
   B,
   match
 }) {
+  if (match.v === 'rugby') return React.createElement(RugbySummary, {
+    d: d,
+    A: A,
+    B: B,
+    match: match
+  });
   if (match.v === 'golf') return React.createElement(GolfSummary, {
     d: d,
     A: A,
@@ -45704,7 +46391,7 @@ function PitchMatch({
   }));
 }
 function MatchView(props) {
-  return props.match && props.match.v === 'golf' ? React.createElement(GolfView, props) : props.match && props.match.v === 'mlb' ? React.createElement(DiamondView, props) : props.match && props.match.v === 'cricket' ? React.createElement(CricketView, props) : props.match && props.match.v === 'nhl' ? React.createElement(RinkView, props) : props.match && props.match.v === 'nfl' ? React.createElement(GridironView, props) : props.match && props.match.v === 'tennis' ? React.createElement(TennisView, props) : props.match && props.match.v === 'gp' ? React.createElement(TrackView, props) : props.match && props.match.v === 'card' ? React.createElement(RingView, props) : props.match && props.match.v === 'hoops' ? React.createElement(CourtView, props) : props.match && props.match.v === 'show' ? React.createElement(ShowView, props) : props.match && props.match.v === 'mission' ? React.createElement(MissionView, props) : props.match && props.match.v === 'survival' ? React.createElement(SurvivalView, props) : props.match && props.match.v === 'arena' ? React.createElement(ArenaView, props) : props.match && props.match.v === 'battle' ? React.createElement(BattleView, props) : props.match && props.match.v === 2 ? React.createElement(PitchMatch, props) : React.createElement(MatchPlayer, props);
+  return props.match && props.match.v === 'rugby' ? React.createElement(RugbyView, props) : props.match && props.match.v === 'golf' ? React.createElement(GolfView, props) : props.match && props.match.v === 'mlb' ? React.createElement(DiamondView, props) : props.match && props.match.v === 'cricket' ? React.createElement(CricketView, props) : props.match && props.match.v === 'nhl' ? React.createElement(RinkView, props) : props.match && props.match.v === 'nfl' ? React.createElement(GridironView, props) : props.match && props.match.v === 'tennis' ? React.createElement(TennisView, props) : props.match && props.match.v === 'gp' ? React.createElement(TrackView, props) : props.match && props.match.v === 'card' ? React.createElement(RingView, props) : props.match && props.match.v === 'hoops' ? React.createElement(CourtView, props) : props.match && props.match.v === 'show' ? React.createElement(ShowView, props) : props.match && props.match.v === 'mission' ? React.createElement(MissionView, props) : props.match && props.match.v === 'survival' ? React.createElement(SurvivalView, props) : props.match && props.match.v === 'arena' ? React.createElement(ArenaView, props) : props.match && props.match.v === 'battle' ? React.createElement(BattleView, props) : props.match && props.match.v === 2 ? React.createElement(PitchMatch, props) : React.createElement(MatchPlayer, props);
 }
 function matchReport(d, A, B, match) {
   const teams = [A, B];
@@ -49716,6 +50403,701 @@ function NHLChip({
       margin: 0
     }
   }, "Now: how good they are today. ", keys.map(a => a + ' ' + NHL_ATTR_NAMES[a].toLowerCase()).join(' · '), ". Draft Night estimate, not an official rating.")), React.createElement("button", {
+    className: "btn btn-ghost",
+    onClick: () => setOpen(false)
+  }, "Close")), document.body));
+}
+const RP = {
+  w: 120,
+  h: 70
+};
+const rx = (s, x) => s === 0 ? 10 + x : 110 - x;
+const RUGBY_DUR = {
+  try: 5,
+  pen: 3.6,
+  drop: 3.4,
+  break: 3.2,
+  turnover: 2.6,
+  tackle: 2.4,
+  card: 2.6,
+  scrum: 2.8,
+  et: 2.4,
+  kickcomp: 2.6,
+  kcwin: 2.6
+};
+function rugbyScript(match) {
+  const beats = [];
+  let t = 0;
+  const add = b => {
+    b.t0 = t;
+    t += b.dur;
+    beats.push(b);
+    return b;
+  };
+  add({
+    type: 'intro',
+    dur: 2.4
+  });
+  let roll = [];
+  const flush = () => {
+    if (!roll.length) return;
+    add({
+      type: 'roll',
+      dur: Math.min(2.4, 0.5 + roll.length * 0.1),
+      evs: roll
+    });
+    roll = [];
+  };
+  match.plays.forEach(e => {
+    if (e.kind === 'ht') {
+      flush();
+      add({
+        type: 'ht',
+        dur: 2.4,
+        e
+      });
+      return;
+    }
+    if (e.hl) {
+      flush();
+      add({
+        type: 'ev',
+        dur: RUGBY_DUR[e.kind] || 2.6,
+        e
+      });
+    } else roll.push(e);
+  });
+  flush();
+  add({
+    type: 'final',
+    dur: 2.8
+  });
+  return {
+    beats,
+    total: t
+  };
+}
+function rugbyFrame(beat, u, xv) {
+  const out = {
+    P: [[], []],
+    ball: null,
+    banner: null,
+    flash: null,
+    card: null
+  };
+  const e = beat.e || null;
+  const s = e && e.s != null ? e.s : 0;
+  const o = 1 - s;
+  const ballX = e ? rx(s, Math.max(0, Math.min(100, e.from != null ? e.from : e.x || 50))) : 60;
+  const dir = s === 0 ? 1 : -1;
+  const form = (side, bx, att) => xv[side].map((p, i) => {
+    const d2 = side === s ? -dir : dir;
+    if (p.fwd) return {
+      x: bx + d2 * (1 + i % 3 * 1.2) * (att ? 1 : 0.6),
+      y: RP.h / 2 + (i % 8 - 3.5) * 2.2
+    };
+    const bi = i - 8;
+    const off = [0, 1, -1, 2, -2, 3, -3][bi] || 0;
+    return {
+      x: bx + d2 * (4 + Math.abs(off) * 2.6),
+      y: RP.h / 2 + off * 9
+    };
+  });
+  out.P[s] = form(s, ballX, true);
+  out.P[o] = form(o, ballX + dir * 1.5, false);
+  out.ball = {
+    x: ballX,
+    y: RP.h / 2,
+    h: 0
+  };
+  if (beat.type !== 'ev') return out;
+  const k = (a, b) => Math.max(0, Math.min(1, (u - a) / (b - a)));
+  const idx = (side, name) => xv[side].findIndex(p => p.name === name);
+  if (e.kind === 'try' || e.kind === 'break') {
+    const ci = Math.max(0, idx(s, e.kind === 'try' && e.breaker ? e.breaker : e.p));
+    const fi = Math.max(0, idx(s, e.p));
+    const endX = e.kind === 'try' ? rx(s, 103) : rx(s, Math.min(98, (e.from || 50) + 35));
+    const laneY = e.how === 'maul' || e.how === 'close' ? RP.h / 2 : 10 + unit('lane', e.i) * 50;
+    const runK = easeC(k(0.4, e.kind === 'try' ? 2.8 : 2.4));
+    const start = out.P[s][ci];
+    if (e.how === 'maul' || e.how === 'close') {
+      out.P[s] = out.P[s].map((p, i) => xv[s][i].fwd ? {
+        x: p.x + dir * runK * 6,
+        y: RP.h / 2 + (i % 8 - 3.5) * 1.4
+      } : p);
+      out.P[o] = out.P[o].map((p, i) => xv[o][i].fwd ? {
+        x: p.x + dir * runK * 5,
+        y: RP.h / 2 + (i % 8 - 3.5) * 1.4
+      } : p);
+      out.ball = {
+        x: rx(s, Math.min(101, (e.x || 95) + runK * 8)),
+        y: RP.h / 2,
+        h: 0
+      };
+    } else {
+      const runner = {
+        x: start.x + (endX - start.x) * runK,
+        y: start.y + (laneY - start.y) * runK
+      };
+      out.P[s][ci] = runner;
+      if (fi !== ci && runK > 0.75) out.P[s][fi] = {
+        x: runner.x - dir * 2,
+        y: runner.y + 3
+      };
+      out.P[o] = out.P[o].map((p, i) => ({
+        x: p.x + (runner.x - p.x) * runK * 0.55,
+        y: p.y + (runner.y - p.y) * runK * 0.5
+      }));
+      out.ball = {
+        ...(fi !== ci && runK > 0.85 ? out.P[s][fi] : runner),
+        h: 0
+      };
+    }
+    if (e.kind === 'try') {
+      if (u > 2.8 && u < 3.6) out.banner = 'TRY!';
+      if (u >= 3.6) {
+        const post = {
+          x: s === 0 ? 110 : 10,
+          y: RP.h / 2
+        };
+        const kick = {
+          x: rx(s, 78),
+          y: 18 + unit('conv', e.i) * 34
+        };
+        const kk = k(3.7, 4.5);
+        out.ball = kk <= 0 ? {
+          ...kick,
+          h: 0
+        } : {
+          x: kick.x + (post.x - kick.x) * kk,
+          y: kick.y + (post.y + (e.conv ? 0 : 6) - kick.y) * kk,
+          h: Math.sin(kk * Math.PI) * 9 + kk * 2
+        };
+        if (u > 4.5) out.banner = e.conv ? 'CONVERTED!' : 'MISSED';
+      }
+    } else if (u > 1.2) out.banner = 'LINE BREAK!';
+    return out;
+  }
+  if (e.kind === 'pen' || e.kind === 'drop' || e.kind === 'kickcomp') {
+    const post = {
+      x: s === 0 ? 110 : 10,
+      y: RP.h / 2
+    };
+    const spot = e.kind === 'kickcomp' ? {
+      x: rx(s, 78),
+      y: 20 + unit('kc', e.i) * 30
+    } : {
+      x: rx(s, Math.min(95, e.x || 70)),
+      y: 16 + unit('pk', e.i) * 38
+    };
+    const kk = k(1.0, 2.2);
+    out.ball = kk <= 0 ? {
+      ...spot,
+      h: 0
+    } : {
+      x: spot.x + (post.x - spot.x) * kk,
+      y: spot.y + (post.y + (e.good ? 0 : unit('w', e.i) < 0.5 ? -7 : 7) - spot.y) * kk,
+      h: Math.sin(kk * Math.PI) * 10 + kk * 3
+    };
+    if (e.kind === 'pen') {
+      out.P[s] = out.P[s].map(p => ({
+        x: p.x - dir * 8,
+        y: p.y
+      }));
+    }
+    if (u > 2.2) out.banner = e.kind === 'drop' ? e.good ? 'DROP GOAL!' : 'WIDE!' : e.good ? 'OVER!' : 'WIDE!';
+    return out;
+  }
+  if (e.kind === 'turnover') {
+    if (u > 0.8) {
+      out.banner = 'TURNOVER!';
+      const ji = idx(s, e.b);
+      if (ji >= 0) out.flash = out.P[s][ji];
+    }
+    return out;
+  }
+  if (e.kind === 'tackle') {
+    const ti = idx(s, e.b);
+    const ci = idx(o, e.p);
+    if (ti >= 0 && ci >= 0) {
+      out.P[s][ti] = {
+        x: out.P[o][ci].x - dir * 0.6 * k(0.3, 0.9),
+        y: out.P[o][ci].y
+      };
+      out.flash = out.P[o][ci];
+    }
+    if (u > 0.9) out.banner = 'BIG HIT!';
+    return out;
+  }
+  if (e.kind === 'card') {
+    out.card = k(0.2, 0.6);
+    if (u > 0.5) out.banner = 'YELLOW CARD';
+    const ci = idx(s, e.p);
+    if (ci >= 0) out.flash = out.P[s][ci];
+    return out;
+  }
+  if (e.kind === 'scrum') {
+    [0, 1].forEach(side => {
+      out.P[side] = out.P[side].map((p, i) => xv[side][i].fwd ? {
+        x: ballX + (side === s ? -1 : 1) * dir * (1 + Math.floor(i / 3)),
+        y: RP.h / 2 + (i % 3 - 1) * 1.2
+      } : p);
+    });
+    if (u > 1.2 && e.pen != null) out.banner = 'SCRUM PENALTY!';
+    return out;
+  }
+  if (e.kind === 'et') out.banner = 'GOLDEN POINT';
+  if (e.kind === 'kcwin') out.banner = 'KICKING COMPETITION WON';
+  return out;
+}
+function RugbyView({
+  d,
+  A,
+  B,
+  match,
+  speed,
+  onDone,
+  label
+}) {
+  const script = useMemo(() => rugbyScript(match), [match]);
+  const base = speed === 'fast' ? 2 : 1;
+  const [t, setT] = useState(speed === 'instant' ? script.total : 0);
+  const [playing, setPlaying] = useState(speed !== 'instant');
+  const [mult, setMult] = useState(1);
+  const done = t >= script.total;
+  const fired = useRef(false);
+  useEffect(() => {
+    if (!playing || done) return undefined;
+    let raf;
+    let last = performance.now();
+    const tick = now => {
+      const dt = Math.min(0.1, (now - last) / 1000);
+      last = now;
+      setT(x => Math.min(script.total, x + dt * base * mult / Math.max(0.001, GAME_SPEED)));
+      raf = requestAnimationFrame(tick);
+    };
+    raf = requestAnimationFrame(tick);
+    return () => cancelAnimationFrame(raf);
+  }, [playing, done, mult, base]);
+  useEffect(() => {
+    if (done && !fired.current) {
+      fired.current = true;
+      audio.play('whistle');
+      onDone && onDone();
+    }
+  }, [done]);
+  const bi = Math.max(0, script.beats.findIndex(b => t < b.t0 + b.dur));
+  const beat = done ? script.beats[script.beats.length - 1] : script.beats[bi];
+  const u = done ? beat.dur : t - beat.t0;
+  const xv = match.xv;
+  const evNow = beat.type === 'ev' || beat.type === 'ht' ? beat.e : beat.type === 'roll' ? beat.evs[Math.min(beat.evs.length - 1, Math.floor(u / beat.dur * beat.evs.length))] : null;
+  const fr = rugbyFrame(beat.type === 'roll' ? {
+    type: 'roll',
+    e: evNow
+  } : beat, u, xv);
+  const prevScore = e => {
+    const p = match.plays[e.i - 1];
+    return p ? p.score : [0, 0];
+  };
+  const scoredAt = e => e.kind === 'try' ? 2.8 : e.kind === 'pen' || e.kind === 'drop' ? 2.2 : 0;
+  const score = done || beat.type === 'final' ? match.score : evNow ? beat.type === 'ev' && u < scoredAt(evNow) ? prevScore(evNow) : evNow.score : [0, 0];
+  const status = done || beat.type === 'final' ? match.golden ? 'FINAL/ET' : 'FULL-TIME' : beat.type === 'intro' ? 'KICK-OFF' : beat.type === 'ht' ? 'HALF-TIME' : evNow ? rugbyMin(evNow.t) : '';
+  const colors = [A.color, B.color];
+  const short = n => {
+    const w = String(n || '').split(' ');
+    return w[w.length - 1].slice(0, 10);
+  };
+  const banner = done ? null : beat.type === 'intro' ? 'KICK-OFF' : beat.type === 'ht' ? 'HALF-TIME' : beat.type === 'final' ? 'FULL-TIME' : fr.banner;
+  const lastBeat = useRef(-1);
+  useEffect(() => {
+    if (!playing || done || bi === lastBeat.current) return;
+    lastBeat.current = bi;
+    if (beat.type === 'ht' || beat.type === 'intro') audio.play('whistle');
+  }, [bi]);
+  const said = useRef({});
+  useEffect(() => {
+    if (!playing || done || beat.type !== 'ev' || said.current[bi] || u < scoredAt(beat.e) || !scoredAt(beat.e)) return;
+    said.current[bi] = true;
+    const e = beat.e;
+    if (e.kind === 'try') {
+      audio.play('cheer');
+      audio.say('Try, ' + e.p + '!', 2, d.id + ':' + label + ':t' + bi);
+    } else if (e.good) audio.play('bid');
+  }, [t]);
+  const feed = [];
+  script.beats.forEach((b, k2) => {
+    if (!done && b.t0 + b.dur * 0.75 > t) return;
+    if (b.type === 'ev') feed.push({
+      k: k2,
+      tag: rugbyMin(b.e.t),
+      team: b.e.s,
+      big: b.e.big,
+      text: b.e.text
+    });else if (b.type === 'ht') feed.push({
+      k: k2,
+      tag: 'HT',
+      text: b.e.text,
+      half: true
+    });
+  });
+  const feedRef = useRef(null);
+  useEffect(() => {
+    const f = feedRef.current;
+    if (f) f.scrollTop = f.scrollHeight;
+  }, [feed.length]);
+  const binned = evNow ? [0, 1].map(s2 => match.plays.filter(e => e.kind === 'card' && e.s === s2 && e.t <= evNow.t && evNow.t < e.t + 600).length) : [0, 0];
+  return React.createElement("div", {
+    className: "matchview rugbyview"
+  }, React.createElement("div", {
+    className: "scoreboard"
+  }, React.createElement("div", {
+    className: "sb-team"
+  }, React.createElement(Badge, {
+    m: A
+  }), React.createElement("span", {
+    className: "sb-n"
+  }, A.name)), React.createElement("div", {
+    className: "sb-mid"
+  }, React.createElement("span", {
+    className: "sb-score num",
+    "aria-live": "polite"
+  }, score[0], "\u2013", score[1]), React.createElement("span", {
+    className: "sb-clock num"
+  }, status)), React.createElement("div", {
+    className: "sb-team"
+  }, React.createElement(Badge, {
+    m: B
+  }), React.createElement("span", {
+    className: "sb-n"
+  }, B.name))), React.createElement("div", {
+    className: "boutbar small"
+  }, React.createElement("span", {
+    className: "muted"
+  }, "Rugby union \xB7 15 a side"), binned[0] || binned[1] ? React.createElement("span", {
+    className: "muted"
+  }, " \xB7 \uD83D\uDFE8 ", binned[0] ? A.name + ' down to ' + (15 - binned[0]) : '', binned[0] && binned[1] ? ', ' : '', binned[1] ? B.name + ' down to ' + (15 - binned[1]) : '') : null), React.createElement("div", {
+    className: "pitchwrap"
+  }, React.createElement("svg", {
+    className: "pitchsvg rugbysvg",
+    viewBox: '-2 -2 ' + (RP.w + 4) + ' ' + (RP.h + 4),
+    role: "img",
+    "aria-label": 'Rugby: ' + A.name + ' ' + score[0] + ', ' + B.name + ' ' + score[1] + ', ' + status
+  }, React.createElement("rect", {
+    x: "-2",
+    y: "-2",
+    width: RP.w + 4,
+    height: RP.h + 4,
+    fill: "#2f6b2a"
+  }), Array.from({
+    length: 10
+  }, (_, i) => React.createElement("rect", {
+    key: i,
+    x: 10 + i * 10,
+    y: "0",
+    width: "10",
+    height: RP.h,
+    fill: i % 2 ? '#3f8a37' : '#47963e'
+  })), React.createElement("rect", {
+    x: "0",
+    y: "0",
+    width: "10",
+    height: RP.h,
+    fill: A.color,
+    opacity: ".4"
+  }), React.createElement("rect", {
+    x: "110",
+    y: "0",
+    width: "10",
+    height: RP.h,
+    fill: B.color,
+    opacity: ".4"
+  }), React.createElement("g", {
+    stroke: "rgba(255,255,255,.85)",
+    strokeWidth: "0.35",
+    fill: "none"
+  }, React.createElement("rect", {
+    x: "0",
+    y: "0",
+    width: RP.w,
+    height: RP.h
+  }), [10, 32, 60, 88, 110].map(x2 => React.createElement("line", {
+    key: x2,
+    x1: x2,
+    y1: "0",
+    x2: x2,
+    y2: RP.h,
+    strokeDasharray: x2 === 60 || x2 === 10 || x2 === 110 ? '' : ''
+  })), [20, 50, 70, 100].map(x2 => React.createElement("line", {
+    key: 'd' + x2,
+    x1: x2,
+    y1: "0",
+    x2: x2,
+    y2: RP.h,
+    strokeDasharray: "1.5 1.5",
+    opacity: ".6"
+  }))), [10, 110].map(x2 => React.createElement("g", {
+    key: 'p' + x2,
+    stroke: "#fff",
+    strokeWidth: "0.6"
+  }, React.createElement("line", {
+    x1: x2,
+    y1: RP.h / 2 - 3,
+    x2: x2,
+    y2: RP.h / 2 + 3
+  }), React.createElement("circle", {
+    cx: x2,
+    cy: RP.h / 2 - 3,
+    r: "0.6",
+    fill: "#fff"
+  }), React.createElement("circle", {
+    cx: x2,
+    cy: RP.h / 2 + 3,
+    r: "0.6",
+    fill: "#fff"
+  }))), beat.type !== 'intro' && [0, 1].map(side => xv[side].map((pl, i) => {
+    const p = fr.P[side][i];
+    if (!p) return null;
+    const named = !pl.avg;
+    return React.createElement("g", {
+      key: side + '-' + i,
+      transform: 'translate(' + p.x.toFixed(2) + ' ' + p.y.toFixed(2) + ')'
+    }, React.createElement("circle", {
+      r: named ? 1.45 : 1.15,
+      fill: colors[side],
+      stroke: named ? '#fff' : 'rgba(0,0,0,.45)',
+      strokeWidth: named ? 0.4 : 0.25
+    }), named && React.createElement("text", {
+      y: "-2",
+      textAnchor: "middle",
+      fontSize: "2",
+      fontWeight: "800",
+      fill: "#fff",
+      stroke: "#0f0c21",
+      strokeWidth: "0.4",
+      paintOrder: "stroke"
+    }, short(pl.name)));
+  })), fr.ball && React.createElement("g", null, React.createElement("ellipse", {
+    cx: fr.ball.x,
+    cy: fr.ball.y + 0.3,
+    rx: "0.8",
+    ry: "0.4",
+    fill: "rgba(0,0,0,.3)"
+  }), React.createElement("ellipse", {
+    cx: fr.ball.x,
+    cy: fr.ball.y - (fr.ball.h || 0) * 0.45,
+    rx: "1",
+    ry: "0.65",
+    fill: "#f4f1ea",
+    stroke: "#8a4a1f",
+    strokeWidth: "0.2"
+  })), fr.flash && React.createElement("circle", {
+    cx: fr.flash.x,
+    cy: fr.flash.y,
+    r: "3",
+    fill: "none",
+    stroke: "#ffd23d",
+    strokeWidth: "0.5"
+  }), fr.card != null && React.createElement("rect", {
+    x: 60 - 3,
+    y: 18 - 4 * fr.card,
+    width: "6",
+    height: "8",
+    rx: "0.8",
+    fill: "#ffd23d",
+    stroke: "#0f0c21",
+    strokeWidth: "0.3"
+  }), (done || beat.type === 'final') && React.createElement("g", null, React.createElement("rect", {
+    x: "-2",
+    y: "-2",
+    width: RP.w + 4,
+    height: RP.h + 4,
+    fill: "rgba(15,12,33,.55)"
+  }), React.createElement("text", {
+    x: "60",
+    y: "30",
+    textAnchor: "middle",
+    fontSize: "8",
+    fontWeight: "900",
+    fill: colors[match.winner],
+    stroke: "#0f0c21",
+    strokeWidth: "0.6",
+    paintOrder: "stroke"
+  }, (match.winner === 0 ? A : B).name.toUpperCase().slice(0, 16), " WIN"), React.createElement("text", {
+    x: "60",
+    y: "40",
+    textAnchor: "middle",
+    fontSize: "6",
+    fontWeight: "900",
+    fill: "#ffc83d"
+  }, match.score[0], "\u2013", match.score[1])), banner && React.createElement("text", {
+    x: "60",
+    y: "12",
+    textAnchor: "middle",
+    fontSize: banner.length > 14 ? 6 : 8,
+    fontWeight: "900",
+    fill: /TRY|CONVERTED|OVER|DROP|BREAK|TURNOVER|YELLOW|HIT|PENALTY|WON/.test(banner) ? '#ffc83d' : '#fff',
+    stroke: "#0f0c21",
+    strokeWidth: "0.7",
+    paintOrder: "stroke",
+    className: "pbanner"
+  }, banner))), React.createElement("div", {
+    className: "mctrl",
+    role: "group",
+    "aria-label": "Match controls"
+  }, !done && React.createElement("button", {
+    className: "btn btn-sm",
+    onClick: () => setPlaying(x => !x),
+    "aria-label": playing ? 'Pause' : 'Play'
+  }, playing ? '⏸ Pause' : '▶ Play'), !done && [1, 2, 4].map(x => React.createElement("button", {
+    key: x,
+    className: 'btn btn-sm' + (mult === x ? ' btn-gold' : ''),
+    "aria-pressed": mult === x,
+    onClick: () => setMult(x)
+  }, x, "\xD7")), !done && React.createElement("button", {
+    className: "btn btn-sm btn-ghost",
+    onClick: () => setT(script.total)
+  }, "Skip to result"), done && React.createElement("button", {
+    className: "btn btn-sm",
+    onClick: () => {
+      fired.current = true;
+      said.current = {};
+      setT(0);
+      setPlaying(true);
+    }
+  }, "\u21BA Watch again")), React.createElement("div", {
+    className: "mfeed",
+    ref: feedRef,
+    "aria-live": "polite"
+  }, feed.map(e => React.createElement("p", {
+    key: e.k,
+    className: 'mev ' + (e.big ? 'goal' : e.half ? 'half' : '') + (e.team != null ? ' t' + e.team : '')
+  }, React.createElement("span", {
+    className: "mm num"
+  }, e.tag), React.createElement("span", null, e.big ? '🏉 ' : '', e.text, e.team != null ? React.createElement("small", null, " \xB7 ", (e.team === 0 ? A : B).name) : null)))), done && React.createElement(RugbySummary, {
+    d: d,
+    A: A,
+    B: B,
+    match: match
+  }));
+}
+function rugbyReport(d, A, B, match) {
+  const T = [A, B];
+  const rows = [0, 1].flatMap(s => Object.entries(match.box[s]).map(([name, b]) => ({
+    team: s,
+    name,
+    ...b,
+    avg: !!(match.xv[s].find(p => p.name === name) || {}).avg,
+    gs: b.pts * 1.2 + b.tries * 4 + b.breaks * 2 + b.metres / 15 + b.turnovers * 3 + b.tackles * 0.3
+  })));
+  const real = rows.filter(r => !r.avg);
+  const potm = real.filter(r => r.team === match.winner).sort((x, y) => y.gs - x.gs)[0] || null;
+  const price = (s, name) => {
+    const e = T[s].team.find(x => x && d.items[x.itemId] && d.items[x.itemId].name === name);
+    return e ? e.price || 0 : 0;
+  };
+  const wp = real.map(r => ({
+    ...r,
+    price: price(r.team, r.name)
+  }));
+  const best = wp.filter(r => r.gs > 4 && r.price > 0).sort((x, y) => y.gs / y.price - x.gs / x.price)[0] || null;
+  const flop = wp.filter(r => r.price >= 3).sort((x, y) => x.gs / x.price - y.gs / y.price)[0] || null;
+  const tries = [0, 1].map(s => match.plays.filter(e => e.kind === 'try' && e.s === s));
+  return {
+    rows: real,
+    potm,
+    best,
+    flop,
+    tries
+  };
+}
+const rugbyStat = r => [r.tries ? r.tries + ' tr' + (r.tries > 1 ? 'ies' : 'y') : '', r.pts && r.pts !== r.tries * 5 ? r.pts + ' pts' : '', r.carries ? r.carries + ' carries, ' + r.metres + ' m' : '', r.breaks ? r.breaks + ' line break' + (r.breaks > 1 ? 's' : '') : '', r.tackles ? r.tackles + ' tackles' : '', r.turnovers ? r.turnovers + ' turnover' + (r.turnovers > 1 ? 's' : '') : ''].filter(Boolean).join(', ');
+function RugbySummary({
+  d,
+  A,
+  B,
+  match
+}) {
+  const R = rugbyReport(d, A, B, match);
+  const T = i => i === 0 ? A : B;
+  return React.createElement("div", {
+    className: "board msummary"
+  }, React.createElement("h3", null, "\uD83C\uDFC9 Match summary"), React.createElement("p", {
+    className: "small",
+    style: {
+      margin: 0
+    }
+  }, React.createElement("b", null, A.name, " ", match.score[0], "\u2013", match.score[1], " ", B.name), " \xB7 half-time ", match.halves[0][0], "\u2013", match.halves[0][1], match.golden ? ' · decided in extra time' : ''), [0, 1].map(s => React.createElement("p", {
+    key: s,
+    className: "small",
+    style: {
+      margin: 0
+    }
+  }, React.createElement("b", null, T(s).name, ":"), " ", R.tries[s].length ? 'tries ' + R.tries[s].map(e => e.p + ' ' + rugbyMin(e.t)).join(', ') : 'no tries')), React.createElement("div", {
+    className: "mreport"
+  }, React.createElement("h4", null, "\uD83D\uDCCB Match report"), R.potm && React.createElement("p", {
+    className: "small"
+  }, React.createElement("b", null, "\u2B50 Player of the Match:"), " ", R.potm.name, " (", T(R.potm.team).name, ") \u2014 ", rugbyStat(R.potm), "."), R.best && R.best !== R.potm && React.createElement("p", {
+    className: "small"
+  }, React.createElement("b", null, "\uD83D\uDCB0 Best buy:"), " ", R.best.name, " \u2014 $", R.best.price, ": ", rugbyStat(R.best), "."), R.flop && React.createElement("p", {
+    className: "small"
+  }, React.createElement("b", null, "\uD83D\uDCC9 Quiet day:"), " ", R.flop.name, " cost $", R.flop.price, rugbyStat(R.flop) ? ': ' + rugbyStat(R.flop) : '', ".")), React.createElement("p", {
+    className: "hint",
+    style: {
+      margin: 0
+    }
+  }, "Simulated phase by phase from Draft Night\u2019s estimated Prime numbers (not official ratings). Your five play their real positions; the other ten are average players."));
+}
+function RugbyChip({
+  item,
+  topic
+}) {
+  const [open, setOpen] = useState(false);
+  if (!numbersShown()) return null;
+  const r = rugbyRating(item);
+  return React.createElement(React.Fragment, null, React.createElement("button", {
+    type: "button",
+    className: "ratingchip",
+    onClick: () => setOpen(true),
+    "aria-label": 'Prime ' + r.ovr + ', estimated. Show details'
+  }, "Prime ", React.createElement("b", {
+    className: "num"
+  }, r.ovr), " est."), open && ReactDOM.createPortal(React.createElement(Sheet, {
+    center: true,
+    onClose: () => setOpen(false)
+  }, React.createElement("div", {
+    className: "ratingcard"
+  }, React.createElement("div", {
+    className: "rc-top"
+  }, React.createElement("span", {
+    className: "rc-ovr num"
+  }, React.createElement("small", {
+    className: "rc-era"
+  }, "Prime"), r.ovr), React.createElement("span", {
+    className: "rc-role"
+  }, r.fwd ? 'FWD' : 'BACK'), React.createElement("span", {
+    className: "rc-name"
+  }, item.name, React.createElement("br", null), React.createElement("small", null, r.pos))), React.createElement("div", {
+    className: "rc-attrs"
+  }, RUGBY_ATTRS.map(a => React.createElement("div", {
+    key: a,
+    className: "rc-attr"
+  }, React.createElement("span", {
+    className: "k",
+    title: RUGBY_ATTR_NAMES[a]
+  }, a), React.createElement("span", {
+    className: "bar"
+  }, React.createElement("i", {
+    style: {
+      width: r.attrs[a] + '%'
+    }
+  })), React.createElement("span", {
+    className: "v num"
+  }, r.attrs[a])))), React.createElement("p", {
+    className: "hint",
+    style: {
+      margin: 0
+    }
+  }, "Prime: how good they were at their peak (for current players, their best so far). ", RUGBY_ATTRS.map(a => a + ' ' + RUGBY_ATTR_NAMES[a].toLowerCase()).join(' · '), ". Draft Night estimate, not an official rating.")), React.createElement("button", {
     className: "btn btn-ghost",
     onClick: () => setOpen(false)
   }, "Close")), document.body));
