@@ -738,3 +738,11 @@ html[data-motion="reduce"] *,html[data-motion="reduce"] *::before,html[data-moti
 .gprow .tn{flex:1;letter-spacing:.04em}
 .gprow .tt{width:24px;text-align:center;font-size:11px}
 .gprow .tg{min-width:44px;text-align:right;color:var(--muted);font-size:12px}
+/* Tennis */
+.tboard{border-collapse:collapse;background:#141026;color:#fff;border-radius:12px;overflow:hidden;align-self:center;font-family:var(--cond);font-weight:800;font-size:14px}
+.tboard td{padding:3px 8px;text-align:center;border-bottom:1px solid rgba(255,255,255,.08)}
+.tboard td.tb-n{text-align:left;min-width:140px;max-width:180px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.tboard td.won{color:var(--gold)}
+.tboard td.cur{background:rgba(255,255,255,.08)}
+.tboard td.pt{background:var(--gold);color:var(--gold-ink);min-width:30px}
+.tb-srv{color:#e6f54a;font-size:10px}

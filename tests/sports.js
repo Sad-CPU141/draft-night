@@ -127,5 +127,50 @@ module.exports = async function sportsTests({ ok, boot, btn, click, sleep }) {
     ok(live && /Race result/.test(X.d.body.textContent) && /Driver of the Day/.test(X.d.body.textContent) && /Podium/.test(X.d.body.textContent), 'the track map shows all 20 cars with a timing tower and ends with the race result and report');
     X.w.close();
   }
+  // Tennis tie.
+  {
+    const S = DN.sports; const t = T('t-ten'); const d = dOf(t);
+    const pickT = (id, names) => ({ id, name: id, team: names.map((n) => ({ itemId: t.items.find((i) => i.name === n).id, price: 4 })) });
+    const big = pickT('A', ['Novak Djokovic', 'Carlos Alcaraz', 'Serena Williams', 'Iga Świątek']);
+    const close = pickT('B', ['Roger Federer', 'Jannik Sinner', 'Steffi Graf', 'Aryna Sabalenka']);
+    const g = S.simulateTennisTie(d, big, close, 'm1');
+    ok(F.battleKind(t).name === 'Tennis tie' && g.v === 'tennis' && JSON.stringify(g) === JSON.stringify(S.simulateTennisTie(d, big, close, 'm1')) && g.score[0] !== g.score[1] && g.matches.length >= 4, 'Tennis Players play a team tie that always has a winner and replays exactly (' + g.score.join('–') + ')');
+    ok(g.matches[0].label === 'Men’s singles' && g.matches[2].label === 'Women’s singles' && !g.matches[2].a.concat(g.matches[2].b).some((p) => !p.women), 'men play men and women play women');
+    // Scoring rules, checked by replaying every point of many matches.
+    let legal = true, tbs = 0, deciders = 0, three = 0, n = 0, kinds = new Set(), wins = 0, longest = 0;
+    const validSet = (s2, final) => { const [a, b] = s2; const hi = Math.max(a, b), lo = Math.min(a, b); if (s2.length === 4) { const [x, y] = [s2[2], s2[3]]; const tgt = 7; return hi === 7 && lo === 6 && Math.max(x, y) >= tgt && Math.abs(x - y) >= 2 && (Math.max(x, y) === tgt || Math.abs(x - y) === 2); } return (hi === 6 && lo <= 4) || (hi === 7 && lo === 5); };
+    for (let k = 0; k < 120; k++) {
+      const tie = S.simulateTennisTie({ ...d, seed: 'tn' + k }, big, close, 'k'); if (tie.winner === 0) wins++; if (tie.how === 'doubles') deciders++;
+      tie.matches.forEach((m) => {
+        n++; if (m.sets.length === 3) three++;
+        const won = [0, 1].map((sd) => m.sets.filter((s2) => s2[sd] > s2[1 - sd]).length);
+        if (Math.max(...won) !== 2 || won[m.winner] !== 2) legal = false;
+        m.sets.forEach((s2, si) => { if (s2.length === 4) tbs++; if (si < 2 && !validSet(s2)) legal = false; if (si === 2 && s2.length === 4 && !(Math.max(s2[2], s2[3]) >= 10)) legal = false; });
+        const rp = S.tennisReplay(m); const last = rp[rp.length - 1]; if (!last.after.done || JSON.stringify(last.after.sets) !== JSON.stringify(m.sets.map((s2) => [s2[0], s2[1]]))) legal = false;
+        rp.forEach((p) => { kinds.add(p.how); longest = Math.max(longest, p.shots); });
+      });
+    }
+    ok(legal, 'every match follows real scoring: sets to six (by two), 7-point tiebreaks at 6–6, a 10-point tiebreak in the deciding set, best of three');
+    ok(tbs > 10 && three / n > 0.25 && deciders > 10, 'close matches go to tiebreaks and third sets, and level ties go to the mixed doubles decider (' + deciders + ' of 120)');
+    ok(['ace', 'df', 'svw', 'fh', 'bh', 'volley', 'smash', 'pass', 'lob', 'drop', 'forced', 'ue'].every((x) => kinds.has(x)) && longest >= 15, 'points end in aces, double faults, winners of every kind and errors, with rallies up to ' + longest + ' shots');
+    const weak = pickT('C', ['Frances Tiafoe', 'Tommy Paul', 'Emma Raducanu', 'Leylah Fernandez']);
+    let ww = 0; for (let k = 0; k < 60; k++) if (S.simulateTennisTie({ ...d, seed: 'w' + k }, big, weak, 'k').winner === 0) ww++;
+    ok(ww > 50 && wins > 30 && wins < 90, 'stronger players usually win (' + Math.round(ww / 60 * 100) + '% against a weaker team), close ties are close (' + Math.round(wins / 1.2) + '%)');
+    const clayTie = (() => { for (let k = 0; k < 40; k++) { const x = S.simulateTennisTie({ ...d, seed: 'c' + k }, big, close, 'k'); if (x.surface === 'clay') return x; } return null; })();
+    const grassTie = (() => { for (let k = 0; k < 40; k++) { const x = S.simulateTennisTie({ ...d, seed: 'c' + k }, big, close, 'k'); if (x.surface === 'grass') return x; } return null; })();
+    ok(clayTie && grassTie && S.tenRating(t.items.find((i) => i.name === 'Rafael Nadal')).surf === 'clay', 'ties are played on grass, clay or hard courts, with clay and grass specialists');
+    // Every highlight point animates without errors.
+    let framesOK = true; g.matches.forEach((m) => { const sc = S.tennisScript(g); sc.beats.filter((b) => b.type === 'pt').slice(0, 40).forEach((b) => { for (let u = 0; u < b.dur; u += 0.2) { const f = S.tennisFrame(b, u, g.matches[b.mi]); if (!f.P || (f.ball && (!isFinite(f.ball.x) || !isFinite(f.ball.y)))) framesOK = false; } }); });
+    ok(framesOK, 'every shown point animates without errors');
+    const fill = (topic, n2, seed) => { const ms = [...Array(n2)].map((_, i) => ({ id: 'm' + i, name: ['Lions', 'Sharks', 'Owls'][i], color: DN.COLORS[i], emoji: 'x', human: true })); let dd = DN.createDraft(topic, ms, { ...DN.DEFAULT_RULES, slots: topic.slots, finale: { mode: 'sim', speed: 'normal' } }, { seed }); let gg = 0, rr = 0; while (!DN.isDraftOver(dd) && gg++ < 800) { if (dd.phase === 'auction') { const m = dd.managers.find((x, k) => (k + rr++) % 2 === 0 && DN.canBid(dd, x, DN.nextAmount(dd))) || dd.managers.find((x) => DN.canBid(dd, x, DN.nextAmount(dd))); dd = m ? DN.sell(DN.placeBid(dd, m.id, DN.nextAmount(dd))) : DN.skipItem(dd); } else if (dd.phase === 'freepick') { const cp = DN.currentPicker(dd); dd = DN.freePick(dd, dd.leftover.find((x) => DN.canTake(dd, cp.m, x))); } else break; } return dd; };
+    const raw = { ...fill(t, 3, 'tnui'), mode: 'local', createdAt: Date.now(), history: [] };
+    const X = await boot({ idb: false, speed: 0.05, storage: { dn_current_v1: JSON.stringify(raw) } });
+    await click(X.w, btn(X.d, 'Resume draft')); await click(X.w, btn(X.d, 'Start the finale')); await click(X.w, btn(X.d, 'First serve')); await sleep(500);
+    const live = !!X.d.querySelector('.tennissvg') && !!X.d.querySelector('.tboard');
+    await click(X.w, btn(X.d, 'Next match')); await sleep(150);
+    await click(X.w, btn(X.d, 'Skip to result')); await sleep(150);
+    ok(live && /Tie result/.test(X.d.body.textContent) && /Break points/.test(X.d.body.textContent) && X.d.querySelectorAll('.fc-row').length >= 4, 'the court shows a tennis scoreboard and ends with every match result and the tie report');
+    X.w.close();
+  }
   P.w.close();
 };

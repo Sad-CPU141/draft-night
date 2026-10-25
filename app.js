@@ -1,4 +1,4 @@
-/* Draft Night aea80a2297 — built from src/ by build.js. Edit src/, not this file. */
+/* Draft Night f70e6f1ba7 — built from src/ by build.js. Edit src/, not this file. */
 "use strict";
 (function(){
 function _extends() { return _extends = Object.assign ? Object.assign.bind() : function (n) { for (var e = 1; e < arguments.length; e++) { var t = arguments[e]; for (var r in t) ({}).hasOwnProperty.call(t, r) && (n[r] = t[r]); } return n; }, _extends.apply(null, arguments); }
@@ -656,7 +656,8 @@ const STARTER_BATTLE = {
   't-nba': 'basketball',
   't-nbal': 'basketball',
   't-fight': 'combat',
-  't-f1': 'f1'
+  't-f1': 'f1',
+  't-ten': 'tennis'
 };
 function starterTopics() {
   const v3 = [...sportsTopicsV3(), ...foodTopicsV3(), ...entTopicsV3(), ...travelTopicsV3(), ...animalTopicsV3(), ...styleTopicsV3(), ...funTopicsV3()];
@@ -23692,6 +23693,15 @@ const BATTLE_KINDS = {
     upset: ['Who knew? {w} beats {l} when it counts!', 'Surprise hero: {w}!'],
     noshow: ['{w} wins the night — the other team had nothing.']
   },
+  tennis: {
+    name: 'Tennis tie',
+    start: 'First serve',
+    emoji: '🎾',
+    round: 'Match',
+    win: [''],
+    upset: [''],
+    noshow: ['{w} wins by walkover.']
+  },
   f1: {
     name: 'Grand Prix',
     start: 'Lights out',
@@ -23745,6 +23755,7 @@ function simulateFor(d, A, B, key, opts) {
   if (k === 'basketball') return simulateBasketball(d, A, B, key);
   if (k === 'combat') return simulateFightCard(d, A, B, key);
   if (k === 'f1') return simulateGrandPrix(d, A, B, key);
+  if (k === 'tennis') return simulateTennisTie(d, A, B, key);
   if (k === 'survival') return simulateSurvival(d, A, B, key);
   if (k === 'powers' || k === 'weird') return simulateMissions(d, A, B, key);
   if (k === 'cute') return simulatePuppyBowl(d, A, B, key, opts && opts.knockout === false ? false : true);
@@ -23757,6 +23768,7 @@ function simWhy(w, mt) {
     const f = mt.final[mt.winner];
     return w.name + (f.rescued ? ' got rescued' : ' survived ' + ws + ' day' + (ws === 1 ? '' : 's')) + (ws !== ls ? ' (the others lasted ' + ls + ')' : mt.how === 'rescue' ? ', and got rescued first' : mt.how === 'shape' ? ', level on days but in better shape' : ' and won the last night') + '.';
   }
+  if (mt.v === 'tennis') return w.name + ' won the tie ' + mt.score[mt.winner] + '–' + mt.score[1 - mt.winner] + (mt.how === 'doubles' ? ' in the mixed doubles decider' : '') + '.';
   if (mt.v === 'gp') {
     if (mt.forfeit) return w.name + ' won — the other team had no drivers.';
     const geo = F1_TRACKS.find(x => x.id === mt.track);
@@ -23773,7 +23785,7 @@ function simWhy(w, mt) {
   if (mt.v === 'mission') return w.name + ' won ' + mt.score[mt.winner] + ' of ' + mt.missions.length + ' missions.';
   return w.name + ' won the ' + (BATTLE_KINDS[mt.kind] || BATTLE_KINDS.fight).name.toLowerCase() + ' ' + mt.score[mt.winner] + '–' + mt.score[1 - mt.winner] + (mt.sudden ? ' in sudden death' : '') + '.';
 }
-const isSimResult = mt => !!mt && (mt.v === 'gp' || mt.v === 'card' || mt.v === 'hoops' || mt.v === 'battle' || mt.v === 'arena' || mt.v === 'survival' || mt.v === 'mission' || mt.v === 'show');
+const isSimResult = mt => !!mt && (mt.v === 'tennis' || mt.v === 'gp' || mt.v === 'card' || mt.v === 'hoops' || mt.v === 'battle' || mt.v === 'arena' || mt.v === 'survival' || mt.v === 'mission' || mt.v === 'show');
 function battleDuel(rng, kind, a, b, maxP) {
   const fill = (lines, w, l) => lines[Math.floor(rng() * lines.length)].replace('{w}', w).replace('{l}', l);
   if (!a || !b) {
@@ -27913,6 +27925,523 @@ function simulateSurvival(d, A, B, key) {
   };
 }
 const moodOf = c => c >= 75 ? '😀' : c >= 50 ? '😐' : c >= 25 ? '😟' : c > 0 ? '🤕' : '💀';
+const TEN_ATTRS = ['SRV', 'RET', 'GRD', 'MOV', 'NET', 'MEN'];
+const TEN_ATTR_NAMES = {
+  SRV: 'Serve',
+  RET: 'Return',
+  GRD: 'Groundstrokes',
+  MOV: 'Movement',
+  NET: 'Net play',
+  MEN: 'Nerve'
+};
+const TEN_PROFILE_SRC = `
+Novak Djokovic|98|RET+6 MOV+5 MEN+6
+Rafael Nadal|97|MOV+6 MEN+5 GRD+4 clay
+Roger Federer|97|SRV+3 NET+5 grass
+Carlos Alcaraz|95|MOV+5 NET+3
+Jannik Sinner|95|GRD+5 RET+3
+Andy Murray|91|RET+6 MOV+5 SRV-3
+Pete Sampras|95|SRV+8 NET+6 RET-3 grass
+Andre Agassi|93|RET+8 GRD+4 SRV-4
+Daniil Medvedev|90|MOV+5 RET+4 NET-5
+Alexander Zverev|89|SRV+5
+Taylor Fritz|86|SRV+6 MOV-3
+Félix Auger-Aliassime|84|SRV+4
+Stan Wawrinka|89|GRD+6
+Nick Kyrgios|85|SRV+9 MEN-6
+Ben Shelton|84|SRV+10 RET-5
+Boris Becker|92|SRV+7 NET+5 grass
+Stefan Edberg|91|NET+8 grass
+John McEnroe|93|NET+8 grass
+Björn Borg|95|MOV+5 MEN+5 clay
+Jimmy Connors|92|RET+6 MEN+4
+Ivan Lendl|93|GRD+6
+Lleyton Hewitt|88|MOV+6 RET+4 SRV-4
+Andy Roddick|87|SRV+10 RET-5
+Marat Safin|88|GRD+4 MEN-4
+Juan Martín del Potro|88|GRD+6 MOV-3
+Dominic Thiem|88|GRD+4 clay
+Stefanos Tsitsipas|87|clay
+Casper Ruud|86|clay
+Holger Rune|84|
+Grigor Dimitrov|85|
+Rod Laver|96|
+Gustavo Kuerten|89|clay
+Marin Čilić|85|SRV+5
+Jack Draper|84|
+Denis Shapovalov|82|
+Milos Raonic|84|SRV+10 MOV-5
+Frances Tiafoe|83|
+Tommy Paul|83|
+Lorenzo Musetti|84|clay
+João Fonseca|82|
+Serena Williams|98|SRV+8 GRD+5 MEN+5
+Venus Williams|92|SRV+5 grass
+Steffi Graf|97|GRD+5 MOV+5
+Iga Świątek|94|RET+5 clay
+Aryna Sabalenka|93|SRV+6 GRD+6 MOV-2
+Coco Gauff|90|MOV+6 SRV-2
+Maria Sharapova|90|GRD+5 MEN+4 MOV-4
+Naomi Osaka|89|SRV+6
+Bianca Andreescu|84|
+Leylah Fernandez|82|
+Martina Navratilova|96|NET+9 SRV+4 grass
+Elena Rybakina|90|SRV+9 grass
+Ons Jabeur|86|NET+4
+Emma Raducanu|82|
+Madison Keys|86|SRV+5
+Chris Evert|95|MEN+6 NET-4 GRD+4 clay
+Billie Jean King|93|NET+7
+Monica Seles|94|GRD+6 RET+4
+Martina Hingis|91|MEN+3 SRV-4
+Justine Henin|92|GRD+5 clay
+Kim Clijsters|90|MOV+5
+Lindsay Davenport|89|GRD+4 MOV-4
+Caroline Wozniacki|87|MOV+6 GRD-3
+Simona Halep|88|MOV+5 clay
+Petra Kvitová|88|SRV+3 grass
+Victoria Azarenka|88|RET+4
+Angelique Kerber|88|MOV+5
+Ashleigh Barty|91|NET+5 grass
+Jessica Pegula|85|
+Jasmine Paolini|85|clay
+Mirra Andreeva|85|
+Zheng Qinwen|85|SRV+4
+Li Na|87|
+Garbiñe Muguruza|87|
+Amélie Mauresmo|87|NET+4
+Barbora Krejčíková|86|
+Elina Svitolina|86|MOV+4
+Markéta Vondroušová|84|`;
+const TEN_PROFILE = {};
+TEN_PROFILE_SRC.trim().split('\n').forEach(line => {
+  const [name, ovr, tw] = line.split('|');
+  const tweak = {};
+  let surf = null;
+  (tw || '').split(' ').filter(Boolean).forEach(t => {
+    const m = t.match(/^([A-Z]+)([+-]\d+)$/);
+    if (m) tweak[m[1]] = +m[2];else if (t === 'clay' || t === 'grass') surf = t;
+  });
+  TEN_PROFILE[name.toLowerCase()] = {
+    ovr: +ovr,
+    tweak,
+    surf
+  };
+});
+const TEN_SURFACES = {
+  grass: {
+    name: 'Grass',
+    event: 'on the lawns',
+    serve: 0.035,
+    ace: 0.03,
+    rally: 0.8,
+    court: '#5aa646',
+    court2: '#4e9a3c',
+    out: '#3f7f31'
+  },
+  hard: {
+    name: 'Hard court',
+    event: 'on the hard courts',
+    serve: 0,
+    ace: 0,
+    rally: 1,
+    court: '#3d6be2',
+    court2: '#3560cf',
+    out: '#2f8a5a'
+  },
+  clay: {
+    name: 'Clay',
+    event: 'on the red clay',
+    serve: -0.03,
+    ace: -0.02,
+    rally: 1.35,
+    court: '#d0773f',
+    court2: '#c56c35',
+    out: '#b86230'
+  }
+};
+const tenWomen = (item, slot) => /WOMEN|WOMAN|LADIES|WTA/.test(norm(item && item.pos || slot));
+function tenRating(item) {
+  const prof = TEN_PROFILE[String(item.name || '').toLowerCase()];
+  const fixed = validRating(item.rating);
+  const ovr = fixed ? clamp(Math.round(+item.rating), 1, 99) : prof ? prof.ovr : clamp(Math.round(74 + itemFame(item) * 22 + (unit('teo', item.name) - 0.5) * 6), 65, 95);
+  const tw = prof ? prof.tweak : {};
+  const attrs = {};
+  TEN_ATTRS.forEach(a => {
+    attrs[a] = clamp(Math.round(ovr + (tw[a] || 0) + (unit('tea', item.name, a) - 0.5) * 6), 40, 99);
+  });
+  return {
+    ovr,
+    attrs,
+    surf: prof ? prof.surf : null,
+    estimated: !fixed
+  };
+}
+const TEN_HOW = ['ace', 'df', 'svw', 'fh', 'bh', 'volley', 'smash', 'pass', 'lob', 'drop', 'forced', 'ue'];
+const TEN_HOW_WORD = {
+  ace: 'Ace',
+  df: 'Double fault',
+  svw: 'Service winner',
+  fh: 'Forehand winner',
+  bh: 'Backhand winner',
+  volley: 'Volley winner',
+  smash: 'Smash',
+  pass: 'Passing shot',
+  lob: 'Lob winner',
+  drop: 'Drop shot winner',
+  forced: 'Forced error',
+  ue: 'Unforced error'
+};
+function tennisScorer(cfg) {
+  const S = {
+    sets: [],
+    games: [0, 0],
+    pts: [0, 0],
+    tb: false,
+    setsWon: [0, 0],
+    server: cfg.firstServer || 0,
+    tbStart: 0,
+    done: false,
+    winner: null,
+    bestOf: cfg.bestOf || 3
+  };
+  const need = Math.ceil(S.bestOf / 2);
+  const finalSet = () => S.setsWon[0] === need - 1 && S.setsWon[1] === need - 1;
+  const tbTarget = () => finalSet() ? 10 : 7;
+  S.flags = () => {
+    const f = {
+      bp: false,
+      sp: null,
+      mp: null,
+      tb: S.tb
+    };
+    const wouldWinGame = w => S.tb ? S.pts[w] + 1 >= tbTarget() && S.pts[w] + 1 - S.pts[1 - w] >= 2 : S.pts[w] >= 3 && S.pts[w] - S.pts[1 - w] >= 1;
+    [0, 1].forEach(w => {
+      if (!wouldWinGame(w)) return;
+      if (!S.tb && w !== S.server) f.bp = true;
+      const g = [...S.games];
+      g[w]++;
+      const wonSet = S.tb || g[w] >= 6 && g[w] - g[1 - w] >= 2;
+      if (wonSet) {
+        if (S.setsWon[w] + 1 >= need) f.mp = w;else f.sp = w;
+      }
+    });
+    return f;
+  };
+  S.point = w => {
+    if (S.done) return;
+    S.pts[w]++;
+    if (S.tb) {
+      if (S.pts[w] >= tbTarget() && S.pts[w] - S.pts[1 - w] >= 2) {
+        S.games[w]++;
+        const tbPts = [...S.pts];
+        endSet(w, tbPts);
+        S.server = 1 - S.tbStart;
+        return;
+      }
+      const n = S.pts[0] + S.pts[1];
+      if (n % 2 === 1) S.server = 1 - S.server;
+      return;
+    }
+    if (S.pts[w] >= 4 && S.pts[w] - S.pts[1 - w] >= 2) {
+      S.games[w]++;
+      S.pts = [0, 0];
+      S.server = 1 - S.server;
+      if (S.games[w] >= 6 && S.games[w] - S.games[1 - w] >= 2) endSet(w, null);else if (S.games[0] === 6 && S.games[1] === 6) {
+        S.tb = true;
+        S.tbStart = S.server;
+      }
+    }
+  };
+  function endSet(w, tbPts) {
+    S.sets.push({
+      g: [...S.games],
+      tb: tbPts
+    });
+    S.setsWon[w]++;
+    S.games = [0, 0];
+    S.pts = [0, 0];
+    S.tb = false;
+    if (S.setsWon[w] >= need) {
+      S.done = true;
+      S.winner = w;
+    }
+  }
+  S.label = () => {
+    if (S.tb) return S.pts[0] + '–' + S.pts[1];
+    const P = ['0', '15', '30', '40'];
+    const [a, b] = S.pts;
+    if (a >= 3 && b >= 3) return a === b ? 'Deuce' : (a > b ? 'Ad ' : 'Ad ') + (a > b ? 'A' : 'B');
+    return P[Math.min(3, a)] + '–' + P[Math.min(3, b)];
+  };
+  return S;
+}
+function tennisMatch(rng, sides, cfg) {
+  const surf = TEN_SURFACES[cfg.surface];
+  const gauss = () => {
+    let u = 0;
+    for (let i = 0; i < 4; i++) u += rng();
+    return (u - 2) / 0.58;
+  };
+  const eff = sides.map(ps => {
+    const avg = {};
+    TEN_ATTRS.forEach(a => {
+      avg[a] = ps.reduce((n, p) => n + p.attrs[a] + (p.surf === cfg.surface ? 3 : p.surf ? -1 : 0), 0) / ps.length;
+    });
+    if (ps.length > 1) avg.NET += 4;
+    return avg;
+  });
+  const form = sides.map(() => gauss() * 0.018);
+  const base = cfg.doubles ? 0.65 : cfg.women ? 0.565 : 0.64;
+  const first = rng() < 0.5 ? 0 : 1;
+  const S = tennisScorer({
+    bestOf: 3,
+    firstServer: first
+  });
+  const pts = [];
+  const stats = [0, 1].map(() => ({
+    aces: 0,
+    dfs: 0,
+    winners: 0,
+    ue: 0,
+    bp: 0,
+    bpWon: 0,
+    pts: 0,
+    longest: 0
+  }));
+  let guard = 0;
+  let lastBreak = null;
+  while (!S.done && guard++ < 600) {
+    const s = S.server,
+      r = 1 - s;
+    const A = eff[s],
+      R = eff[r];
+    const f = S.flags();
+    const big = f.bp || f.sp != null || f.mp != null;
+    let p = base + surf.serve + (A.SRV - R.RET) / 210 + (A.GRD - R.GRD) / 480 + (A.MOV - R.MOV) / 700 + form[s] - form[r];
+    if (big) p += (A.MEN - R.MEN) / 260;
+    if (lastBreak === r) p -= 0.02;
+    p = clamp(p, 0.33, 0.9);
+    const ace = clamp((0.045 + (A.SRV - 82) / 190 + surf.ace - (R.RET - 82) / 420) * (cfg.women ? 0.65 : 1) * (cfg.doubles ? 0.7 : 1), 0.008, 0.24);
+    const df = clamp(0.032 - (A.SRV - 82) / 700 - (A.MEN - 82) / 900 + (f.bp ? 0.012 : 0), 0.008, 0.08);
+    const x = rng();
+    let w, how, shots, by;
+    if (x < ace) {
+      w = s;
+      how = 'ace';
+      shots = 1;
+      by = s;
+    } else if (x < ace + df) {
+      w = r;
+      how = 'df';
+      shots = 0;
+      by = s;
+    } else {
+      const pr = clamp((p - ace) / (1 - ace - df), 0.2, 0.92);
+      w = rng() < pr ? s : r;
+      if (w === s && rng() < 0.16 + (A.SRV - 82) / 300) {
+        how = 'svw';
+        shots = 1;
+        by = s;
+      } else {
+        shots = 2 + Math.floor(-Math.log(1 - rng() * 0.999) * 3.4 * surf.rally * (cfg.doubles ? 0.6 : 1) * (1 + (A.MOV + R.MOV - 170) / 200));
+        shots = Math.min(40, shots);
+        const W = eff[w],
+          L = eff[1 - w];
+        const net = clamp((W.NET - 75) / 120 + (cfg.doubles ? 0.25 : 0), 0.02, 0.6);
+        const opts = [['fh', 3 + (W.GRD - 80) / 8], ['bh', 2 + (W.GRD - 80) / 12], ['volley', net * 8], ['smash', net * 2.5], ['pass', L.NET > 85 ? 1.5 : 0.5], ['lob', 0.5], ['drop', 0.4 + (W.NET > 88 ? 0.6 : 0)], ['forced', 4 + (W.GRD - L.MOV) / 15], ['ue', 4 + shots * 0.25 + (82 - L.MEN) / 10 + (big ? 1 : 0)]].filter(o => o[1] > 0);
+        how = weighted(rng, opts, o => o[1])[0];
+        by = how === 'ue' || how === 'forced' ? 1 - w : w;
+      }
+    }
+    const st = stats[w];
+    st.pts++;
+    if (how === 'ace') stats[s].aces++;
+    if (how === 'df') stats[s].dfs++;
+    if (['fh', 'bh', 'volley', 'smash', 'pass', 'lob', 'drop', 'ace', 'svw'].includes(how)) stats[w].winners++;
+    if (how === 'ue' || how === 'df') stats[by].ue++;
+    if (f.bp) {
+      stats[r].bp++;
+      if (w === r) stats[r].bpWon++;
+    }
+    stats[0].longest = Math.max(stats[0].longest, shots);
+    stats[1].longest = stats[0].longest;
+    pts.push(w | TEN_HOW.indexOf(how) << 1 | Math.min(63, shots) << 5);
+    const g0 = S.games[0] + S.games[1],
+      n0 = S.sets.length,
+      wasServer = S.server,
+      wasTb = S.tb;
+    S.point(w);
+    if (S.games[0] + S.games[1] !== g0 || S.sets.length !== n0) lastBreak = !wasTb && w !== wasServer ? w : null;
+  }
+  return {
+    first,
+    pts,
+    sets: S.sets,
+    winner: S.winner,
+    stats
+  };
+}
+function tennisReplay(m) {
+  const S = tennisScorer({
+    bestOf: 3,
+    firstServer: m.serve
+  });
+  const out = [];
+  m.pts.forEach((code, i) => {
+    const w = code & 1,
+      how = TEN_HOW[code >> 1 & 15],
+      shots = code >> 5;
+    const before = {
+      sets: S.sets.map(x => x.g),
+      games: [...S.games],
+      pts: [...S.pts],
+      tb: S.tb,
+      server: S.server,
+      label: S.label(),
+      flags: S.flags(),
+      setNo: S.sets.length + 1
+    };
+    S.point(w);
+    const after = {
+      sets: S.sets.map(x => x.g),
+      games: [...S.games],
+      pts: [...S.pts],
+      tb: S.tb,
+      server: S.server,
+      setsWon: [...S.setsWon],
+      done: S.done
+    };
+    const gameOver = after.games[0] + after.games[1] !== before.games[0] + before.games[1] || after.sets.length !== before.sets.length;
+    const brk = gameOver && !before.tb && w !== before.server;
+    out.push({
+      i,
+      w,
+      how,
+      shots,
+      before,
+      after,
+      gameOver,
+      brk,
+      setOver: after.sets.length !== before.sets.length
+    });
+  });
+  return out;
+}
+function simulateTennisTie(d, A, B, key) {
+  const rng = seeded(d.seed, 'tennis', key, A.id, B.id);
+  const surface = ['grass', 'hard', 'clay'][Math.floor(rng() * 3)];
+  const slots = d.rules.slots;
+  const row = (m, k) => {
+    const x = m.team[k];
+    const it = x && d.items[x.itemId];
+    return it ? {
+      name: it.name,
+      itemId: it.id,
+      price: x.price || 0,
+      women: tenWomen(it, slots[k]),
+      ...tenRating(it)
+    } : null;
+  };
+  const sq = [A, B].map(m => slots.map((_, k) => row(m, k)));
+  const matches = [];
+  const score = [0, 0];
+  const play = (pa, pb, label, extra) => {
+    const women = pa.every(p => p.women) && pb.every(p => p.women);
+    const doubles = pa.length > 1;
+    const m = tennisMatch(rng, [pa, pb], {
+      surface,
+      women,
+      doubles
+    });
+    const res = {
+      label,
+      doubles,
+      women,
+      a: pa.map(tenView),
+      b: pb.map(tenView),
+      pts: m.pts,
+      sets: m.sets.map(x => x.tb ? [x.g[0], x.g[1], x.tb[0], x.tb[1]] : x.g),
+      winner: m.winner,
+      stats: m.stats,
+      serve: m.first,
+      ...(extra || {})
+    };
+    return res;
+  };
+  const tenView = p => ({
+    name: p.name,
+    itemId: p.itemId,
+    price: p.price,
+    ovr: p.ovr,
+    women: p.women
+  });
+  slots.forEach((slot, k) => {
+    const a = sq[0][k],
+      b = sq[1][k];
+    if (!a && !b) return;
+    const label = (a || b).women ? 'Women’s singles' : 'Men’s singles';
+    if (!a || !b) {
+      const w = a ? 0 : 1;
+      score[w]++;
+      matches.push({
+        label,
+        walkover: true,
+        a: a ? [tenView(a)] : [],
+        b: b ? [tenView(b)] : [],
+        winner: w,
+        pts: [],
+        sets: [],
+        score: [...score]
+      });
+      return;
+    }
+    const m = play([a], [b], label);
+    score[m.winner]++;
+    m.score = [...score];
+    matches.push(m);
+  });
+  let how = 'matches';
+  if (score[0] === score[1]) {
+    const pickBest = (s, women) => sq[s].filter(p => p && p.women === women).sort((x, y) => y.price - x.price || y.ovr - x.ovr)[0] || null;
+    const pair = s => {
+      const m2 = pickBest(s, false),
+        w2 = pickBest(s, true);
+      const ps = [m2, w2].filter(Boolean);
+      return ps.length ? ps : sq[s].filter(Boolean).slice(0, 2);
+    };
+    const pa = pair(0),
+      pb = pair(1);
+    if (pa.length && pb.length) {
+      const both = ps => ps.length === 1 ? [ps[0], ps[0]] : ps;
+      const m = play(both(pa), both(pb), 'Mixed doubles decider', {
+        decider: true
+      });
+      score[m.winner]++;
+      m.score = [...score];
+      matches.push(m);
+      how = 'doubles';
+    } else {
+      const w = pa.length ? 0 : 1;
+      score[w]++;
+      how = 'walkover';
+    }
+  }
+  const winner = score[0] > score[1] ? 0 : 1;
+  return {
+    v: 'tennis',
+    kind: 'tennis',
+    surface,
+    matches,
+    score,
+    winner,
+    how,
+    sudden: how === 'doubles',
+    et: false,
+    pens: null,
+    events: []
+  };
+}
 const KITS = {
   'brazil': ['#FFDC02', '#1B7A3E'],
   'italy': ['#1F4FA8', '#ffffff'],
@@ -29933,7 +30462,7 @@ function TopicEditor({
   }, "Fun battles (Battles finale)"), React.createElement(Seg, {
     label: "Fun battle style",
     value: topic.battle || 'none',
-    options: [['none', 'Off'], ['fight', '⚔️ Fight'], ['powers', '💥 Powers'], ['survival', '🧟 Survival'], ['cute', '🥰 Puppy Bowl'], ['weird', '🤡 Silly'], ['combat', '🥊 Fight night'], ['f1', '🏎️ Grand Prix'], ['basketball', '🏀 Basketball']],
+    options: [['none', 'Off'], ['fight', '⚔️ Fight'], ['powers', '💥 Powers'], ['survival', '🧟 Survival'], ['cute', '🥰 Puppy Bowl'], ['weird', '🤡 Silly'], ['combat', '🥊 Fight night'], ['f1', '🏎️ Grand Prix'], ['tennis', '🎾 Tennis'], ['basketball', '🏀 Basketball']],
     onChange: v => set({
       battle: v === 'none' ? '' : v
     })
@@ -32086,6 +32615,9 @@ function ItemCard({
     item: item,
     topic: d.topic
   }) : battleKindId(d.topic) === 'f1' ? React.createElement(F1Chip, {
+    item: item,
+    topic: d.topic
+  }) : battleKindId(d.topic) === 'tennis' ? React.createElement(TenChip, {
     item: item,
     topic: d.topic
   }) : hasBattle(d.topic) && React.createElement(StatChip, {
@@ -36865,7 +37397,15 @@ if (window.__DN_TEST__) window.__DN = {
     trackGeo,
     gpReport,
     F1_TRACKS,
-    f1EraOf
+    f1EraOf,
+    simulateTennisTie,
+    tenRating,
+    tennisReplay,
+    tennisScorer,
+    tennisScript,
+    tennisFrame,
+    tennisHighlights,
+    tenLine
   },
   simStats: {
     simulatePuppyBowl,
@@ -38984,6 +39524,12 @@ function MatchSummary({
   B,
   match
 }) {
+  if (match.v === 'tennis') return React.createElement(TennisSummary, {
+    d: d,
+    A: A,
+    B: B,
+    match: match
+  });
   if (match.v === 'gp') return React.createElement(GPSummary, {
     d: d,
     A: A,
@@ -40496,7 +41042,7 @@ function PitchMatch({
   }));
 }
 function MatchView(props) {
-  return props.match && props.match.v === 'gp' ? React.createElement(TrackView, props) : props.match && props.match.v === 'card' ? React.createElement(RingView, props) : props.match && props.match.v === 'hoops' ? React.createElement(CourtView, props) : props.match && props.match.v === 'show' ? React.createElement(ShowView, props) : props.match && props.match.v === 'mission' ? React.createElement(MissionView, props) : props.match && props.match.v === 'survival' ? React.createElement(SurvivalView, props) : props.match && props.match.v === 'arena' ? React.createElement(ArenaView, props) : props.match && props.match.v === 'battle' ? React.createElement(BattleView, props) : props.match && props.match.v === 2 ? React.createElement(PitchMatch, props) : React.createElement(MatchPlayer, props);
+  return props.match && props.match.v === 'tennis' ? React.createElement(TennisView, props) : props.match && props.match.v === 'gp' ? React.createElement(TrackView, props) : props.match && props.match.v === 'card' ? React.createElement(RingView, props) : props.match && props.match.v === 'hoops' ? React.createElement(CourtView, props) : props.match && props.match.v === 'show' ? React.createElement(ShowView, props) : props.match && props.match.v === 'mission' ? React.createElement(MissionView, props) : props.match && props.match.v === 'survival' ? React.createElement(SurvivalView, props) : props.match && props.match.v === 'arena' ? React.createElement(ArenaView, props) : props.match && props.match.v === 'battle' ? React.createElement(BattleView, props) : props.match && props.match.v === 2 ? React.createElement(PitchMatch, props) : React.createElement(MatchPlayer, props);
 }
 function matchReport(d, A, B, match) {
   const teams = [A, B];
@@ -42643,6 +43189,860 @@ function SurvivalSummary({
       margin: 0
     }
   }, "Both teams face the same days. Each event needs certain kit; the best matching item\u2019s usefulness (a Draft Night estimate) sets the odds. Just for fun."));
+}
+const TC = {
+  x0: 11,
+  x1: 89,
+  y0: 10,
+  y1: 46,
+  net: 50,
+  sy0: 14.5,
+  sy1: 41.5
+};
+const tenPos = (side, x, y) => ({
+  x: side === 0 ? x : 100 - x,
+  y
+});
+function tennisHighlights(rp) {
+  const score = p => {
+    const f = p.before.flags;
+    if (f.mp != null) return 10;
+    if (f.sp != null) return 8;
+    if (f.bp) return 6;
+    if (p.before.tb && Math.min(p.before.pts[0], p.before.pts[1]) >= 4) return 5;
+    if (p.shots >= 12) return 4;
+    if (p.i === 0) return 3;
+    if (p.how === 'ace' && p.before.pts[0] + p.before.pts[1] >= 4) return 2;
+    if (p.how === 'drop' || p.how === 'lob' || p.how === 'smash' || p.how === 'pass') return 2;
+    return 0;
+  };
+  const cand = rp.map(p => ({
+    p,
+    s: score(p)
+  })).filter(x => x.s > 0);
+  cand.sort((a, b) => b.s - a.s || a.p.i - b.p.i);
+  const keep = new Set(cand.slice(0, 16).map(x => x.p.i));
+  keep.add(rp.length - 1);
+  return keep;
+}
+function tennisScript(match) {
+  const beats = [];
+  let t = 0;
+  const add = b => {
+    b.t0 = t;
+    t += b.dur;
+    beats.push(b);
+    return b;
+  };
+  add({
+    type: 'intro',
+    dur: 2.6,
+    mi: 0
+  });
+  match.matches.forEach((m, mi) => {
+    add({
+      type: 'walk',
+      dur: 2.6,
+      mi
+    });
+    if (m.walkover) {
+      add({
+        type: 'result',
+        dur: 2.2,
+        mi
+      });
+      return;
+    }
+    const rp = tennisReplay(m);
+    const hl = tennisHighlights(rp);
+    let roll = [];
+    const flush = () => {
+      if (!roll.length) return;
+      add({
+        type: 'roll',
+        dur: Math.min(2.4, 0.5 + roll.length * 0.12),
+        mi,
+        from: roll[0],
+        to: roll[roll.length - 1],
+        rp
+      });
+      roll = [];
+    };
+    rp.forEach(p => {
+      if (hl.has(p.i)) {
+        flush();
+        const n = Math.min(p.shots, 7);
+        add({
+          type: 'pt',
+          dur: (p.before.flags.bp || p.before.flags.sp != null || p.before.flags.mp != null ? 1.0 : 0.4) + 1.1 + Math.max(1, n) * 0.55 + 1.3,
+          mi,
+          p,
+          rp
+        });
+      } else roll.push(p.i);
+      if (p.gameOver) {
+        flush();
+        if (p.setOver) add({
+          type: 'set',
+          dur: 2,
+          mi,
+          p,
+          rp
+        });
+      }
+    });
+    flush();
+    add({
+      type: 'result',
+      dur: 3.2,
+      mi
+    });
+  });
+  add({
+    type: 'final',
+    dur: 2.8,
+    mi: match.matches.length - 1
+  });
+  return {
+    beats,
+    total: t
+  };
+}
+function tennisFrame(beat, u, m) {
+  const doubles = m.doubles;
+  const home = (side, k) => tenPos(side, doubles ? k === 0 ? 7 : 38 : 7, doubles ? k === 0 ? 34 : 22 : 28);
+  const P = [[home(0, 0), home(0, 1)], [home(1, 0), home(1, 1)]];
+  const out = {
+    P,
+    ball: null,
+    banner: null,
+    hitter: null
+  };
+  if (beat.type !== 'pt') return out;
+  const p = beat.p;
+  const srv = p.before.server;
+  const rcv = 1 - srv;
+  const flags = p.before.flags;
+  const pre = flags.bp || flags.sp != null || flags.mp != null ? 1.0 : 0.4;
+  if (u < pre) {
+    out.banner = flags.mp != null ? 'MATCH POINT' : flags.sp != null ? 'SET POINT' : flags.bp ? 'BREAK POINT' : null;
+  }
+  const ptsPlayed = p.before.pts[0] + p.before.pts[1];
+  const deuce = ptsPlayed % 2 === 0;
+  const sY = deuce ? 33 : 23;
+  const srvAt = tenPos(srv, 10, srv === 0 ? sY : 56 - sY);
+  const rcvAt = tenPos(rcv, 9, srv === 0 ? 56 - sY - 1 : sY + 1);
+  P[srv][0] = srvAt;
+  P[rcv][0] = rcvAt;
+  if (doubles) {
+    P[srv][1] = tenPos(srv, 41, 56 - srvAt.y);
+    P[rcv][1] = tenPos(rcv, 38, srvAt.y);
+  }
+  const box = tenPos(rcv, 38, srv === 0 ? 56 - sY - 2 : sY + 2);
+  const n = p.how === 'ace' || p.how === 'svw' ? 1 : p.how === 'df' ? 0 : Math.max(2, Math.min(7, p.shots));
+  const T0 = pre;
+  const TS = 0.75;
+  const TR = 0.55;
+  const k0 = u - T0;
+  const spot = (i, side) => tenPos(side, 14 + unit('tsx', p.i, i) * 22, 13 + unit('tsy', p.i, i) * 30);
+  const arcBall = (a, b, k, h) => ({
+    x: a.x + (b.x - a.x) * k,
+    y: a.y + (b.y - a.y) * k,
+    h: Math.sin(Math.min(1, k / 0.72) * Math.PI) * h * (k < 0.72 ? 1 : 0.3) + (k >= 0.72 ? Math.sin((k - 0.72) / 0.28 * Math.PI) * 1.2 : 0)
+  });
+  if (k0 < 0) {
+    out.ball = {
+      ...srvAt,
+      h: 1
+    };
+    return out;
+  }
+  if (p.how === 'df') {
+    const tries = Math.floor(k0 / TS);
+    const k = k0 % TS / TS;
+    if (tries < 2) {
+      const tgt = tries === 0 ? {
+        x: 50,
+        y: box.y
+      } : {
+        x: box.x + (srv === 0 ? 6 : -6),
+        y: box.y
+      };
+      out.ball = tries === 0 ? {
+        ...arcBall(srvAt, tgt, Math.min(1, k * 1.2), 3),
+        h: Math.max(0, 3 * (1 - k))
+      } : arcBall(srvAt, tgt, k, 3);
+      out.banner = tries === 0 ? 'FAULT' : null;
+    } else {
+      out.ball = {
+        x: box.x,
+        y: box.y,
+        h: 0
+      };
+      out.banner = 'DOUBLE FAULT';
+    }
+    return out;
+  }
+  const tAfterServe = k0 - TS;
+  if (tAfterServe < 0) {
+    const k = k0 / TS;
+    out.ball = arcBall(srvAt, box, k, 3.5);
+    out.hitter = srv;
+    if (n === 1 && k > 0.6) out.banner = p.how === 'ace' ? 'ACE!' : null;
+    return out;
+  }
+  if (n === 1) {
+    const k = Math.min(1, tAfterServe / 0.6);
+    out.ball = {
+      x: box.x + (box.x - srvAt.x) * 0.25 * k,
+      y: box.y + (box.y - srvAt.y) * 0.25 * k,
+      h: 1.5 * (1 - k)
+    };
+    P[rcv][0] = {
+      x: rcvAt.x + (box.x - rcvAt.x) * 0.3 * easeC(k),
+      y: rcvAt.y + (box.y - rcvAt.y) * 0.3 * easeC(k)
+    };
+    out.banner = p.how === 'ace' ? 'ACE!' : 'SERVICE WINNER';
+    return out;
+  }
+  const j = Math.min(n - 1, 1 + Math.floor(tAfterServe / TR));
+  const k = Math.min(1, (tAfterServe - (j - 1) * TR) / TR);
+  const hitterSide = j % 2 === 1 ? rcv : srv;
+  const toSide = 1 - hitterSide;
+  const last = j === n - 1;
+  const from = j === 1 ? box : spot(j - 1, hitterSide);
+  let to = spot(j, toSide);
+  const winSide = p.w;
+  const finisher = p.how === 'ue' || p.how === 'forced' ? 1 - winSide : winSide;
+  const netShot = p.how === 'volley' || p.how === 'smash';
+  if (last) {
+    if (p.how === 'ue' || p.how === 'forced') to = rng01(p.i) < 0.5 ? {
+      x: 50,
+      y: from.y + (to.y - from.y) * 0.5
+    } : tenPos(toSide, 5, to.y);else if (p.how === 'drop') to = tenPos(toSide, 44, to.y);else if (p.how === 'lob') to = tenPos(toSide, 13, to.y);else to = tenPos(toSide, 13 + unit('tw', p.i) * 4, unit('tw2', p.i) < 0.5 ? 12 : 44);
+  }
+  const chase = (side, target, kk) => {
+    const i0 = 0;
+    P[side][i0] = {
+      x: P[side][i0].x + (target.x - P[side][i0].x) * easeC(kk),
+      y: P[side][i0].y + (target.y - P[side][i0].y) * easeC(kk)
+    };
+  };
+  chase(hitterSide, from, 1);
+  if (last && netShot) P[hitterSide][0] = tenPos(hitterSide, 41, from.y);
+  if (!last) chase(toSide, to, k);else if (p.how === 'ue' || p.how === 'forced') chase(toSide, spot(j, toSide), 0.4);else chase(toSide, {
+    x: (P[toSide][0].x + to.x) / 2,
+    y: (P[toSide][0].y + to.y) / 2
+  }, k * 0.8);
+  const h = last && p.how === 'lob' ? 9 : last && p.how === 'smash' ? 2 : last && p.how === 'drop' ? 2.2 : 3.2;
+  out.ball = last && to.x === 50 ? {
+    x: from.x + (50 - from.x) * k,
+    y: from.y + (to.y - from.y) * k,
+    h: Math.max(0, 2.6 * (1 - k))
+  } : arcBall(from, to, k, h);
+  out.hitter = hitterSide;
+  if (last && k > 0.55) out.banner = p.how === 'ue' ? to.x === 50 ? 'INTO THE NET' : 'LONG!' : p.how === 'forced' ? 'ERROR!' : p.how === 'smash' ? 'SMASH!' : p.how === 'drop' ? 'DROP SHOT!' : p.how === 'lob' ? 'LOB!' : p.how === 'volley' ? 'VOLLEY WINNER' : p.how === 'pass' ? 'PASSING SHOT!' : 'WINNER!';
+  if (last && tAfterServe > j * TR + 0.3) {
+    if (flags.mp === p.w) out.banner = 'GAME, SET & MATCH';else if (flags.sp === p.w) out.banner = 'SET!';else if (flags.bp && p.w !== srv) out.banner = 'BREAK!';else if (flags.bp) out.banner = 'SAVED!';
+  }
+  out.rallyN = p.shots;
+  return out;
+}
+const rng01 = i => unit('tr', i);
+function TennisBoard({
+  m,
+  st,
+  A,
+  B
+}) {
+  const names = side => (side === 0 ? m.a : m.b).map(p => p.name.split(' ').slice(-1)[0]).join(' / ');
+  const P = ['0', '15', '30', '40'];
+  const ptLabel = side => {
+    if (!st || st.done) return '';
+    if (st.tb) return st.pts[side];
+    const a = st.pts[side],
+      b = st.pts[1 - side];
+    if (a >= 3 && b >= 3) return a > b ? 'AD' : a === b ? '40' : '';
+    return P[Math.min(3, a)];
+  };
+  const sets = st ? st.sets : [];
+  return React.createElement("table", {
+    className: "tboard small num"
+  }, React.createElement("tbody", null, [0, 1].map(side => React.createElement("tr", {
+    key: side
+  }, React.createElement("td", {
+    className: "tb-n"
+  }, React.createElement("span", {
+    className: "tc",
+    style: {
+      background: side === 0 ? A.color : B.color
+    }
+  }), " ", names(side), " ", st && !st.done && st.server === side ? React.createElement("span", {
+    className: "tb-srv",
+    "aria-label": "serving"
+  }, "\u25CF") : null), sets.map((g, k) => React.createElement("td", {
+    key: k,
+    className: g[side] > g[1 - side] ? 'won' : ''
+  }, g[side])), st && !st.done && React.createElement("td", {
+    className: "cur"
+  }, st.games[side]), st && !st.done && React.createElement("td", {
+    className: "pt"
+  }, ptLabel(side))))));
+}
+function TennisView({
+  d,
+  A,
+  B,
+  match,
+  speed,
+  onDone,
+  label
+}) {
+  const script = useMemo(() => tennisScript(match), [match]);
+  const base = speed === 'fast' ? 2 : 1;
+  const [t, setT] = useState(speed === 'instant' ? script.total : 0);
+  const [playing, setPlaying] = useState(speed !== 'instant');
+  const [mult, setMult] = useState(1);
+  const done = t >= script.total;
+  const fired = useRef(false);
+  useEffect(() => {
+    if (!playing || done) return undefined;
+    let raf;
+    let last = performance.now();
+    const tick = now => {
+      const dt = Math.min(0.1, (now - last) / 1000);
+      last = now;
+      setT(x => Math.min(script.total, x + dt * base * mult / Math.max(0.001, GAME_SPEED)));
+      raf = requestAnimationFrame(tick);
+    };
+    raf = requestAnimationFrame(tick);
+    return () => cancelAnimationFrame(raf);
+  }, [playing, done, mult, base]);
+  useEffect(() => {
+    if (done && !fired.current) {
+      fired.current = true;
+      audio.play('cheer');
+      onDone && onDone();
+    }
+  }, [done]);
+  const bi = Math.max(0, script.beats.findIndex(b => t < b.t0 + b.dur));
+  const beat = done ? script.beats[script.beats.length - 1] : script.beats[bi];
+  const u = done ? beat.dur : t - beat.t0;
+  const m = match.matches[Math.min(match.matches.length - 1, beat.mi)];
+  const surf = TEN_SURFACES[match.surface];
+  const fr = tennisFrame(beat, u, m);
+  const rpOf = useMemo(() => match.matches.map(mm => mm.walkover ? [] : tennisReplay(mm)), [match]);
+  const rp = rpOf[Math.min(match.matches.length - 1, beat.mi)];
+  let st = null;
+  if (rp.length) {
+    if (beat.type === 'walk' || beat.type === 'intro') st = {
+      ...rp[0].before,
+      done: false
+    };else if (beat.type === 'pt') st = u > beat.dur - 1.0 ? {
+      ...beat.p.after
+    } : {
+      ...beat.p.before,
+      done: false
+    };else if (beat.type === 'roll') {
+      const k = Math.min(beat.to, beat.from + Math.floor(u / beat.dur * (beat.to - beat.from + 1)));
+      st = {
+        ...rp[k].after
+      };
+    } else if (beat.type === 'set') st = {
+      ...beat.p.after
+    };else st = {
+      ...rp[rp.length - 1].after
+    };
+  }
+  const decided = k => k < beat.mi || k === beat.mi && beat.type === 'result' && u > 0.6 || beat.type === 'final' || done;
+  const tie = [0, 1].map(s => match.matches.filter((x, k) => decided(k) && x.winner === s).length);
+  const status = done || beat.type === 'final' ? 'FINAL' : beat.type === 'intro' ? 'ORDER OF PLAY' : m.decider ? 'DECIDER' : 'MATCH ' + (beat.mi + 1);
+  const colors = [A.color, B.color];
+  const short = n => n.split(' ').slice(-1)[0].slice(0, 11);
+  const sides = [m.a, m.b];
+  const rollBanner = beat.type === 'roll' && u > beat.dur * 0.55 ? (() => {
+    const p = beat.rp[beat.to];
+    return p.gameOver ? p.brk ? 'BREAK — ' + short(sides[p.w][0].name).toUpperCase() : 'HOLD' : null;
+  })() : null;
+  const banner = done ? null : beat.type === 'intro' ? 'DRAFT CUP' : beat.type === 'walk' ? m.decider ? 'MIXED DOUBLES DECIDER' : m.label.toUpperCase() : beat.type === 'set' ? 'SET ' + short(sides[beat.p.w][0].name).toUpperCase() : beat.type === 'result' ? m.winner != null ? short(sides[m.winner][0].name).toUpperCase() + (m.doubles ? ' & ' + short(sides[m.winner][1].name).toUpperCase() : '') + ' WIN' : null : beat.type === 'final' ? 'FINAL' : fr.banner || rollBanner;
+  const lastBeat = useRef(-1);
+  useEffect(() => {
+    if (!playing || done || bi === lastBeat.current) return;
+    lastBeat.current = bi;
+    if (beat.type === 'set' || beat.type === 'result') audio.play('cheer');
+    if (beat.type === 'walk') audio.play('whistle');
+  }, [bi]);
+  const hitRef = useRef(null);
+  useEffect(() => {
+    if (!playing || done || beat.type !== 'pt' || !fr.ball) return;
+    const key = bi + ':' + Math.floor((u - 0.4) / 0.55);
+    if (hitRef.current === key) return;
+    hitRef.current = key;
+    audio.play('bid');
+  }, [t]);
+  const feed = [];
+  script.beats.forEach((b, k) => {
+    if (!done && b.t0 + Math.min(b.dur * 0.7, 2) > t) return;
+    const mm = match.matches[b.mi];
+    const nm = side => (side === 0 ? mm.a : mm.b).map(p => p.name).join(' & ');
+    if (b.type === 'walk') feed.push({
+      k,
+      tag: mm.decider ? 'DEC' : 'M' + (b.mi + 1),
+      text: mm.label + ': ' + nm(0) + ' vs ' + nm(1),
+      half: true
+    });else if (b.type === 'pt') {
+      const p = b.p;
+      const f = p.before.flags;
+      const who = side => (side === 0 ? mm.a : mm.b)[0].name;
+      feed.push({
+        k,
+        tag: 'S' + p.before.setNo,
+        team: p.w,
+        big: f.mp != null || f.sp != null,
+        text: (f.mp != null ? 'Match point. ' : f.sp != null ? 'Set point. ' : f.bp ? 'Break point. ' : '') + (p.how === 'ace' ? who(p.before.server) + ' fires an ace.' : p.how === 'df' ? who(p.before.server) + ' double faults.' : (p.shots >= 10 ? p.shots + '-shot rally — ' : '') + TEN_HOW_WORD[p.how] + (p.how === 'ue' || p.how === 'forced' ? ' from ' + who(1 - p.w) : ' from ' + who(p.w)) + '.') + (f.bp && p.w !== p.before.server ? ' BREAK!' : f.bp ? ' Saved.' : '')
+      });
+    } else if (b.type === 'set') feed.push({
+      k,
+      tag: 'SET',
+      text: 'Set to ' + nm(b.p.w) + ': ' + b.p.after.sets.map(g => g[0] + '–' + g[1]).join(', '),
+      team: b.p.w,
+      big: true
+    });else if (b.type === 'result') feed.push({
+      k,
+      tag: '🏆',
+      text: tenLine(mm),
+      team: mm.winner,
+      big: true
+    });
+  });
+  const feedRef = useRef(null);
+  useEffect(() => {
+    const f = feedRef.current;
+    if (f) f.scrollTop = f.scrollHeight;
+  }, [feed.length]);
+  const nextMatch = () => {
+    const nb = script.beats.find(b => b.type === 'walk' && b.t0 > t + 0.01);
+    setT(nb ? nb.t0 : script.total);
+  };
+  return React.createElement("div", {
+    className: "matchview tennisview"
+  }, React.createElement("div", {
+    className: "scoreboard"
+  }, React.createElement("div", {
+    className: "sb-team"
+  }, React.createElement(Badge, {
+    m: A
+  }), React.createElement("span", {
+    className: "sb-n"
+  }, A.name)), React.createElement("div", {
+    className: "sb-mid"
+  }, React.createElement("span", {
+    className: "sb-score num",
+    "aria-live": "polite"
+  }, tie[0], "\u2013", tie[1]), React.createElement("span", {
+    className: "sb-clock num"
+  }, status)), React.createElement("div", {
+    className: "sb-team"
+  }, React.createElement(Badge, {
+    m: B
+  }), React.createElement("span", {
+    className: "sb-n"
+  }, B.name))), React.createElement("div", {
+    className: "boutbar small"
+  }, React.createElement("b", null, m.label), " ", React.createElement("span", {
+    className: "muted"
+  }, "\xB7 ", surf.name, " \xB7 best of 3 sets")), !m.walkover && React.createElement(TennisBoard, {
+    m: m,
+    st: st,
+    A: A,
+    B: B
+  }), React.createElement("div", {
+    className: "pitchwrap"
+  }, React.createElement("svg", {
+    className: "pitchsvg tennissvg",
+    viewBox: "0 0 100 56",
+    role: "img",
+    "aria-label": 'Tennis: ' + m.label + ', ' + status
+  }, React.createElement("rect", {
+    x: "0",
+    y: "0",
+    width: "100",
+    height: "56",
+    fill: surf.out
+  }), React.createElement("rect", {
+    x: TC.x0,
+    y: TC.y0,
+    width: TC.x1 - TC.x0,
+    height: TC.y1 - TC.y0,
+    fill: surf.court
+  }), match.surface === 'grass' && Array.from({
+    length: 12
+  }, (_, i) => React.createElement("rect", {
+    key: i,
+    x: TC.x0 + i * 6.5,
+    y: TC.y0,
+    width: "3.25",
+    height: TC.y1 - TC.y0,
+    fill: "rgba(255,255,255,.05)"
+  })), React.createElement("g", {
+    fill: "none",
+    stroke: "#fff",
+    strokeWidth: "0.35"
+  }, React.createElement("rect", {
+    x: TC.x0,
+    y: TC.y0,
+    width: TC.x1 - TC.x0,
+    height: TC.y1 - TC.y0
+  }), React.createElement("line", {
+    x1: TC.x0,
+    y1: TC.sy0,
+    x2: TC.x1,
+    y2: TC.sy0
+  }), React.createElement("line", {
+    x1: TC.x0,
+    y1: TC.sy1,
+    x2: TC.x1,
+    y2: TC.sy1
+  }), React.createElement("line", {
+    x1: "29",
+    y1: TC.sy0,
+    x2: "29",
+    y2: TC.sy1
+  }), React.createElement("line", {
+    x1: "71",
+    y1: TC.sy0,
+    x2: "71",
+    y2: TC.sy1
+  }), React.createElement("line", {
+    x1: "29",
+    y1: "28",
+    x2: "71",
+    y2: "28"
+  }), React.createElement("line", {
+    x1: TC.x0,
+    y1: "28",
+    x2: TC.x0 + 1,
+    y2: "28"
+  }), React.createElement("line", {
+    x1: TC.x1 - 1,
+    y1: "28",
+    x2: TC.x1,
+    y2: "28"
+  })), React.createElement("line", {
+    x1: "50",
+    y1: TC.y0 - 2,
+    x2: "50",
+    y2: TC.y1 + 2,
+    stroke: "#f4f1ea",
+    strokeWidth: "0.8"
+  }), React.createElement("line", {
+    x1: "50",
+    y1: TC.y0 - 2,
+    x2: "50",
+    y2: TC.y1 + 2,
+    stroke: "rgba(0,0,0,.35)",
+    strokeWidth: "0.25",
+    strokeDasharray: "0.5 0.5"
+  }), beat.type !== 'intro' && beat.type !== 'final' && [0, 1].map(side => sides[side].map((pl, k) => {
+    const p = fr.P[side][k];
+    if (!p || !m.doubles && k > 0) return null;
+    return React.createElement("g", {
+      key: side + '-' + k,
+      transform: 'translate(' + p.x.toFixed(2) + ' ' + p.y.toFixed(2) + ')'
+    }, React.createElement("ellipse", {
+      cx: "0.3",
+      cy: "0.6",
+      rx: "1.9",
+      ry: "1.1",
+      fill: "rgba(0,0,0,.25)"
+    }), React.createElement("circle", {
+      r: "1.8",
+      fill: colors[side],
+      stroke: fr.hitter === side ? '#fff' : 'rgba(0,0,0,.5)',
+      strokeWidth: fr.hitter === side ? 0.5 : 0.3
+    }), React.createElement("text", {
+      y: "-2.5",
+      textAnchor: "middle",
+      fontSize: "2.1",
+      fontWeight: "800",
+      fill: "#fff",
+      stroke: "#0f0c21",
+      strokeWidth: "0.4",
+      paintOrder: "stroke"
+    }, short(pl.name)));
+  })), fr.ball && React.createElement("g", null, React.createElement("ellipse", {
+    cx: fr.ball.x,
+    cy: fr.ball.y + 0.3,
+    rx: "0.6",
+    ry: "0.35",
+    fill: "rgba(0,0,0,.3)"
+  }), React.createElement("circle", {
+    cx: fr.ball.x,
+    cy: fr.ball.y - (fr.ball.h || 0) * 0.5,
+    r: 0.65 + (fr.ball.h || 0) * 0.03,
+    fill: "#e6f54a",
+    stroke: "#6b7a12",
+    strokeWidth: "0.15"
+  })), beat.type === 'pt' && fr.rallyN >= 8 && React.createElement("text", {
+    x: "50",
+    y: "53.5",
+    textAnchor: "middle",
+    fontSize: "2.6",
+    fontWeight: "800",
+    fill: "#fff"
+  }, fr.rallyN, "-shot rally"), (beat.type === 'intro' || beat.type === 'walk') && React.createElement("g", null, React.createElement("rect", {
+    x: "0",
+    y: "0",
+    width: "100",
+    height: "56",
+    fill: "rgba(15,12,33,.55)"
+  }), beat.type === 'intro' && match.matches.map((mm, k) => React.createElement("text", {
+    key: k,
+    x: "50",
+    y: 22 + k * 5,
+    textAnchor: "middle",
+    fontSize: "2.8",
+    fontWeight: "700",
+    fill: "#fff"
+  }, mm.label, ": ", mm.a.map(p => short(p.name)).join('/') || '—', " v ", mm.b.map(p => short(p.name)).join('/') || '—')), beat.type === 'walk' && [0, 1].map(side => React.createElement("g", {
+    key: side,
+    transform: 'translate(' + (side === 0 ? 25 : 75) + ' 30)'
+  }, sides[side].map((p, k) => React.createElement("text", {
+    key: k,
+    y: k * 5,
+    textAnchor: "middle",
+    fontSize: "3.6",
+    fontWeight: "900",
+    fill: colors[side],
+    stroke: "#0f0c21",
+    strokeWidth: "0.5",
+    paintOrder: "stroke"
+  }, p.name.toUpperCase().slice(0, 18))), React.createElement("text", {
+    y: sides[side].length * 5,
+    textAnchor: "middle",
+    fontSize: "2.4",
+    fill: "#fff"
+  }, numbersShown() ? sides[side].map(p => 'Prime ' + p.ovr + ' est.').join(' · ') : ''))), beat.type === 'walk' && React.createElement("text", {
+    x: "50",
+    y: "31",
+    textAnchor: "middle",
+    fontSize: "5",
+    fontWeight: "900",
+    fill: "#ffc83d"
+  }, "VS")), (done || beat.type === 'final') && React.createElement("g", null, React.createElement("rect", {
+    x: "0",
+    y: "0",
+    width: "100",
+    height: "56",
+    fill: "rgba(15,12,33,.6)"
+  }), React.createElement("text", {
+    x: "50",
+    y: "22",
+    textAnchor: "middle",
+    fontSize: "3.4",
+    fontWeight: "800",
+    fill: "#fff"
+  }, "DRAFT CUP \xB7 ", surf.name.toUpperCase()), React.createElement("text", {
+    x: "50",
+    y: "32",
+    textAnchor: "middle",
+    fontSize: "7",
+    fontWeight: "900",
+    fill: colors[match.winner],
+    stroke: "#0f0c21",
+    strokeWidth: "0.6",
+    paintOrder: "stroke"
+  }, (match.winner === 0 ? A : B).name.toUpperCase().slice(0, 16), " WIN"), React.createElement("text", {
+    x: "50",
+    y: "40",
+    textAnchor: "middle",
+    fontSize: "5",
+    fontWeight: "900",
+    fill: "#ffc83d"
+  }, match.score[0], "\u2013", match.score[1])), banner && React.createElement("text", {
+    x: "50",
+    y: beat.type === 'walk' ? 15 : 7.5,
+    textAnchor: "middle",
+    fontSize: banner.length > 15 ? 4.6 : 6,
+    fontWeight: "900",
+    fill: /ACE|BREAK|SET|MATCH|WINNER|SMASH|DROP|LOB|PASSING|WIN/.test(banner) ? '#ffc83d' : '#fff',
+    stroke: "#0f0c21",
+    strokeWidth: "0.6",
+    paintOrder: "stroke",
+    className: "pbanner"
+  }, banner))), React.createElement("div", {
+    className: "mctrl",
+    role: "group",
+    "aria-label": "Match controls"
+  }, !done && React.createElement("button", {
+    className: "btn btn-sm",
+    onClick: () => setPlaying(x => !x),
+    "aria-label": playing ? 'Pause' : 'Play'
+  }, playing ? '⏸ Pause' : '▶ Play'), !done && [1, 2, 4].map(x => React.createElement("button", {
+    key: x,
+    className: 'btn btn-sm' + (mult === x ? ' btn-gold' : ''),
+    "aria-pressed": mult === x,
+    onClick: () => setMult(x)
+  }, x, "\xD7")), !done && React.createElement("button", {
+    className: "btn btn-sm btn-ghost",
+    onClick: nextMatch
+  }, "Next match"), !done && React.createElement("button", {
+    className: "btn btn-sm btn-ghost",
+    onClick: () => setT(script.total)
+  }, "Skip to result"), done && React.createElement("button", {
+    className: "btn btn-sm",
+    onClick: () => {
+      fired.current = true;
+      setT(0);
+      setPlaying(true);
+    }
+  }, "\u21BA Watch again")), React.createElement("div", {
+    className: "mfeed",
+    ref: feedRef,
+    "aria-live": "polite"
+  }, feed.map(e => React.createElement("p", {
+    key: e.k,
+    className: 'mev ' + (e.big ? 'goal' : e.half ? 'half' : '') + (e.team != null ? ' t' + e.team : '')
+  }, React.createElement("span", {
+    className: "mm num"
+  }, e.tag), React.createElement("span", null, e.big ? '🎾 ' : '', e.text)))), done && React.createElement(TennisSummary, {
+    d: d,
+    A: A,
+    B: B,
+    match: match
+  }));
+}
+function tenLine(m) {
+  const nm = side => (side === 0 ? m.a : m.b).map(p => p.name).join(' & ');
+  if (m.walkover) return nm(m.winner) + ' wins by walkover.';
+  const sc = m.sets.map(s => {
+    const w = m.winner;
+    const a = s[w],
+      b = s[1 - w];
+    return a + '–' + b + (s.length === 4 ? '(' + Math.min(s[2], s[3]) + ')' : '');
+  }).join(', ');
+  return nm(m.winner) + ' beat ' + nm(1 - m.winner) + ' ' + sc + '.';
+}
+function tennisReport(d, A, B, match) {
+  const played = match.matches.filter(m => !m.walkover);
+  const dom = m => {
+    const g = [0, 1].map(s => m.sets.reduce((n, x) => n + x[s], 0));
+    return g[m.winner] / Math.max(1, g[0] + g[1]);
+  };
+  const star = played.slice().sort((x, y) => dom(y) - dom(x))[0] || null;
+  const epic = played.slice().sort((x, y) => y.pts.length - x.pts.length)[0] || null;
+  const ppl = match.matches.flatMap(m => [0, 1].map(s => ({
+    s,
+    m,
+    ps: s === 0 ? m.a : m.b
+  }))).filter(x => !x.m.doubles && x.ps.length);
+  const best = ppl.filter(x => x.m.winner === x.s).sort((x, y) => x.ps[0].price - y.ps[0].price)[0] || null;
+  const flop = ppl.filter(x => x.m.winner !== x.s).sort((x, y) => y.ps[0].price - x.ps[0].price)[0] || null;
+  return {
+    star,
+    epic,
+    best,
+    flop
+  };
+}
+function TennisSummary({
+  d,
+  A,
+  B,
+  match
+}) {
+  const R = tennisReport(d, A, B, match);
+  const T = i => i === 0 ? A : B;
+  const nm = (m, side) => (side === 0 ? m.a : m.b).map(p => p.name).join(' & ');
+  return React.createElement("div", {
+    className: "board msummary"
+  }, React.createElement("h3", null, "\uD83C\uDFBE Tie result"), React.createElement("p", {
+    className: "small",
+    style: {
+      margin: 0
+    }
+  }, React.createElement("b", null, A.name, " ", match.score[0], "\u2013", match.score[1], " ", B.name), " \xB7 ", TEN_SURFACES[match.surface].name, match.how === 'doubles' ? ' · decided by the mixed doubles' : ''), React.createElement("div", {
+    className: "fightcard"
+  }, match.matches.map((m, k) => React.createElement("div", {
+    key: k,
+    className: 'fc-row' + (m.decider ? ' main' : '')
+  }, React.createElement("span", {
+    className: "fc-tag"
+  }, m.label), React.createElement("span", {
+    className: "fc-line small"
+  }, tenLine(m)), !m.walkover && React.createElement("span", {
+    className: "fc-stats small muted num"
+  }, "Aces ", m.stats[0].aces, "\u2013", m.stats[1].aces, " \xB7 Winners ", m.stats[0].winners, "\u2013", m.stats[1].winners, " \xB7 Unforced errors ", m.stats[0].ue, "\u2013", m.stats[1].ue, " \xB7 Break points ", m.stats[0].bpWon, "/", m.stats[0].bp, " \u2013 ", m.stats[1].bpWon, "/", m.stats[1].bp)))), React.createElement("div", {
+    className: "mreport"
+  }, React.createElement("h4", null, "\uD83D\uDCCB Tie report"), R.star && React.createElement("p", {
+    className: "small"
+  }, React.createElement("b", null, "\u2B50 Player of the tie:"), " ", nm(R.star, R.star.winner), " (", T(R.star.winner).name, "): ", tenLine(R.star)), R.epic && R.epic !== R.star && React.createElement("p", {
+    className: "small"
+  }, React.createElement("b", null, "\uD83D\uDD25 Match of the day:"), " ", nm(R.epic, 0), " vs ", nm(R.epic, 1), ", ", R.epic.pts.length, " points."), R.best && React.createElement("p", {
+    className: "small"
+  }, React.createElement("b", null, "\uD83D\uDCB0 Best buy:"), " ", R.best.ps[0].name, " cost $", R.best.ps[0].price, " and won."), R.flop && React.createElement("p", {
+    className: "small"
+  }, React.createElement("b", null, "\uD83D\uDCC9 Tough day:"), " ", R.flop.ps[0].name, " cost $", R.flop.ps[0].price, " and lost.")), React.createElement("p", {
+    className: "hint",
+    style: {
+      margin: 0
+    }
+  }, "Every point simulated from Draft Night\u2019s estimated Prime numbers (not official ratings). Surface matters: grass helps big servers, clay helps grinders."));
+}
+function TenChip({
+  item,
+  topic
+}) {
+  const [open, setOpen] = useState(false);
+  if (!numbersShown()) return null;
+  const r = tenRating(item);
+  return React.createElement(React.Fragment, null, React.createElement("button", {
+    type: "button",
+    className: "ratingchip",
+    onClick: () => setOpen(true),
+    "aria-label": 'Prime ' + r.ovr + ', estimated. Show details'
+  }, "Prime ", React.createElement("b", {
+    className: "num"
+  }, r.ovr), " est."), open && ReactDOM.createPortal(React.createElement(Sheet, {
+    center: true,
+    onClose: () => setOpen(false)
+  }, React.createElement("div", {
+    className: "ratingcard"
+  }, React.createElement("div", {
+    className: "rc-top"
+  }, React.createElement("span", {
+    className: "rc-ovr num"
+  }, React.createElement("small", {
+    className: "rc-era"
+  }, "Prime"), r.ovr), React.createElement("span", {
+    className: "rc-role"
+  }, tenWomen(item) ? 'WTA' : 'ATP'), React.createElement("span", {
+    className: "rc-name"
+  }, item.name, r.surf ? React.createElement(React.Fragment, null, React.createElement("br", null), React.createElement("small", null, r.surf === 'clay' ? 'Clay-court specialist' : 'Grass-court specialist')) : null)), React.createElement("div", {
+    className: "rc-attrs"
+  }, TEN_ATTRS.map(a => React.createElement("div", {
+    key: a,
+    className: "rc-attr"
+  }, React.createElement("span", {
+    className: "k",
+    title: TEN_ATTR_NAMES[a]
+  }, a), React.createElement("span", {
+    className: "bar"
+  }, React.createElement("i", {
+    style: {
+      width: r.attrs[a] + '%'
+    }
+  })), React.createElement("span", {
+    className: "v num"
+  }, r.attrs[a])))), React.createElement("p", {
+    className: "hint",
+    style: {
+      margin: 0
+    }
+  }, "Prime: how good they were at their peak (for current players, their best so far). SRV serve \xB7 RET return \xB7 GRD groundstrokes \xB7 MOV movement \xB7 NET net play \xB7 MEN nerve. Draft Night estimate, not an official rating.")), React.createElement("button", {
+    className: "btn btn-ghost",
+    onClick: () => setOpen(false)
+  }, "Close")), document.body));
 }
 const TYRE_COL = {
   S: '#e2463b',

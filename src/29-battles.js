@@ -33,6 +33,7 @@ const BATTLE_KINDS = {
     upset: ['Who knew? {w} beats {l} when it counts!', 'Surprise hero: {w}!'],
     noshow: ['{w} wins the night — the other team had nothing.'],
   },
+  tennis: { name: 'Tennis tie', start: 'First serve', emoji: '🎾', round: 'Match', win: [''], upset: [''], noshow: ['{w} wins by walkover.'] },
   f1: { name: 'Grand Prix', start: 'Lights out', emoji: '🏎️', round: 'Lap', win: [''], upset: [''], noshow: ['{w} wins — the other team had no drivers.'] },
   combat: { name: 'Fight night', start: 'Ring the bell', emoji: '🥊', round: 'Bout', win: [''], upset: [''], noshow: ['{w} wins by walkover.'] },
   basketball: { name: 'Basketball game', start: 'Tip off', emoji: '🏀', round: 'Quarter', win: [''], upset: [''], noshow: ['{w} wins by forfeit.'] },
@@ -53,6 +54,7 @@ function simulateFor(d, A, B, key, opts) {
   if (k === 'basketball') return simulateBasketball(d, A, B, key);
   if (k === 'combat') return simulateFightCard(d, A, B, key);
   if (k === 'f1') return simulateGrandPrix(d, A, B, key);
+  if (k === 'tennis') return simulateTennisTie(d, A, B, key);
   if (k === 'survival') return simulateSurvival(d, A, B, key);
   if (k === 'powers' || k === 'weird') return simulateMissions(d, A, B, key);
   if (k === 'cute') return simulatePuppyBowl(d, A, B, key, opts && opts.knockout === false ? false : true);
@@ -61,6 +63,7 @@ function simulateFor(d, A, B, key, opts) {
 // One line for the result screen.
 function simWhy(w, mt) {
   if (mt.v === 'survival') { const ws = mt.score[mt.winner], ls = mt.score[1 - mt.winner]; const f = mt.final[mt.winner]; return w.name + (f.rescued ? ' got rescued' : ' survived ' + ws + ' day' + (ws === 1 ? '' : 's')) + (ws !== ls ? ' (the others lasted ' + ls + ')' : mt.how === 'rescue' ? ', and got rescued first' : mt.how === 'shape' ? ', level on days but in better shape' : ' and won the last night') + '.'; }
+  if (mt.v === 'tennis') return w.name + ' won the tie ' + mt.score[mt.winner] + '–' + mt.score[1 - mt.winner] + (mt.how === 'doubles' ? ' in the mixed doubles decider' : '') + '.';
   if (mt.v === 'gp') { if (mt.forfeit) return w.name + ' won — the other team had no drivers.'; const geo = F1_TRACKS.find((x) => x.id === mt.track); const best = mt.result.find((r) => mt.cars[r.car].team === mt.winner && r.pos != null); return w.name + ' won the ' + (geo ? geo.name : 'Grand Prix') + ' ' + mt.score[mt.winner] + '–' + mt.score[1 - mt.winner] + ' on points' + (best ? ' (' + mt.cars[best.car].name + ' P' + best.pos + ')' : '') + (mt.how === 'best' ? ', level on points but with the best finish' : '') + '.'; }
   if (mt.v === 'card') { const ws = mt.score[mt.winner], ls = mt.score[1 - mt.winner]; return mt.how === 'super' ? w.name + ' won the super fight to take the card ' + ws + '–' + ls + '.' : w.name + ' won the fight card ' + ws + '–' + ls + (mt.finishes[mt.winner] ? ' (' + mt.finishes[mt.winner] + ' stoppage' + (mt.finishes[mt.winner] === 1 ? '' : 's') + ')' : '') + '.'; }
   if (mt.v === 'hoops') return w.name + ' won ' + mt.score[mt.winner] + '–' + mt.score[1 - mt.winner] + (mt.ot ? ' after ' + (mt.ot > 1 ? mt.ot + ' overtimes' : 'overtime') : '') + '.';
@@ -68,7 +71,7 @@ function simWhy(w, mt) {
   if (mt.v === 'mission') return w.name + ' won ' + mt.score[mt.winner] + ' of ' + mt.missions.length + ' missions.';
   return w.name + ' won the ' + ((BATTLE_KINDS[mt.kind] || BATTLE_KINDS.fight).name).toLowerCase() + ' ' + mt.score[mt.winner] + '–' + mt.score[1 - mt.winner] + (mt.sudden ? ' in sudden death' : '') + '.';
 }
-const isSimResult = (mt) => !!mt && (mt.v === 'gp' || mt.v === 'card' || mt.v === 'hoops' || mt.v === 'battle' || mt.v === 'arena' || mt.v === 'survival' || mt.v === 'mission' || mt.v === 'show');
+const isSimResult = (mt) => !!mt && (mt.v === 'tennis' || mt.v === 'gp' || mt.v === 'card' || mt.v === 'hoops' || mt.v === 'battle' || mt.v === 'arena' || mt.v === 'survival' || mt.v === 'mission' || mt.v === 'show');
 
 // One duel: the pricier pick has the edge, capped so luck always matters.
 function battleDuel(rng, kind, a, b, maxP) {
