@@ -1,4 +1,4 @@
-/* Draft Night 9783b571b6 — built from src/ by build.js. Edit src/, not this file. */
+/* Draft Night 11d28cd7e9 — built from src/ by build.js. Edit src/, not this file. */
 "use strict";
 (function(){
 function _extends() { return _extends = Object.assign ? Object.assign.bind() : function (n) { for (var e = 1; e < arguments.length; e++) { var t = arguments[e]; for (var r in t) ({}).hasOwnProperty.call(t, r) && (n[r] = t[r]); } return n; }, _extends.apply(null, arguments); }
@@ -659,7 +659,8 @@ const STARTER_BATTLE = {
   't-f1': 'f1',
   't-ten': 'tennis',
   't-nfl': 'nfl',
-  't-nhl': 'nhl'
+  't-nhl': 'nhl',
+  't-crk': 'cricket'
 };
 function starterTopics() {
   const v3 = [...sportsTopicsV3(), ...foodTopicsV3(), ...entTopicsV3(), ...travelTopicsV3(), ...animalTopicsV3(), ...styleTopicsV3(), ...funTopicsV3()];
@@ -23695,6 +23696,15 @@ const BATTLE_KINDS = {
     upset: ['Who knew? {w} beats {l} when it counts!', 'Surprise hero: {w}!'],
     noshow: ['{w} wins the night — the other team had nothing.']
   },
+  cricket: {
+    name: 'T20 match',
+    start: 'Toss the coin',
+    emoji: '🏏',
+    round: 'Innings',
+    win: [''],
+    upset: [''],
+    noshow: ['{w} wins by forfeit.']
+  },
   nhl: {
     name: 'Hockey game',
     start: 'Puck drop',
@@ -23778,6 +23788,7 @@ function simulateFor(d, A, B, key, opts) {
   if (k === 'tennis') return simulateTennisTie(d, A, B, key);
   if (k === 'nfl') return simulateNFL(d, A, B, key);
   if (k === 'nhl') return simulateHockey(d, A, B, key);
+  if (k === 'cricket') return simulateCricket(d, A, B, key);
   if (k === 'survival') return simulateSurvival(d, A, B, key);
   if (k === 'powers' || k === 'weird') return simulateMissions(d, A, B, key);
   if (k === 'cute') return simulatePuppyBowl(d, A, B, key, opts && opts.knockout === false ? false : true);
@@ -23790,6 +23801,11 @@ function simWhy(w, mt) {
     const f = mt.final[mt.winner];
     return w.name + (f.rescued ? ' got rescued' : ' survived ' + ws + ' day' + (ws === 1 ? '' : 's')) + (ws !== ls ? ' (the others lasted ' + ls + ')' : mt.how === 'rescue' ? ', and got rescued first' : mt.how === 'shape' ? ', level on days but in better shape' : ' and won the last night') + '.';
   }
+  if (mt.v === 'cricket') return crkResultLine(mt, mt.winner === 0 ? w : {
+    name: 'the others'
+  }, mt.winner === 1 ? w : {
+    name: 'the others'
+  });
   if (mt.v === 'nhl') return w.name + ' won ' + mt.score[mt.winner] + '–' + mt.score[1 - mt.winner] + (mt.so ? ' in a shootout' : mt.ot ? ' in overtime' : '') + '.';
   if (mt.v === 'nfl') return w.name + ' won ' + mt.score[mt.winner] + '–' + mt.score[1 - mt.winner] + (mt.ot ? ' in overtime' : '') + '.';
   if (mt.v === 'tennis') return w.name + ' won the tie ' + mt.score[mt.winner] + '–' + mt.score[1 - mt.winner] + (mt.how === 'doubles' ? ' in the mixed doubles decider' : '') + '.';
@@ -23809,7 +23825,7 @@ function simWhy(w, mt) {
   if (mt.v === 'mission') return w.name + ' won ' + mt.score[mt.winner] + ' of ' + mt.missions.length + ' missions.';
   return w.name + ' won the ' + (BATTLE_KINDS[mt.kind] || BATTLE_KINDS.fight).name.toLowerCase() + ' ' + mt.score[mt.winner] + '–' + mt.score[1 - mt.winner] + (mt.sudden ? ' in sudden death' : '') + '.';
 }
-const isSimResult = mt => !!mt && (mt.v === 'nhl' || mt.v === 'nfl' || mt.v === 'tennis' || mt.v === 'gp' || mt.v === 'card' || mt.v === 'hoops' || mt.v === 'battle' || mt.v === 'arena' || mt.v === 'survival' || mt.v === 'mission' || mt.v === 'show');
+const isSimResult = mt => !!mt && (mt.v === 'cricket' || mt.v === 'nhl' || mt.v === 'nfl' || mt.v === 'tennis' || mt.v === 'gp' || mt.v === 'card' || mt.v === 'hoops' || mt.v === 'battle' || mt.v === 'arena' || mt.v === 'survival' || mt.v === 'mission' || mt.v === 'show');
 function battleDuel(rng, kind, a, b, maxP) {
   const fill = (lines, w, l) => lines[Math.floor(rng() * lines.length)].replace('{w}', w).replace('{l}', l);
   if (!a || !b) {
@@ -25034,6 +25050,450 @@ function simulateFightCard(d, A, B, key) {
     pens: null,
     events: []
   };
+}
+const CRK_SPIN = /Warne|Muralitharan|Rashid Khan|Kumble|Harbhajan|Kuldeep|Chahal|Lyon|Zampa|Saqlain|Varun|Shakib|Jadeja|Axar|Santner|Shadab|Hasaranga|Maxwell|Ashwin|Narine/;
+const CRK_POWER = /Gayle|Russell|Pollard|Maxwell|Shahid Afridi|Sehwag|Travis Head|Buttler|Klaasen|Pooran|Salt|Suryakumar|de Villiers|McCullum|Rohit|Pant|Stokes|Hardik|Gilchrist|Hayden|Warner|Jaiswal|Brook|Stoinis|Viv Richards|Dhoni|Fakhar|Hayden|Pietersen|Marsh|Green/;
+const CRK_ANCHOR = /Dravid|Root|Williamson|Steve Smith|Cook|Gavaskar|Chanderpaul|Babar|Amla|Younis|Labuschagne|Latham|Conway|Saud|Kallis|Bradman|Miandad|Sangakkara|Jayawardene/;
+const CRK_PROFILE_SRC = `
+Virat Kohli|96|
+Rohit Sharma|92|
+Babar Azam|90|
+Joe Root|91|
+Steve Smith|92|
+Kane Williamson|91|
+Sachin Tendulkar|98|
+Brian Lara|97|
+Shubman Gill|88|
+Travis Head|89|
+MS Dhoni|93|
+Rishabh Pant|88|
+Jos Buttler|91|
+Quinton de Kock|88|
+Adam Gilchrist|94|
+Mohammad Rizwan|87|
+Jasprit Bumrah|97|
+Shaheen Afridi|90|
+Pat Cummins|93|
+Mitchell Starc|91|
+James Anderson|94|
+Rashid Khan|93|
+Shane Warne|97|
+Muttiah Muralitharan|97|
+Wasim Akram|96|
+Kagiso Rabada|91|
+Ben Stokes|92|
+Shakib Al Hasan|90|
+Hardik Pandya|88|
+Jacques Kallis|96|
+Ravindra Jadeja|91|
+Glenn Maxwell|89|
+Ricky Ponting|95|
+Rahul Dravid|93|
+Viv Richards|97|
+Don Bradman|99|
+AB de Villiers|96|
+Kumar Sangakkara|94|
+Glenn McGrath|96|
+Dale Steyn|95|
+Curtly Ambrose|94|
+Malcolm Marshall|95|
+Lasith Malinga|92|
+Garfield Sobers|98|
+Imran Khan|94|
+Kapil Dev|92|
+Ian Botham|92|
+Richard Hadlee|94|
+Chris Gayle|92|
+Andre Russell|89|
+Suryakumar Yadav|89|
+Anil Kumble|93|`;
+const CRK_PROFILE = {};
+CRK_PROFILE_SRC.trim().split('\n').forEach(line => {
+  const [name, ovr] = line.split('|');
+  CRK_PROFILE[name.toLowerCase()] = {
+    ovr: +ovr
+  };
+});
+const crkRole = (item, slot) => {
+  const p = norm(item && item.pos || slot || '');
+  return ['BAT', 'BOWL', 'WK', 'AR'].includes(p) ? p : 'AR';
+};
+function crkRating(item, slot) {
+  const prof = CRK_PROFILE[String(item.name || '').toLowerCase()];
+  const fixed = validRating(item.rating);
+  const ovr = fixed ? clamp(Math.round(+item.rating), 1, 99) : prof ? prof.ovr : clamp(Math.round(74 + itemFame(item) * 20 + (unit('crko', item.name) - 0.5) * 6), 66, 94);
+  const role = crkRole(item, slot);
+  const n = String(item.name || '');
+  const j = k => (unit('crka', n, k) - 0.5) * 6;
+  const bat = Math.round(role === 'BAT' ? ovr + j(1) : role === 'WK' ? ovr - 2 + j(1) : role === 'AR' ? ovr - 5 + j(1) : 42 + j(1) * 2);
+  const bowl = Math.round(role === 'BOWL' ? ovr + j(2) : role === 'AR' ? ovr - 5 + j(2) : 30 + j(2));
+  const pwr = Math.round(clamp(bat + (CRK_POWER.test(n) ? 8 : CRK_ANCHOR.test(n) ? -6 : 0) + j(3), 30, 99));
+  return {
+    ovr,
+    role,
+    bat: clamp(bat, 25, 99),
+    bowl: clamp(bowl, 20, 99),
+    pwr,
+    type: CRK_SPIN.test(n) ? 'spin' : 'pace',
+    keep: role === 'WK' ? ovr : 50,
+    estimated: !fixed
+  };
+}
+const CRK_SQUAD = 78;
+const crkOvers = b => Math.floor(b / 6) + (b % 6 ? '.' + b % 6 : '');
+const CRK_WK = ['bowled', 'lbw', 'caught', 'caught behind', 'stumped', 'run out'];
+function crkXI(d, m, side) {
+  const got = m.team.map((x, k) => {
+    const it = x && d.items[x.itemId];
+    return it ? {
+      name: it.name,
+      itemId: it.id,
+      price: x.price || 0,
+      ...crkRating(it, d.rules.slots[k])
+    } : null;
+  }).filter(Boolean);
+  const take = role => {
+    const i = got.findIndex(p => p.role === role);
+    return i >= 0 ? got.splice(i, 1)[0] : null;
+  };
+  const sq = (n, kind) => ({
+    name: 'Squad ' + kind + ' ' + n,
+    itemId: null,
+    price: 0,
+    ovr: CRK_SQUAD,
+    role: kind === 'bowler' ? 'BOWL' : 'BAT',
+    bat: kind === 'bowler' ? 48 : CRK_SQUAD,
+    bowl: kind === 'bowler' ? CRK_SQUAD : 35,
+    pwr: kind === 'bowler' ? 45 : CRK_SQUAD,
+    type: n % 2 ? 'spin' : 'pace',
+    keep: 50,
+    squad: true
+  });
+  const bat1 = take('BAT') || sq(1, 'batter'),
+    bat2 = take('BAT') || sq(2, 'batter'),
+    wk = take('WK') || {
+      ...sq(3, 'batter'),
+      role: 'WK',
+      keep: 75,
+      name: 'Squad keeper'
+    },
+    ar = take('AR') || {
+      ...sq(4, 'batter'),
+      role: 'AR',
+      bowl: 72,
+      name: 'Squad all-rounder'
+    };
+  const bw1 = take('BOWL') || sq(5, 'bowler'),
+    bw2 = take('BOWL') || sq(6, 'bowler');
+  const extra = got.splice(0);
+  const order = [bat1, bat2, sq(1, 'batter'), wk, ar, ...extra, sq(2, 'batter'), {
+    ...sq(3, 'batter'),
+    name: 'Squad all-rounder',
+    bowl: 74,
+    role: 'AR'
+  }, bw1, bw2, sq(4, 'bowler'), sq(5, 'bowler')].slice(0, 11);
+  while (order.length < 11) order.push(sq(order.length, 'bowler'));
+  return order;
+}
+function crkPlan(xi) {
+  const bowlers = xi.map((p, i) => ({
+    i,
+    p
+  })).filter(x => x.p.bowl >= 60).sort((a, b) => b.p.bowl - a.p.bowl).slice(0, 6);
+  while (bowlers.length < 5) bowlers.push({
+    i: xi.length - 1 - bowlers.length,
+    p: xi[xi.length - 1 - bowlers.length]
+  });
+  const left = Object.fromEntries(bowlers.map(b => [b.i, 4]));
+  const plan = [];
+  let last = -1;
+  for (let o = 0; o < 20; o++) {
+    const phase = o < 6 ? 'pp' : o < 15 ? 'mid' : 'death';
+    const need = 20 - o;
+    const opts = bowlers.filter(b => left[b.i] > 0 && b.i !== last);
+    const score = b => b.p.bowl + (phase === 'mid' ? b.p.type === 'spin' ? 8 : 0 : b.p.type === 'pace' ? 6 : -4) + left[b.i] * (need <= 8 ? 6 : 1);
+    const pick = opts.sort((a, b) => score(b) - score(a))[0] || bowlers.find(b => left[b.i] > 0) || bowlers[0];
+    plan.push(pick.i);
+    left[pick.i]--;
+    last = pick.i;
+  }
+  return plan;
+}
+function crkInnings(rng, bat, bowlXI, target, ctx) {
+  const balls = [];
+  const hl = [];
+  const maxBalls = ctx.superOver ? 6 : 120,
+    maxWk = ctx.superOver ? 2 : 10;
+  const plan = ctx.superOver ? [ctx.soBowler] : crkPlan(bowlXI);
+  const bs = bat.map(() => ({
+    r: 0,
+    b: 0,
+    f: 0,
+    s: 0,
+    out: null
+  }));
+  const bw = bowlXI.map(() => ({
+    o: 0,
+    r: 0,
+    w: 0,
+    dots: 0,
+    balls: 0
+  }));
+  const order = ctx.superOver ? ctx.soOrder : bat.map((_, i) => i);
+  let next = 2;
+  let striker = order[0],
+    non = order[1];
+  let runs = 0,
+    wk = 0,
+    legal = 0,
+    freeHit = false,
+    extras = 0;
+  const form = bat.map(() => (rng() - 0.5) * 6);
+  while (legal < maxBalls && wk < maxWk && !(target != null && runs >= target)) {
+    const over = Math.floor(legal / 6);
+    const bi = plan[Math.min(plan.length - 1, over)];
+    const B = bowlXI[bi];
+    const S = bat[striker];
+    const phase = ctx.superOver ? 'death' : over < 6 ? 'pp' : over < 15 ? 'mid' : 'death';
+    const set = Math.min(1, bs[striker].b / 15);
+    const left = maxBalls - legal;
+    const need = target != null ? target - runs : null;
+    let agg = phase === 'pp' ? 0.45 : phase === 'mid' ? 0.35 : 0.85;
+    if (need != null) agg += clamp((need / Math.max(1, left) * 6 - 8.5) / 8, -0.3, 0.8);
+    agg += (10 - wk - 6) * 0.03;
+    agg = clamp(agg, 0.05, 1.4);
+    const q = (S.bat + form[striker] + set * 6 - B.bowl) / 100;
+    const wides = rng();
+    const code = {
+      r: 0,
+      x: 0,
+      w: 0,
+      bat: striker,
+      bowl: bi,
+      how: null,
+      f: null,
+      fh: freeHit
+    };
+    if (wides < 0.034) {
+      code.x = 1;
+      code.r = 1;
+      runs += 1;
+      extras++;
+      bw[bi].r++;
+      code.tot = runs;
+      code.wk = wk;
+      code.lb = legal;
+      balls.push(code);
+      continue;
+    }
+    const pen = wides < 0.042 ? 1 : 0;
+    if (pen) code.x = 2;
+    const pW = clamp(0.047 - q * 0.11 + agg * 0.025 + (bs[striker].b < 4 ? 0.012 : 0) + (B.type === 'spin' && phase === 'mid' ? 0.004 : 0), 0.012, 0.13);
+    let out = false;
+    let batRuns = 0;
+    if (!freeHit && !pen && rng() < pW) {
+      const how = B.type === 'spin' ? weighted(rng, [['bowled', 2], ['lbw', 2], ['caught', 4.5], ['stumped', bowlXI.some(p => p.role === 'WK') ? 1.2 : 0.3], ['run out', 0.4]], x => x[1])[0] : weighted(rng, [['bowled', 2.2], ['lbw', 1.6], ['caught', 4], ['caught behind', 1.4], ['run out', 0.5]], x => x[1])[0];
+      const keeper = bowlXI.findIndex(p => p.role === 'WK');
+      const fielder = how === 'caught behind' || how === 'stumped' ? Math.max(0, keeper) : how === 'caught' || how === 'run out' ? Math.floor(rng() * 11) : null;
+      if ((how === 'caught' || how === 'caught behind') && rng() < 0.085) {
+        code.drop = fielder;
+        batRuns = rng() < 0.5 ? 1 : 0;
+      } else {
+        out = true;
+        code.w = 1;
+        code.how = how;
+        code.f = fielder;
+      }
+    }
+    if (!out && code.drop == null) {
+      const p6 = clamp(0.042 + (S.pwr + form[striker] - B.bowl) / 650 + agg * 0.055 + (freeHit ? 0.12 : 0), 0.004, 0.3);
+      const p4 = clamp(0.105 + q * 0.18 + agg * 0.04 + (phase === 'pp' ? 0.025 : 0), 0.03, 0.3);
+      const y = rng();
+      if (y < p6) batRuns = 6;else if (y < p6 + p4) batRuns = 4;else {
+        const z = rng();
+        batRuns = z < clamp(0.4 - agg * 0.12 - q * 0.2, 0.18, 0.55) ? 0 : z < 0.86 ? 1 : z < 0.985 ? 2 : 3;
+      }
+    }
+    freeHit = !!pen;
+    code.r = pen + batRuns;
+    runs += code.r;
+    extras += pen;
+    bw[bi].r += code.r;
+    bs[striker].r += batRuns;
+    if (batRuns === 4) bs[striker].f++;
+    if (batRuns === 6) bs[striker].s++;
+    if (!pen) {
+      legal++;
+      bs[striker].b++;
+      bw[bi].balls++;
+      if (code.r === 0) bw[bi].dots++;
+    }
+    if (out) {
+      wk++;
+      bs[striker].out = {
+        how: code.how,
+        by: bi,
+        f: code.f
+      };
+      if (code.how !== 'run out') bw[bi].w++;
+      code.out = striker;
+      striker = next < order.length ? order[next++] : -1;
+      if (striker < 0) {
+        balls.push(code);
+        break;
+      }
+    } else if (batRuns % 2 === 1) {
+      const t2 = striker;
+      striker = non;
+      non = t2;
+    }
+    if (!pen && legal % 6 === 0) {
+      const t2 = striker;
+      striker = non;
+      non = t2;
+      bw[bi].o++;
+    }
+    code.tot = runs;
+    code.wk = wk;
+    code.lb = legal;
+    balls.push(code);
+  }
+  bw.forEach(b => {
+    b.o = Math.floor(b.balls / 6) + b.balls % 6 / 10;
+  });
+  return {
+    balls,
+    runs,
+    wk,
+    legal,
+    bs,
+    bw,
+    extras
+  };
+}
+function simulateCricket(d, A, B, key) {
+  const rng = seeded(d.seed, 'cricket', key, A.id, B.id);
+  const XI = [crkXI(d, A, 0), crkXI(d, B, 1)];
+  const tossW = rng() < 0.5 ? 0 : 1;
+  const batFirst = rng() < 0.55 ? 1 - tossW : tossW;
+  const first = batFirst,
+    second = 1 - batFirst;
+  const inn1 = crkInnings(rng, XI[first], XI[second], null, {});
+  const inn2 = crkInnings(rng, XI[second], XI[first], inn1.runs + 1, {});
+  const innings = [{
+    team: first,
+    ...inn1
+  }, {
+    team: second,
+    ...inn2
+  }];
+  let winner,
+    margin,
+    superOvers = [];
+  if (inn2.runs > inn1.runs) {
+    winner = second;
+    margin = {
+      wickets: 10 - inn2.wk,
+      balls: 120 - inn2.legal
+    };
+  } else if (inn1.runs > inn2.runs) {
+    winner = first;
+    margin = {
+      runs: inn1.runs - inn2.runs
+    };
+  } else {
+    for (let k = 0; k < 4 && winner == null; k++) {
+      const pickBat = xi => xi.map((p, i) => ({
+        i,
+        v: p.pwr + p.bat
+      })).sort((a, b) => b.v - a.v).slice(0, 3).map(x => x.i);
+      const pickBowl = xi => xi.map((p, i) => ({
+        i,
+        v: p.bowl
+      })).sort((a, b) => b.v - a.v)[0].i;
+      const soA = crkInnings(rng, XI[second], XI[first], null, {
+        superOver: true,
+        soOrder: pickBat(XI[second]),
+        soBowler: pickBowl(XI[first])
+      });
+      const soB = crkInnings(rng, XI[first], XI[second], soA.runs + 1, {
+        superOver: true,
+        soOrder: pickBat(XI[first]),
+        soBowler: pickBowl(XI[second])
+      });
+      superOvers.push({
+        team: second,
+        ...soA
+      }, {
+        team: first,
+        ...soB
+      });
+      if (soB.runs > soA.runs) winner = first;else if (soA.runs > soB.runs) winner = second;
+    }
+    if (winner == null) {
+      const fours = inn => inn.balls.filter(b => b.r === 4 || b.r === 6).length;
+      winner = fours(inn1) >= fours(inn2) ? first : second;
+    }
+    margin = {
+      superOver: true
+    };
+  }
+  const tag = (inn, ii) => {
+    const bsRun = inn.balls.map(() => 0);
+    const cum = {};
+    inn.balls.forEach((b, k) => {
+      const over = Math.floor((b.lb - (b.x === 1 || b.x === 2 ? 0 : 1)) / 6);
+      cum[b.bat] = (cum[b.bat] || 0) + (b.x === 2 ? b.r - 1 : b.x === 1 ? 0 : b.r);
+      const prev = cum[b.bat] - (b.x === 2 ? b.r - 1 : b.x === 1 ? 0 : b.r);
+      const mile = [50, 100].find(m2 => prev < m2 && cum[b.bat] >= m2);
+      if (mile) b.mile = mile;
+      const close = ii === 1 && inn.balls.length - k < 18 && Math.abs(inn1.runs + 1 - b.tot) <= 24;
+      b.hl = !!(b.w || b.r === 6 || b.drop || mile || b.r === 4 && (close || over >= 18 || unit('crk4', key, ii, k) < 0.22) || ii >= 2);
+      b.over = over;
+    });
+  };
+  innings.forEach((inn, ii) => tag(inn, ii));
+  superOvers.forEach(inn => tag(inn, 2));
+  [...innings, ...superOvers].forEach(inn => inn.balls.forEach(b => {
+    Object.keys(b).forEach(k => {
+      if (b[k] === null || b[k] === false || b[k] === 0 && !['r', 'tot', 'wk', 'lb', 'bat', 'bowl', 'drop', 'f', 'out'].includes(k)) delete b[k];
+    });
+  }));
+  const view = XI.map(xi => xi.map(p => ({
+    name: p.name,
+    itemId: p.itemId,
+    role: p.role,
+    type: p.type,
+    squad: !!p.squad,
+    ovr: p.ovr,
+    price: p.price
+  })));
+  const score = [0, 0];
+  score[first] = inn1.runs;
+  score[second] = inn2.runs;
+  return {
+    v: 'cricket',
+    kind: 'cricket',
+    toss: tossW,
+    batFirst: first,
+    innings,
+    superOvers,
+    winner,
+    margin,
+    xi: view,
+    score,
+    et: false,
+    pens: null,
+    sudden: superOvers.length > 0,
+    events: []
+  };
+}
+function crkResultLine(m, A, B) {
+  const T = i => i === 0 ? A : B;
+  const w = T(m.winner);
+  if (m.margin.superOver) return w.name + ' won the Super Over!';
+  if (m.margin.runs != null) return w.name + ' won by ' + m.margin.runs + ' run' + (m.margin.runs === 1 ? '' : 's') + '.';
+  return w.name + ' won by ' + m.margin.wickets + ' wicket' + (m.margin.wickets === 1 ? '' : 's') + (m.margin.balls ? ' with ' + m.margin.balls + ' ball' + (m.margin.balls === 1 ? '' : 's') + ' to spare' : ' off the last ball') + '.';
 }
 const F1_ATTRS = ['PAC', 'RAC', 'OVT', 'DEF', 'TYR', 'WET', 'CON'];
 const F1_ATTR_NAMES = {
@@ -31853,7 +32313,7 @@ function TopicEditor({
   }, "Fun battles (Battles finale)"), React.createElement(Seg, {
     label: "Fun battle style",
     value: topic.battle || 'none',
-    options: [['none', 'Off'], ['fight', '⚔️ Fight'], ['powers', '💥 Powers'], ['survival', '🧟 Survival'], ['cute', '🥰 Puppy Bowl'], ['weird', '🤡 Silly'], ['combat', '🥊 Fight night'], ['f1', '🏎️ Grand Prix'], ['tennis', '🎾 Tennis'], ['nfl', '🏈 American football'], ['nhl', '🏒 Ice hockey'], ['basketball', '🏀 Basketball']],
+    options: [['none', 'Off'], ['fight', '⚔️ Fight'], ['powers', '💥 Powers'], ['survival', '🧟 Survival'], ['cute', '🥰 Puppy Bowl'], ['weird', '🤡 Silly'], ['combat', '🥊 Fight night'], ['f1', '🏎️ Grand Prix'], ['tennis', '🎾 Tennis'], ['nfl', '🏈 American football'], ['nhl', '🏒 Ice hockey'], ['cricket', '🏏 Cricket'], ['basketball', '🏀 Basketball']],
     onChange: v => set({
       battle: v === 'none' ? '' : v
     })
@@ -34015,6 +34475,9 @@ function ItemCard({
     item: item,
     topic: d.topic
   }) : battleKindId(d.topic) === 'nhl' ? React.createElement(NHLChip, {
+    item: item,
+    topic: d.topic
+  }) : battleKindId(d.topic) === 'cricket' ? React.createElement(CrkChip, {
     item: item,
     topic: d.topic
   }) : hasBattle(d.topic) && React.createElement(StatChip, {
@@ -38813,7 +39276,13 @@ if (window.__DN_TEST__) window.__DN = {
     nhlRating,
     rinkScript,
     rinkFrame,
-    nhlReport
+    nhlReport,
+    simulateCricket,
+    crkRating,
+    cricketScript,
+    cricketFrame,
+    cricketReport,
+    crkResultLine
   },
   simStats: {
     simulatePuppyBowl,
@@ -40555,6 +41024,894 @@ function HoopsChip({
     onClick: () => setOpen(false)
   }, "Close")), document.body));
 }
+const CG = {
+  cx: 50,
+  cy: 30,
+  rx: 46,
+  ry: 27
+};
+const FIELD_POS = [{
+  x: 50,
+  y: 22.5
+}, {
+  x: 54,
+  y: 20
+}, {
+  x: 64,
+  y: 26
+}, {
+  x: 69,
+  y: 34
+}, {
+  x: 60,
+  y: 46
+}, {
+  x: 40,
+  y: 46
+}, {
+  x: 31,
+  y: 35
+}, {
+  x: 33,
+  y: 24
+}, {
+  x: 42,
+  y: 12
+}, {
+  x: 60,
+  y: 10
+}, {
+  x: 50,
+  y: 52
+}];
+const CRK_BALL_DUR = 3.4;
+function cricketScript(match) {
+  const beats = [];
+  let t = 0;
+  const add = b => {
+    b.t0 = t;
+    t += b.dur;
+    beats.push(b);
+    return b;
+  };
+  add({
+    type: 'toss',
+    dur: 2.8
+  });
+  const all = [...match.innings.map((x, ii) => ({
+    ...x,
+    ii
+  })), ...match.superOvers.map((x, k) => ({
+    ...x,
+    ii: 2 + k
+  }))];
+  all.forEach(inn => {
+    add({
+      type: 'innstart',
+      dur: 2.2,
+      inn
+    });
+    let over = -1;
+    let buf = [];
+    const flush = () => {
+      if (!buf.length) return;
+      add({
+        type: 'over',
+        dur: Math.min(2.2, 0.6 + buf.length * 0.12),
+        inn,
+        balls: buf,
+        over
+      });
+      buf = [];
+    };
+    inn.balls.forEach((b, k) => {
+      if (b.over !== over) {
+        flush();
+        over = b.over;
+      }
+      if (b.hl) {
+        flush();
+        add({
+          type: 'ball',
+          dur: CRK_BALL_DUR + (b.w || b.mile ? 0.8 : 0),
+          inn,
+          b,
+          k
+        });
+      } else buf.push({
+        b,
+        k
+      });
+    });
+    flush();
+    add({
+      type: 'innend',
+      dur: 2.4,
+      inn
+    });
+  });
+  add({
+    type: 'final',
+    dur: 3
+  });
+  return {
+    beats,
+    total: t
+  };
+}
+function shotDir(b, k) {
+  const a = unit('crkdir', k, b.bat, b.bowl, b.tot) * Math.PI * 2;
+  return {
+    x: Math.cos(a),
+    y: Math.sin(a) * 0.85 + 0.15
+  };
+}
+const crkPosOf = xi => {
+  const wk = Math.max(0, xi.findIndex(p => p.role === 'WK'));
+  const order = [wk, ...xi.map((_, i) => i).filter(i => i !== wk)];
+  const m = {};
+  order.forEach((xiI, posI) => {
+    m[xiI] = posI;
+  });
+  return i => m[i] != null ? m[i] : 1;
+};
+function cricketFrame(beat, u, xiBowl) {
+  const F = FIELD_POS.map(p => ({
+    ...p
+  }));
+  const pos = crkPosOf(xiBowl || []);
+  const striker = {
+      x: 50,
+      y: 24.5
+    },
+    non = {
+      x: 50.8,
+      y: 36.5
+    },
+    bowler = {
+      x: 49,
+      y: 37
+    };
+  const out = {
+    F,
+    striker: {
+      ...striker
+    },
+    non: {
+      ...non
+    },
+    bowler: {
+      ...bowler
+    },
+    ball: null,
+    banner: null,
+    stumps: null,
+    flash: null
+  };
+  if (beat.type !== 'ball') return out;
+  const b = beat.b;
+  const k = (a, z) => Math.max(0, Math.min(1, (u - a) / (z - a)));
+  out.bowler = {
+    x: 49 + (1 - k(0, 0.9)) * 0,
+    y: 44 - k(0, 0.9) * 7
+  };
+  const rel = 0.9,
+    pitchAt = 1.15,
+    arrive = 1.32;
+  if (u < rel) out.ball = {
+    x: out.bowler.x,
+    y: out.bowler.y,
+    h: 1
+  };else if (u < pitchAt) out.ball = {
+    ...lerpR({
+      x: 49.5,
+      y: 37
+    }, {
+      x: 50,
+      y: 28
+    }, k(rel, pitchAt)),
+    h: 1.2 * (1 - k(rel, pitchAt))
+  };else if (u < arrive) out.ball = {
+    ...lerpR({
+      x: 50,
+      y: 28
+    }, {
+      x: 50,
+      y: 24.8
+    }, k(pitchAt, arrive)),
+    h: 0.6 * Math.sin(k(pitchAt, arrive) * Math.PI)
+  };else {
+    const d = shotDir(b, beat.k);
+    const kk = k(arrive, arrive + 1.1);
+    const runs = b.x === 2 ? b.r - 1 : b.r;
+    if (b.w && (b.how === 'bowled' || b.how === 'lbw')) {
+      out.ball = {
+        x: 50,
+        y: 23.4,
+        h: 0
+      };
+      out.stumps = b.how === 'bowled' ? {
+        x: 50,
+        y: 23.2,
+        k: k(arrive, arrive + 0.4)
+      } : null;
+      out.banner = b.how === 'bowled' ? 'BOWLED!' : u > arrive + 0.5 ? 'LBW!' : 'HOWZAT?';
+    } else if (b.w && (b.how === 'caught behind' || b.how === 'stumped')) {
+      out.ball = {
+        ...lerpR({
+          x: 50,
+          y: 24.8
+        }, F[0], k(arrive, arrive + 0.25)),
+        h: 0.8
+      };
+      if (b.how === 'stumped') {
+        out.striker = lerpR(striker, {
+          x: 50,
+          y: 27
+        }, k(arrive - 0.2, arrive + 0.2));
+        out.stumps = {
+          x: 50,
+          y: 23.2,
+          k: k(arrive + 0.4, arrive + 0.7)
+        };
+      }
+      out.banner = u > arrive + 0.5 ? b.how === 'stumped' ? 'STUMPED!' : 'CAUGHT BEHIND!' : null;
+      out.flash = F[0];
+    } else if (b.w && b.how === 'caught' || b.drop != null) {
+      const fi = pos(b.w ? b.f : b.drop);
+      const fp = F[fi];
+      out.ball = {
+        ...lerpR({
+          x: 50,
+          y: 24.8
+        }, fp, kk),
+        h: Math.sin(kk * Math.PI) * 7
+      };
+      F[fi] = lerpR(fp, {
+        x: fp.x + (unit('cd', beat.k) - 0.5) * 3,
+        y: fp.y
+      }, kk);
+      if (kk >= 1) {
+        if (b.drop != null) {
+          out.ball = {
+            x: fp.x + 1.6,
+            y: fp.y + 1.4,
+            h: 0
+          };
+          out.banner = 'DROPPED!';
+        } else {
+          out.ball = {
+            ...F[fi],
+            h: 0
+          };
+          out.banner = 'CAUGHT!';
+        }
+        out.flash = F[fi];
+      }
+    } else if (b.w && b.how === 'run out') {
+      out.striker = lerpR(striker, {
+        x: 50.4,
+        y: 33
+      }, k(arrive, arrive + 1.1));
+      out.non = lerpR(non, {
+        x: 50.2,
+        y: 28
+      }, k(arrive, arrive + 1.1));
+      const fp = F[pos(b.f != null ? b.f : 3)];
+      out.ball = k(arrive, arrive + 0.5) < 1 ? {
+        ...lerpR({
+          x: 50,
+          y: 24.8
+        }, fp, k(arrive, arrive + 0.5)),
+        h: 0
+      } : {
+        ...lerpR(fp, {
+          x: 50.8,
+          y: 36.5
+        }, k(arrive + 0.5, arrive + 1.0)),
+        h: 1
+      };
+      if (u > arrive + 1.0) {
+        out.stumps = {
+          x: 50.8,
+          y: 36.8,
+          k: k(arrive + 1.0, arrive + 1.3)
+        };
+        out.banner = 'RUN OUT!';
+      }
+    } else if (runs === 6) {
+      const land = {
+        x: CG.cx + d.x * (CG.rx + 4),
+        y: CG.cy + d.y * (CG.ry + 3)
+      };
+      out.ball = {
+        ...lerpR({
+          x: 50,
+          y: 24.8
+        }, land, kk),
+        h: Math.sin(kk * Math.PI) * 14
+      };
+      if (kk > 0.6) out.banner = 'SIX!';
+    } else if (runs === 4) {
+      const land = {
+        x: CG.cx + d.x * CG.rx * 0.98,
+        y: CG.cy + d.y * CG.ry * 0.98
+      };
+      out.ball = {
+        ...lerpR({
+          x: 50,
+          y: 24.8
+        }, land, easeC(kk)),
+        h: 0
+      };
+      const near = F.reduce((bi2, p, i) => i && Math.hypot(p.x - land.x, p.y - land.y) < Math.hypot(F[bi2].x - land.x, F[bi2].y - land.y) ? i : bi2, 1);
+      F[near] = lerpR(F[near], land, kk * 0.75);
+      if (kk > 0.7) out.banner = 'FOUR!';
+    } else {
+      const land = {
+        x: 50 + d.x * 14,
+        y: 30 + d.y * 10
+      };
+      out.ball = {
+        ...lerpR({
+          x: 50,
+          y: 24.8
+        }, land, kk),
+        h: 0
+      };
+      if (runs > 0) {
+        out.striker = lerpR(striker, non, Math.min(1, kk * runs));
+        out.non = lerpR(non, striker, Math.min(1, kk * runs));
+      }
+    }
+    if (b.mile && u > beat.dur - 1.1) out.banner = b.mile === 100 ? 'HUNDRED!' : 'FIFTY!';
+    if (b.x === 2 && u < arrive + 0.6) out.banner = 'NO BALL — FREE HIT';
+  }
+  return out;
+}
+function CricketView({
+  d,
+  A,
+  B,
+  match,
+  speed,
+  onDone,
+  label
+}) {
+  const script = useMemo(() => cricketScript(match), [match]);
+  const base = speed === 'fast' ? 2 : 1;
+  const [t, setT] = useState(speed === 'instant' ? script.total : 0);
+  const [playing, setPlaying] = useState(speed !== 'instant');
+  const [mult, setMult] = useState(1);
+  const done = t >= script.total;
+  const fired = useRef(false);
+  useEffect(() => {
+    if (!playing || done) return undefined;
+    let raf;
+    let last = performance.now();
+    const tick = now => {
+      const dt = Math.min(0.1, (now - last) / 1000);
+      last = now;
+      setT(x => Math.min(script.total, x + dt * base * mult / Math.max(0.001, GAME_SPEED)));
+      raf = requestAnimationFrame(tick);
+    };
+    raf = requestAnimationFrame(tick);
+    return () => cancelAnimationFrame(raf);
+  }, [playing, done, mult, base]);
+  useEffect(() => {
+    if (done && !fired.current) {
+      fired.current = true;
+      audio.play('cheer');
+      onDone && onDone();
+    }
+  }, [done]);
+  const bi = Math.max(0, script.beats.findIndex(b => t < b.t0 + b.dur));
+  const beat = done ? script.beats[script.beats.length - 1] : script.beats[bi];
+  const u = done ? beat.dur : t - beat.t0;
+  const T = i => i === 0 ? A : B;
+  const inn = beat.inn || (match.superOvers.length ? match.superOvers[match.superOvers.length - 1] : match.innings[1]);
+  const batT = inn.team,
+    bowlT = 1 - inn.team;
+  const xiBat = match.xi[batT],
+    xiBowl = match.xi[bowlT];
+  const fr = cricketFrame(beat, u, xiBowl);
+  const posOfX = crkPosOf(xiBowl);
+  let cur = null;
+  if (beat.type === 'ball') cur = u > 2.2 ? beat.b : beat.k ? inn.balls[beat.k - 1] : null;else if (beat.type === 'over') cur = beat.balls[Math.min(beat.balls.length - 1, Math.floor(u / beat.dur * beat.balls.length))].b;else if (beat.type === 'innend' || beat.type === 'final' || done) cur = inn.balls[inn.balls.length - 1];
+  const runs = cur ? cur.tot : 0,
+    wk = cur ? cur.wk : 0,
+    lb = cur ? cur.lb : 0;
+  const isSO = beat.inn && beat.inn.ii >= 2;
+  const isChase = beat.inn && (beat.inn.ii === 1 || beat.inn.ii % 2 === 1);
+  const target = isChase ? beat.inn.ii === 1 ? match.innings[0].runs + 1 : match.superOvers[beat.inn.ii - 3].runs + 1 : null;
+  const ballsMax = isSO ? 6 : 120;
+  const chaseTxt = target != null && cur && runs < target ? 'need ' + (target - runs) + ' off ' + (ballsMax - lb) : target != null && runs >= target ? 'target reached' : '';
+  const status = done || beat.type === 'final' ? 'RESULT' : beat.type === 'toss' ? 'TOSS' : isSO ? 'SUPER OVER' : beat.inn.ii === 0 ? '1ST INNINGS' : '2ND INNINGS';
+  const striker = cur && beat.type === 'ball' ? xiBat[beat.b.bat] : null;
+  const bowler = beat.type === 'ball' ? xiBowl[beat.b.bowl] : beat.type === 'over' ? xiBowl[beat.balls[0].b.bowl] : null;
+  const colors = [A.color, B.color];
+  const short = n => {
+    if (/^Squad /.test(String(n || ''))) return '';
+    const w = String(n || '').split(' ');
+    return w[w.length - 1].slice(0, 10);
+  };
+  const ballLabel = b => b.x === 1 ? 'wd' : b.w ? 'W' : b.x === 2 ? 'nb' + (b.r - 1 || '') : String(b.r === 0 ? '•' : b.r);
+  const banner = done ? null : beat.type === 'toss' ? T(match.toss).name.toUpperCase().slice(0, 12) + ' WIN THE TOSS' : beat.type === 'innstart' ? beat.inn.ii >= 2 ? 'SUPER OVER!' : T(batT).name.toUpperCase().slice(0, 12) + ' BAT' : beat.type === 'innend' ? T(batT).name.toUpperCase().slice(0, 10) + ' ' + inn.runs + '/' + inn.wk : beat.type === 'final' ? 'RESULT' : fr.banner;
+  const lastBeat = useRef(-1);
+  useEffect(() => {
+    if (!playing || done || bi === lastBeat.current) return;
+    lastBeat.current = bi;
+    if (beat.type === 'innstart' || beat.type === 'innend') audio.play('whistle');
+  }, [bi]);
+  const said = useRef({});
+  useEffect(() => {
+    if (!playing || done || beat.type !== 'ball' || said.current[bi] || u < 1.9) return;
+    said.current[bi] = true;
+    const b = beat.b;
+    const r = b.x === 2 ? b.r - 1 : b.r;
+    if (b.w) {
+      audio.play('buzzer');
+      audio.say('Out! ' + xiBat[b.bat].name.split(' ').slice(-1)[0] + ' has to go.', 2, d.id + ':' + label + ':w' + bi);
+    } else if (r === 6) {
+      audio.play('cheer');
+    } else if (r === 4) audio.play('bid');else if (b.drop != null) audio.play('card');
+  }, [t]);
+  const feed = [];
+  script.beats.forEach((b, k2) => {
+    if (!done && b.t0 + b.dur * 0.75 > t) return;
+    const xb = match.xi[b.inn ? b.inn.team : 0],
+      xw = match.xi[b.inn ? 1 - b.inn.team : 1];
+    if (b.type === 'ball') {
+      const x = b.b;
+      const r = x.x === 2 ? x.r - 1 : x.r;
+      const bat = xb[x.bat].name,
+        bw = xw[x.bowl].name;
+      const txt = x.w ? bat + (x.how === 'caught' ? ' caught by ' + (xw[x.f] ? xw[x.f].name : 'a fielder') : x.how === 'caught behind' ? ' caught behind' : x.how === 'stumped' ? ' stumped' : x.how === 'run out' ? ' run out' : ' ' + x.how) + (x.how !== 'run out' ? ', bowled ' + bw : '') + '! ' + x.tot + '/' + x.wk : x.drop != null ? 'DROPPED! ' + (xw[x.drop] ? xw[x.drop].name : 'A fielder') + ' puts down ' + bat + '.' : r === 6 ? bat + ' hits ' + bw + ' for SIX!' : r === 4 ? bat + ' drives ' + bw + ' for four.' : bat + ' takes ' + r + '.';
+      feed.push({
+        k: k2,
+        tag: crkOvers(x.lb),
+        team: x.w ? 1 - b.inn.team : b.inn.team,
+        big: x.w || r === 6,
+        text: txt + (x.mile ? ' ' + (x.mile === 100 ? 'HUNDRED' : 'FIFTY') + ' for ' + bat + '!' : '')
+      });
+    } else if (b.type === 'innend') feed.push({
+      k: k2,
+      tag: '🏏',
+      text: T(b.inn.team).name + ' ' + (b.inn.ii >= 2 ? '(Super Over) ' : '') + b.inn.runs + '/' + b.inn.wk + ' (' + crkOvers(b.inn.legal) + ' ov)',
+      half: true
+    });
+  });
+  const feedRef = useRef(null);
+  useEffect(() => {
+    const f = feedRef.current;
+    if (f) f.scrollTop = f.scrollHeight;
+  }, [feed.length]);
+  const overBalls = beat.type === 'over' ? beat.balls.slice(0, Math.floor(u / beat.dur * beat.balls.length) + 1).map(x => x.b) : beat.type === 'ball' ? inn.balls.filter((x, k3) => x.over === beat.b.over && k3 <= beat.k && (k3 < beat.k || u > 2)) : [];
+  return React.createElement("div", {
+    className: "matchview cricketview"
+  }, React.createElement("div", {
+    className: "scoreboard"
+  }, React.createElement("div", {
+    className: "sb-team"
+  }, React.createElement(Badge, {
+    m: A
+  }), React.createElement("span", {
+    className: "sb-n"
+  }, A.name)), React.createElement("div", {
+    className: "sb-mid"
+  }, React.createElement("span", {
+    className: "sb-score num",
+    "aria-live": "polite"
+  }, done || beat.type === 'final' ? match.innings.map(x => x.runs + '/' + x.wk).join(' · ') : runs + '/' + wk), React.createElement("span", {
+    className: "sb-clock num"
+  }, status)), React.createElement("div", {
+    className: "sb-team"
+  }, React.createElement(Badge, {
+    m: B
+  }), React.createElement("span", {
+    className: "sb-n"
+  }, B.name))), React.createElement("div", {
+    className: "boutbar small"
+  }, beat.inn ? React.createElement(React.Fragment, null, React.createElement("b", null, T(batT).name), " ", React.createElement("span", {
+    className: "muted"
+  }, "\xB7 ", runs, "/", wk, " (", crkOvers(lb), " ov)", chaseTxt ? ' · ' + chaseTxt : '')) : React.createElement("span", {
+    className: "muted"
+  }, "T20 \xB7 20 overs a side"), (striker || bowler) && React.createElement("span", {
+    className: "boutstats"
+  }, striker ? '🏏 ' + striker.name : '', bowler ? (striker ? ' · ' : '') + '⚾ ' + bowler.name + (bowler.type === 'spin' ? ' (spin)' : ' (pace)') : ''), overBalls.length > 0 && React.createElement("span", {
+    className: "boutstats overticker"
+  }, overBalls.map((x, i) => React.createElement("i", {
+    key: i,
+    className: 'ob' + (x.w ? ' w' : (x.x === 2 ? x.r - 1 : x.r) >= 4 ? ' b' : '')
+  }, ballLabel(x))))), React.createElement("div", {
+    className: "pitchwrap"
+  }, React.createElement("svg", {
+    className: "pitchsvg cricketsvg",
+    viewBox: "0 0 100 60",
+    role: "img",
+    "aria-label": 'Cricket: ' + status + ', ' + runs + ' for ' + wk
+  }, React.createElement("rect", {
+    x: "0",
+    y: "0",
+    width: "100",
+    height: "60",
+    fill: "#2c6b2f"
+  }), React.createElement("ellipse", {
+    cx: CG.cx,
+    cy: CG.cy,
+    rx: CG.rx,
+    ry: CG.ry,
+    fill: "#4f9a3f",
+    stroke: "#fff",
+    strokeWidth: "0.5",
+    strokeDasharray: "1 0.6"
+  }), Array.from({
+    length: 8
+  }, (_, i) => React.createElement("ellipse", {
+    key: i,
+    cx: CG.cx,
+    cy: CG.cy,
+    rx: CG.rx - i * 5.5,
+    ry: CG.ry - i * 3.2,
+    fill: "none",
+    stroke: "rgba(255,255,255,.05)",
+    strokeWidth: "2.4"
+  })), React.createElement("ellipse", {
+    cx: CG.cx,
+    cy: CG.cy,
+    rx: "17",
+    ry: "11",
+    fill: "none",
+    stroke: "rgba(255,255,255,.35)",
+    strokeWidth: "0.25",
+    strokeDasharray: "0.8 0.8"
+  }), React.createElement("rect", {
+    x: "48.6",
+    y: "22",
+    width: "2.8",
+    height: "16",
+    fill: "#d9c79a"
+  }), [[50, 23.2], [50.8, 36.8]].map(([x, y], i) => {
+    const st = fr.stumps && Math.abs(fr.stumps.y - y) < 1 ? fr.stumps.k : 0;
+    return React.createElement("g", {
+      key: i
+    }, [-0.35, 0, 0.35].map((dx, j) => React.createElement("rect", {
+      key: j,
+      x: x + dx - 0.08 + st * dx * 3,
+      y: y - 0.6 - st * (j - 1) * 0.8,
+      width: "0.16",
+      height: "1.2",
+      fill: "#f4f1ea",
+      transform: st ? 'rotate(' + st * (j - 1) * 40 + ' ' + (x + dx) + ' ' + y + ')' : ''
+    })));
+  }), beat.type !== 'toss' && xiBowl.map((pl, xiI) => {
+    const i = posOfX(xiI);
+    const p = fr.F[i];
+    const named = !pl.squad && (i === 0 || fr.flash && Math.abs(fr.flash.x - p.x) < 0.1 && Math.abs(fr.flash.y - p.y) < 0.1);
+    return React.createElement("g", {
+      key: 'f' + i,
+      transform: 'translate(' + p.x.toFixed(2) + ' ' + p.y.toFixed(2) + ')'
+    }, React.createElement("circle", {
+      r: "1.15",
+      fill: colors[bowlT],
+      stroke: "rgba(0,0,0,.5)",
+      strokeWidth: "0.25"
+    }), named && React.createElement("text", {
+      y: "-1.7",
+      textAnchor: "middle",
+      fontSize: "1.8",
+      fontWeight: "800",
+      fill: "#fff",
+      stroke: "#0f0c21",
+      strokeWidth: "0.4",
+      paintOrder: "stroke"
+    }, short(pl.name)));
+  }), beat.inn && [['striker', striker], ['non', null]].map(([k3, pl]) => {
+    const p = fr[k3];
+    return React.createElement("g", {
+      key: k3,
+      transform: 'translate(' + p.x.toFixed(2) + ' ' + p.y.toFixed(2) + ')'
+    }, React.createElement("circle", {
+      r: "1.25",
+      fill: colors[batT],
+      stroke: "#fff",
+      strokeWidth: "0.35"
+    }), pl && React.createElement("text", {
+      y: "-1.8",
+      textAnchor: "middle",
+      fontSize: "1.9",
+      fontWeight: "800",
+      fill: "#fff",
+      stroke: "#0f0c21",
+      strokeWidth: "0.4",
+      paintOrder: "stroke"
+    }, short(pl.name)));
+  }), beat.type === 'ball' && React.createElement("g", {
+    transform: 'translate(' + fr.bowler.x.toFixed(2) + ' ' + fr.bowler.y.toFixed(2) + ')'
+  }, React.createElement("circle", {
+    r: "1.2",
+    fill: colors[bowlT],
+    stroke: "#fff",
+    strokeWidth: "0.35"
+  }), bowler && React.createElement("text", {
+    y: "2.9",
+    textAnchor: "middle",
+    fontSize: "1.8",
+    fontWeight: "800",
+    fill: "#fff",
+    stroke: "#0f0c21",
+    strokeWidth: "0.4",
+    paintOrder: "stroke"
+  }, short(bowler.name))), fr.ball && React.createElement("g", null, React.createElement("ellipse", {
+    cx: fr.ball.x,
+    cy: fr.ball.y + 0.2,
+    rx: "0.45",
+    ry: "0.25",
+    fill: "rgba(0,0,0,.3)"
+  }), React.createElement("circle", {
+    cx: fr.ball.x,
+    cy: fr.ball.y - (fr.ball.h || 0) * 0.4,
+    r: 0.45 + (fr.ball.h || 0) * 0.025,
+    fill: "#c0272d",
+    stroke: "#fff",
+    strokeWidth: "0.1"
+  })), fr.flash && React.createElement("circle", {
+    cx: fr.flash.x,
+    cy: fr.flash.y,
+    r: "2.6",
+    fill: "none",
+    stroke: "#ffd23d",
+    strokeWidth: "0.45"
+  }), (done || beat.type === 'final') && React.createElement("g", null, React.createElement("rect", {
+    x: "0",
+    y: "0",
+    width: "100",
+    height: "60",
+    fill: "rgba(15,12,33,.6)"
+  }), React.createElement("text", {
+    x: "50",
+    y: "25",
+    textAnchor: "middle",
+    fontSize: "6.5",
+    fontWeight: "900",
+    fill: colors[match.winner],
+    stroke: "#0f0c21",
+    strokeWidth: "0.6",
+    paintOrder: "stroke"
+  }, T(match.winner).name.toUpperCase().slice(0, 16), " WIN"), React.createElement("text", {
+    x: "50",
+    y: "34",
+    textAnchor: "middle",
+    fontSize: "3.2",
+    fontWeight: "800",
+    fill: "#ffc83d"
+  }, crkResultLine(match, A, B).replace(/^.*? won /, 'Won '))), banner && React.createElement("text", {
+    x: "50",
+    y: "9",
+    textAnchor: "middle",
+    fontSize: banner.length > 14 ? 4.6 : 6.5,
+    fontWeight: "900",
+    fill: /SIX|FOUR|BOWLED|CAUGHT|LBW|STUMPED|RUN OUT|HUNDRED|FIFTY|DROPPED|SUPER/.test(banner) ? '#ffc83d' : '#fff',
+    stroke: "#0f0c21",
+    strokeWidth: "0.6",
+    paintOrder: "stroke",
+    className: "pbanner"
+  }, banner))), React.createElement("div", {
+    className: "mctrl",
+    role: "group",
+    "aria-label": "Match controls"
+  }, !done && React.createElement("button", {
+    className: "btn btn-sm",
+    onClick: () => setPlaying(x => !x),
+    "aria-label": playing ? 'Pause' : 'Play'
+  }, playing ? '⏸ Pause' : '▶ Play'), !done && [1, 2, 4].map(x => React.createElement("button", {
+    key: x,
+    className: 'btn btn-sm' + (mult === x ? ' btn-gold' : ''),
+    "aria-pressed": mult === x,
+    onClick: () => setMult(x)
+  }, x, "\xD7")), !done && React.createElement("button", {
+    className: "btn btn-sm btn-ghost",
+    onClick: () => {
+      const nb = script.beats.find(b => b.type === 'innstart' && b.t0 > t + 0.01);
+      setT(nb ? nb.t0 : script.total);
+    }
+  }, "Next innings"), !done && React.createElement("button", {
+    className: "btn btn-sm btn-ghost",
+    onClick: () => setT(script.total)
+  }, "Skip to result"), done && React.createElement("button", {
+    className: "btn btn-sm",
+    onClick: () => {
+      fired.current = true;
+      said.current = {};
+      setT(0);
+      setPlaying(true);
+    }
+  }, "\u21BA Watch again")), React.createElement("div", {
+    className: "mfeed",
+    ref: feedRef,
+    "aria-live": "polite"
+  }, feed.map(e => React.createElement("p", {
+    key: e.k,
+    className: 'mev ' + (e.big ? 'goal' : e.half ? 'half' : '') + (e.team != null ? ' t' + e.team : '')
+  }, React.createElement("span", {
+    className: "mm num"
+  }, e.tag), React.createElement("span", null, e.text)))), done && React.createElement(CricketSummary, {
+    d: d,
+    A: A,
+    B: B,
+    match: match
+  }));
+}
+function cricketReport(d, A, B, match) {
+  const rows = [];
+  match.innings.forEach(inn => {
+    inn.bs.forEach((b, i) => {
+      if (b.b || b.out) rows.push({
+        team: inn.team,
+        i,
+        kind: 'bat',
+        name: match.xi[inn.team][i].name,
+        squad: match.xi[inn.team][i].squad,
+        ...b
+      });
+    });
+    inn.bw.forEach((b, i) => {
+      if (b.balls) rows.push({
+        team: 1 - inn.team,
+        i,
+        kind: 'bowl',
+        name: match.xi[1 - inn.team][i].name,
+        squad: match.xi[1 - inn.team][i].squad,
+        ...b
+      });
+    });
+  });
+  const impact = {};
+  rows.forEach(r => {
+    const k = r.team + '|' + r.name;
+    impact[k] = impact[k] || {
+      team: r.team,
+      name: r.name,
+      squad: r.squad,
+      v: 0,
+      bat: null,
+      bowl: null
+    };
+    if (r.kind === 'bat') {
+      impact[k].v += r.r + (r.r >= 50 ? 15 : 0) + (r.r - r.b * 1.3) * 0.3;
+      impact[k].bat = r;
+    } else {
+      impact[k].v += r.w * 22 + (r.balls * 1.35 - r.r) * 0.6;
+      impact[k].bowl = r;
+    }
+  });
+  const list = Object.values(impact);
+  const potm = list.filter(x => x.team === match.winner).sort((a, b) => b.v - a.v)[0] || null;
+  const price = (s, name) => {
+    const T = s === 0 ? A : B;
+    const e = T.team.find(x => x && d.items[x.itemId] && d.items[x.itemId].name === name);
+    return e ? e.price || 0 : 0;
+  };
+  const wp = list.filter(x => !x.squad).map(x => ({
+    ...x,
+    price: price(x.team, x.name)
+  }));
+  const best = wp.filter(x => x.v > 20 && x.price > 0).sort((a, b) => b.v / b.price - a.v / a.price)[0] || null;
+  const flop = wp.filter(x => x.price >= 3).sort((a, b) => a.v / a.price - b.v / b.price)[0] || null;
+  return {
+    rows,
+    potm,
+    best,
+    flop
+  };
+}
+const crkBatLine = r => r.r + (r.out ? '' : '*') + ' (' + r.b + ')' + (r.f || r.s ? ' · ' + (r.f ? r.f + '×4' : '') + (r.f && r.s ? ' ' : '') + (r.s ? r.s + '×6' : '') : '');
+const crkBowlLine = r => r.w + '/' + r.r + ' (' + crkOvers(r.balls) + ')';
+const crkImpact = x => [x.bat ? crkBatLine(x.bat) : '', x.bowl ? crkBowlLine(x.bowl) : ''].filter(Boolean).join(' and ');
+function CricketSummary({
+  d,
+  A,
+  B,
+  match
+}) {
+  const R = cricketReport(d, A, B, match);
+  const T = i => i === 0 ? A : B;
+  return React.createElement("div", {
+    className: "board msummary"
+  }, React.createElement("h3", null, "\uD83C\uDFCF Scorecard"), React.createElement("p", {
+    className: "small",
+    style: {
+      margin: 0
+    }
+  }, React.createElement("b", null, crkResultLine(match, A, B))), match.innings.map((inn, ii) => {
+    const bats = R.rows.filter(r => r.kind === 'bat' && r.team === inn.team).sort((a, b) => b.r - a.r).slice(0, 4);
+    const bowls = R.rows.filter(r => r.kind === 'bowl' && r.team === 1 - inn.team).sort((a, b) => b.w - a.w || a.r - b.r).slice(0, 3);
+    return React.createElement("div", {
+      key: ii,
+      className: "fc-row"
+    }, React.createElement("span", {
+      className: "fc-tag"
+    }, T(inn.team).name, " ", inn.runs, "/", inn.wk, " (", crkOvers(inn.legal), " ov)"), React.createElement("span", {
+      className: "small"
+    }, "\uD83C\uDFCF ", bats.map(r => r.name + ' ' + crkBatLine(r)).join(' · ')), React.createElement("span", {
+      className: "small muted"
+    }, "\u26BE ", bowls.map(r => r.name + ' ' + crkBowlLine(r)).join(' · ')));
+  }), match.superOvers.length > 0 && React.createElement("p", {
+    className: "small",
+    style: {
+      margin: 0
+    }
+  }, "Super Over: ", match.superOvers.map(s2 => T(s2.team).name + ' ' + s2.runs + '/' + s2.wk).join(' · ')), React.createElement("div", {
+    className: "mreport"
+  }, React.createElement("h4", null, "\uD83D\uDCCB Match report"), R.potm && React.createElement("p", {
+    className: "small"
+  }, React.createElement("b", null, "\u2B50 Player of the Match:"), " ", R.potm.name, " (", T(R.potm.team).name, ") \u2014 ", crkImpact(R.potm), "."), R.best && R.best !== R.potm && React.createElement("p", {
+    className: "small"
+  }, React.createElement("b", null, "\uD83D\uDCB0 Best buy:"), " ", R.best.name, " \u2014 $", R.best.price, ": ", crkImpact(R.best), "."), R.flop && React.createElement("p", {
+    className: "small"
+  }, React.createElement("b", null, "\uD83D\uDCC9 Quiet day:"), " ", R.flop.name, " cost $", R.flop.price, crkImpact(R.flop) ? ': ' + crkImpact(R.flop) : ' and barely got involved', ".")), React.createElement("p", {
+    className: "hint",
+    style: {
+      margin: 0
+    }
+  }, "Every ball simulated from Draft Night\u2019s estimated Prime numbers (not official ratings). Each XI is your six plus five average squad players."));
+}
+function CrkChip({
+  item,
+  topic
+}) {
+  const [open, setOpen] = useState(false);
+  if (!numbersShown()) return null;
+  const r = crkRating(item, item.pos);
+  const rows = [['BAT', r.bat, 'Batting'], ['PWR', r.pwr, 'Power hitting'], ['BWL', r.bowl, 'Bowling']].concat(r.role === 'WK' ? [['KEEP', r.keep, 'Wicketkeeping']] : []);
+  return React.createElement(React.Fragment, null, React.createElement("button", {
+    type: "button",
+    className: "ratingchip",
+    onClick: () => setOpen(true),
+    "aria-label": 'Prime ' + r.ovr + ', estimated. Show details'
+  }, "Prime ", React.createElement("b", {
+    className: "num"
+  }, r.ovr), " est."), open && ReactDOM.createPortal(React.createElement(Sheet, {
+    center: true,
+    onClose: () => setOpen(false)
+  }, React.createElement("div", {
+    className: "ratingcard"
+  }, React.createElement("div", {
+    className: "rc-top"
+  }, React.createElement("span", {
+    className: "rc-ovr num"
+  }, React.createElement("small", {
+    className: "rc-era"
+  }, "Prime"), r.ovr), React.createElement("span", {
+    className: "rc-role"
+  }, r.role), React.createElement("span", {
+    className: "rc-name"
+  }, item.name, r.role === 'BOWL' || r.role === 'AR' ? React.createElement(React.Fragment, null, React.createElement("br", null), React.createElement("small", null, r.type === 'spin' ? 'Spin bowler' : 'Pace bowler')) : null)), React.createElement("div", {
+    className: "rc-attrs"
+  }, rows.map(([k3, v, nm]) => React.createElement("div", {
+    key: k3,
+    className: "rc-attr"
+  }, React.createElement("span", {
+    className: "k",
+    title: nm
+  }, k3), React.createElement("span", {
+    className: "bar"
+  }, React.createElement("i", {
+    style: {
+      width: v + '%'
+    }
+  })), React.createElement("span", {
+    className: "v num"
+  }, v)))), React.createElement("p", {
+    className: "hint",
+    style: {
+      margin: 0
+    }
+  }, "Prime: how good they were at their peak (for current players, their best so far). Draft Night estimate, not an official rating.")), React.createElement("button", {
+    className: "btn btn-ghost",
+    onClick: () => setOpen(false)
+  }, "Close")), document.body));
+}
 const EST_LABEL = 'Estimated by Draft Night · not official EA Sports FC / FIFA numbers';
 const ATTR_NAMES = {
   PAC: 'Pace',
@@ -40932,6 +42289,12 @@ function MatchSummary({
   B,
   match
 }) {
+  if (match.v === 'cricket') return React.createElement(CricketSummary, {
+    d: d,
+    A: A,
+    B: B,
+    match: match
+  });
   if (match.v === 'nhl') return React.createElement(NHLSummary, {
     d: d,
     A: A,
@@ -42462,7 +43825,7 @@ function PitchMatch({
   }));
 }
 function MatchView(props) {
-  return props.match && props.match.v === 'nhl' ? React.createElement(RinkView, props) : props.match && props.match.v === 'nfl' ? React.createElement(GridironView, props) : props.match && props.match.v === 'tennis' ? React.createElement(TennisView, props) : props.match && props.match.v === 'gp' ? React.createElement(TrackView, props) : props.match && props.match.v === 'card' ? React.createElement(RingView, props) : props.match && props.match.v === 'hoops' ? React.createElement(CourtView, props) : props.match && props.match.v === 'show' ? React.createElement(ShowView, props) : props.match && props.match.v === 'mission' ? React.createElement(MissionView, props) : props.match && props.match.v === 'survival' ? React.createElement(SurvivalView, props) : props.match && props.match.v === 'arena' ? React.createElement(ArenaView, props) : props.match && props.match.v === 'battle' ? React.createElement(BattleView, props) : props.match && props.match.v === 2 ? React.createElement(PitchMatch, props) : React.createElement(MatchPlayer, props);
+  return props.match && props.match.v === 'cricket' ? React.createElement(CricketView, props) : props.match && props.match.v === 'nhl' ? React.createElement(RinkView, props) : props.match && props.match.v === 'nfl' ? React.createElement(GridironView, props) : props.match && props.match.v === 'tennis' ? React.createElement(TennisView, props) : props.match && props.match.v === 'gp' ? React.createElement(TrackView, props) : props.match && props.match.v === 'card' ? React.createElement(RingView, props) : props.match && props.match.v === 'hoops' ? React.createElement(CourtView, props) : props.match && props.match.v === 'show' ? React.createElement(ShowView, props) : props.match && props.match.v === 'mission' ? React.createElement(MissionView, props) : props.match && props.match.v === 'survival' ? React.createElement(SurvivalView, props) : props.match && props.match.v === 'arena' ? React.createElement(ArenaView, props) : props.match && props.match.v === 'battle' ? React.createElement(BattleView, props) : props.match && props.match.v === 2 ? React.createElement(PitchMatch, props) : React.createElement(MatchPlayer, props);
 }
 function matchReport(d, A, B, match) {
   const teams = [A, B];

@@ -35,7 +35,7 @@ const STARTER_BATTLE = {
   't-pow': 'powers', 't-powercombos': 'powers', 't-worstpowers': 'weird',
   't-zomb': 'survival', 't-island': 'survival',
   't-cute': 'cute', 't-pet': 'cute', 't-dogbreeds': 'cute', 't-catbreeds': 'cute',
-  't-nba': 'basketball', 't-nbal': 'basketball', 't-fight': 'combat', 't-f1': 'f1', 't-ten': 'tennis', 't-nfl': 'nfl', 't-nhl': 'nhl',
+  't-nba': 'basketball', 't-nbal': 'basketball', 't-fight': 'combat', 't-f1': 'f1', 't-ten': 'tennis', 't-nfl': 'nfl', 't-nhl': 'nhl', 't-crk': 'cricket',
 };
 function starterTopics() {
   const v3 = [...sportsTopicsV3(), ...foodTopicsV3(), ...entTopicsV3(), ...travelTopicsV3(), ...animalTopicsV3(), ...styleTopicsV3(), ...funTopicsV3()];

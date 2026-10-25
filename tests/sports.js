@@ -238,5 +238,46 @@ module.exports = async function sportsTests({ ok, boot, btn, click, sleep }) {
     ok(live && /Game summary/.test(X.d.body.textContent) && /Three stars/.test(X.d.body.textContent), 'the rink plays the game and ends with period scores and the three stars');
     X.w.close();
   }
+  // Cricket T20.
+  {
+    const S = DN.sports; const t = T('t-crk'); const d = dOf(t);
+    const pickT = (id, names) => ({ id, name: id, team: names.map((n) => ({ itemId: t.items.find((i) => i.name === n).id, price: 4 })) });
+    const stars = pickT('A', ['Virat Kohli', 'Sachin Tendulkar', 'AB de Villiers', 'Jasprit Bumrah', 'Shane Warne', 'Ben Stokes']);
+    const close = pickT('B', ['Brian Lara', 'Ricky Ponting', 'Adam Gilchrist', 'Glenn McGrath', 'Muttiah Muralitharan', 'Jacques Kallis']);
+    const weak = pickT('C', ['Devon Conway', 'Saud Shakeel', 'Tom Latham', 'Naseem Shah', 'Arshdeep Singh', 'Sam Curran']);
+    const g = S.simulateCricket(d, stars, close, 'c1');
+    ok(F.battleKind(t).name === 'T20 match' && g.v === 'cricket' && JSON.stringify(g) === JSON.stringify(S.simulateCricket(d, stars, close, 'c1')) && g.winner != null, 'Cricket Players play a T20 match that always has a result and replays exactly (' + g.innings.map((x) => x.runs + '/' + x.wk).join(' v ') + ')');
+    let runs = 0, wk = 0, six = 0, n = 150, legal = true, kinds = new Set(), sos = 0, wins = 0, drops = 0, miles = 0;
+    for (let k = 0; k < n; k++) {
+      const m = S.simulateCricket({ ...d, seed: 'ck' + k }, stars, close, 'k'); if (m.superOvers.length) sos++;
+      m.innings.forEach((inn, ii) => {
+        runs += inn.runs; wk += inn.wk;
+        const sum = inn.balls.reduce((x, b) => x + b.r, 0); if (sum !== inn.runs || inn.legal > 120 || inn.wk > 10) legal = false;
+        const bowlBalls = {}; inn.balls.forEach((b) => { if (b.x !== 1 && b.x !== 2) bowlBalls[b.bowl] = (bowlBalls[b.bowl] || 0) + 1; if (b.w) kinds.add(b.how); if (b.drop != null) drops++; if (b.mile) miles++; if ((b.x === 2 ? b.r - 1 : b.r) === 6 && b.x !== 1) six++; });
+        if (Object.values(bowlBalls).some((v) => v > 24)) legal = false;
+        if (ii === 1 && inn.runs > m.innings[0].runs + 6) legal = false;
+        const batSum = inn.bs.reduce((x, b) => x + b.r, 0); if (batSum + inn.extras !== inn.runs) legal = false;
+      });
+      if (!m.superOvers.length && ((m.innings[1].runs > m.innings[0].runs) !== (m.winner === m.innings[1].team))) legal = false;
+    }
+    for (let k = 0; k < 80; k++) if (S.simulateCricket({ ...d, seed: 'cw' + k }, stars, weak, 'k').winner === 0) wins++;
+    ok(runs / n / 2 > 140 && runs / n / 2 < 195 && wk / n / 2 > 4.5 && wk / n / 2 < 8.5 && six / n / 2 > 4, 'scores look like T20 cricket (' + Math.round(runs / n / 2) + '/' + (wk / n / 2).toFixed(1) + ' an innings, ' + (six / n / 2).toFixed(1) + ' sixes)');
+    ok(legal, 'the rules hold: 20 overs, 10 wickets, at most 4 overs a bowler, the chase stops when the target is passed, and the scorecard adds up');
+    ok(['bowled', 'lbw', 'caught', 'caught behind', 'stumped', 'run out'].every((x) => kinds.has(x)) && drops > 20 && miles > 50, 'wickets fall every way (bowled, LBW, caught, caught behind, stumped, run out), catches get dropped, and batters reach fifties and hundreds');
+    ok(wins > 55 && wins < 79, 'the stronger team usually wins, but not always (' + Math.round(wins / 0.8) + '%)');
+    let tie = null; for (let k = 0; k < 600 && !tie; k++) { const m = S.simulateCricket({ ...d, seed: 'ct' + k }, stars, close, 'k'); if (m.superOvers.length) tie = m; }
+    ok(tie && tie.innings[0].runs === tie.innings[1].runs && tie.superOvers.every((x) => x.legal <= 6 && x.wk <= 2), 'a tie goes to a Super Over (six balls, two wickets)');
+    let framesOK = true; S.cricketScript(g).beats.filter((b) => b.type === 'ball').forEach((b) => { for (let u = 0; u < b.dur; u += 0.25) { const f = S.cricketFrame(b, u, g.xi[1 - b.inn.team]); if (!f || (f.ball && (!isFinite(f.ball.x) || !isFinite(f.ball.y)))) framesOK = false; } });
+    ok(framesOK, 'every highlight ball animates without errors');
+    const fill = (topic, n2, seed) => { const ms = [...Array(n2)].map((_, i) => ({ id: 'm' + i, name: ['Lions', 'Sharks', 'Owls'][i], color: DN.COLORS[i], emoji: 'x', human: true })); let dd = DN.createDraft(topic, ms, { ...DN.DEFAULT_RULES, slots: topic.slots, finale: { mode: 'sim', speed: 'normal' } }, { seed }); let gg = 0, rr = 0; while (!DN.isDraftOver(dd) && gg++ < 800) { if (dd.phase === 'auction') { const m = dd.managers.find((x, k) => (k + rr++) % 2 === 0 && DN.canBid(dd, x, DN.nextAmount(dd))) || dd.managers.find((x) => DN.canBid(dd, x, DN.nextAmount(dd))); dd = m ? DN.sell(DN.placeBid(dd, m.id, DN.nextAmount(dd))) : DN.skipItem(dd); } else if (dd.phase === 'freepick') { const cp = DN.currentPicker(dd); dd = DN.freePick(dd, dd.leftover.find((x) => DN.canTake(dd, cp.m, x))); } else break; } return dd; };
+    const raw = { ...fill(t, 3, 'crkui'), mode: 'local', createdAt: Date.now(), history: [] };
+    const X = await boot({ idb: false, speed: 0.05, storage: { dn_current_v1: JSON.stringify(raw) } });
+    await click(X.w, btn(X.d, 'Resume draft')); await click(X.w, btn(X.d, 'Start the finale')); await click(X.w, btn(X.d, 'Toss the coin')); await sleep(500);
+    const live = !!X.d.querySelector('.cricketsvg');
+    await click(X.w, btn(X.d, 'Next innings')); await sleep(150);
+    await click(X.w, btn(X.d, 'Skip to result')); await sleep(150);
+    ok(live && /Scorecard/.test(X.d.body.textContent) && /Player of the Match/.test(X.d.body.textContent), 'the ground plays the match and ends with a scorecard and Player of the Match');
+    X.w.close();
+  }
   P.w.close();
 };

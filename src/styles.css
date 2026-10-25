@@ -746,3 +746,8 @@ html[data-motion="reduce"] *,html[data-motion="reduce"] *::before,html[data-moti
 .tboard td.cur{background:rgba(255,255,255,.08)}
 .tboard td.pt{background:var(--gold);color:var(--gold-ink);min-width:30px}
 .tb-srv{color:#e6f54a;font-size:10px}
+/* Cricket */
+.overticker{display:flex;gap:3px;justify-content:center}
+.overticker .ob{font-style:normal;min-width:20px;padding:0 4px;border-radius:999px;background:var(--panel);border:1px solid var(--line);font-family:var(--cond);font-weight:800;font-size:12px}
+.overticker .ob.b{background:var(--gold);color:var(--gold-ink);border-color:var(--gold)}
+.overticker .ob.w{background:#e2463b;color:#fff;border-color:#e2463b}
