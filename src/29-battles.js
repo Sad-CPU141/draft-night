@@ -33,6 +33,7 @@ const BATTLE_KINDS = {
     upset: ['Who knew? {w} beats {l} when it counts!', 'Surprise hero: {w}!'],
     noshow: ['{w} wins the night — the other team had nothing.'],
   },
+  oly: { name: 'Draft Night Games', start: 'Light the flame', emoji: '🏅', round: 'Event', win: [''], upset: [''], noshow: ['{w} wins — the other team had no athletes.'] },
   wwe: { name: 'Royal Rumble', start: 'Ring the bell', emoji: '🤼', round: 'Entrant', win: [''], upset: [''], noshow: ['{w} wins — the other team had nobody.'] },
   rugby: { name: 'Rugby match', start: 'Kick-off', emoji: '🏉', round: 'Half', win: [''], upset: [''], noshow: ['{w} wins by forfeit.'] },
   golf: { name: 'Golf cup', start: 'First tee', emoji: '⛳', round: 'Match', win: [''], upset: [''], noshow: ['{w} wins by walkover.'] },
@@ -69,6 +70,7 @@ function simulateFor(d, A, B, key, opts) {
   if (k === 'golf') return simulateGolf(d, A, B, key);
   if (k === 'rugby') return simulateRugby(d, A, B, key);
   if (k === 'wwe') return simulateRumble(d, A, B, key);
+  if (k === 'oly') return simulateGames(d, A, B, key);
   if (k === 'survival') return simulateSurvival(d, A, B, key);
   if (k === 'powers' || k === 'weird') return simulateMissions(d, A, B, key);
   if (k === 'cute') return simulatePuppyBowl(d, A, B, key, opts && opts.knockout === false ? false : true);
@@ -77,6 +79,7 @@ function simulateFor(d, A, B, key, opts) {
 // One line for the result screen.
 function simWhy(w, mt) {
   if (mt.v === 'survival') { const ws = mt.score[mt.winner], ls = mt.score[1 - mt.winner]; const f = mt.final[mt.winner]; return w.name + (f.rescued ? ' got rescued' : ' survived ' + ws + ' day' + (ws === 1 ? '' : 's')) + (ws !== ls ? ' (the others lasted ' + ls + ')' : mt.how === 'rescue' ? ', and got rescued first' : mt.how === 'shape' ? ', level on days but in better shape' : ' and won the last night') + '.'; }
+  if (mt.v === 'games') return mt.forfeit ? w.name + ' won — the other team had no athletes.' : w.name + ' won the Games ' + mt.score[mt.winner] + '–' + mt.score[1 - mt.winner] + ' on points (' + mt.medals[mt.winner][0] + ' gold' + (mt.medals[mt.winner][0] === 1 ? '' : 's') + ')' + (mt.how === 'relay' ? ', after a relay decider' : '') + '.';
   if (mt.v === 'rumble') return mt.forfeit ? w.name + ' won — the other team had nobody.' : w.name + ' won the Royal Rumble ' + mt.score[mt.winner] + '–' + mt.score[1 - mt.winner] + ' on Rumble points (' + mt.winnerName + ' won the Rumble).';
   if (mt.v === 'rugby') { const tr = mt.plays.filter((e) => e.kind === 'try' && e.s === mt.winner).length; return w.name + ' won ' + mt.score[mt.winner] + '–' + mt.score[1 - mt.winner] + (tr ? ' (' + tr + ' tr' + (tr === 1 ? 'y' : 'ies') + ')' : '') + (mt.golden ? ' in extra time' : '') + '.'; }
   if (mt.v === 'golf') return w.name + ' won the cup ' + golfPts(mt.score[mt.winner]) + '–' + golfPts(mt.score[1 - mt.winner]) + (mt.how === 'playoff' ? ' in a sudden-death playoff' : '') + '.';
@@ -92,7 +95,7 @@ function simWhy(w, mt) {
   if (mt.v === 'mission') return w.name + ' won ' + mt.score[mt.winner] + ' of ' + mt.missions.length + ' missions.';
   return w.name + ' won the ' + ((BATTLE_KINDS[mt.kind] || BATTLE_KINDS.fight).name).toLowerCase() + ' ' + mt.score[mt.winner] + '–' + mt.score[1 - mt.winner] + (mt.sudden ? ' in sudden death' : '') + '.';
 }
-const isSimResult = (mt) => !!mt && (mt.v === 'rumble' || mt.v === 'rugby' || mt.v === 'golf' || mt.v === 'mlb' || mt.v === 'cricket' || mt.v === 'nhl' || mt.v === 'nfl' || mt.v === 'tennis' || mt.v === 'gp' || mt.v === 'card' || mt.v === 'hoops' || mt.v === 'battle' || mt.v === 'arena' || mt.v === 'survival' || mt.v === 'mission' || mt.v === 'show');
+const isSimResult = (mt) => !!mt && (mt.v === 'games' || mt.v === 'rumble' || mt.v === 'rugby' || mt.v === 'golf' || mt.v === 'mlb' || mt.v === 'cricket' || mt.v === 'nhl' || mt.v === 'nfl' || mt.v === 'tennis' || mt.v === 'gp' || mt.v === 'card' || mt.v === 'hoops' || mt.v === 'battle' || mt.v === 'arena' || mt.v === 'survival' || mt.v === 'mission' || mt.v === 'show');
 
 // One duel: the pricier pick has the edge, capped so luck always matters.
 function battleDuel(rng, kind, a, b, maxP) {

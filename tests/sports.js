@@ -414,5 +414,32 @@ module.exports = async function sportsTests({ ok, boot, btn, click, sleep }) {
     ok(live && /Royal Rumble results/.test(X.d.body.textContent) && /Iron man/.test(X.d.body.textContent), 'the ring plays the Rumble and ends with the final four, eliminations and the iron man');
     X.w.close();
   }
+  // Olympic Athletes: the Draft Night Games.
+  {
+    const S = DN.sports; const t = T('t-oly'); const d = dOf(t);
+    const pickT = (id, names) => ({ id, name: id, team: names.map((n) => ({ itemId: t.items.find((i) => i.name === n).id, price: 4 })) });
+    const a = pickT('A', ['Usain Bolt', 'Michael Phelps', 'Simone Biles', 'Eliud Kipchoge', 'Carl Lewis']);
+    const b = pickT('B', ['Mo Farah', 'Katie Ledecky', 'Nadia Comăneci', 'Noah Lyles', 'Daley Thompson']);
+    const g = S.simulateGames(d, a, b, 'o1');
+    ok(F.battleKind(t).name === 'Draft Night Games' && g.v === 'games' && JSON.stringify(g) === JSON.stringify(S.simulateGames(d, a, b, 'o1')) && g.score[0] !== g.score[1] && g.events.length >= 5, 'Olympic Athletes compete in a five-event Games that always has a winner and replays exactly (' + g.score.join('–') + ')');
+    ok(t.items.every((i) => S.gamesRating(i).sport !== 'All-rounder') && S.gamesRating(t.items.find((i) => i.name === 'Katie Ledecky')).sport === 'Swimmer' && S.gamesRating(t.items.find((i) => i.name === 'Mo Farah')).sport === 'Distance runner', 'every athlete is recognised by their sport (Ledecky swims, Farah runs distance)');
+    let specialists = 0, n = 120, legal = true, relays = 0; const winsBy = {};
+    for (let k = 0; k < n; k++) {
+      const m = S.simulateGames({ ...d, seed: 'og' + k }, a, b, 'k'); if (m.how === 'relay') relays++;
+      m.events.forEach((e) => { if (!e.rows) return; const w = m.athletes[e.rows[0].i]; winsBy[e.id + ':' + w.sport] = (winsBy[e.id + ':' + w.sport] || 0) + 1; const pts = e.rows.reduce((x, r) => x + r.pts, 0); if (pts !== 58 || e.rows.some((r, kk) => r.place !== kk + 1)) legal = false; if (e.kind !== 'jump' && e.rows.some((r, kk) => kk && r.perf < e.rows[kk - 1].perf)) legal = false; });
+      const tot = [0, 1].map((s2) => m.events.reduce((x, e) => x + (e.rows ? e.rows.filter((r) => m.athletes[r.i].team === s2).reduce((y, r) => y + r.pts, 0) : e.winner === s2 ? 1 : 0), 0)); if (tot[0] !== m.score[0] || tot[1] !== m.score[1]) legal = false;
+    }
+    ok(legal, 'places, points (12-10-8-7-6-5-4-3-2-1) and medals add up for every event');
+    ok((winsBy['100m:Sprinter'] || 0) > 90 && (winsBy['swim:Swimmer'] || 0) > 100 && (winsBy['1500m:Distance runner'] || 0) > 90, 'sprinters usually win the 100m, swimmers the swim and distance runners the 1500m');
+    const fill = (topic, n2, seed) => { const ms = [...Array(n2)].map((_, i) => ({ id: 'm' + i, name: ['Lions', 'Sharks', 'Owls'][i], color: DN.COLORS[i], emoji: 'x', human: true })); let dd = DN.createDraft(topic, ms, { ...DN.DEFAULT_RULES, slots: topic.slots, finale: { mode: 'sim', speed: 'normal' } }, { seed }); let gg = 0, rr = 0; while (!DN.isDraftOver(dd) && gg++ < 800) { if (dd.phase === 'auction') { const m = dd.managers.find((x, kk) => (kk + rr++) % 2 === 0 && DN.canBid(dd, x, DN.nextAmount(dd))) || dd.managers.find((x) => DN.canBid(dd, x, DN.nextAmount(dd))); dd = m ? DN.sell(DN.placeBid(dd, m.id, DN.nextAmount(dd))) : DN.skipItem(dd); } else if (dd.phase === 'freepick') { const cp = DN.currentPicker(dd); dd = DN.freePick(dd, dd.leftover.find((x) => DN.canTake(dd, cp.m, x))); } else break; } return dd; };
+    const raw = { ...fill(t, 3, 'olyui'), mode: 'local', createdAt: Date.now(), history: [] };
+    const X = await boot({ idb: false, speed: 0.05, storage: { dn_current_v1: JSON.stringify(raw) } });
+    await click(X.w, btn(X.d, 'Resume draft')); await click(X.w, btn(X.d, 'Start the finale')); await click(X.w, btn(X.d, 'Light the flame')); await sleep(500);
+    const live = !!X.d.querySelector('.gamessvg');
+    await click(X.w, btn(X.d, 'Next event')); await sleep(150);
+    await click(X.w, btn(X.d, 'Skip to result')); await sleep(150);
+    ok(live && /Medal table/.test(X.d.body.textContent) && /Athlete of the Games/.test(X.d.body.textContent), 'the Games play event by event and end with a medal table and Athlete of the Games');
+    X.w.close();
+  }
   P.w.close();
 };

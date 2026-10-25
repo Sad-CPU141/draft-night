@@ -1,4 +1,4 @@
-/* Draft Night da52f1990c — built from src/ by build.js. Edit src/, not this file. */
+/* Draft Night 31c1cffa22 — built from src/ by build.js. Edit src/, not this file. */
 "use strict";
 (function(){
 function _extends() { return _extends = Object.assign ? Object.assign.bind() : function (n) { for (var e = 1; e < arguments.length; e++) { var t = arguments[e]; for (var r in t) ({}).hasOwnProperty.call(t, r) && (n[r] = t[r]); } return n; }, _extends.apply(null, arguments); }
@@ -667,7 +667,8 @@ const STARTER_BATTLE = {
   't-mlbl': 'mlb',
   't-golf': 'golf',
   't-rugby': 'rugby',
-  't-wwe': 'wwe'
+  't-wwe': 'wwe',
+  't-oly': 'oly'
 };
 function starterTopics() {
   const v3 = [...sportsTopicsV3(), ...foodTopicsV3(), ...entTopicsV3(), ...travelTopicsV3(), ...animalTopicsV3(), ...styleTopicsV3(), ...funTopicsV3()];
@@ -24310,6 +24311,15 @@ const BATTLE_KINDS = {
     upset: ['Who knew? {w} beats {l} when it counts!', 'Surprise hero: {w}!'],
     noshow: ['{w} wins the night — the other team had nothing.']
   },
+  oly: {
+    name: 'Draft Night Games',
+    start: 'Light the flame',
+    emoji: '🏅',
+    round: 'Event',
+    win: [''],
+    upset: [''],
+    noshow: ['{w} wins — the other team had no athletes.']
+  },
   wwe: {
     name: 'Royal Rumble',
     start: 'Ring the bell',
@@ -24443,6 +24453,7 @@ function simulateFor(d, A, B, key, opts) {
   if (k === 'golf') return simulateGolf(d, A, B, key);
   if (k === 'rugby') return simulateRugby(d, A, B, key);
   if (k === 'wwe') return simulateRumble(d, A, B, key);
+  if (k === 'oly') return simulateGames(d, A, B, key);
   if (k === 'survival') return simulateSurvival(d, A, B, key);
   if (k === 'powers' || k === 'weird') return simulateMissions(d, A, B, key);
   if (k === 'cute') return simulatePuppyBowl(d, A, B, key, opts && opts.knockout === false ? false : true);
@@ -24455,6 +24466,7 @@ function simWhy(w, mt) {
     const f = mt.final[mt.winner];
     return w.name + (f.rescued ? ' got rescued' : ' survived ' + ws + ' day' + (ws === 1 ? '' : 's')) + (ws !== ls ? ' (the others lasted ' + ls + ')' : mt.how === 'rescue' ? ', and got rescued first' : mt.how === 'shape' ? ', level on days but in better shape' : ' and won the last night') + '.';
   }
+  if (mt.v === 'games') return mt.forfeit ? w.name + ' won — the other team had no athletes.' : w.name + ' won the Games ' + mt.score[mt.winner] + '–' + mt.score[1 - mt.winner] + ' on points (' + mt.medals[mt.winner][0] + ' gold' + (mt.medals[mt.winner][0] === 1 ? '' : 's') + ')' + (mt.how === 'relay' ? ', after a relay decider' : '') + '.';
   if (mt.v === 'rumble') return mt.forfeit ? w.name + ' won — the other team had nobody.' : w.name + ' won the Royal Rumble ' + mt.score[mt.winner] + '–' + mt.score[1 - mt.winner] + ' on Rumble points (' + mt.winnerName + ' won the Rumble).';
   if (mt.v === 'rugby') {
     const tr = mt.plays.filter(e => e.kind === 'try' && e.s === mt.winner).length;
@@ -24486,7 +24498,7 @@ function simWhy(w, mt) {
   if (mt.v === 'mission') return w.name + ' won ' + mt.score[mt.winner] + ' of ' + mt.missions.length + ' missions.';
   return w.name + ' won the ' + (BATTLE_KINDS[mt.kind] || BATTLE_KINDS.fight).name.toLowerCase() + ' ' + mt.score[mt.winner] + '–' + mt.score[1 - mt.winner] + (mt.sudden ? ' in sudden death' : '') + '.';
 }
-const isSimResult = mt => !!mt && (mt.v === 'rumble' || mt.v === 'rugby' || mt.v === 'golf' || mt.v === 'mlb' || mt.v === 'cricket' || mt.v === 'nhl' || mt.v === 'nfl' || mt.v === 'tennis' || mt.v === 'gp' || mt.v === 'card' || mt.v === 'hoops' || mt.v === 'battle' || mt.v === 'arena' || mt.v === 'survival' || mt.v === 'mission' || mt.v === 'show');
+const isSimResult = mt => !!mt && (mt.v === 'games' || mt.v === 'rumble' || mt.v === 'rugby' || mt.v === 'golf' || mt.v === 'mlb' || mt.v === 'cricket' || mt.v === 'nhl' || mt.v === 'nfl' || mt.v === 'tennis' || mt.v === 'gp' || mt.v === 'card' || mt.v === 'hoops' || mt.v === 'battle' || mt.v === 'arena' || mt.v === 'survival' || mt.v === 'mission' || mt.v === 'show');
 function battleDuel(rng, kind, a, b, maxP) {
   const fill = (lines, w, l) => lines[Math.floor(rng() * lines.length)].replace('{w}', w).replace('{l}', l);
   if (!a || !b) {
@@ -27651,6 +27663,382 @@ function goldenBoot(d) {
     player: top[0].slice(top[0].indexOf('|') + 1),
     goals: top[1]
   } : null;
+}
+const GAMES_ATTRS = ['SPD', 'END', 'SWM', 'JMP', 'AGI', 'STR'];
+const GAMES_ATTR_NAMES = {
+  SPD: 'Speed',
+  END: 'Endurance',
+  SWM: 'Swimming',
+  JMP: 'Jumping',
+  AGI: 'Agility',
+  STR: 'Strength'
+};
+const GAMES_SPORTS = [[/sprint|100m|200m|400m|double-double|Bolt|Griffith|Fraser|Lyles|Rudolph|Freeman|Felix|Thompson-Herah|Michael Johnson|Owens/i, 'Sprinter', {
+  SPD: 99,
+  END: 62,
+  SWM: 40,
+  JMP: 84,
+  AGI: 74,
+  STR: 72
+}], [/hurdle/i, 'Hurdler', {
+  SPD: 93,
+  END: 70,
+  SWM: 40,
+  JMP: 86,
+  AGI: 82,
+  STR: 70
+}], [/long jump|triple jump|Beamon/i, 'Jumper', {
+  SPD: 92,
+  END: 58,
+  SWM: 40,
+  JMP: 99,
+  AGI: 80,
+  STR: 72
+}], [/pole vault/i, 'Pole vaulter', {
+  SPD: 88,
+  END: 58,
+  SWM: 40,
+  JMP: 96,
+  AGI: 88,
+  STR: 76
+}], [/heptathlon|decathlon/i, 'Multi-eventer', {
+  SPD: 88,
+  END: 76,
+  SWM: 50,
+  JMP: 90,
+  AGI: 84,
+  STR: 80
+}], [/swim|freestyle|breaststroke|Phelps|Ledecky|Spitz|Thorpe|Marchand|Dressel|Lochte|Peaty|Titmus|McIntosh|Fraser/i, 'Swimmer', {
+  SPD: 66,
+  END: 88,
+  SWM: 99,
+  JMP: 64,
+  AGI: 70,
+  STR: 76
+}], [/marathon|distance|10,000|5000|1500|middle distance|Nurmi|Zátopek|Coe|Ingebrigtsen|Kipyegon|Hassan|Farah|Bekele|Gebrselassie|El Guerrouj|Holmes/i, 'Distance runner', {
+  SPD: 74,
+  END: 99,
+  SWM: 42,
+  JMP: 60,
+  AGI: 70,
+  STR: 55
+}], [/diving/i, 'Diver', {
+  SPD: 62,
+  END: 64,
+  SWM: 82,
+  JMP: 80,
+  AGI: 96,
+  STR: 70
+}], [/gymnast|perfect 10|Latynina|Uchimura|Korbut|Retton|Scherbo/i, 'Gymnast', {
+  SPD: 72,
+  END: 66,
+  SWM: 45,
+  JMP: 88,
+  AGI: 99,
+  STR: 80
+}], [/cycling|Hoy|Kenny|Wiggins/i, 'Cyclist', {
+  SPD: 70,
+  END: 94,
+  SWM: 45,
+  JMP: 68,
+  AGI: 62,
+  STR: 86
+}], [/rowing|canoe|Redgrave|Pinsent|Fischer/i, 'Rower', {
+  SPD: 62,
+  END: 94,
+  SWM: 60,
+  JMP: 60,
+  AGI: 58,
+  STR: 97
+}], [/judo|wrestling|boxing|Riner|Yoshida|Adams/i, 'Fighter', {
+  SPD: 70,
+  END: 84,
+  SWM: 45,
+  JMP: 68,
+  AGI: 82,
+  STR: 95
+}], [/javelin/i, 'Thrower', {
+  SPD: 80,
+  END: 62,
+  SWM: 42,
+  JMP: 78,
+  AGI: 72,
+  STR: 94
+}], [/ski|snowboard|biathlon|White|Vonn|Shiffrin|Kim|Bjørgen|Dæhlie|Bjørndalen/i, 'Winter athlete', {
+  SPD: 70,
+  END: 88,
+  SWM: 42,
+  JMP: 76,
+  AGI: 88,
+  STR: 80
+}], [/skating|short track|Heiden|Ohno|Hanyu|Yuna|Witt/i, 'Skater', {
+  SPD: 72,
+  END: 84,
+  SWM: 42,
+  JMP: 82,
+  AGI: 92,
+  STR: 72
+}], [/sailing|Ainslie/i, 'Sailor', {
+  SPD: 60,
+  END: 82,
+  SWM: 72,
+  JMP: 58,
+  AGI: 72,
+  STR: 82
+}]];
+const GAMES_PROFILE = {
+  'usain bolt': 99,
+  'michael phelps': 99,
+  'simone biles': 99,
+  'carl lewis': 97,
+  'jesse owens': 96,
+  'nadia comăneci': 95,
+  'katie ledecky': 97,
+  'eliud kipchoge': 97,
+  'mo farah': 93,
+  'allyson felix': 94,
+  'florence griffith joyner': 96,
+  'armand duplantis': 97,
+  'sydney mclaughlin-levrone': 96,
+  'faith kipyegon': 96,
+  'shelly-ann fraser-pryce': 95,
+  'paavo nurmi': 95,
+  'mark spitz': 96,
+  'ian thorpe': 95,
+  'léon marchand': 95,
+  'caeleb dressel': 94,
+  'jessica ennis-hill': 93,
+  'chris hoy': 93,
+  'kelly holmes': 91,
+  'noah lyles': 94,
+  'sifan hassan': 95,
+  'rebeca andrade': 93,
+  'shaun white': 93,
+  'marit bjørgen': 95,
+  'steve redgrave': 95,
+  'greg louganis': 95,
+  'daley thompson': 94
+};
+function gamesRating(item) {
+  const n = String(item.name || '');
+  const txt = (item.desc || '') + ' ' + n;
+  const sp = GAMES_SPORTS.find(([re]) => re.test(txt)) || [null, 'All-rounder', {
+    SPD: 80,
+    END: 80,
+    SWM: 60,
+    JMP: 78,
+    AGI: 80,
+    STR: 80
+  }];
+  const fixed = validRating(item.rating);
+  const ovr = fixed ? clamp(Math.round(+item.rating), 1, 99) : GAMES_PROFILE[n.toLowerCase()] || clamp(Math.round(82 + itemFame(item) * 14 + (unit('gmo', n) - 0.5) * 6), 78, 96);
+  const attrs = {};
+  GAMES_ATTRS.forEach(a => {
+    attrs[a] = clamp(Math.round(sp[2][a] * (0.82 + ovr / 550) + (unit('gma', n, a) - 0.5) * 6), 30, 99);
+  });
+  return {
+    ovr,
+    attrs,
+    sport: sp[1],
+    estimated: !fixed
+  };
+}
+const GAMES_PTS = [12, 10, 8, 7, 6, 5, 4, 3, 2, 1];
+const GAMES_EVENTS = [{
+  id: '100m',
+  name: '100m sprint',
+  kind: 'race',
+  unit: 's',
+  dist: 100
+}, {
+  id: 'swim',
+  name: '50m freestyle',
+  kind: 'swim',
+  unit: 's',
+  dist: 50
+}, {
+  id: '1500m',
+  name: '1500m',
+  kind: 'race',
+  unit: 'time',
+  dist: 1500
+}, {
+  id: 'lj',
+  name: 'Long jump',
+  kind: 'jump',
+  unit: 'm'
+}, {
+  id: 'obst',
+  name: 'Obstacle course',
+  kind: 'obstacle',
+  unit: 's'
+}];
+const gamesTime = (s, unitK) => unitK === 'time' || s >= 60 ? Math.floor(s / 60) + ':' + (s % 60).toFixed(2).padStart(5, '0') : s.toFixed(2);
+function simulateGames(d, A, B, key) {
+  const rng = seeded(d.seed, 'games', key, A.id, B.id);
+  const gauss = () => {
+    let u = 0;
+    for (let i = 0; i < 4; i++) u += rng();
+    return (u - 2) / 0.58;
+  };
+  const ath = [];
+  [A, B].forEach((m, team) => m.team.forEach(x => {
+    const it = x && d.items[x.itemId];
+    if (it) ath.push({
+      name: it.name,
+      itemId: it.id,
+      team,
+      price: x.price || 0,
+      ...gamesRating(it)
+    });
+  }));
+  if (!ath.some(a => a.team === 0) || !ath.some(a => a.team === 1)) {
+    const w = ath.some(a => a.team === 0) ? 0 : 1;
+    return {
+      v: 'games',
+      kind: 'oly',
+      forfeit: true,
+      athletes: [],
+      events: [],
+      score: w === 0 ? [1, 0] : [0, 1],
+      winner: w,
+      medals: [[0, 0, 0], [0, 0, 0]],
+      et: false,
+      pens: null,
+      sudden: false
+    };
+  }
+  const form = ath.map(() => gauss());
+  const events = [];
+  const score = [0, 0];
+  const medals = [[0, 0, 0], [0, 0, 0]];
+  const rank = (rows, lowerBetter) => rows.slice().sort((a, b) => lowerBetter ? a.perf - b.perf : b.perf - a.perf);
+  GAMES_EVENTS.forEach(E => {
+    let rows;
+    if (E.id === '100m') rows = ath.map((a, i) => {
+      const react = 0.13 + rng() * 0.08;
+      const t2 = 9.66 + (99 - a.attrs.SPD) * 0.055 + (99 - a.attrs.JMP) * 0.006 + Math.abs(gauss()) * 0.08 + form[i] * 0.15 + react - 0.15;
+      return {
+        i,
+        perf: Math.round(t2 * 100) / 100,
+        react: Math.round(react * 1000) / 1000
+      };
+    });else if (E.id === 'swim') rows = ath.map((a, i) => {
+      const t2 = 21.0 + (99 - a.attrs.SWM) * 0.17 + (99 - a.attrs.STR) * 0.015 + gauss() * 0.35 + form[i] * 0.6;
+      return {
+        i,
+        perf: Math.round(t2 * 100) / 100
+      };
+    });else if (E.id === '1500m') rows = ath.map((a, i) => {
+      const t2 = 207 + (99 - a.attrs.END) * 1.6 + (99 - a.attrs.SPD) * 0.25 + gauss() * 4 + form[i] * 4;
+      const kick = clamp((a.attrs.SPD - 70) / 30, 0, 1);
+      return {
+        i,
+        perf: Math.round(t2 * 100) / 100,
+        kick: Math.round(kick * 100) / 100
+      };
+    });else if (E.id === 'lj') rows = ath.map((a, i) => {
+      const jumps = [0, 1, 2].map(() => {
+        if (rng() < 0.15 + (90 - a.attrs.AGI) / 400) return null;
+        return Math.round((8.45 - (99 - a.attrs.JMP) * 0.045 - (99 - a.attrs.SPD) * 0.012 + gauss() * 0.2 - form[i] * 0.15) * 100) / 100;
+      });
+      const best = Math.max(0, ...jumps.filter(x => x != null));
+      return {
+        i,
+        perf: best || 0,
+        jumps
+      };
+    });else rows = ath.map((a, i) => {
+      const falls = rng() < clamp(0.18 - (a.attrs.AGI - 80) / 150, 0.02, 0.3) ? 1 : 0;
+      const t2 = 38 - (a.attrs.AGI - 80) * 0.18 - (a.attrs.SPD - 80) * 0.06 - (a.attrs.STR - 80) * 0.06 + falls * 3.2 + gauss() * 1.0 + form[i] * 1.2;
+      return {
+        i,
+        perf: Math.round(t2 * 100) / 100,
+        falls
+      };
+    });
+    const lower = E.kind !== 'jump';
+    const order = rank(rows, lower);
+    order.forEach((r, k) => {
+      r.place = k + 1;
+      r.pts = GAMES_PTS[k] || 0;
+      const tm = ath[r.i].team;
+      score[tm] += r.pts;
+      if (k < 3) medals[tm][k]++;
+    });
+    const margin = Math.abs(order[0].perf - order[1].perf);
+    const tm0 = ath[order[0].i].team;
+    events.push({
+      id: E.id,
+      name: E.name,
+      kind: E.kind,
+      unit: E.unit,
+      dist: E.dist,
+      rows: order,
+      winner: order[0].i,
+      photo: lower && margin < (E.id === '1500m' ? 0.15 : 0.03),
+      score: [...score],
+      text: ath[order[0].i].name + ' wins the ' + E.name + ' (' + (E.kind === 'jump' ? order[0].perf.toFixed(2) + ' m' : gamesTime(order[0].perf, E.unit)) + ')' + (lower && margin < 0.03 ? ' in a photo finish!' : '!') + ' ' + ath[order[1].i].name + ' second, ' + ath[order[2].i].name + ' third.',
+      team: tm0
+    });
+  });
+  let how = 'points';
+  if (score[0] === score[1]) {
+    const legs = [0, 1].map(tm => ath.map((a, i) => ({
+      a,
+      i
+    })).filter(x => x.a.team === tm).sort((x, y) => y.a.attrs.SPD - x.a.attrs.SPD).slice(0, 4));
+    const rows = legs.map((L, tm) => {
+      let tot = 0;
+      const splits = L.map(x => {
+        const s2 = 9.0 + (99 - x.a.attrs.SPD) * 0.05 + gauss() * 0.08 + (rng() < 0.04 ? 0.6 : 0);
+        tot += s2;
+        return Math.round(s2 * 100) / 100;
+      });
+      return {
+        tm,
+        legs: L.map(x => x.i),
+        splits,
+        perf: Math.round(tot * 100) / 100
+      };
+    });
+    const w = rows[0].perf <= rows[1].perf ? 0 : 1;
+    score[w] += 1;
+    events.push({
+      id: 'relay',
+      name: '4×100m relay decider',
+      kind: 'relay',
+      unit: 's',
+      dist: 400,
+      relay: rows,
+      winner: w,
+      score: [...score],
+      text: (w === 0 ? A : B).name + ' win the relay decider in ' + rows[w].perf.toFixed(2) + '!',
+      team: w
+    });
+    how = 'relay';
+  }
+  const winner = score[0] > score[1] ? 0 : 1;
+  return {
+    v: 'games',
+    kind: 'oly',
+    athletes: ath.map(a => ({
+      name: a.name,
+      itemId: a.itemId,
+      team: a.team,
+      price: a.price,
+      sport: a.sport,
+      ovr: a.ovr
+    })),
+    events,
+    score,
+    medals,
+    winner,
+    how,
+    et: false,
+    pens: null,
+    sudden: how === 'relay'
+  };
 }
 const GOLF_ATTRS = ['DRV', 'ACC', 'IRN', 'SHT', 'PUT', 'MEN'];
 const GOLF_ATTR_NAMES = {
@@ -34480,7 +34868,7 @@ function TopicEditor({
   }, "Fun battles (Battles finale)"), React.createElement(Seg, {
     label: "Fun battle style",
     value: topic.battle || 'none',
-    options: [['none', 'Off'], ['fight', '⚔️ Fight'], ['powers', '💥 Powers'], ['survival', '🧟 Survival'], ['cute', '🥰 Puppy Bowl'], ['weird', '🤡 Silly'], ['combat', '🥊 Fight night'], ['f1', '🏎️ Grand Prix'], ['tennis', '🎾 Tennis'], ['nfl', '🏈 American football'], ['nhl', '🏒 Ice hockey'], ['cricket', '🏏 Cricket'], ['mlb', '⚾ Baseball'], ['golf', '⛳ Golf'], ['rugby', '🏉 Rugby'], ['wwe', '🤼 Royal Rumble'], ['basketball', '🏀 Basketball']],
+    options: [['none', 'Off'], ['fight', '⚔️ Fight'], ['powers', '💥 Powers'], ['survival', '🧟 Survival'], ['cute', '🥰 Puppy Bowl'], ['weird', '🤡 Silly'], ['combat', '🥊 Fight night'], ['f1', '🏎️ Grand Prix'], ['tennis', '🎾 Tennis'], ['nfl', '🏈 American football'], ['nhl', '🏒 Ice hockey'], ['cricket', '🏏 Cricket'], ['mlb', '⚾ Baseball'], ['golf', '⛳ Golf'], ['rugby', '🏉 Rugby'], ['wwe', '🤼 Royal Rumble'], ['oly', '🏅 Multi-event Games'], ['basketball', '🏀 Basketball']],
     onChange: v => set({
       battle: v === 'none' ? '' : v
     })
@@ -36657,6 +37045,9 @@ function ItemCard({
     item: item,
     topic: d.topic
   }) : battleKindId(d.topic) === 'wwe' ? React.createElement(RumbleChip, {
+    item: item,
+    topic: d.topic
+  }) : battleKindId(d.topic) === 'oly' ? React.createElement(GamesChip, {
     item: item,
     topic: d.topic
   }) : hasBattle(d.topic) && React.createElement(StatChip, {
@@ -41483,7 +41874,12 @@ if (window.__DN_TEST__) window.__DN = {
     rumbleRating,
     rumbleScript,
     rumbleFrame,
-    rumbleReport
+    rumbleReport,
+    simulateGames,
+    gamesRating,
+    gamesScript,
+    gamesProgress,
+    gamesReport
   },
   simStats: {
     simulatePuppyBowl,
@@ -45250,6 +45646,12 @@ function MatchSummary({
   B,
   match
 }) {
+  if (match.v === 'games') return React.createElement(GamesSummary, {
+    d: d,
+    A: A,
+    B: B,
+    match: match
+  });
   if (match.v === 'rumble') return React.createElement(RumbleSummary, {
     d: d,
     A: A,
@@ -46810,7 +47212,7 @@ function PitchMatch({
   }));
 }
 function MatchView(props) {
-  return props.match && props.match.v === 'rumble' ? React.createElement(RumbleView, props) : props.match && props.match.v === 'rugby' ? React.createElement(RugbyView, props) : props.match && props.match.v === 'golf' ? React.createElement(GolfView, props) : props.match && props.match.v === 'mlb' ? React.createElement(DiamondView, props) : props.match && props.match.v === 'cricket' ? React.createElement(CricketView, props) : props.match && props.match.v === 'nhl' ? React.createElement(RinkView, props) : props.match && props.match.v === 'nfl' ? React.createElement(GridironView, props) : props.match && props.match.v === 'tennis' ? React.createElement(TennisView, props) : props.match && props.match.v === 'gp' ? React.createElement(TrackView, props) : props.match && props.match.v === 'card' ? React.createElement(RingView, props) : props.match && props.match.v === 'hoops' ? React.createElement(CourtView, props) : props.match && props.match.v === 'show' ? React.createElement(ShowView, props) : props.match && props.match.v === 'mission' ? React.createElement(MissionView, props) : props.match && props.match.v === 'survival' ? React.createElement(SurvivalView, props) : props.match && props.match.v === 'arena' ? React.createElement(ArenaView, props) : props.match && props.match.v === 'battle' ? React.createElement(BattleView, props) : props.match && props.match.v === 2 ? React.createElement(PitchMatch, props) : React.createElement(MatchPlayer, props);
+  return props.match && props.match.v === 'games' ? React.createElement(GamesView, props) : props.match && props.match.v === 'rumble' ? React.createElement(RumbleView, props) : props.match && props.match.v === 'rugby' ? React.createElement(RugbyView, props) : props.match && props.match.v === 'golf' ? React.createElement(GolfView, props) : props.match && props.match.v === 'mlb' ? React.createElement(DiamondView, props) : props.match && props.match.v === 'cricket' ? React.createElement(CricketView, props) : props.match && props.match.v === 'nhl' ? React.createElement(RinkView, props) : props.match && props.match.v === 'nfl' ? React.createElement(GridironView, props) : props.match && props.match.v === 'tennis' ? React.createElement(TennisView, props) : props.match && props.match.v === 'gp' ? React.createElement(TrackView, props) : props.match && props.match.v === 'card' ? React.createElement(RingView, props) : props.match && props.match.v === 'hoops' ? React.createElement(CourtView, props) : props.match && props.match.v === 'show' ? React.createElement(ShowView, props) : props.match && props.match.v === 'mission' ? React.createElement(MissionView, props) : props.match && props.match.v === 'survival' ? React.createElement(SurvivalView, props) : props.match && props.match.v === 'arena' ? React.createElement(ArenaView, props) : props.match && props.match.v === 'battle' ? React.createElement(BattleView, props) : props.match && props.match.v === 2 ? React.createElement(PitchMatch, props) : React.createElement(MatchPlayer, props);
 }
 function matchReport(d, A, B, match) {
   const teams = [A, B];
@@ -46903,6 +47305,700 @@ function MatchReport({
   }, React.createElement("b", null, "\uD83D\uDCC9 Quiet day:"), " ", R.flop.name, " cost $", R.flop.price, " and didn\u2019t get on the scoresheet."), match.puppy && match.moments && match.moments.length > 0 && React.createElement("p", {
     className: "small"
   }, React.createElement("b", null, "\uD83D\uDC3E Cute moments:"), " ", match.moments.map(m => m.emoji + ' ' + m.player + ' (' + T(m.team).name + ') → ' + m.outcome).join(' · ')));
+}
+const GAMES_DUR = {
+  race: 5,
+  swim: 5,
+  obstacle: 5.5,
+  jump: 7,
+  relay: 6.5
+};
+function gamesScript(match) {
+  const beats = [];
+  let t = 0;
+  const add = b => {
+    b.t0 = t;
+    t += b.dur;
+    beats.push(b);
+    return b;
+  };
+  add({
+    type: 'intro',
+    dur: 2.8
+  });
+  match.events.forEach((e, ei) => {
+    add({
+      type: 'call',
+      dur: 1.8,
+      ei
+    });
+    add({
+      type: 'ev',
+      dur: (GAMES_DUR[e.kind] || 5) + (e.id === '1500m' ? 1.5 : 0),
+      ei
+    });
+    add({
+      type: 'res',
+      dur: 2.8,
+      ei
+    });
+  });
+  add({
+    type: 'final',
+    dur: 3
+  });
+  return {
+    beats,
+    total: t
+  };
+}
+function gamesProgress(e, row, s, med) {
+  const T = row.perf;
+  if (e.id === '100m') {
+    const r = row.react || 0.15;
+    if (s <= r) return 0;
+    return Math.min(1, Math.pow((s - r) / (T - r), 1.08));
+  }
+  if (e.id === '1500m') {
+    const a = s / med,
+      b = s / T;
+    const k = Math.max(0, Math.min(1, (a - 0.72) / 0.28));
+    return Math.min(1, a + (b - a) * k * k * (3 - 2 * k));
+  }
+  if (e.id === 'obst' && row.falls) {
+    const fallAt = T * 0.5 - 1.6;
+    if (s < fallAt) return Math.min(1, s / (T - 3.2));
+    if (s < fallAt + 3.2) return Math.min(1, fallAt / (T - 3.2));
+    return Math.min(1, (s - 3.2) / (T - 3.2));
+  }
+  return Math.min(1, s / T);
+}
+function GamesView({
+  d,
+  A,
+  B,
+  match,
+  speed,
+  onDone,
+  label
+}) {
+  const script = useMemo(() => gamesScript(match), [match]);
+  const base = speed === 'fast' ? 2 : 1;
+  const [t, setT] = useState(speed === 'instant' ? script.total : 0);
+  const [playing, setPlaying] = useState(speed !== 'instant');
+  const [mult, setMult] = useState(1);
+  const done = t >= script.total;
+  const fired = useRef(false);
+  useEffect(() => {
+    if (!playing || done) return undefined;
+    let raf;
+    let last = performance.now();
+    const tick = now => {
+      const dt = Math.min(0.1, (now - last) / 1000);
+      last = now;
+      setT(x => Math.min(script.total, x + dt * base * mult / Math.max(0.001, GAME_SPEED)));
+      raf = requestAnimationFrame(tick);
+    };
+    raf = requestAnimationFrame(tick);
+    return () => cancelAnimationFrame(raf);
+  }, [playing, done, mult, base]);
+  useEffect(() => {
+    if (done && !fired.current) {
+      fired.current = true;
+      audio.play('fanfare');
+      onDone && onDone();
+    }
+  }, [done]);
+  const bi = Math.max(0, script.beats.findIndex(b => t < b.t0 + b.dur));
+  const beat = done ? script.beats[script.beats.length - 1] : script.beats[bi];
+  const u = done ? beat.dur : t - beat.t0;
+  const at = match.athletes;
+  const colors = [A.color, B.color];
+  const ev = beat.ei != null ? match.events[beat.ei] : null;
+  const decided = k => k < (beat.ei != null ? beat.ei : 99) || beat.ei === k && beat.type === 'res' && u > 0.5 || beat.type === 'final' || done;
+  const score = done || beat.type === 'final' ? match.score : (() => {
+    let last = null;
+    match.events.forEach((e, k) => {
+      if (decided(k)) last = e.score;
+    });
+    return last || [0, 0];
+  })();
+  const short = n => {
+    const w = String(n || '').split(' ');
+    return w[w.length - 1].slice(0, 11);
+  };
+  const lastBeat = useRef(-1);
+  useEffect(() => {
+    if (!playing || done || bi === lastBeat.current) return;
+    lastBeat.current = bi;
+    if (beat.type === 'ev') audio.play(ev && ev.kind === 'jump' ? 'bid' : 'buzzer');
+    if (beat.type === 'res') {
+      audio.play('cheer');
+      const w = at[ev.winner] || null;
+      if (w && ev.kind !== 'relay') audio.say(w.name + ' wins the ' + ev.name + '!', 2, d.id + ':' + label + ':g' + beat.ei);
+    }
+  }, [bi]);
+  let lanes = null,
+    jumps = null,
+    relay = null,
+    banner = null;
+  if (beat.type === 'ev' && ev) {
+    const animT = beat.dur - 0.8;
+    const k = Math.max(0, Math.min(1, (u - 0.4) / animT));
+    if (ev.kind === 'race' || ev.kind === 'swim' || ev.kind === 'obstacle') {
+      const Tmax = Math.max(...ev.rows.map(r => r.perf)) * 1.01;
+      const med = ev.rows.map(r => r.perf).sort((a, b) => a - b)[Math.floor(ev.rows.length / 2)];
+      const s = k * Tmax;
+      lanes = ev.rows.slice().sort((a, b) => a.i - b.i).map((r, lane) => ({
+        r,
+        lane,
+        p: gamesProgress(ev, r, s, med),
+        fell: ev.id === 'obst' && r.falls && s > r.perf * 0.5 - 1.6 && s < r.perf * 0.5 + 1.6
+      }));
+      const leader = lanes.slice().sort((a, b) => b.p - a.p)[0];
+      banner = u < 0.5 ? ev.kind === 'swim' ? 'TAKE YOUR MARKS…' : 'SET…' : k < 0.08 ? 'GO!' : leader.p >= 1 ? ev.photo && k < 0.98 ? 'PHOTO FINISH!' : short(at[ev.rows[0].i].name).toUpperCase() + ' WINS!' : ev.id === '1500m' && leader.p > 0.72 && leader.p < 0.8 ? 'THE BELL! LAST LAP' : null;
+    } else if (ev.kind === 'jump') {
+      const order = ev.rows.slice().reverse();
+      const per = animT / order.length;
+      const j = Math.min(order.length - 1, Math.floor((u - 0.4) / per));
+      const kk = (u - 0.4) / per - j;
+      jumps = {
+        order,
+        j: Math.max(0, j),
+        kk: Math.max(0, Math.min(1, kk))
+      };
+      const cur = order[jumps.j];
+      banner = cur && jumps.kk > 0.75 ? cur.perf ? cur.perf.toFixed(2) + ' m' : 'NO MARK' : null;
+      if (jumps.j === order.length - 1 && jumps.kk > 0.8) banner = short(at[ev.rows[0].i].name).toUpperCase() + ' WINS!';
+    } else if (ev.kind === 'relay') {
+      const Tmax = Math.max(...ev.relay.map(r => r.perf)) * 1.01;
+      const s = k * Tmax;
+      relay = ev.relay.map(r => {
+        let acc = 0,
+          leg = 0;
+        for (; leg < 4; leg++) {
+          if (s < acc + r.splits[leg]) break;
+          acc += r.splits[leg];
+        }
+        const p = leg >= 4 ? 1 : (leg + (s - acc) / r.splits[leg]) / 4;
+        return {
+          r,
+          p: Math.min(1, p),
+          leg: Math.min(3, leg)
+        };
+      });
+      banner = relay.some(x => x.p >= 1) ? (ev.winner === 0 ? A : B).name.toUpperCase() + ' WIN!' : null;
+    }
+  }
+  const resultsFor = e => e.kind === 'relay' ? e.relay.slice().sort((a, b) => a.perf - b.perf).map((r, k) => ({
+    name: (r.tm === 0 ? A : B).name,
+    team: r.tm,
+    mark: r.perf.toFixed(2) + 's',
+    k
+  })) : e.rows.slice(0, 3).map((r, k) => ({
+    name: at[r.i].name,
+    team: at[r.i].team,
+    mark: e.kind === 'jump' ? r.perf.toFixed(2) + ' m' : gamesTime(r.perf, e.unit),
+    k
+  }));
+  const feed = [];
+  script.beats.forEach((b, k2) => {
+    if (b.type !== 'res' || !done && b.t0 + 0.6 > t) return;
+    const e = match.events[b.ei];
+    feed.push({
+      k: k2,
+      tag: '🏅',
+      team: e.team,
+      big: true,
+      text: e.text + ' Score ' + e.score[0] + '–' + e.score[1] + '.'
+    });
+  });
+  const feedRef = useRef(null);
+  useEffect(() => {
+    const f = feedRef.current;
+    if (f) f.scrollTop = f.scrollHeight;
+  }, [feed.length]);
+  const pool = ev && ev.kind === 'swim';
+  return React.createElement("div", {
+    className: "matchview gamesview"
+  }, React.createElement("div", {
+    className: "scoreboard"
+  }, React.createElement("div", {
+    className: "sb-team"
+  }, React.createElement(Badge, {
+    m: A
+  }), React.createElement("span", {
+    className: "sb-n"
+  }, A.name)), React.createElement("div", {
+    className: "sb-mid"
+  }, React.createElement("span", {
+    className: "sb-score num",
+    "aria-live": "polite"
+  }, score[0], "\u2013", score[1]), React.createElement("span", {
+    className: "sb-clock num"
+  }, done || beat.type === 'final' ? 'FINAL' : ev ? 'EVENT ' + (beat.ei + 1) + '/' + match.events.length : 'OPENING')), React.createElement("div", {
+    className: "sb-team"
+  }, React.createElement(Badge, {
+    m: B
+  }), React.createElement("span", {
+    className: "sb-n"
+  }, B.name))), React.createElement("div", {
+    className: "boutbar small"
+  }, ev ? React.createElement("b", null, ev.name) : React.createElement("span", {
+    className: "muted"
+  }, "The Draft Night Games \xB7 everyone does every event"), React.createElement("span", {
+    className: "muted"
+  }, " \xB7 \uD83E\uDD47 golds so far ", [0, 1].map(s2 => match.events.filter((e, k) => decided(k) && (e.kind === 'relay' ? false : at[e.rows[0].i].team === s2)).length).join('–'))), React.createElement("div", {
+    className: "pitchwrap"
+  }, React.createElement("svg", {
+    className: "pitchsvg gamessvg",
+    viewBox: "0 0 100 60",
+    role: "img",
+    "aria-label": (ev ? ev.name : 'Games') + ': ' + A.name + ' ' + score[0] + ', ' + B.name + ' ' + score[1]
+  }, React.createElement("rect", {
+    x: "0",
+    y: "0",
+    width: "100",
+    height: "60",
+    fill: pool ? '#1c6fb0' : ev && ev.kind === 'obstacle' ? '#3f7d3a' : '#b4553a'
+  }), (lanes || relay) && Array.from({
+    length: relay ? 2 : 10
+  }, (_, i) => {
+    const h = relay ? 20 : 5;
+    const y = (relay ? 12 : 6) + i * h;
+    return React.createElement("g", {
+      key: i
+    }, React.createElement("rect", {
+      x: "0",
+      y: y,
+      width: "100",
+      height: h,
+      fill: i % 2 ? 'rgba(255,255,255,.05)' : 'rgba(0,0,0,.05)'
+    }), React.createElement("line", {
+      x1: "0",
+      y1: y,
+      x2: "100",
+      y2: y,
+      stroke: pool ? '#e2463b' : 'rgba(255,255,255,.7)',
+      strokeWidth: "0.25",
+      strokeDasharray: pool ? '1 1' : ''
+    }));
+  }), (lanes || relay) && React.createElement("g", null, React.createElement("line", {
+    x1: "8",
+    y1: "5",
+    x2: "8",
+    y2: "56",
+    stroke: "#fff",
+    strokeWidth: "0.5"
+  }), React.createElement("line", {
+    x1: "92",
+    y1: "5",
+    x2: "92",
+    y2: "56",
+    stroke: "#fff",
+    strokeWidth: "0.9",
+    strokeDasharray: "0.8 0.8"
+  })), lanes && ev.kind === 'obstacle' && [25, 42, 58, 75].map(x => React.createElement("g", {
+    key: x
+  }, Array.from({
+    length: 10
+  }, (_, i) => React.createElement("rect", {
+    key: i,
+    x: x,
+    y: 6.6 + i * 5,
+    width: "1.4",
+    height: "3.8",
+    fill: x === 58 ? '#c08a55' : '#e2463b',
+    opacity: ".85"
+  })))), lanes && lanes.map(({
+    r,
+    lane,
+    p,
+    fell
+  }) => {
+    const a = at[r.i];
+    const x = 8 + p * 84;
+    const y = 8.5 + lane * 5;
+    return React.createElement("g", {
+      key: r.i,
+      transform: 'translate(' + x.toFixed(2) + ' ' + y + ')'
+    }, React.createElement("circle", {
+      r: "1.6",
+      fill: colors[a.team],
+      stroke: p >= 1 && r.place <= 3 ? '#ffd23d' : '#0f0c21',
+      strokeWidth: p >= 1 && r.place <= 3 ? 0.6 : 0.3,
+      opacity: fell ? 0.5 : 1
+    }), React.createElement("text", {
+      x: x > 70 ? -2.4 : 2.4,
+      y: "0.9",
+      textAnchor: x > 70 ? 'end' : 'start',
+      fontSize: "2.3",
+      fontWeight: "800",
+      fill: "#fff",
+      stroke: "#0f0c21",
+      strokeWidth: "0.4",
+      paintOrder: "stroke"
+    }, short(a.name), p >= 1 ? ' ' + (ev.kind === 'race' && ev.id === '1500m' ? gamesTime(r.perf, 'time') : r.perf.toFixed(2)) : fell ? ' 💥' : ''));
+  }), relay && relay.map(({
+    r,
+    p,
+    leg
+  }, k2) => {
+    const y = 22 + k2 * 20;
+    const x = 8 + p * 84;
+    const runner = at[r.legs[leg]];
+    return React.createElement("g", {
+      key: k2,
+      transform: 'translate(' + x.toFixed(2) + ' ' + y + ')'
+    }, React.createElement("circle", {
+      r: "2.2",
+      fill: colors[r.tm],
+      stroke: "#0f0c21",
+      strokeWidth: "0.35"
+    }), React.createElement("text", {
+      x: x > 70 ? -3 : 3,
+      y: "1",
+      textAnchor: x > 70 ? 'end' : 'start',
+      fontSize: "2.8",
+      fontWeight: "800",
+      fill: "#fff",
+      stroke: "#0f0c21",
+      strokeWidth: "0.4",
+      paintOrder: "stroke"
+    }, "Leg ", leg + 1, ": ", short(runner && runner.name)));
+  }), jumps && (() => {
+    const cur = jumps.order[jumps.j];
+    const a = at[cur.i];
+    const kk = jumps.kk;
+    const board = 40;
+    const land = board + (cur.perf || 7) * 4.6;
+    const x = kk < 0.45 ? 6 + (board - 6) * (kk / 0.45) : board + (land - board) * Math.min(1, (kk - 0.45) / 0.35);
+    const h = kk < 0.45 ? 0 : Math.sin(Math.min(1, (kk - 0.45) / 0.35) * Math.PI) * 9;
+    return React.createElement("g", null, React.createElement("rect", {
+      x: "0",
+      y: "30",
+      width: "100",
+      height: "8",
+      fill: "#b4553a"
+    }), React.createElement("rect", {
+      x: board,
+      y: "30",
+      width: "1",
+      height: "8",
+      fill: "#fff"
+    }), React.createElement("rect", {
+      x: "70",
+      y: "28",
+      width: "30",
+      height: "12",
+      fill: "#e8d6a0"
+    }), [7, 8].map(m => React.createElement("g", {
+      key: m
+    }, React.createElement("line", {
+      x1: board + m * 4.6,
+      y1: "27",
+      x2: board + m * 4.6,
+      y2: "41",
+      stroke: "#fff",
+      strokeWidth: "0.25"
+    }), React.createElement("text", {
+      x: board + m * 4.6,
+      y: "44",
+      textAnchor: "middle",
+      fontSize: "2.2",
+      fill: "#fff"
+    }, m, "m"))), jumps.order.slice(0, jumps.j).map((r, k3) => React.createElement("text", {
+      key: r.i,
+      x: "3",
+      y: 47 + k3 % 4 * 3.2,
+      fontSize: "2.1",
+      fill: "#fff",
+      opacity: ".8"
+    }, short(at[r.i].name), " ", r.perf ? r.perf.toFixed(2) : 'X')), React.createElement("g", {
+      transform: 'translate(' + x.toFixed(2) + ' ' + (34 - h).toFixed(2) + ')'
+    }, React.createElement("circle", {
+      r: "1.8",
+      fill: colors[a.team],
+      stroke: "#0f0c21",
+      strokeWidth: "0.35"
+    }), React.createElement("text", {
+      y: "-2.6",
+      textAnchor: "middle",
+      fontSize: "2.6",
+      fontWeight: "800",
+      fill: "#fff",
+      stroke: "#0f0c21",
+      strokeWidth: "0.4",
+      paintOrder: "stroke"
+    }, short(a.name))), React.createElement("text", {
+      x: "50",
+      y: "22",
+      textAnchor: "middle",
+      fontSize: "2.6",
+      fill: "#fff"
+    }, cur.jumps ? 'Jumps: ' + cur.jumps.map(j2 => j2 == null ? 'X' : j2.toFixed(2)).join(' · ') : ''));
+  })(), (beat.type === 'res' || beat.type === 'call') && ev && React.createElement("g", null, React.createElement("rect", {
+    x: "0",
+    y: "0",
+    width: "100",
+    height: "60",
+    fill: "rgba(15,12,33,.65)"
+  }), React.createElement("text", {
+    x: "50",
+    y: "14",
+    textAnchor: "middle",
+    fontSize: "4.6",
+    fontWeight: "900",
+    fill: "#fff"
+  }, ev.name.toUpperCase()), beat.type === 'call' && React.createElement("text", {
+    x: "50",
+    y: "24",
+    textAnchor: "middle",
+    fontSize: "2.8",
+    fill: "#fff"
+  }, ev.kind === 'relay' ? 'Level on points — the relay decides it!' : 'All ten athletes. Points for every place.'), beat.type === 'res' && resultsFor(ev).map(x => React.createElement("g", {
+    key: x.k,
+    transform: 'translate(50 ' + (24 + x.k * 8) + ')'
+  }, React.createElement("text", {
+    textAnchor: "middle",
+    fontSize: "3.6",
+    fontWeight: "900",
+    fill: colors[x.team],
+    stroke: "#0f0c21",
+    strokeWidth: "0.4",
+    paintOrder: "stroke"
+  }, ['🥇', '🥈', '🥉'][x.k], " ", x.name.slice(0, 22), " \xB7 ", x.mark)))), beat.type === 'intro' && React.createElement("g", null, React.createElement("rect", {
+    x: "0",
+    y: "0",
+    width: "100",
+    height: "60",
+    fill: "rgba(15,12,33,.65)"
+  }), React.createElement("text", {
+    x: "50",
+    y: "18",
+    textAnchor: "middle",
+    fontSize: "5",
+    fontWeight: "900",
+    fill: "#ffc83d"
+  }, "THE DRAFT NIGHT GAMES"), match.athletes.map((a2, k3) => React.createElement("text", {
+    key: k3,
+    x: a2.team === 0 ? 27 : 73,
+    y: 26 + Math.floor(k3 % 5) * 5,
+    textAnchor: "middle",
+    fontSize: "2.6",
+    fontWeight: "700",
+    fill: colors[a2.team]
+  }, a2.name, " \xB7 ", a2.sport))), (done || beat.type === 'final') && React.createElement("g", null, React.createElement("rect", {
+    x: "0",
+    y: "0",
+    width: "100",
+    height: "60",
+    fill: "rgba(15,12,33,.65)"
+  }), React.createElement("text", {
+    x: "50",
+    y: "24",
+    textAnchor: "middle",
+    fontSize: "7",
+    fontWeight: "900",
+    fill: colors[match.winner],
+    stroke: "#0f0c21",
+    strokeWidth: "0.6",
+    paintOrder: "stroke"
+  }, (match.winner === 0 ? A : B).name.toUpperCase().slice(0, 16), " WIN"), React.createElement("text", {
+    x: "50",
+    y: "33",
+    textAnchor: "middle",
+    fontSize: "4.6",
+    fontWeight: "900",
+    fill: "#ffc83d"
+  }, match.score[0], "\u2013", match.score[1], " points"), React.createElement("text", {
+    x: "50",
+    y: "40",
+    textAnchor: "middle",
+    fontSize: "3",
+    fill: "#fff"
+  }, "Medals \uD83E\uDD47\uD83E\uDD48\uD83E\uDD49 ", match.medals[0].join('-'), " v ", match.medals[1].join('-'))), banner && React.createElement("text", {
+    x: "50",
+    y: "4.6",
+    textAnchor: "middle",
+    fontSize: "4.2",
+    fontWeight: "900",
+    fill: "#ffc83d",
+    stroke: "#0f0c21",
+    strokeWidth: "0.5",
+    paintOrder: "stroke",
+    className: "pbanner"
+  }, banner))), React.createElement("div", {
+    className: "mctrl",
+    role: "group",
+    "aria-label": "Games controls"
+  }, !done && React.createElement("button", {
+    className: "btn btn-sm",
+    onClick: () => setPlaying(x => !x),
+    "aria-label": playing ? 'Pause' : 'Play'
+  }, playing ? '⏸ Pause' : '▶ Play'), !done && [1, 2, 4].map(x => React.createElement("button", {
+    key: x,
+    className: 'btn btn-sm' + (mult === x ? ' btn-gold' : ''),
+    "aria-pressed": mult === x,
+    onClick: () => setMult(x)
+  }, x, "\xD7")), !done && React.createElement("button", {
+    className: "btn btn-sm btn-ghost",
+    onClick: () => {
+      const nb = script.beats.find(b => b.type === 'call' && b.t0 > t + 0.01);
+      setT(nb ? nb.t0 : script.total);
+    }
+  }, "Next event"), !done && React.createElement("button", {
+    className: "btn btn-sm btn-ghost",
+    onClick: () => setT(script.total)
+  }, "Skip to result"), done && React.createElement("button", {
+    className: "btn btn-sm",
+    onClick: () => {
+      fired.current = true;
+      setT(0);
+      setPlaying(true);
+    }
+  }, "\u21BA Watch again")), React.createElement("div", {
+    className: "mfeed",
+    ref: feedRef,
+    "aria-live": "polite"
+  }, feed.map(e => React.createElement("p", {
+    key: e.k,
+    className: 'mev goal t' + e.team
+  }, React.createElement("span", {
+    className: "mm num"
+  }, e.tag), React.createElement("span", null, e.text)))), done && React.createElement(GamesSummary, {
+    d: d,
+    A: A,
+    B: B,
+    match: match
+  }));
+}
+function gamesReport(d, A, B, match) {
+  const at = match.athletes;
+  const pts = at.map((a, i) => ({
+    ...a,
+    i,
+    pts: match.events.reduce((n, e) => n + (e.rows ? (e.rows.find(r => r.i === i) || {}).pts || 0 : 0), 0),
+    golds: match.events.filter(e => e.rows && e.rows[0].i === i).length
+  }));
+  const star = pts.slice().sort((a, b) => b.pts - a.pts)[0];
+  const best = pts.filter(a => a.price > 0).sort((a, b) => b.pts / b.price - a.pts / a.price)[0] || null;
+  const flop = pts.filter(a => a.price >= 3).sort((a, b) => a.pts / a.price - b.pts / b.price)[0] || null;
+  const surprise = match.events.filter(e => e.rows).map(e => ({
+    e,
+    a: at[e.rows[0].i]
+  })).find(x => !new RegExp({
+    '100m': 'Sprinter|Hurdler|Jumper',
+    swim: 'Swimmer|Diver',
+    '1500m': 'Distance',
+    lj: 'Jumper|Sprinter|Multi',
+    obst: 'Gymnast|Skater|Winter|Diver'
+  }[x.e.id] || '.').test(x.a.sport)) || null;
+  return {
+    pts,
+    star,
+    best,
+    flop,
+    surprise
+  };
+}
+function GamesSummary({
+  d,
+  A,
+  B,
+  match
+}) {
+  const R = gamesReport(d, A, B, match);
+  const T = i => i === 0 ? A : B;
+  return React.createElement("div", {
+    className: "board msummary"
+  }, React.createElement("h3", null, "\uD83C\uDFC5 Medal table"), React.createElement("p", {
+    className: "small",
+    style: {
+      margin: 0
+    }
+  }, React.createElement("b", null, A.name, " ", match.score[0], "\u2013", match.score[1], " ", B.name), " on points", match.how === 'relay' ? ' · decided by the relay' : ''), React.createElement("table", {
+    className: "qtable small"
+  }, React.createElement("thead", null, React.createElement("tr", null, React.createElement("th", null, "Event"), React.createElement("th", null, "\uD83E\uDD47"), React.createElement("th", null, "Mark"))), React.createElement("tbody", null, match.events.map(e => React.createElement("tr", {
+    key: e.id
+  }, React.createElement("td", null, e.name), React.createElement("td", null, e.kind === 'relay' ? T(e.winner).name : match.athletes[e.rows[0].i].name), React.createElement("td", {
+    className: "num"
+  }, e.kind === 'relay' ? e.relay[e.winner].perf.toFixed(2) + 's' : e.kind === 'jump' ? e.rows[0].perf.toFixed(2) + ' m' : gamesTime(e.rows[0].perf, e.unit)))))), React.createElement("p", {
+    className: "small",
+    style: {
+      margin: 0
+    }
+  }, "Medals (gold-silver-bronze): ", A.name, " ", match.medals[0].join('-'), " \xB7 ", B.name, " ", match.medals[1].join('-')), React.createElement("div", {
+    className: "mreport"
+  }, React.createElement("h4", null, "\uD83D\uDCCB Games report"), R.star && React.createElement("p", {
+    className: "small"
+  }, React.createElement("b", null, "\u2B50 Athlete of the Games:"), " ", R.star.name, " (", T(R.star.team).name, ", ", R.star.sport.toLowerCase(), ") \u2014 ", R.star.pts, " points", R.star.golds ? ', ' + R.star.golds + ' gold' + (R.star.golds > 1 ? 's' : '') : '', "."), R.surprise && React.createElement("p", {
+    className: "small"
+  }, React.createElement("b", null, "\uD83D\uDE2E Out of their comfort zone:"), " ", R.surprise.a.name, " (", R.surprise.a.sport.toLowerCase(), ") won the ", R.surprise.e.name, "!"), R.best && React.createElement("p", {
+    className: "small"
+  }, React.createElement("b", null, "\uD83D\uDCB0 Best buy:"), " ", R.best.name, " \u2014 $", R.best.price, " for ", R.best.pts, " points."), R.flop && React.createElement("p", {
+    className: "small"
+  }, React.createElement("b", null, "\uD83D\uDCC9 Tough day:"), " ", R.flop.name, " cost $", R.flop.price, " and scored ", R.flop.pts, ".")), React.createElement("p", {
+    className: "hint",
+    style: {
+      margin: 0
+    }
+  }, "Times and distances are simulated from Draft Night\u2019s estimated abilities for each athlete\u2019s sport (not official ratings, and not their real personal bests)."));
+}
+function GamesChip({
+  item,
+  topic
+}) {
+  const [open, setOpen] = useState(false);
+  if (!numbersShown()) return null;
+  const r = gamesRating(item);
+  return React.createElement(React.Fragment, null, React.createElement("button", {
+    type: "button",
+    className: "ratingchip",
+    onClick: () => setOpen(true),
+    "aria-label": 'Prime ' + r.ovr + ', estimated. Show details'
+  }, "Prime ", React.createElement("b", {
+    className: "num"
+  }, r.ovr), " est."), open && ReactDOM.createPortal(React.createElement(Sheet, {
+    center: true,
+    onClose: () => setOpen(false)
+  }, React.createElement("div", {
+    className: "ratingcard"
+  }, React.createElement("div", {
+    className: "rc-top"
+  }, React.createElement("span", {
+    className: "rc-ovr num"
+  }, React.createElement("small", {
+    className: "rc-era"
+  }, "Prime"), r.ovr), React.createElement("span", {
+    className: "rc-role"
+  }, "OLY"), React.createElement("span", {
+    className: "rc-name"
+  }, item.name, React.createElement("br", null), React.createElement("small", null, r.sport))), React.createElement("div", {
+    className: "rc-attrs"
+  }, GAMES_ATTRS.map(a => React.createElement("div", {
+    key: a,
+    className: "rc-attr"
+  }, React.createElement("span", {
+    className: "k",
+    title: GAMES_ATTR_NAMES[a]
+  }, a), React.createElement("span", {
+    className: "bar"
+  }, React.createElement("i", {
+    style: {
+      width: r.attrs[a] + '%'
+    }
+  })), React.createElement("span", {
+    className: "v num"
+  }, r.attrs[a])))), React.createElement("p", {
+    className: "hint",
+    style: {
+      margin: 0
+    }
+  }, "Prime: at their peak. SPD speed \xB7 END endurance \xB7 SWM swimming \xB7 JMP jumping \xB7 AGI agility \xB7 STR strength. Draft Night estimate from their sport, not an official rating.")), React.createElement("button", {
+    className: "btn btn-ghost",
+    onClick: () => setOpen(false)
+  }, "Close")), document.body));
 }
 const GH = {
   teeY: 57,
