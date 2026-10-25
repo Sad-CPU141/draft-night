@@ -819,7 +819,7 @@ async function tap(w, el) { el.dispatchEvent(new w.MouseEvent('pointerdown', { b
     }
     ok(allOk, 'every mode × 2/3/4/5/8/16 teams: one champion, no own-team or duplicate votes, no re-simulation, nothing decided twice' + (notes.length ? ' — ' + notes.join('; ') : ''));
     // Non-football topics: sim/combined fall back to the vote bracket; no sports ratings.
-    const nf = DN.starterTopics().find((t) => t.layout !== 'pitch');
+    const nf = DN.starterTopics().find((t) => t.id === 't-redflags');
     ok(F.finaleMode({ topic: nf, rules: { finale: { mode: 'sim' } } }) === 'bracket' && !F.isFootball(nf), 'non-football topics don’t get ratings, and simulator modes fall back to the vote bracket');
     ok(F.finaleMode({ topic: nf, rules: {} }) === 'vote', 'Group Vote stays the default (old saves without the setting)');
     // Ties.

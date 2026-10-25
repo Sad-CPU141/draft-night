@@ -1,4 +1,4 @@
-/* Draft Night 2fa708940a — built from src/ by build.js. Edit src/, not this file. */
+/* Draft Night 629d2e8932 — built from src/ by build.js. Edit src/, not this file. */
 "use strict";
 (function(){
 function _extends() { return _extends = Object.assign ? Object.assign.bind() : function (n) { for (var e = 1; e < arguments.length; e++) { var t = arguments[e]; for (var r in t) ({}).hasOwnProperty.call(t, r) && (n[r] = t[r]); } return n; }, _extends.apply(null, arguments); }
@@ -622,7 +622,9 @@ const STARTER_ERA = {
   't-goat': 'prime',
   't-ucl': 'prime',
   't-wonder': 'now',
-  't-wfoot': 'prime'
+  't-wfoot': 'prime',
+  't-nba': 'now',
+  't-nbal': 'prime'
 };
 const STARTER_BATTLE = {
   't-ani': 'fight',
@@ -650,7 +652,9 @@ const STARTER_BATTLE = {
   't-cute': 'cute',
   't-pet': 'cute',
   't-dogbreeds': 'cute',
-  't-catbreeds': 'cute'
+  't-catbreeds': 'cute',
+  't-nba': 'basketball',
+  't-nbal': 'basketball'
 };
 function starterTopics() {
   const v3 = [...sportsTopicsV3(), ...foodTopicsV3(), ...entTopicsV3(), ...travelTopicsV3(), ...animalTopicsV3(), ...styleTopicsV3(), ...funTopicsV3()];
@@ -667,7 +671,7 @@ function starterTopics() {
   } : t).map(t => STARTER_ERA[t.id] ? {
     ...t,
     era: STARTER_ERA[t.id]
-  } : STARTER_BATTLE[t.id] ? {
+  } : t).map(t => STARTER_BATTLE[t.id] ? {
     ...t,
     battle: STARTER_BATTLE[t.id]
   } : t);
@@ -23261,6 +23265,386 @@ const callLine = (k, vars) => {
   const l = ls[Math.floor(Math.random() * ls.length)];
   return l.replace(/\{(\w+)\}/g, (_, v) => vars && vars[v] != null ? vars[v] : '');
 };
+const HOOPS_SHAPE = {
+  G: {
+    SHO: 0.98,
+    TPT: 1.02,
+    PAS: 1.0,
+    REB: 0.66,
+    DEF: 0.86,
+    ATH: 0.95,
+    INS: 0.8
+  },
+  F: {
+    SHO: 0.96,
+    TPT: 0.9,
+    PAS: 0.86,
+    REB: 0.88,
+    DEF: 0.94,
+    ATH: 0.98,
+    INS: 0.92
+  },
+  C: {
+    SHO: 0.82,
+    TPT: 0.62,
+    PAS: 0.78,
+    REB: 1.04,
+    DEF: 1.0,
+    ATH: 0.92,
+    INS: 1.04
+  }
+};
+const HOOPS_ATTRS = ['SHO', 'TPT', 'PAS', 'REB', 'DEF', 'ATH', 'INS'];
+const HOOPS_ATTR_NAMES = {
+  SHO: 'Shooting',
+  TPT: '3-point',
+  PAS: 'Passing',
+  REB: 'Rebounding',
+  DEF: 'Defence',
+  ATH: 'Athleticism',
+  INS: 'Inside'
+};
+const hoopsRole = (item, slot) => {
+  const p = norm(item && item.pos || slot || '');
+  return p === 'C' ? 'C' : p === 'F' ? 'F' : p === 'G' ? 'G' : 'F';
+};
+function hoopsRating(item, slot) {
+  const fixed = validRating(item.rating);
+  const ovr = fixed ? clamp(Math.round(+item.rating), 1, 99) : clamp(Math.round(66 + itemFame(item) * 28 + (unit('hovr', item.name) - 0.5) * 6), 55, 97);
+  const role = hoopsRole(item, slot);
+  const shape = HOOPS_SHAPE[role];
+  const d = (item.desc || '') + ' ' + item.name;
+  const tilt = {
+    TPT: /shoot|three|splash|Dame|Curry|Ray Allen|Reggie|sharpshoot|stretch/i.test(d) ? 8 : 0,
+    REB: /rebound|Rodman/i.test(d) ? 8 : 0,
+    DEF: /Defensive|defen|block|Mutombo|Gobert/i.test(d) ? 8 : 0,
+    PAS: /assist|Point God|triple|Magic|Stockton|Nash|Kidd/i.test(d) ? 8 : 0,
+    ATH: /dunk|flyer|speed|Vinsanity|Human Highlight|Glide|Zion|Ja Morant/i.test(d) ? 8 : 0
+  };
+  const attrs = {};
+  HOOPS_ATTRS.forEach(a => {
+    attrs[a] = clamp(Math.round(ovr * shape[a] + (tilt[a] || 0) + (unit('hattr', item.name, a) - 0.5) * 10), 20, 99);
+  });
+  return {
+    ovr,
+    attrs,
+    role,
+    estimated: !fixed
+  };
+}
+function hoopsSquad(d, m) {
+  return m.team.map((t, i) => {
+    if (!t || !d.items[t.itemId]) return null;
+    const item = d.items[t.itemId];
+    return {
+      name: item.name,
+      itemId: item.id,
+      price: t.price || 0,
+      slot: d.rules.slots[i],
+      ...hoopsRating(item, d.rules.slots[i])
+    };
+  }).filter(Boolean);
+}
+const HOOPS_LINES = {
+  three: ['{p} from downtown… BANG!', '{p} pulls up from deep — it’s good!', 'Splash! {p} hits the three!'],
+  dunk: ['{p} throws it DOWN!', 'What a slam from {p}!', '{p} rises up — POSTER!'],
+  layup: ['{p} drives and finishes at the rim.', '{p} with the smooth lay-in.', '{p} spins and scores.'],
+  mid: ['{p} with the pull-up jumper.', '{p} fades away… good!', '{p} hits from mid-range.'],
+  post: ['{p} backs down and scores in the post.', '{p} with the hook shot.'],
+  miss3: ['{p} fires from three… off the rim.', '{p} misses from deep.'],
+  missIn: ['{p} can’t get it to drop.', '{p} misses at the rim.'],
+  block: ['REJECTED! {b} swats {p}!', '{b} with the huge block on {p}!', 'Get that outta here! {b} blocks {p}!'],
+  steal: ['{b} picks {p}’s pocket!', 'Stolen! {b} jumps the passing lane!', '{b} rips it from {p}!'],
+  tov: ['{p} throws it away.', 'Travel on {p}.', '{p} steps out of bounds.'],
+  oreb: ['{p} crashes the glass for the offensive rebound!'],
+  andone: [' And one!', ' Plus the foul!'],
+  ft: ['{p} at the line: {n} of 2.']
+};
+const hoopsLine = (rng, k, v) => {
+  const ls = HOOPS_LINES[k];
+  return ls[Math.floor(rng() * ls.length)].replace('{p}', v.p || '').replace('{b}', v.b || '').replace('{n}', v.n != null ? v.n : '');
+};
+function simulateBasketball(d, A, B, key) {
+  const rng = seeded(d.seed, 'hoops', key, A.id, B.id);
+  const sq = [hoopsSquad(d, A), hoopsSquad(d, B)];
+  if (!sq[0].length || !sq[1].length) {
+    const w = sq[0].length ? 0 : 1;
+    return {
+      v: 'hoops',
+      kind: 'basketball',
+      score: w === 0 ? [20, 0] : [0, 20],
+      winner: w,
+      forfeit: true,
+      quarters: [],
+      plays: [],
+      beats: [],
+      box: [{}, {}],
+      ot: 0,
+      et: false,
+      pens: null,
+      events: []
+    };
+  }
+  const avg = (s, a) => s.reduce((n, p) => n + p.attrs[a], 0) / s.length;
+  const team = sq.map(s => ({
+    off: avg(s, 'SHO') * 0.5 + avg(s, 'PAS') * 0.25 + avg(s, 'ATH') * 0.25,
+    def: avg(s, 'DEF') * 0.7 + avg(s, 'ATH') * 0.3,
+    reb: avg(s, 'REB'),
+    size: 5 - s.length
+  }));
+  const form = sq.map(s => Object.fromEntries(s.map(p => [p.name, (rng() - 0.5) * 0.12])));
+  const heat = Array.from({
+    length: 10
+  }, () => [(rng() - 0.5) * 0.07, (rng() - 0.5) * 0.07]);
+  const box = sq.map(s => Object.fromEntries(s.map(p => [p.name, {
+    pts: 0,
+    reb: 0,
+    ast: 0,
+    blk: 0,
+    stl: 0,
+    fgm: 0,
+    fga: 0,
+    tpm: 0
+  }])));
+  const score = [0, 0];
+  const plays = [];
+  const pick = (rows, w) => weighted(rng, rows, w);
+  const matchup = (D, shooter) => sq[D].find(p => p.role === shooter.role) || sq[D][0];
+  const usage = p => (p.attrs.SHO * 0.6 + p.ovr * 0.4) * (p.role === 'C' ? 0.85 : 1);
+  const periodLen = q => q < 4 ? 720 : 300;
+  let q = 0;
+  let lead = 0;
+  const playPeriod = qi => {
+    const len = periodLen(qi);
+    const poss = Math.round((qi < 4 ? 24 : 10) + (rng() - 0.5) * 3);
+    let o = qi % 2;
+    for (let k = 0; k < poss * 2; k++) {
+      const clock = Math.max(0, Math.round(len * (1 - (k + 1) / (poss * 2)) + (rng() - 0.5) * 8));
+      const O = o,
+        D = 1 - o;
+      o = D;
+      const P = {
+        q: qi,
+        clock,
+        team: O,
+        pts: 0
+      };
+      const offAdv = (team[O].off - team[D].def) / 100;
+      const tovP = clamp(0.12 - offAdv * 0.15 + team[O].size * 0.02, 0.06, 0.2);
+      if (rng() < tovP) {
+        const loser = pick(sq[O], p => usage(p) * (p.role === 'G' ? 1.4 : 1));
+        if (rng() < 0.55) {
+          const stealer = pick(sq[D], p => p.attrs.DEF * (p.role === 'G' ? 1.5 : 1) + p.attrs.ATH * 0.3);
+          box[D][stealer.name].stl++;
+          P.kind = 'steal';
+          P.p = loser.name;
+          P.b = stealer.name;
+          P.text = hoopsLine(rng, 'steal', {
+            p: loser.name,
+            b: stealer.name
+          });
+        } else {
+          P.kind = 'tov';
+          P.p = loser.name;
+          P.text = hoopsLine(rng, 'tov', {
+            p: loser.name
+          });
+        }
+        P.score = [...score];
+        plays.push(P);
+        continue;
+      }
+      let shots = 0;
+      while (shots < 3) {
+        shots++;
+        const shooter = pick(sq[O], usage);
+        const def = matchup(D, shooter);
+        const r = rng();
+        const tptW = shooter.attrs.TPT / 100 * (shooter.role === 'C' ? 0.35 : 1);
+        const insW = shooter.attrs.INS / 100 * (shooter.role === 'C' ? 1.5 : 0.9);
+        const type = r < 0.36 * tptW / 0.85 ? 'three' : r < 0.36 * tptW / 0.85 + 0.22 ? 'mid' : rng() < (shooter.attrs.ATH - 62) / 80 + (shooter.role === 'C' ? 0.18 : 0) ? 'dunk' : shooter.role === 'C' && rng() < 0.4 ? 'post' : 'layup';
+        const skill = type === 'three' ? shooter.attrs.TPT : type === 'mid' ? shooter.attrs.SHO : (shooter.attrs.INS + shooter.attrs.ATH) / 2;
+        const base = {
+          three: 0.355,
+          mid: 0.43,
+          layup: 0.56,
+          dunk: 0.72,
+          post: 0.5
+        }[type];
+        const pMake = clamp(base + (skill - def.attrs.DEF) / 260 + offAdv * 0.08 + form[O][shooter.name] + heat[Math.min(9, P.q)][O], 0.18, 0.86);
+        const rim = type === 'layup' || type === 'dunk' || type === 'post';
+        const blocker = rim ? pick(sq[D], p => (p.role === 'C' ? 3 : p.role === 'F' ? 1.4 : 0.5) * p.attrs.DEF) : null;
+        if (rim && rng() < clamp(0.05 + (blocker.attrs.DEF - shooter.attrs.ATH) / 400 + (blocker.role === 'C' ? 0.03 : 0), 0.02, 0.14)) {
+          box[D][blocker.name].blk++;
+          box[O][shooter.name].fga++;
+          Object.assign(P, {
+            kind: 'block',
+            p: shooter.name,
+            b: blocker.name,
+            type,
+            text: hoopsLine(rng, 'block', {
+              p: shooter.name,
+              b: blocker.name
+            })
+          });
+          break;
+        }
+        const made = rng() < pMake;
+        box[O][shooter.name].fga++;
+        const passer = rng() < 0.62 ? pick(sq[O].filter(p => p !== shooter), p => p.attrs.PAS * (p.role === 'G' ? 1.5 : 1)) : null;
+        if (made) {
+          const pts = type === 'three' ? 3 : 2;
+          const andOne = rim && rng() < 0.08;
+          const ft = andOne ? rng() < 0.75 ? 1 : 0 : 0;
+          score[O] += pts + ft;
+          P.pts = pts + ft;
+          box[O][shooter.name].pts += pts + ft;
+          box[O][shooter.name].fgm++;
+          if (type === 'three') box[O][shooter.name].tpm++;
+          if (passer) box[O][passer.name].ast++;
+          Object.assign(P, {
+            kind: 'make',
+            type,
+            p: shooter.name,
+            a: passer ? passer.name : null,
+            text: hoopsLine(rng, type, {
+              p: shooter.name
+            }) + (passer && rng() < 0.6 ? ' Assist ' + passer.name + '.' : '') + (andOne ? hoopsLine(rng, 'andone', {}) + (ft ? '' : ' (misses the free throw)') : ''),
+            andOne
+          });
+          break;
+        }
+        if (rng() < (rim ? 0.16 : 0.05)) {
+          const fts = type === 'three' ? 3 : 2;
+          let m2 = 0;
+          for (let f = 0; f < fts; f++) if (rng() < clamp(0.6 + (shooter.attrs.SHO - 60) / 120, 0.45, 0.92)) m2++;
+          score[O] += m2;
+          P.pts = m2;
+          box[O][shooter.name].pts += m2;
+          Object.assign(P, {
+            kind: 'ft',
+            type,
+            p: shooter.name,
+            n: m2,
+            of: fts,
+            text: shooter.name + ' is fouled — ' + m2 + ' of ' + fts + ' at the line.'
+          });
+          break;
+        }
+        const orebP = clamp(0.24 + (team[O].reb - team[D].reb) / 200, 0.12, 0.38);
+        if (rng() < orebP && shots < 3) {
+          const grab = pick(sq[O], p => p.attrs.REB * (p.role === 'C' ? 2 : p.role === 'F' ? 1.3 : 0.6));
+          box[O][grab.name].reb++;
+          P.second = (P.second || []).concat([{
+            p: shooter.name,
+            type,
+            rebound: grab.name
+          }]);
+          continue;
+        }
+        const grab = pick(sq[D], p => p.attrs.REB * (p.role === 'C' ? 2 : p.role === 'F' ? 1.3 : 0.6));
+        box[D][grab.name].reb++;
+        Object.assign(P, {
+          kind: 'miss',
+          type,
+          p: shooter.name,
+          r: grab.name,
+          text: hoopsLine(rng, type === 'three' ? 'miss3' : 'missIn', {
+            p: shooter.name
+          }) + ' ' + grab.name + ' rebounds.'
+        });
+        break;
+      }
+      if (!P.kind) Object.assign(P, {
+        kind: 'miss',
+        type: 'mid',
+        p: sq[O][0].name,
+        r: sq[D][0].name,
+        text: 'The shot clock runs down… no good.'
+      });
+      P.score = [...score];
+      const newLead = Math.sign(score[0] - score[1]);
+      if (newLead && newLead !== lead && lead !== 0) P.leadChange = true;
+      if (newLead) lead = newLead;
+      plays.push(P);
+    }
+  };
+  for (q = 0; q < 4; q++) playPeriod(q);
+  let ot = 0;
+  while (score[0] === score[1] && ot < 4) {
+    playPeriod(4 + ot);
+    ot++;
+  }
+  if (score[0] === score[1]) {
+    const w = rng() < 0.5 ? 0 : 1;
+    score[w] += 2;
+    plays.push({
+      q: 3 + ot,
+      clock: 0,
+      team: w,
+      kind: 'make',
+      type: 'mid',
+      p: sq[w][0].name,
+      pts: 2,
+      text: sq[w][0].name + ' hits the winner at the buzzer!',
+      score: [...score],
+      buzzer: true
+    });
+  }
+  const winner = score[0] > score[1] ? 0 : 1;
+  const lastP = plays[plays.length - 1];
+  for (let k = plays.length - 1; k >= 0; k--) {
+    const p = plays[k];
+    if (p.kind === 'make' && p.team === winner) {
+      if (p.clock <= 4 && Math.abs(score[0] - score[1]) <= 3 && p.q === lastP.q) p.buzzer = true;
+      break;
+    }
+  }
+  const close = p => Math.abs(p.score[0] - p.score[1]) <= 6;
+  const finalQ = 3 + ot;
+  plays.forEach((p, k) => {
+    p.i = k;
+    const late = p.q === finalQ && p.clock <= 120 && close(p);
+    p.hl = p.buzzer || late || p.kind === 'make' && (p.type === 'dunk' || p.type === 'three') || p.kind === 'block' || p.kind === 'steal' || p.andOne || p.leadChange;
+  });
+  for (let qi = 0; qi <= finalQ; qi++) {
+    const hl = plays.filter(p => p.q === qi && p.hl);
+    const keepAll = hl.filter(p => p.buzzer || p.q === finalQ && p.clock <= 120 && close(p));
+    const rest = hl.filter(p => !keepAll.includes(p));
+    const want = Math.max(0, (qi < 4 ? 8 : 5) - keepAll.length);
+    rest.forEach((p, j) => {
+      if (j % Math.max(1, Math.ceil(rest.length / Math.max(1, want))) !== 0) p.hl = false;
+    });
+  }
+  const quarters = Array.from({
+    length: 4 + ot
+  }, (_, qi) => {
+    const last = [...plays].reverse().find(p => p.q === qi);
+    const prev = [...plays].reverse().find(p => p.q === qi - 1);
+    return last ? [last.score[0] - (prev ? prev.score[0] : 0), last.score[1] - (prev ? prev.score[1] : 0)] : [0, 0];
+  });
+  return {
+    v: 'hoops',
+    kind: 'basketball',
+    score: [...score],
+    winner,
+    ot,
+    quarters,
+    plays,
+    box,
+    lineups: sq.map(s => s.map(p => ({
+      name: p.name,
+      itemId: p.itemId,
+      role: p.role,
+      ovr: p.ovr
+    }))),
+    et: ot > 0,
+    pens: null,
+    events: []
+  };
+}
+const hoopsPeriodName = q => q < 4 ? 'Q' + (q + 1) : q === 4 ? 'OT' : 'OT' + (q - 3);
+const hoopsClock = s => Math.floor(s / 60) + ':' + String(s % 60).padStart(2, '0');
 const BATTLE_KINDS = {
   fight: {
     name: 'Battle',
@@ -23298,6 +23682,15 @@ const BATTLE_KINDS = {
     upset: ['Who knew? {w} beats {l} when it counts!', 'Surprise hero: {w}!'],
     noshow: ['{w} wins the night — the other team had nothing.']
   },
+  basketball: {
+    name: 'Basketball game',
+    start: 'Tip off',
+    emoji: '🏀',
+    round: 'Quarter',
+    win: [''],
+    upset: [''],
+    noshow: ['{w} wins by forfeit.']
+  },
   cute: {
     name: 'Puppy Bowl',
     start: 'Kick off',
@@ -23321,6 +23714,7 @@ const hasBattle = topic => !!battleKindId(topic);
 function simulateFor(d, A, B, key, opts) {
   const k = battleKindId(d.topic);
   if (k === 'fight') return simulateArena(d, A, B, key);
+  if (k === 'basketball') return simulateBasketball(d, A, B, key);
   if (k === 'survival') return simulateSurvival(d, A, B, key);
   if (k === 'powers' || k === 'weird') return simulateMissions(d, A, B, key);
   if (k === 'cute') return simulatePuppyBowl(d, A, B, key, opts && opts.knockout === false ? false : true);
@@ -23333,11 +23727,12 @@ function simWhy(w, mt) {
     const f = mt.final[mt.winner];
     return w.name + (f.rescued ? ' got rescued' : ' survived ' + ws + ' day' + (ws === 1 ? '' : 's')) + (ws !== ls ? ' (the others lasted ' + ls + ')' : mt.how === 'rescue' ? ', and got rescued first' : mt.how === 'shape' ? ', level on days but in better shape' : ' and won the last night') + '.';
   }
+  if (mt.v === 'hoops') return w.name + ' won ' + mt.score[mt.winner] + '–' + mt.score[1 - mt.winner] + (mt.ot ? ' after ' + (mt.ot > 1 ? mt.ot + ' overtimes' : 'overtime') : '') + '.';
   if (mt.v === 'show') return w.name + ' won the cuteness contest ' + mt.score[mt.winner] + '–' + mt.score[1 - mt.winner] + (mt.how === 'points' ? ' on total points' : mt.how === 'crowd' ? ' — the crowd decided' : '') + '.';
   if (mt.v === 'mission') return w.name + ' won ' + mt.score[mt.winner] + ' of ' + mt.missions.length + ' missions.';
   return w.name + ' won the ' + (BATTLE_KINDS[mt.kind] || BATTLE_KINDS.fight).name.toLowerCase() + ' ' + mt.score[mt.winner] + '–' + mt.score[1 - mt.winner] + (mt.sudden ? ' in sudden death' : '') + '.';
 }
-const isSimResult = mt => !!mt && (mt.v === 'battle' || mt.v === 'arena' || mt.v === 'survival' || mt.v === 'mission' || mt.v === 'show');
+const isSimResult = mt => !!mt && (mt.v === 'hoops' || mt.v === 'battle' || mt.v === 'arena' || mt.v === 'survival' || mt.v === 'mission' || mt.v === 'show');
 function battleDuel(rng, kind, a, b, maxP) {
   const fill = (lines, w, l) => lines[Math.floor(rng() * lines.length)].replace('{w}', w).replace('{l}', l);
   if (!a || !b) {
@@ -29934,7 +30329,10 @@ function ItemCard({
   }), isFootball(d.topic) && React.createElement(RatingChip, {
     item: item,
     topic: d.topic
-  }), hasBattle(d.topic) && React.createElement(StatChip, {
+  }), battleKindId(d.topic) === 'basketball' ? React.createElement(HoopsChip, {
+    item: item,
+    topic: d.topic
+  }) : hasBattle(d.topic) && React.createElement(StatChip, {
     item: item,
     topic: d.topic
   })), React.createElement("div", {
@@ -34691,7 +35089,10 @@ class Boundary extends React.Component {
 if (window.__DN_TEST__) window.__DN = {
   sports: {
     roleOf,
-    ROLE_BY_NAME
+    ROLE_BY_NAME,
+    simulateBasketball,
+    hoopsRating,
+    hoopsSquad
   },
   simStats: {
     simulatePuppyBowl,
@@ -35543,6 +35944,896 @@ function StatChip({
     onClick: () => setOpen(false)
   }, "Close")), document.body));
 }
+const COURT = {
+  w: 94,
+  h: 50
+};
+const RIM = [{
+  x: 5.25,
+  y: 25
+}, {
+  x: 88.75,
+  y: 25
+}];
+const HOOP_SPOTS = {
+  G: [{
+    x: 63,
+    y: 25
+  }, {
+    x: 71,
+    y: 8
+  }, {
+    x: 71,
+    y: 42
+  }],
+  F: [{
+    x: 72,
+    y: 41
+  }, {
+    x: 85,
+    y: 45
+  }, {
+    x: 72,
+    y: 9
+  }],
+  C: [{
+    x: 83,
+    y: 18
+  }, {
+    x: 83,
+    y: 32
+  }]
+};
+const SHOT_SPOT = {
+  three: side => side > 0.5 ? {
+    x: 88,
+    y: 3.5
+  } : side > 0.2 ? {
+    x: 66.5,
+    y: 25
+  } : {
+    x: 70,
+    y: 10
+  },
+  mid: () => ({
+    x: 76,
+    y: 31
+  }),
+  layup: () => ({
+    x: 86,
+    y: 27
+  }),
+  dunk: () => ({
+    x: 87.5,
+    y: 25
+  }),
+  post: () => ({
+    x: 84,
+    y: 21
+  })
+};
+const lerpC = (a, b, u) => ({
+  x: a.x + (b.x - a.x) * u,
+  y: a.y + (b.y - a.y) * u
+});
+const easeC = u => {
+  const v = Math.max(0, Math.min(1, u));
+  return v * v * (3 - 2 * v);
+};
+function hoopLineup(lineup) {
+  const used = {
+    G: 0,
+    F: 0,
+    C: 0
+  };
+  return lineup.map(p => {
+    const list = HOOP_SPOTS[p.role] || HOOP_SPOTS.F;
+    const s = list[used[p.role]++ % list.length];
+    return {
+      ...p,
+      spot: s
+    };
+  });
+}
+const flipX = (team, p) => team === 0 ? p : {
+  x: COURT.w - p.x,
+  y: p.y
+};
+function hoopsScript(match) {
+  const beats = [];
+  let t = 0;
+  const add = b => {
+    b.t0 = t;
+    t += b.dur;
+    beats.push(b);
+    return b;
+  };
+  add({
+    type: 'tip',
+    dur: 2.2,
+    score: [0, 0],
+    clock: 720,
+    q: 0
+  });
+  let run = [];
+  let lastScore = [0, 0];
+  let lastQ = 0;
+  const flush = () => {
+    if (!run.length) return;
+    const s0 = lastScore,
+      s1 = run[run.length - 1].score;
+    const d = [s1[0] - s0[0], s1[1] - s0[1]];
+    add({
+      type: 'run',
+      dur: Math.min(3, 1.1 + run.length * 0.14),
+      from: s0,
+      to: s1,
+      run: d,
+      q: run[0].q,
+      c0: run[0].clock,
+      c1: run[run.length - 1].clock,
+      team: d[0] >= d[1] ? 0 : 1
+    });
+    lastScore = s1;
+    run = [];
+  };
+  match.plays.forEach(p => {
+    if (p.q !== lastQ) {
+      flush();
+      add({
+        type: 'qend',
+        dur: 2.4,
+        q: lastQ,
+        score: lastScore
+      });
+      lastQ = p.q;
+    }
+    if (!p.hl) {
+      run.push(p);
+      return;
+    }
+    flush();
+    const passes = p.a ? 2 : 1;
+    const tail = p.kind === 'ft' ? 2.4 : p.kind === 'tov' || p.kind === 'steal' ? 1.8 : 2.2;
+    add({
+      type: 'play',
+      p,
+      dur: 1.1 + passes * 0.62 + 1.0 + tail,
+      passes,
+      from: lastScore,
+      q: p.q,
+      clock: p.clock
+    });
+    lastScore = p.score;
+  });
+  flush();
+  add({
+    type: 'final',
+    dur: 2.6,
+    q: lastQ,
+    score: match.score
+  });
+  return {
+    beats,
+    total: t
+  };
+}
+function hoopsFrame(beat, L, u) {
+  const homeOf = team => L[team].map(pl => flipX(team, pl.spot));
+  const neutral = () => [0, 1].map(team => L[team].map((pl, i) => ({
+    x: COURT.w / 2 + (team === 0 ? -6 : 6) - (i - 2) * 1.5 * (team === 0 ? 1 : -1),
+    y: 8 + i * 8.5
+  })));
+  if (beat.type !== 'play') {
+    const pos = beat.type === 'run' ? [0, 1].map(team => homeOf(team === beat.team ? team : team).map((p, i) => lerpC(p, {
+      x: COURT.w / 2,
+      y: p.y
+    }, 0.35 + 0.1 * Math.sin(u * 2 + i)))) : neutral();
+    return {
+      pos,
+      ball: beat.type === 'tip' ? {
+        x: COURT.w / 2,
+        y: 25,
+        h: Math.sin(Math.min(1, u / 1.2) * Math.PI) * 7
+      } : {
+        x: COURT.w / 2,
+        y: 25,
+        h: 0
+      },
+      holder: null
+    };
+  }
+  const p = beat.p;
+  const O = p.team,
+    D = 1 - O;
+  const idx = (team, name) => Math.max(0, L[team].findIndex(x => x.name === name));
+  const off = homeOf(O);
+  const def = off.map(x => lerpC(x, flipX(O, RIM[1]), 0.28));
+  const rim = flipX(O, RIM[1]);
+  const si = idx(O, p.p);
+  const pi = p.a ? idx(O, p.a) : (si + 1) % L[O].length;
+  const shotAt = flipX(O, (SHOT_SPOT[p.type] || SHOT_SPOT.mid)(unit('spot', p.i)));
+  const handler = p.kind === 'steal' || p.kind === 'tov' ? si : pi;
+  const T1 = 1.1,
+    TP = 0.62 * beat.passes,
+    T2 = T1 + TP,
+    T3 = T2 + 1.0;
+  const pos = [off.map(x => ({
+    ...x
+  })), def.map(x => ({
+    ...x
+  }))];
+  const offT = O,
+    defT = D;
+  const posT = [[], []];
+  posT[offT] = pos[0];
+  posT[defT] = L[defT].map((_, i) => ({
+    ...(def[i] || def[0])
+  }));
+  let ball;
+  let holder = null;
+  let banner = null;
+  let jump = null;
+  if (u < T1) {
+    const start = flipX(O, {
+      x: 50,
+      y: 25
+    });
+    const k = easeC(u / T1);
+    posT[offT] = off.map((x, i) => lerpC({
+      x: flipX(O, {
+        x: 47,
+        y: 0
+      }).x,
+      y: x.y
+    }, x, k));
+    posT[offT][handler] = lerpC(start, off[handler], k);
+    ball = {
+      ...posT[offT][handler],
+      h: 1.5 + Math.abs(Math.sin(u * 14)) * 1.2
+    };
+    holder = {
+      team: offT,
+      i: handler
+    };
+    posT[defT] = posT[defT].map(x => lerpC({
+      x: flipX(O, {
+        x: 60,
+        y: 0
+      }).x,
+      y: x.y
+    }, x, k));
+  } else if (u < T2) {
+    const k = easeC((u - T1) / TP);
+    if (p.kind === 'steal') {
+      const st = idx(defT, p.b);
+      const mid = lerpC(off[si], off[(si + 1) % off.length], 0.5);
+      posT[defT][st] = lerpC(posT[defT][st], mid, k);
+      ball = {
+        ...lerpC(off[si], mid, k),
+        h: 2
+      };
+      if (k > 0.85) banner = 'STEAL!';
+    } else {
+      ball = {
+        ...lerpC(off[pi], off[si], k),
+        h: 2 + Math.sin(k * Math.PI) * 2
+      };
+      if (k > 0.95) holder = {
+        team: offT,
+        i: si
+      };
+    }
+  } else if (u < T3) {
+    const k = (u - T2) / 1.0;
+    if (p.kind === 'steal') {
+      const st = idx(defT, p.b);
+      const away = flipX(D, {
+        x: 84,
+        y: 25
+      });
+      const from = lerpC(off[si], off[(si + 1) % off.length], 0.5);
+      posT[defT][st] = lerpC(from, away, easeC(k));
+      ball = {
+        ...posT[defT][st],
+        h: 1.5 + Math.abs(Math.sin(u * 16))
+      };
+      holder = {
+        team: defT,
+        i: st
+      };
+      banner = 'STEAL!';
+      posT[offT] = posT[offT].map(x => lerpC(x, {
+        x: COURT.w / 2,
+        y: x.y
+      }, easeC(k) * 0.6));
+    } else if (p.kind === 'tov') {
+      ball = {
+        ...lerpC(off[si], {
+          x: off[si].x,
+          y: off[si].y < 25 ? -3 : 53
+        }, easeC(k)),
+        h: 1
+      };
+      banner = 'TURNOVER';
+    } else {
+      const moveK = easeC(Math.min(1, k / 0.45));
+      posT[offT][si] = lerpC(off[si], shotAt, moveK);
+      const di = Math.min(posT[defT].length - 1, si);
+      posT[defT][di] = lerpC(posT[defT][di], lerpC(shotAt, rim, 0.25), moveK);
+      if (p.kind === 'block') {
+        const bi = idx(defT, p.b);
+        posT[defT][bi] = lerpC(posT[defT][bi], lerpC(shotAt, rim, 0.18), easeC(k / 0.6));
+      }
+      const flight = Math.max(0, (k - 0.45) / 0.55);
+      if (flight <= 0) {
+        ball = {
+          ...posT[offT][si],
+          h: 1.5
+        };
+        holder = {
+          team: offT,
+          i: si
+        };
+      } else if (p.kind === 'block') {
+        const bp = lerpC(shotAt, rim, 0.18);
+        ball = {
+          ...lerpC(shotAt, bp, easeC(flight * 1.6)),
+          h: 4 + flight * 3
+        };
+        if (flight > 0.6) {
+          banner = 'BLOCKED!';
+          ball = {
+            ...lerpC(bp, {
+              x: bp.x + (O === 0 ? -14 : 14),
+              y: bp.y + 10
+            }, easeC((flight - 0.6) / 0.4)),
+            h: 3
+          };
+        }
+        jump = {
+          team: defT,
+          i: idx(defT, p.b)
+        };
+      } else if (p.type === 'dunk') {
+        ball = {
+          ...lerpC(posT[offT][si], rim, easeC(flight)),
+          h: 6 + flight * 3
+        };
+        jump = {
+          team: offT,
+          i: si
+        };
+      } else ball = {
+        ...lerpC(shotAt, rim, flight),
+        h: 2 + Math.sin(flight * Math.PI) * (p.type === 'three' ? 11 : 8) + flight * 2
+      };
+    }
+  } else {
+    const k = (u - T3) / Math.max(0.1, beat.dur - T3);
+    posT[offT][si] = p.kind === 'steal' || p.kind === 'tov' ? off[si] : shotAt;
+    if (p.kind === 'make') {
+      ball = {
+        ...rim,
+        h: Math.max(0, 3 - k * 6)
+      };
+      banner = p.buzzer ? 'BUZZER BEATER!' : p.andOne ? 'AND ONE!' : p.type === 'three' ? 'THREE!' : p.type === 'dunk' ? 'SLAM DUNK!' : 'BUCKET!';
+      if (p.type === 'dunk' && k < 0.3) jump = {
+        team: offT,
+        i: si
+      };
+    } else if (p.kind === 'miss') {
+      const ri = Math.max(0, L[defT].findIndex(x => x.name === p.r));
+      const rr = lerpC(rim, flipX(O, {
+        x: 80,
+        y: 30
+      }), 0.6);
+      posT[defT][ri] = lerpC(posT[defT][ri], rr, easeC(k * 2));
+      ball = {
+        ...lerpC(rim, rr, easeC(k * 2)),
+        h: 4 * (1 - easeC(k * 2)) + 1
+      };
+      banner = k < 0.5 ? 'NO GOOD' : 'REBOUND';
+    } else if (p.kind === 'block') {
+      const bi = idx(defT, p.b);
+      const bp = lerpC(shotAt, rim, 0.18);
+      posT[defT][bi] = bp;
+      ball = {
+        x: bp.x + (O === 0 ? -14 : 14),
+        y: bp.y + 10,
+        h: 1
+      };
+      banner = 'BLOCKED!';
+    } else if (p.kind === 'steal') {
+      const st = idx(defT, p.b);
+      const away = flipX(D, {
+        x: 84,
+        y: 25
+      });
+      posT[defT][st] = away;
+      ball = {
+        ...away,
+        h: 1.5
+      };
+      banner = 'STEAL!';
+    } else if (p.kind === 'tov') {
+      ball = {
+        x: off[si].x,
+        y: off[si].y < 25 ? -2 : 52,
+        h: 0
+      };
+      banner = 'TURNOVER';
+    } else if (p.kind === 'ft') {
+      const line = flipX(O, {
+        x: 75,
+        y: 25
+      });
+      posT[offT][si] = line;
+      const shotK = k * 2 % 1;
+      ball = {
+        ...lerpC(line, rim, shotK),
+        h: 2 + Math.sin(shotK * Math.PI) * 6
+      };
+      banner = 'FREE THROWS ' + p.n + '/' + p.of;
+    }
+  }
+  return {
+    pos: posT,
+    ball: ball || {
+      x: 47,
+      y: 25,
+      h: 0
+    },
+    holder,
+    banner,
+    jump
+  };
+}
+function CourtView({
+  d,
+  A,
+  B,
+  match,
+  speed,
+  commentary,
+  onDone,
+  label
+}) {
+  const L = useMemo(() => match.lineups.map(hoopLineup), [match]);
+  const script = useMemo(() => hoopsScript(match), [match]);
+  const base = speed === 'fast' ? 2 : 1.2;
+  const [t, setT] = useState(speed === 'instant' ? script.total : 0);
+  const [playing, setPlaying] = useState(speed !== 'instant');
+  const [mult, setMult] = useState(1);
+  const done = t >= script.total;
+  const fired = useRef(false);
+  const reduced = reducedMotion();
+  useEffect(() => {
+    if (!playing || done) return undefined;
+    let raf;
+    let last = performance.now();
+    const tick = now => {
+      const dt = Math.min(0.1, (now - last) / 1000);
+      last = now;
+      setT(x => Math.min(script.total, x + dt * base * mult / Math.max(0.001, GAME_SPEED)));
+      raf = requestAnimationFrame(tick);
+    };
+    raf = requestAnimationFrame(tick);
+    return () => cancelAnimationFrame(raf);
+  }, [playing, done, mult, base]);
+  useEffect(() => {
+    if (done && !fired.current) {
+      fired.current = true;
+      audio.play('whistle');
+      onDone && onDone();
+    }
+  }, [done]);
+  const bi = Math.max(0, script.beats.findIndex(b => t < b.t0 + b.dur));
+  const beat = done ? script.beats[script.beats.length - 1] : script.beats[bi];
+  const u = done ? beat.dur : t - beat.t0;
+  const tq = reduced && !done ? Math.floor(u / 0.6) * 0.6 : u;
+  const fr = hoopsFrame(beat, L, tq);
+  const resultAt = b => b.type === 'play' ? b.dur - (b.p.kind === 'ft' ? 2.4 : b.p.kind === 'tov' || b.p.kind === 'steal' ? 1.8 : 2.2) : 0;
+  let score = beat.type === 'run' ? [0, 1].map(k => Math.round(beat.from[k] + (beat.to[k] - beat.from[k]) * easeC(u / beat.dur))) : beat.type === 'play' ? u >= resultAt(beat) ? beat.p.score : beat.from : beat.score || [0, 0];
+  if (done) score = match.score;
+  const clock = beat.type === 'run' ? Math.round(beat.c0 + (beat.c1 - beat.c0) * easeC(u / beat.dur)) : beat.type === 'play' ? beat.clock : beat.type === 'tip' ? 720 : 0;
+  const period = done ? match.ot ? 'FINAL/OT' : 'FINAL' : beat.type === 'qend' ? 'END ' + hoopsPeriodName(beat.q) : hoopsPeriodName(beat.q) + ' ' + hoopsClock(clock);
+  const runBanner = beat.type === 'run' && Math.abs(beat.run[0] - beat.run[1]) >= 6 && u > 0.4 ? (beat.team === 0 ? A : B).name.toUpperCase().slice(0, 12) + ' ' + Math.max(...beat.run) + '–' + Math.min(...beat.run) + ' RUN' : null;
+  const bannerNow = done ? null : beat.type === 'tip' ? u > 1.2 ? 'TIP-OFF!' : null : beat.type === 'qend' ? 'END OF ' + hoopsPeriodName(beat.q) : beat.type === 'final' ? 'FINAL' : runBanner || fr.banner;
+  const lastBeat = useRef(-1);
+  useEffect(() => {
+    if (!playing || done || bi === lastBeat.current) return;
+    lastBeat.current = bi;
+    if (beat.type === 'qend' || beat.type === 'tip') audio.play('whistle');
+  }, [bi]);
+  const said = useRef({});
+  useEffect(() => {
+    if (!playing || done || beat.type !== 'play' || u < resultAt(beat) || said.current[bi]) return;
+    said.current[bi] = true;
+    const p = beat.p;
+    if (p.kind === 'make') {
+      audio.play(p.type === 'three' || p.type === 'dunk' || p.buzzer ? 'cheer' : 'bid');
+      if (p.buzzer || p.type === 'dunk') audio.say((p.buzzer ? 'At the buzzer! ' : '') + p.p + '!', 2, d.id + ':' + label + ':h' + bi);
+    } else if (p.kind === 'block' || p.kind === 'steal') audio.play('card');
+  }, [t]);
+  const feed = [];
+  script.beats.forEach((b, k) => {
+    if (b.t0 + (b.type === 'play' ? resultAt(b) : b.dur * 0.6) > t && !done) return;
+    if (b.type === 'play') feed.push({
+      k,
+      q: b.q,
+      clock: b.clock,
+      team: b.p.team,
+      text: b.p.text,
+      big: b.p.buzzer || b.p.type === 'three' || b.p.type === 'dunk'
+    });else if (b.type === 'run' && (commentary || Math.abs(b.run[0] - b.run[1]) >= 6)) feed.push({
+      k,
+      q: b.q,
+      clock: b.c1,
+      text: (b.run[0] !== b.run[1] ? (b.team === 0 ? A : B).name + ' go on a ' + Math.max(...b.run) + '–' + Math.min(...b.run) + ' run.' : 'Back and forth: ' + b.run[0] + '–' + b.run[1] + '.') + ' ' + b.to[0] + '–' + b.to[1],
+      run: true
+    });else if (b.type === 'qend') feed.push({
+      k,
+      q: b.q,
+      clock: 0,
+      text: 'End of ' + hoopsPeriodName(b.q) + ': ' + b.score[0] + '–' + b.score[1],
+      half: true
+    });
+  });
+  const feedRef = useRef(null);
+  useEffect(() => {
+    const f = feedRef.current;
+    if (f) f.scrollTop = f.scrollHeight;
+  }, [feed.length]);
+  const colors = [A, B].map(m => ({
+    fill: m.color,
+    text: onColor(m.color)
+  }));
+  const short = n => {
+    const w = n.split(' ');
+    const s2 = w[w.length - 1];
+    return s2.length > 10 ? s2.slice(0, 9) + '.' : s2;
+  };
+  const numOf = name => {
+    const it = Object.values(d.items).find(x => x.name === name);
+    return it ? kitNumber(it) : '';
+  };
+  const era = eraWord(d.topic);
+  return React.createElement("div", {
+    className: "matchview courtview"
+  }, React.createElement("div", {
+    className: "scoreboard"
+  }, React.createElement("div", {
+    className: "sb-team"
+  }, React.createElement(Badge, {
+    m: A
+  }), React.createElement("span", {
+    className: "sb-n"
+  }, A.name)), React.createElement("div", {
+    className: "sb-mid"
+  }, React.createElement("span", {
+    className: "sb-score num",
+    "aria-live": "polite"
+  }, score[0], "\u2013", score[1]), React.createElement("span", {
+    className: "sb-clock num"
+  }, period)), React.createElement("div", {
+    className: "sb-team"
+  }, React.createElement(Badge, {
+    m: B
+  }), React.createElement("span", {
+    className: "sb-n"
+  }, B.name))), React.createElement("div", {
+    className: "pitchwrap"
+  }, React.createElement("svg", {
+    className: "pitchsvg courtsvg",
+    viewBox: '-2 -2 ' + (COURT.w + 4) + ' ' + (COURT.h + 4),
+    role: "img",
+    "aria-label": 'Basketball court: ' + A.name + ' ' + score[0] + ', ' + B.name + ' ' + score[1] + ', ' + period
+  }, React.createElement("rect", {
+    x: "-2",
+    y: "-2",
+    width: COURT.w + 4,
+    height: COURT.h + 4,
+    fill: "#2a1f14"
+  }), React.createElement("rect", {
+    x: "0",
+    y: "0",
+    width: COURT.w,
+    height: COURT.h,
+    fill: "#d9a066"
+  }), Array.from({
+    length: 12
+  }, (_, i) => React.createElement("rect", {
+    key: i,
+    x: "0",
+    y: i * 4.2,
+    width: COURT.w,
+    height: "2.1",
+    fill: "rgba(255,255,255,.05)"
+  })), React.createElement("g", {
+    fill: "none",
+    stroke: "rgba(255,255,255,.85)",
+    strokeWidth: "0.3"
+  }, React.createElement("rect", {
+    x: "0",
+    y: "0",
+    width: COURT.w,
+    height: COURT.h
+  }), React.createElement("line", {
+    x1: COURT.w / 2,
+    y1: "0",
+    x2: COURT.w / 2,
+    y2: COURT.h
+  }), React.createElement("circle", {
+    cx: COURT.w / 2,
+    cy: "25",
+    r: "6"
+  }), [0, 1].map(s => {
+    const X = x => s === 0 ? x : COURT.w - x;
+    return React.createElement("g", {
+      key: s
+    }, React.createElement("rect", {
+      x: s === 0 ? 0 : COURT.w - 19,
+      y: "17",
+      width: "19",
+      height: "16",
+      fill: s === 0 ? 'rgba(61,139,255,.25)' : 'rgba(226,70,59,.25)'
+    }), React.createElement("circle", {
+      cx: X(19),
+      cy: "25",
+      r: "6"
+    }), React.createElement("path", {
+      d: 'M' + X(0) + ' 3 H' + X(14) + ' A23.75 23.75 0 0 ' + (s === 0 ? 1 : 0) + ' ' + X(14) + ' 47 H' + X(0)
+    }), React.createElement("line", {
+      x1: X(4),
+      y1: "22",
+      x2: X(4),
+      y2: "28",
+      stroke: "#fff",
+      strokeWidth: "0.5"
+    }), React.createElement("circle", {
+      cx: X(5.25),
+      cy: "25",
+      r: "0.9",
+      stroke: "#ff6a00",
+      strokeWidth: "0.35"
+    }));
+  })), [0, 1].map(team => L[team].map((pl, i) => {
+    const p = fr.pos[team][i];
+    if (!p) return null;
+    const has = fr.holder && fr.holder.team === team && fr.holder.i === i;
+    const up = fr.jump && fr.jump.team === team && fr.jump.i === i;
+    return React.createElement("g", {
+      key: team + '-' + i,
+      transform: 'translate(' + p.x.toFixed(2) + ' ' + p.y.toFixed(2) + ')' + (up ? ' scale(1.3)' : '')
+    }, React.createElement("ellipse", {
+      cx: "0.3",
+      cy: "0.6",
+      rx: "1.9",
+      ry: "1.2",
+      fill: "rgba(0,0,0,.25)"
+    }), React.createElement("circle", {
+      r: "1.9",
+      fill: colors[team].fill,
+      stroke: has ? '#fff' : 'rgba(0,0,0,.55)',
+      strokeWidth: has ? 0.5 : 0.3
+    }), React.createElement("text", {
+      y: "0.75",
+      textAnchor: "middle",
+      fontSize: "2",
+      fontWeight: "800",
+      fill: colors[team].text
+    }, numOf(pl.name)), React.createElement("text", {
+      className: 'plabel' + (has ? ' on' : ''),
+      y: "-2.6",
+      textAnchor: "middle",
+      fontSize: "2.1",
+      fontWeight: "700",
+      fill: "#fff"
+    }, short(pl.name)));
+  })), React.createElement("ellipse", {
+    cx: fr.ball.x,
+    cy: fr.ball.y + 0.4,
+    rx: "0.8",
+    ry: "0.45",
+    fill: "rgba(0,0,0,.3)"
+  }), React.createElement("circle", {
+    cx: fr.ball.x,
+    cy: fr.ball.y - (fr.ball.h || 0) * 0.35,
+    r: 0.85 + (fr.ball.h || 0) * 0.04,
+    fill: "#f07a1f",
+    stroke: "#3a1a08",
+    strokeWidth: "0.22"
+  }), bannerNow && React.createElement("text", {
+    x: COURT.w / 2,
+    y: COURT.h / 2 + 3,
+    textAnchor: "middle",
+    fontSize: bannerNow.length > 12 ? 5.5 : 8,
+    fontWeight: "900",
+    fill: /THREE|DUNK|BUZZER|AND ONE/.test(bannerNow) ? '#ffc83d' : '#fff',
+    stroke: "#0f0c21",
+    strokeWidth: "0.6",
+    paintOrder: "stroke",
+    className: "pbanner"
+  }, bannerNow))), React.createElement("div", {
+    className: "mctrl",
+    role: "group",
+    "aria-label": "Game controls"
+  }, !done && React.createElement("button", {
+    className: "btn btn-sm",
+    onClick: () => setPlaying(x => !x),
+    "aria-label": playing ? 'Pause' : 'Play'
+  }, playing ? '⏸ Pause' : '▶ Play'), !done && [1, 2, 4].map(x => React.createElement("button", {
+    key: x,
+    className: 'btn btn-sm' + (mult === x ? ' btn-gold' : ''),
+    "aria-pressed": mult === x,
+    onClick: () => setMult(x)
+  }, x, "\xD7")), !done && React.createElement("button", {
+    className: "btn btn-sm btn-ghost",
+    onClick: () => setT(script.total)
+  }, "Skip to result"), done && React.createElement("button", {
+    className: "btn btn-sm",
+    onClick: () => {
+      fired.current = true;
+      said.current = {};
+      setT(0);
+      setPlaying(true);
+    }
+  }, "\u21BA Watch again")), React.createElement("div", {
+    className: "mfeed",
+    ref: feedRef,
+    "aria-live": "polite"
+  }, feed.map(e => React.createElement("p", {
+    key: e.k,
+    className: 'mev ' + (e.big ? 'goal' : e.half ? 'half' : '') + (e.team != null ? ' t' + e.team : '')
+  }, React.createElement("span", {
+    className: "mm num"
+  }, hoopsPeriodName(e.q)), React.createElement("span", null, e.big ? '🏀 ' : e.run ? '📈 ' : '', e.text, e.team != null ? React.createElement("small", null, " \xB7 ", (e.team === 0 ? A : B).name) : null)))), done && React.createElement(HoopsSummary, {
+    d: d,
+    A: A,
+    B: B,
+    match: match,
+    era: era
+  }));
+}
+function hoopsReport(d, A, B, match) {
+  const T = [A, B];
+  const rows = [0, 1].flatMap(s => Object.entries(match.box[s]).map(([name, b]) => ({
+    team: s,
+    name,
+    ...b,
+    gs: b.pts + b.reb * 0.7 + b.ast * 0.8 + b.blk * 1.2 + b.stl * 1.2
+  })));
+  const mvp = rows.filter(r => r.team === match.winner).sort((x, y) => y.gs - x.gs)[0] || null;
+  let turning = null;
+  const lc = match.plays.filter(p => p.leadChange && p.team === match.winner);
+  if (lc.length) turning = lc[lc.length - 1];
+  const price = (s, name) => {
+    const e = T[s].team.find(x => x && d.items[x.itemId] && d.items[x.itemId].name === name);
+    return e ? e.price || 0 : 0;
+  };
+  const withPrice = rows.map(r => ({
+    ...r,
+    price: price(r.team, r.name)
+  }));
+  const best = withPrice.filter(r => r.gs > 0).sort((x, y) => y.gs / Math.max(1, y.price) - x.gs / Math.max(1, x.price))[0] || null;
+  const flop = withPrice.filter(r => r.price >= 3).sort((x, y) => x.gs / x.price - y.gs / y.price)[0] || null;
+  return {
+    rows,
+    mvp,
+    turning,
+    best,
+    flop
+  };
+}
+function HoopsSummary({
+  d,
+  A,
+  B,
+  match,
+  era
+}) {
+  const R = hoopsReport(d, A, B, match);
+  const T = i => i === 0 ? A : B;
+  const top = s => R.rows.filter(r => r.team === s).sort((x, y) => y.pts - x.pts);
+  const line = r => r.name + ' ' + r.pts + ' pts' + (r.reb >= 5 ? ', ' + r.reb + ' reb' : '') + (r.ast >= 4 ? ', ' + r.ast + ' ast' : '') + (r.blk >= 2 ? ', ' + r.blk + ' blk' : '') + (r.stl >= 2 ? ', ' + r.stl + ' stl' : '');
+  return React.createElement("div", {
+    className: "board msummary"
+  }, React.createElement("h3", null, "\uD83C\uDFC0 Box score"), React.createElement("p", {
+    className: "small",
+    style: {
+      margin: 0
+    }
+  }, React.createElement("b", null, A.name, " ", match.score[0], "\u2013", match.score[1], " ", B.name), match.ot ? ' · after ' + (match.ot > 1 ? match.ot + ' overtimes' : 'overtime') : ''), !match.forfeit && React.createElement("table", {
+    className: "qtable small"
+  }, React.createElement("thead", null, React.createElement("tr", null, React.createElement("th", null), match.quarters.map((_, q) => React.createElement("th", {
+    key: q
+  }, hoopsPeriodName(q))), React.createElement("th", null, "T"))), React.createElement("tbody", null, [0, 1].map(s => React.createElement("tr", {
+    key: s
+  }, React.createElement("td", null, T(s).name), match.quarters.map((qq, q) => React.createElement("td", {
+    key: q,
+    className: "num"
+  }, qq[s])), React.createElement("td", {
+    className: "num"
+  }, React.createElement("b", null, match.score[s])))))), !match.forfeit && [0, 1].map(s => React.createElement("p", {
+    key: s,
+    className: "small",
+    style: {
+      margin: 0
+    }
+  }, T(s).emoji, " ", T(s).name, ": ", top(s).slice(0, 3).map(line).join(' · '))), !match.forfeit && React.createElement("div", {
+    className: "mreport"
+  }, React.createElement("h4", null, "\uD83D\uDCCB Game report"), R.mvp && React.createElement("p", {
+    className: "small"
+  }, React.createElement("b", null, "\u2B50 MVP:"), " ", line(R.mvp), " (", T(R.mvp.team).name, ")."), R.turning && React.createElement("p", {
+    className: "small"
+  }, React.createElement("b", null, "\uD83D\uDD04 Turning point:"), " ", R.turning.p, " in ", hoopsPeriodName(R.turning.q), " (", hoopsClock(R.turning.clock), ") put ", T(R.turning.team).name, " ahead for good, ", R.turning.score[0], "\u2013", R.turning.score[1], "."), R.best && React.createElement("p", {
+    className: "small"
+  }, React.createElement("b", null, "\uD83D\uDCB0 Best buy:"), " ", R.best.name, " \u2014 $", R.best.price, " for ", R.best.pts, " points."), R.flop && React.createElement("p", {
+    className: "small"
+  }, React.createElement("b", null, "\uD83D\uDCC9 Quiet night:"), " ", R.flop.name, " cost $", R.flop.price, " and scored ", R.flop.pts, ".")), React.createElement("p", {
+    className: "hint",
+    style: {
+      margin: 0
+    }
+  }, "A simulated game from Draft Night\u2019s estimated ", era, " numbers (not official ratings). Players have hot and cold nights, so upsets happen."));
+}
+function HoopsChip({
+  item,
+  topic
+}) {
+  const [open, setOpen] = useState(false);
+  if (!numbersShown()) return null;
+  const r = hoopsRating(item, item.pos);
+  const era = eraWord(topic);
+  return React.createElement(React.Fragment, null, React.createElement("button", {
+    type: "button",
+    className: "ratingchip",
+    onClick: () => setOpen(true),
+    "aria-label": era + ' ' + r.ovr + ', estimated. Show details'
+  }, era, " ", React.createElement("b", {
+    className: "num"
+  }, r.ovr), " est."), open && ReactDOM.createPortal(React.createElement(Sheet, {
+    center: true,
+    onClose: () => setOpen(false)
+  }, React.createElement("div", {
+    className: "ratingcard"
+  }, React.createElement("div", {
+    className: "rc-top"
+  }, React.createElement("span", {
+    className: "rc-ovr num"
+  }, React.createElement("small", {
+    className: "rc-era"
+  }, era), r.ovr), React.createElement("span", {
+    className: "rc-role"
+  }, r.role), React.createElement("span", {
+    className: "rc-name"
+  }, item.name)), React.createElement("div", {
+    className: "rc-attrs"
+  }, HOOPS_ATTRS.map(a => React.createElement("div", {
+    key: a,
+    className: "rc-attr"
+  }, React.createElement("span", {
+    className: "k",
+    title: HOOPS_ATTR_NAMES[a]
+  }, a === 'TPT' ? '3PT' : a), React.createElement("span", {
+    className: "bar"
+  }, React.createElement("i", {
+    style: {
+      width: r.attrs[a] + '%'
+    }
+  })), React.createElement("span", {
+    className: "v num"
+  }, r.attrs[a])))), React.createElement("p", {
+    className: "hint",
+    style: {
+      margin: 0
+    }
+  }, era === 'Now' ? 'Now: how good they are today. ' : 'Prime: how good they were at their peak. ', "Draft Night estimate from position and achievements, not an official rating.")), React.createElement("button", {
+    className: "btn btn-ghost",
+    onClick: () => setOpen(false)
+  }, "Close")), document.body));
+}
 const EST_LABEL = 'Estimated by Draft Night · not official EA Sports FC / FIFA numbers';
 const ATTR_NAMES = {
   PAC: 'Pace',
@@ -35920,6 +37211,13 @@ function MatchSummary({
   B,
   match
 }) {
+  if (match.v === 'hoops') return React.createElement(HoopsSummary, {
+    d: d,
+    A: A,
+    B: B,
+    match: match,
+    era: eraWord(d.topic)
+  });
   if (match.v === 'show') return React.createElement(ShowSummary, {
     d: d,
     A: A,
@@ -37413,7 +38711,7 @@ function PitchMatch({
   }));
 }
 function MatchView(props) {
-  return props.match && props.match.v === 'show' ? React.createElement(ShowView, props) : props.match && props.match.v === 'mission' ? React.createElement(MissionView, props) : props.match && props.match.v === 'survival' ? React.createElement(SurvivalView, props) : props.match && props.match.v === 'arena' ? React.createElement(ArenaView, props) : props.match && props.match.v === 'battle' ? React.createElement(BattleView, props) : props.match && props.match.v === 2 ? React.createElement(PitchMatch, props) : React.createElement(MatchPlayer, props);
+  return props.match && props.match.v === 'hoops' ? React.createElement(CourtView, props) : props.match && props.match.v === 'show' ? React.createElement(ShowView, props) : props.match && props.match.v === 'mission' ? React.createElement(MissionView, props) : props.match && props.match.v === 'survival' ? React.createElement(SurvivalView, props) : props.match && props.match.v === 'arena' ? React.createElement(ArenaView, props) : props.match && props.match.v === 'battle' ? React.createElement(BattleView, props) : props.match && props.match.v === 2 ? React.createElement(PitchMatch, props) : React.createElement(MatchPlayer, props);
 }
 function matchReport(d, A, B, match) {
   const teams = [A, B];

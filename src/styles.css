@@ -715,3 +715,6 @@ html[data-motion="reduce"] *,html[data-motion="reduce"] *::before,html[data-moti
 .mreport h4{margin:0;font-size:15px}
 .mreport .small{margin:0}
 .mev.cute{color:#ffd1e3}
+.qtable{border-collapse:collapse;width:100%}
+.qtable th,.qtable td{padding:3px 6px;text-align:center;border-bottom:1px solid var(--line)}
+.qtable td:first-child,.qtable th:first-child{text-align:left;max-width:120px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
