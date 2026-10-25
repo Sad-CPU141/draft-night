@@ -172,5 +172,39 @@ module.exports = async function sportsTests({ ok, boot, btn, click, sleep }) {
     ok(live && /Tie result/.test(X.d.body.textContent) && /Break points/.test(X.d.body.textContent) && X.d.querySelectorAll('.fc-row').length >= 4, 'the court shows a tennis scoreboard and ends with every match result and the tie report');
     X.w.close();
   }
+  // NFL game.
+  {
+    const S = DN.sports; const t = T('t-nfl'); const d = dOf(t);
+    const pickT = (id, names) => ({ id, name: id, team: names.map((n) => ({ itemId: t.items.find((i) => i.name === n).id, price: 4 })) });
+    const stars = pickT('A', ['Patrick Mahomes', 'Saquon Barkley', 'Justin Jefferson', "Ja'Marr Chase", 'Travis Kelce', 'Aaron Donald']);
+    const avg1 = pickT('B', ['Jordan Love', 'James Cook', 'Drake London', 'Tee Higgins', 'David Njoku', 'Roquan Smith']);
+    const avg2 = pickT('C', ['Baker Mayfield', 'Kyren Williams', 'Terry McLaurin', 'DeVonta Smith', 'Jake Ferguson', 'Kyle Hamilton']);
+    const g = S.simulateNFL(d, stars, avg1, 'n1');
+    ok(F.battleKind(t).name === 'NFL game' && g.v === 'nfl' && JSON.stringify(g) === JSON.stringify(S.simulateNFL(d, stars, avg1, 'n1')) && g.score[0] !== g.score[1], 'NFL Stars play a full game that always has a winner and replays exactly (' + g.score.join('–') + ')');
+    ok(g.quarters.reduce((n, q) => n + q[0], 0) === g.score[0] && g.quarters.reduce((n, q) => n + q[1], 0) === g.score[1] && g.quarters.length >= 4, 'the quarter-by-quarter scores add up to the final');
+    let pts = 0, n = 120, kinds = new Set(), ot = 0, wins = 0, td = 0, legal = true;
+    for (let k = 0; k < n; k++) {
+      const m = S.simulateNFL({ ...d, seed: 'nf' + k }, avg1, avg2, 'k'); pts += m.score[0] + m.score[1]; if (m.ot) ot++;
+      m.plays.forEach((p) => { kinds.add(p.type); if (p.td) td++; if (p.down && (p.down < 1 || p.down > 4 || p.on < 0 || p.on > 100)) legal = false; });
+      [0, 1].forEach((s2) => { if (m.score[s2] === 1) legal = false; });
+    }
+    for (let k = 0; k < 80; k++) if (S.simulateNFL({ ...d, seed: 'nw' + k }, stars, avg1, 'k').winner === 0) wins++;
+    ok(pts / n / 2 > 15 && pts / n / 2 < 32, 'average teams score like the NFL (' + (pts / n / 2).toFixed(1) + ' points a team)');
+    ok(['run', 'pass', 'inc', 'sack', 'int', 'fum', 'fg', 'punt', 'scramble'].every((x) => kinds.has(x)) && td / n > 3, 'games have runs, completions, incompletions, sacks, interceptions, fumbles, field goals, punts and scrambles');
+    ok(legal, 'downs stay 1st to 4th, the ball stays on the field, and scores are real football scores');
+    ok(wins > 55 && wins < 80, 'the stronger team usually wins, but not always (' + Math.round(wins / 0.8) + '%)');
+    const r = S.nflRating(t.items.find((i) => i.name === 'Sauce Gardner'), 'DEF'); const r2 = S.nflRating(t.items.find((i) => i.name === 'Myles Garrett'), 'DEF');
+    ok(r.role === 'CB' && r2.role === 'DL' && S.nflEraOf(t.items.find((i) => i.name === 'Jerry Rice'), t) === 'prime' && S.nflEraOf(t.items.find((i) => i.name === 'Puka Nacua'), t) === 'now', 'defensive stars play their real job (corner, pass rusher), legends show Prime and current players Now');
+    let framesOK = true; S.nflScript(g).beats.filter((b) => b.type === 'play').forEach((b) => { const L2 = g.lineups; const keyOf = (s2, name) => { const x = L2[s2].find((y) => y.name === name); return x ? x.k : null; }; const bb = { ...b, p: { ...b.p, tgtKey: keyOf(b.p.poss, b.p.tgt) || 'wr1' } }; for (let u = 0; u < b.dur; u += 0.3) { const f = S.nflFrame(bb, u); if (!f || !isFinite(f.ball.x) || !isFinite(f.off.qb.x)) framesOK = false; } });
+    ok(framesOK, 'every highlight play animates without errors');
+    const fill = (topic, n2, seed) => { const ms = [...Array(n2)].map((_, i) => ({ id: 'm' + i, name: ['Lions', 'Sharks', 'Owls'][i], color: DN.COLORS[i], emoji: 'x', human: true })); let dd = DN.createDraft(topic, ms, { ...DN.DEFAULT_RULES, slots: topic.slots, finale: { mode: 'sim', speed: 'normal' } }, { seed }); let gg = 0, rr = 0; while (!DN.isDraftOver(dd) && gg++ < 800) { if (dd.phase === 'auction') { const m = dd.managers.find((x, k) => (k + rr++) % 2 === 0 && DN.canBid(dd, x, DN.nextAmount(dd))) || dd.managers.find((x) => DN.canBid(dd, x, DN.nextAmount(dd))); dd = m ? DN.sell(DN.placeBid(dd, m.id, DN.nextAmount(dd))) : DN.skipItem(dd); } else if (dd.phase === 'freepick') { const cp = DN.currentPicker(dd); dd = DN.freePick(dd, dd.leftover.find((x) => DN.canTake(dd, cp.m, x))); } else break; } return dd; };
+    const raw = { ...fill(t, 3, 'nflui'), mode: 'local', createdAt: Date.now(), history: [] };
+    const X = await boot({ idb: false, speed: 0.05, storage: { dn_current_v1: JSON.stringify(raw) } });
+    await click(X.w, btn(X.d, 'Resume draft')); await click(X.w, btn(X.d, 'Start the finale')); await click(X.w, btn(X.d, 'Kick off')); await sleep(500);
+    const live = !!X.d.querySelector('.gridsvg');
+    await click(X.w, btn(X.d, 'Skip to result')); await sleep(150);
+    ok(live && /Box score/.test(X.d.body.textContent) && /MVP/.test(X.d.body.textContent) && !!X.d.querySelector('.qtable'), 'the field plays the game and ends with a box score, quarter scores and an MVP');
+    X.w.close();
+  }
   P.w.close();
 };

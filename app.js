@@ -1,4 +1,4 @@
-/* Draft Night f70e6f1ba7 — built from src/ by build.js. Edit src/, not this file. */
+/* Draft Night 5577940119 — built from src/ by build.js. Edit src/, not this file. */
 "use strict";
 (function(){
 function _extends() { return _extends = Object.assign ? Object.assign.bind() : function (n) { for (var e = 1; e < arguments.length; e++) { var t = arguments[e]; for (var r in t) ({}).hasOwnProperty.call(t, r) && (n[r] = t[r]); } return n; }, _extends.apply(null, arguments); }
@@ -657,7 +657,8 @@ const STARTER_BATTLE = {
   't-nbal': 'basketball',
   't-fight': 'combat',
   't-f1': 'f1',
-  't-ten': 'tennis'
+  't-ten': 'tennis',
+  't-nfl': 'nfl'
 };
 function starterTopics() {
   const v3 = [...sportsTopicsV3(), ...foodTopicsV3(), ...entTopicsV3(), ...travelTopicsV3(), ...animalTopicsV3(), ...styleTopicsV3(), ...funTopicsV3()];
@@ -23693,6 +23694,15 @@ const BATTLE_KINDS = {
     upset: ['Who knew? {w} beats {l} when it counts!', 'Surprise hero: {w}!'],
     noshow: ['{w} wins the night — the other team had nothing.']
   },
+  nfl: {
+    name: 'NFL game',
+    start: 'Kick off',
+    emoji: '🏈',
+    round: 'Quarter',
+    win: [''],
+    upset: [''],
+    noshow: ['{w} wins by forfeit.']
+  },
   tennis: {
     name: 'Tennis tie',
     start: 'First serve',
@@ -23756,6 +23766,7 @@ function simulateFor(d, A, B, key, opts) {
   if (k === 'combat') return simulateFightCard(d, A, B, key);
   if (k === 'f1') return simulateGrandPrix(d, A, B, key);
   if (k === 'tennis') return simulateTennisTie(d, A, B, key);
+  if (k === 'nfl') return simulateNFL(d, A, B, key);
   if (k === 'survival') return simulateSurvival(d, A, B, key);
   if (k === 'powers' || k === 'weird') return simulateMissions(d, A, B, key);
   if (k === 'cute') return simulatePuppyBowl(d, A, B, key, opts && opts.knockout === false ? false : true);
@@ -23768,6 +23779,7 @@ function simWhy(w, mt) {
     const f = mt.final[mt.winner];
     return w.name + (f.rescued ? ' got rescued' : ' survived ' + ws + ' day' + (ws === 1 ? '' : 's')) + (ws !== ls ? ' (the others lasted ' + ls + ')' : mt.how === 'rescue' ? ', and got rescued first' : mt.how === 'shape' ? ', level on days but in better shape' : ' and won the last night') + '.';
   }
+  if (mt.v === 'nfl') return w.name + ' won ' + mt.score[mt.winner] + '–' + mt.score[1 - mt.winner] + (mt.ot ? ' in overtime' : '') + '.';
   if (mt.v === 'tennis') return w.name + ' won the tie ' + mt.score[mt.winner] + '–' + mt.score[1 - mt.winner] + (mt.how === 'doubles' ? ' in the mixed doubles decider' : '') + '.';
   if (mt.v === 'gp') {
     if (mt.forfeit) return w.name + ' won — the other team had no drivers.';
@@ -23785,7 +23797,7 @@ function simWhy(w, mt) {
   if (mt.v === 'mission') return w.name + ' won ' + mt.score[mt.winner] + ' of ' + mt.missions.length + ' missions.';
   return w.name + ' won the ' + (BATTLE_KINDS[mt.kind] || BATTLE_KINDS.fight).name.toLowerCase() + ' ' + mt.score[mt.winner] + '–' + mt.score[1 - mt.winner] + (mt.sudden ? ' in sudden death' : '') + '.';
 }
-const isSimResult = mt => !!mt && (mt.v === 'tennis' || mt.v === 'gp' || mt.v === 'card' || mt.v === 'hoops' || mt.v === 'battle' || mt.v === 'arena' || mt.v === 'survival' || mt.v === 'mission' || mt.v === 'show');
+const isSimResult = mt => !!mt && (mt.v === 'nfl' || mt.v === 'tennis' || mt.v === 'gp' || mt.v === 'card' || mt.v === 'hoops' || mt.v === 'battle' || mt.v === 'arena' || mt.v === 'survival' || mt.v === 'mission' || mt.v === 'show');
 function battleDuel(rng, kind, a, b, maxP) {
   const fill = (lines, w, l) => lines[Math.floor(rng() * lines.length)].replace('{w}', w).replace('{l}', l);
   if (!a || !b) {
@@ -26721,6 +26733,792 @@ function simulateMissions(d, A, B, key) {
     events: []
   };
 }
+const NFL_ATTRS = {
+  QB: ['ACC', 'ARM', 'DEC', 'MOB'],
+  RB: ['SPD', 'POW', 'VIS', 'HND'],
+  WR: ['RTE', 'HND', 'SPD', 'YAC'],
+  TE: ['RTE', 'HND', 'BLK', 'YAC'],
+  DEF: ['RSH', 'COV', 'TKL', 'SPD']
+};
+const NFL_ATTR_NAMES = {
+  ACC: 'Accuracy',
+  ARM: 'Arm strength',
+  DEC: 'Decisions',
+  MOB: 'Mobility',
+  SPD: 'Speed',
+  POW: 'Power',
+  VIS: 'Vision',
+  HND: 'Hands',
+  RTE: 'Route running',
+  YAC: 'After the catch',
+  BLK: 'Blocking',
+  RSH: 'Pass rush',
+  COV: 'Coverage',
+  TKL: 'Tackling'
+};
+const NFL_PROFILE_SRC = `
+Patrick Mahomes|96|ARM+4 MOB+3 DEC+3
+Josh Allen|94|ARM+6 MOB+5 DEC-3
+Lamar Jackson|94|MOB+10 ACC-3
+Joe Burrow|92|ACC+5
+Jalen Hurts|89|MOB+6 ACC-3
+Tom Brady|97|DEC+7 ACC+3 MOB-10
+Peyton Manning|96|DEC+7 ACC+3 MOB-10
+Saquon Barkley|93|SPD+4
+Derrick Henry|91|POW+8 HND-8
+Christian McCaffrey|93|HND+6 VIS+3
+Bijan Robinson|91|VIS+3
+Jahmyr Gibbs|90|SPD+7
+Justin Jefferson|95|RTE+4
+Ja'Marr Chase|95|YAC+4
+CeeDee Lamb|92|
+Tyreek Hill|91|SPD+8
+Jerry Rice|98|RTE+5 HND+3
+Randy Moss|96|SPD+5
+Puka Nacua|89|HND+4
+Amon-Ra St. Brown|91|HND+5 RTE+3
+Travis Kelce|93|RTE+5
+George Kittle|91|BLK+6 YAC+4
+Rob Gronkowski|94|BLK+6
+Brock Bowers|89|YAC+3
+Aaron Donald|96|RSH+5
+T.J. Watt|94|RSH+5
+Myles Garrett|95|RSH+6
+Micah Parsons|93|RSH+4 SPD+3
+Lawrence Taylor|97|RSH+5
+Ray Lewis|95|TKL+6 COV+2 RSH-8
+C.J. Stroud|88|ACC+3
+Justin Herbert|88|ARM+6
+Jayden Daniels|88|MOB+7
+Dak Prescott|87|
+Jared Goff|87|ACC+3 MOB-6
+Brock Purdy|86|DEC+3
+Baker Mayfield|85|
+Kyler Murray|85|MOB+8
+Matthew Stafford|87|ARM+4
+Aaron Rodgers|95|ACC+4 DEC+4
+Jordan Love|85|
+Trevor Lawrence|84|
+Caleb Williams|82|
+Joe Montana|97|DEC+7 ACC+4
+Dan Marino|95|ARM+5
+John Elway|94|ARM+5 MOB+3
+Brett Favre|93|ARM+6 DEC-4
+Drew Brees|95|ACC+7
+Josh Jacobs|87|
+Jonathan Taylor|88|SPD+3
+Kyren Williams|85|
+De'Von Achane|86|SPD+9
+James Cook|85|
+Alvin Kamara|87|HND+6
+Breece Hall|86|
+Ashton Jeanty|84|
+Emmitt Smith|94|VIS+5
+Barry Sanders|98|SPD+5 VIS+6
+Walter Payton|97|POW+3
+LaDainian Tomlinson|96|
+Adrian Peterson|95|POW+5
+Marshall Faulk|95|HND+6
+Jim Brown|97|POW+6
+Davante Adams|90|RTE+5
+A.J. Brown|90|YAC+3
+Stefon Diggs|87|
+Mike Evans|89|HND+2
+DK Metcalf|86|SPD+3
+Garrett Wilson|86|
+Nico Collins|86|
+Drake London|85|
+Malik Nabers|86|
+Brian Thomas Jr.|86|SPD+3
+Terry McLaurin|86|
+DeVonta Smith|85|
+Tee Higgins|85|
+Jaxon Smith-Njigba|88|
+Ladd McConkey|85|RTE+3
+Marvin Harrison Jr.|84|
+Cooper Kupp|90|RTE+4
+Deebo Samuel|86|YAC+6
+Jaylen Waddle|86|SPD+6
+Calvin Johnson|97|HND+3
+Larry Fitzgerald|95|HND+6
+Terrell Owens|95|YAC+4
+Julio Jones|94|
+Odell Beckham Jr.|89|HND+4
+Rashee Rice|84|
+George Pickens|85|HND+3
+Zay Flowers|84|SPD+3
+Mark Andrews|87|
+Sam LaPorta|86|
+Trey McBride|88|
+T.J. Hockenson|85|
+Dallas Goedert|84|
+Kyle Pitts|82|
+Evan Engram|82|
+David Njoku|82|
+Jake Ferguson|82|
+Dalton Kincaid|81|
+Tucker Kraft|82|
+Tony Gonzalez|95|HND+4
+Shannon Sharpe|92|
+Antonio Gates|92|
+Jason Witten|90|BLK+3
+Nick Bosa|92|RSH+4
+Maxx Crosby|91|RSH+3
+Fred Warner|91|TKL+4 COV+3 RSH-10
+Sauce Gardner|89|COV+8 RSH-20
+Patrick Surtain II|91|COV+8 RSH-20
+Chris Jones|91|RSH+3
+Roquan Smith|89|TKL+4 RSH-10
+Derwin James|88|COV+3 RSH-12
+Kyle Hamilton|89|COV+4 RSH-14
+Aidan Hutchinson|90|RSH+3
+Reggie White|97|RSH+5`;
+const NFL_PROFILE = {};
+NFL_PROFILE_SRC.trim().split('\n').forEach(line => {
+  const [name, ovr, tw] = line.split('|');
+  const tweak = {};
+  (tw || '').split(' ').filter(Boolean).forEach(t => {
+    const m = t.match(/^([A-Z]+)([+-]\d+)$/);
+    if (m) tweak[m[1]] = +m[2];
+  });
+  NFL_PROFILE[name.toLowerCase()] = {
+    ovr: +ovr,
+    tweak
+  };
+});
+const nflPos = (item, slot) => {
+  const p = norm(item && item.pos || slot || '');
+  return NFL_ATTRS[p] ? p : NFL_ATTRS[norm(slot)] ? norm(slot) : 'WR';
+};
+const nflDefRole = (item, r) => r.attrs.COV >= r.attrs.RSH + 8 ? /safety/i.test(item && item.desc || '') ? 'S' : 'CB' : r.attrs.TKL >= r.attrs.RSH + 4 ? 'LB' : 'DL';
+function nflRating(item, slot) {
+  const prof = NFL_PROFILE[String(item.name || '').toLowerCase()];
+  const fixed = validRating(item.rating);
+  const ovr = fixed ? clamp(Math.round(+item.rating), 1, 99) : prof ? prof.ovr : clamp(Math.round(72 + itemFame(item) * 22 + (unit('nflo', item.name) - 0.5) * 6), 65, 95);
+  const pos = nflPos(item, slot);
+  const tw = prof ? prof.tweak : {};
+  const attrs = {};
+  NFL_ATTRS[pos].forEach(a => {
+    attrs[a] = clamp(Math.round(ovr + (tw[a] || 0) + (unit('nfla', item.name, a) - 0.5) * 6), 35, 99);
+  });
+  const r = {
+    ovr,
+    attrs,
+    pos,
+    estimated: !fixed
+  };
+  if (pos === 'DEF') r.role = nflDefRole(item, r);
+  return r;
+}
+const nflEraOf = (item, topic) => /legend|Hall of Fame|all-time|greatest|19[5-9]\d|200\d|Megatron|Sweetness|Minister/i.test(item && item.desc || '') || /Brady|Manning|Montana|Marino|Elway|Favre|Brees|Rice|Moss|Gronkowski|Donald|Lawrence Taylor|Ray Lewis|Emmitt|Sanders|Payton|Tomlinson|Peterson|Faulk|Jim Brown|Calvin|Fitzgerald|Owens|Julio|Gonzalez|Sharpe|Gates|Witten|Reggie/.test(item && item.name || '') ? 'prime' : 'now';
+const NFL_REPLACEMENT = 72;
+function nflTeam(d, m) {
+  const by = {
+    QB: [],
+    RB: [],
+    WR: [],
+    TE: [],
+    DEF: []
+  };
+  m.team.forEach((x, k) => {
+    const it = x && d.items[x.itemId];
+    if (!it) return;
+    const r = nflRating(it, d.rules.slots[k]);
+    by[r.pos].push({
+      name: it.name,
+      itemId: it.id,
+      price: x.price || 0,
+      ...r
+    });
+  });
+  const fill = (pos, i, label) => by[pos][i] || {
+    name: label,
+    itemId: null,
+    price: 0,
+    ovr: NFL_REPLACEMENT,
+    pos,
+    attrs: Object.fromEntries(NFL_ATTRS[pos].map(a => [a, NFL_REPLACEMENT])),
+    backup: true,
+    role: pos === 'DEF' ? 'LB' : undefined
+  };
+  const qb = fill('QB', 0, 'Backup QB'),
+    rb = fill('RB', 0, 'Backup RB'),
+    wr1 = fill('WR', 0, 'Backup WR'),
+    wr2 = fill('WR', 1, 'Backup WR 2'),
+    te = fill('TE', 0, 'Backup TE'),
+    def = fill('DEF', 0, 'Backup LB');
+  const rush = 80 + (def.role === 'DL' ? (def.attrs.RSH - 80) * 0.55 : (def.attrs.RSH - 80) * 0.2);
+  const cover = 80 + (def.role === 'CB' || def.role === 'S' ? (def.attrs.COV - 80) * 0.5 : (def.attrs.COV - 80) * 0.2);
+  const runD = 80 + (def.role === 'LB' || def.role === 'DL' ? (def.attrs.TKL - 80) * 0.4 : (def.attrs.TKL - 80) * 0.2);
+  return {
+    qb,
+    rb,
+    wr1,
+    wr2,
+    te,
+    def,
+    rush,
+    cover,
+    runD,
+    ol: 80
+  };
+}
+const nflYard = on => on === 50 ? '50' : on < 50 ? 'own ' + on : 'opp ' + (100 - on);
+const NFL_ORD = ['', '1st', '2nd', '3rd', '4th'];
+function simulateNFL(d, A, B, key) {
+  const rng = seeded(d.seed, 'nfl', key, A.id, B.id);
+  const gauss = () => {
+    let u = 0;
+    for (let i = 0; i < 4; i++) u += rng();
+    return (u - 2) / 0.58;
+  };
+  const T = [nflTeam(d, A), nflTeam(d, B)];
+  const form = [gauss() * 0.025, gauss() * 0.025];
+  const score = [0, 0];
+  const plays = [];
+  const box = [0, 1].map(() => ({}));
+  const st = (s, name) => box[s][name] = box[s][name] || {
+    pass: 0,
+    comp: 0,
+    att: 0,
+    ptd: 0,
+    int: 0,
+    rush: 0,
+    car: 0,
+    rtd: 0,
+    rec: 0,
+    recY: 0,
+    rectd: 0,
+    sack: 0,
+    ints: 0,
+    ff: 0,
+    tkl: 0
+  };
+  let q = 1,
+    clock = 900,
+    poss = rng() < 0.5 ? 0 : 1;
+  const firstPoss = poss;
+  let on = 30,
+    down = 1,
+    togo = 10;
+  let ot = 0;
+  let done = false;
+  let otFirst = null;
+  const push = p => {
+    p.q = q;
+    p.clk = Math.max(0, Math.round(clock));
+    p.score = [...score];
+    p.i = plays.length;
+    plays.push(p);
+    return p;
+  };
+  const turnover = newOn => {
+    poss = 1 - poss;
+    on = clamp(newOn, 1, 99);
+    down = 1;
+    togo = Math.min(10, 100 - on);
+  };
+  const kickoff = () => {
+    on = 30;
+    down = 1;
+    togo = 10;
+  };
+  const secs = x => {
+    clock -= x;
+  };
+  const safety = (s, p) => {
+    score[1 - s] += 2;
+    p.text += ' SAFETY!';
+    p.safety = true;
+    p.hl = true;
+    p.big = true;
+    p.score = [...score];
+    poss = 1 - s;
+    kickoff();
+  };
+  const lateHalf = () => (q === 2 || q === 4) && clock <= 120;
+  const scoreTD = (s, p) => {
+    score[s] += 6;
+    p.td = true;
+    const diff = score[s] - score[1 - s];
+    const goTwo = q === 4 && clock < 600 && [-2, 1, -5, 5, -10].includes(diff);
+    if (goTwo) {
+      const ok2 = rng() < 0.48;
+      if (ok2) score[s] += 2;
+      p.after = ok2 ? 'Two-point try is GOOD!' : 'Two-point try fails.';
+      p.two = ok2;
+    } else {
+      const ok1 = rng() < 0.945;
+      if (ok1) score[s] += 1;
+      p.after = ok1 ? 'Extra point good.' : 'Extra point MISSED!';
+    }
+    p.score = [...score];
+  };
+  const endPeriod = () => {
+    if (q === 2) {
+      q = 3;
+      clock = 900;
+      poss = 1 - firstPoss;
+      kickoff();
+      push({
+        type: 'half',
+        poss,
+        text: 'Halftime: ' + score[0] + '–' + score[1] + '.'
+      });
+      return;
+    }
+    if (q === 4 || q >= 5) {
+      if (score[0] !== score[1]) {
+        done = true;
+        return;
+      }
+      if (ot >= 2) {
+        let dist = 40;
+        let w = null;
+        for (let k = 0; k < 12 && w == null; k++, dist += 5) {
+          const p = x => clamp(1.12 - x / 95, 0.2, 0.98);
+          const a = rng() < p(dist),
+            b = rng() < p(dist);
+          if (a !== b) w = a ? 0 : 1;
+        }
+        if (w == null) w = rng() < 0.5 ? 0 : 1;
+        score[w] += 3;
+        push({
+          type: 'duel',
+          poss: w,
+          text: 'Kicking duel! ' + (w === 0 ? A : B).name + ' win it.',
+          hl: true,
+          big: true
+        });
+        done = true;
+        return;
+      }
+      ot++;
+      q = 4 + ot;
+      clock = 600;
+      poss = rng() < 0.5 ? 0 : 1;
+      kickoff();
+      otFirst = poss;
+      push({
+        type: 'ot',
+        poss,
+        text: 'Overtime! First score wins.',
+        hl: true
+      });
+      return;
+    }
+    q++;
+    clock = 900;
+    push({
+      type: 'qend',
+      poss,
+      text: 'End of quarter ' + (q - 1) + ': ' + score[0] + '–' + score[1] + '.'
+    });
+  };
+  let guard = 0;
+  push({
+    type: 'kick',
+    poss,
+    text: (poss === 0 ? A : B).name + ' receive the opening kickoff.'
+  });
+  kickoff();
+  while (!done && guard++ < 400) {
+    if (clock <= 0) {
+      endPeriod();
+      continue;
+    }
+    const O = T[poss],
+      D = T[1 - poss];
+    const s = poss;
+    const diff = score[s] - score[1 - s];
+    const late = q >= 4 && clock < 300;
+    const hurry = lateHalf() || late && diff < 0;
+    const base = {
+      poss: s,
+      on,
+      down,
+      togo
+    };
+    const fgDist = 100 - on + 17;
+    if (down === 4) {
+      const needTD = late && diff < -3 && diff >= -8;
+      const goFor = togo <= 1 && on > 40 && rng() < 0.55 || late && diff < 0 && (fgDist > 56 || needTD || clock < 120 && diff < -3) || togo <= 3 && on >= 55 && on <= 65 && rng() < 0.4 || q >= 5 && fgDist > 55;
+      if (!goFor && fgDist <= 57) {
+        const pk = clamp(1.12 - fgDist / 95 + (fgDist < 33 ? 0.05 : 0), 0.3, 0.99);
+        const good = rng() < pk;
+        secs(5);
+        const p = push({
+          ...base,
+          type: 'fg',
+          dist: fgDist,
+          good,
+          text: fgDist + '-yard field goal… ' + (good ? 'GOOD!' : rng() < 0.5 ? 'wide right. No good!' : 'off the upright! No good!'),
+          hl: fgDist >= 48 || late || q >= 5 || !good,
+          big: good && (late || q >= 5)
+        });
+        if (good) {
+          score[s] += 3;
+          p.score = [...score];
+          if (q >= 5 && (otFirst !== s || score[s] > score[1 - s])) {
+            done = true;
+            break;
+          }
+          poss = 1 - s;
+          kickoff();
+        } else turnover(100 - Math.max(on, 20));
+        continue;
+      }
+      if (!goFor) {
+        const net = clamp(Math.round(42 + gauss() * 6), 25, 60);
+        let land = on + net;
+        let tb = false;
+        if (land >= 100) {
+          land = 80;
+          tb = true;
+        }
+        secs(8);
+        push({
+          ...base,
+          type: 'punt',
+          yds: net,
+          text: 'Punt, ' + net + ' yards' + (tb ? ' — touchback.' : '.'),
+          hl: false
+        });
+        turnover(100 - land);
+        continue;
+      }
+    }
+    let passP = 0.57 + (togo >= 7 ? 0.17 : togo <= 2 ? -0.22 : 0) + (down === 3 ? 0.1 : 0) + (hurry ? 0.25 : 0) + (late && diff > 0 ? -0.3 : 0) + (O.qb.attrs.ACC - O.rb.ovr) / 200;
+    const isPass = rng() < clamp(passP, 0.15, 0.95);
+    let p;
+    if (isPass) {
+      const sackP = clamp(0.064 + (D.rush - O.ol) / 260 - (O.qb.attrs.MOB - 80) / 650, 0.025, 0.16);
+      const x = rng();
+      if (x < sackP) {
+        const yds = -(4 + Math.floor(rng() * 6));
+        const byStar = D.def.role === 'DL' || D.def.role === 'LB' ? rng() < 0.32 + (D.def.attrs.RSH - 80) / 100 : rng() < 0.1;
+        const by = byStar ? D.def.name : 'the defence';
+        if (byStar) st(1 - s, D.def.name).sack++;
+        const strip = rng() < 0.11;
+        const lost = strip && rng() < 0.55;
+        p = push({
+          ...base,
+          type: lost ? 'fum' : 'sack',
+          yds,
+          who: O.qb.name,
+          by,
+          star: byStar,
+          text: (byStar ? D.def.name + ' sacks ' : O.qb.name + ' is sacked by ') + (byStar ? O.qb.name : by) + '!' + (strip ? lost ? ' Strip-sack — FUMBLE recovered by the defence!' : ' Fumble — the offence falls on it.' : ' Loss of ' + -yds + '.'),
+          hl: byStar || lost || late,
+          big: lost
+        });
+        secs(hurry ? 22 : 36);
+        if (lost) {
+          if (byStar) st(1 - s, D.def.name).ff++;
+          turnover(100 - Math.max(1, on + yds));
+          continue;
+        }
+        if (on + yds <= 0) {
+          safety(s, p);
+          continue;
+        }
+        on += yds;
+        down++;
+        togo -= yds;
+        if (down > 4) {
+          turnover(100 - on);
+        }
+        continue;
+      }
+      if (rng() < 0.022 + Math.max(0, O.qb.attrs.MOB - 85) / 260) {
+        const yds = Math.max(-1, Math.round(4 + gauss() * 3.5 + (O.qb.attrs.MOB - 85) / 5 + (rng() < 0.06 ? 12 + rng() * 22 : 0)));
+        const gain = Math.min(yds, 100 - on);
+        st(s, O.qb.name).rush += gain;
+        st(s, O.qb.name).car++;
+        p = push({
+          ...base,
+          type: 'scramble',
+          yds: gain,
+          who: O.qb.name,
+          text: O.qb.name + ' scrambles for ' + gain + '!',
+          hl: gain >= 15
+        });
+        secs(hurry ? 20 : 34);
+        if (on + gain <= 0) {
+          safety(s, p);
+          continue;
+        }
+        on += gain;
+        if (on >= 100) {
+          st(s, O.qb.name).rtd++;
+          p.text = O.qb.name + ' scrambles ' + gain + ' yards for the TOUCHDOWN!';
+          p.hl = true;
+          p.big = true;
+          scoreTD(s, p);
+          if (q >= 5) {
+            done = true;
+            break;
+          }
+          poss = 1 - s;
+          kickoff();
+          continue;
+        }
+        if (gain >= togo) {
+          down = 1;
+          togo = Math.min(10, 100 - on);
+        } else {
+          down++;
+          togo -= gain;
+          if (down > 4) turnover(100 - on);
+        }
+        continue;
+      }
+      const tgts = [['wr1', 1.0], ['wr2', 0.85], ['te', 0.7], ['rb', 0.4]];
+      const [tk] = weighted(rng, tgts, t2 => t2[1] * (O[t2[0]].ovr / 85) * (O[t2[0]].backup ? 0.6 : 1));
+      const R = O[tk];
+      const deepP = 0.16 + ((R.attrs.SPD || 80) - 85) / 120 + (hurry && diff < 0 ? 0.08 : 0) + (tk === 'rb' ? -0.15 : 0);
+      const dz = rng() < clamp(deepP, 0.02, 0.35) ? 'deep' : rng() < 0.45 ? 'medium' : 'short';
+      const air = dz === 'deep' ? 20 + Math.floor(rng() * 22) : dz === 'medium' ? 9 + Math.floor(rng() * 8) : Math.floor(rng() * 7) - (tk === 'rb' ? 3 : 0);
+      const starCov = D.def.role === 'CB' || D.def.role === 'S';
+      const cov = D.cover + (starCov && tk.startsWith('wr') && rng() < 0.5 ? (D.def.attrs.COV - D.cover) * 0.5 : 0);
+      const compP = clamp({
+        short: 0.71,
+        medium: 0.56,
+        deep: 0.35
+      }[dz] + (O.qb.attrs.ACC - cov) / 220 + ((R.attrs.RTE || 80) - cov) / 380 + ((R.attrs.HND || 80) - 85) / 400 + form[s] + (dz === 'deep' ? (O.qb.attrs.ARM - 85) / 250 : 0), 0.2, 0.9);
+      const intP = clamp(0.026 + (cov - O.qb.attrs.DEC) / 260 + (dz === 'deep' ? 0.02 : 0) + (hurry && diff < 0 ? 0.012 : 0), 0.004, 0.07);
+      st(s, O.qb.name).att++;
+      const y = rng();
+      if (y < intP) {
+        const byStar = starCov ? rng() < 0.45 : rng() < 0.06;
+        const by = byStar ? D.def.name : 'the defence';
+        if (byStar) st(1 - s, D.def.name).ints++;
+        st(s, O.qb.name).int++;
+        const spot = Math.min(99, on + air);
+        let ret = Math.max(0, Math.round(8 + gauss() * 8 + (rng() < 0.06 ? 60 : 0)));
+        const newOn = 100 - spot + ret;
+        p = push({
+          ...base,
+          type: 'int',
+          yds: air,
+          who: O.qb.name,
+          tgt: R.name,
+          by,
+          star: byStar,
+          text: 'INTERCEPTED! ' + (byStar ? D.def.name : 'The defence') + ' picks off ' + O.qb.name + (newOn >= 100 ? ' and takes it all the way — PICK SIX!' : ', returned ' + ret + ' yards.'),
+          hl: true,
+          big: true,
+          dz
+        });
+        secs(hurry ? 10 : 20);
+        if (newOn >= 100) {
+          poss = 1 - s;
+          scoreTD(1 - s, p);
+          if (q >= 5) {
+            done = true;
+            break;
+          }
+          poss = s;
+          kickoff();
+          continue;
+        }
+        turnover(Math.min(99, newOn));
+        continue;
+      }
+      if (y < intP + compP) {
+        let yac = Math.max(0, Math.round(2.5 + gauss() * 2.5 + ((R.attrs.YAC || R.attrs.SPD || 80) - 85) / 7));
+        if (rng() < 0.03 + ((R.attrs.SPD || 80) - 85) / 300) yac += 10 + Math.floor(rng() * 40);
+        const gain = Math.min(air + yac, 100 - on);
+        st(s, O.qb.name).comp++;
+        st(s, O.qb.name).pass += gain;
+        st(s, R.name).rec++;
+        st(s, R.name).recY += gain;
+        p = push({
+          ...base,
+          type: 'pass',
+          yds: gain,
+          who: O.qb.name,
+          tgt: R.name,
+          dz,
+          air,
+          text: O.qb.name + ' finds ' + R.name + (dz === 'deep' ? ' deep' : '') + ' for ' + gain + '.',
+          hl: gain >= 20 || late && Math.abs(diff) <= 8 && rng() < 0.35,
+          dzn: dz
+        });
+        secs(hurry ? 16 : 33);
+        if (on + gain <= 0) {
+          safety(s, p);
+          continue;
+        }
+        on += gain;
+        if (on >= 100) {
+          st(s, O.qb.name).ptd++;
+          st(s, R.name).rectd++;
+          p.text = O.qb.name + ' to ' + R.name + ', ' + gain + ' yards — TOUCHDOWN!';
+          p.hl = true;
+          p.big = true;
+          scoreTD(s, p);
+          if (q >= 5) {
+            done = true;
+            break;
+          }
+          poss = 1 - s;
+          kickoff();
+          continue;
+        }
+        if (gain >= togo) {
+          down = 1;
+          togo = Math.min(10, 100 - on);
+        } else {
+          down++;
+          togo -= gain;
+          if (down > 4) turnover(100 - on);
+        }
+        continue;
+      }
+      p = push({
+        ...base,
+        type: 'inc',
+        yds: 0,
+        who: O.qb.name,
+        tgt: R.name,
+        dz,
+        air,
+        text: 'Incomplete, ' + (rng() < 0.5 ? 'intended for ' + R.name : 'broken up') + '.',
+        hl: false
+      });
+      secs(8);
+      down++;
+      if (down > 4) turnover(100 - on);
+      continue;
+    }
+    const carrier = O.rb;
+    let yds = Math.round(3.4 + gauss() * 3.4 + (carrier.ovr - D.runD) / 18 + ((carrier.attrs.POW || 80) - 85) / 20 + form[s] * 20);
+    if (rng() < 0.022 + ((carrier.attrs.SPD || 80) - 85) / 300 + ((carrier.attrs.VIS || 80) - 85) / 500) yds += 10 + Math.floor(rng() * 45);
+    yds = Math.max(-4, yds);
+    const gain = Math.min(yds, 100 - on);
+    const fum = rng() < 0.012 - ((carrier.attrs.HND || 80) - 85) / 4000;
+    st(s, carrier.name).rush += gain;
+    st(s, carrier.name).car++;
+    if (fum) {
+      const byStar = rng() < 0.3;
+      if (byStar) st(1 - s, D.def.name).ff++;
+      p = push({
+        ...base,
+        type: 'fum',
+        yds: gain,
+        who: carrier.name,
+        by: byStar ? D.def.name : 'the defence',
+        star: byStar,
+        run: true,
+        text: carrier.name + ' runs for ' + gain + ' and FUMBLES! ' + (byStar ? D.def.name + ' forces it out — turnover!' : 'The defence recovers!'),
+        hl: true,
+        big: true
+      });
+      secs(30);
+      turnover(100 - Math.min(99, on + gain));
+      continue;
+    }
+    const tackler = rng() < (D.def.role === 'LB' ? 0.3 : 0.14) ? D.def.name : null;
+    if (tackler) st(1 - s, tackler).tkl++;
+    p = push({
+      ...base,
+      type: 'run',
+      yds: gain,
+      who: carrier.name,
+      by: tackler,
+      text: carrier.name + (gain >= 20 ? ' BREAKS FREE for ' + gain + '!' : gain <= 0 ? ' is stopped' + (tackler ? ' by ' + tackler : '') + ' for ' + (gain < 0 ? 'a loss of ' + -gain : 'no gain') + '.' : ' runs for ' + gain + '.'),
+      hl: gain >= 18 || down === 4 || gain <= 0 && down >= 3 && !!tackler
+    });
+    secs(hurry ? 25 : 38);
+    if (on + gain <= 0) {
+      safety(s, p);
+      continue;
+    }
+    on += gain;
+    if (on >= 100) {
+      st(s, carrier.name).rtd++;
+      p.text = carrier.name + ' runs it in from ' + gain + ' — TOUCHDOWN!';
+      p.hl = true;
+      p.big = true;
+      scoreTD(s, p);
+      if (q >= 5) {
+        done = true;
+        break;
+      }
+      poss = 1 - s;
+      kickoff();
+      continue;
+    }
+    if (gain >= togo) {
+      down = 1;
+      togo = Math.min(10, 100 - on);
+    } else {
+      down++;
+      togo -= gain;
+      if (down > 4) {
+        p.text += ' Turnover on downs!';
+        p.hl = true;
+        turnover(100 - on);
+      }
+    }
+  }
+  if (score[0] === score[1]) {
+    const w = rng() < 0.5 ? 0 : 1;
+    score[w] += 3;
+    push({
+      type: 'duel',
+      poss: w,
+      text: 'A late field goal settles it.',
+      hl: true
+    });
+  }
+  const winner = score[0] > score[1] ? 0 : 1;
+  plays.forEach(p => {
+    if (p.q >= 4 && p.clk <= 120 && Math.abs(p.score[0] - p.score[1]) <= 8 && p.type !== 'qend' && p.type !== 'half') p.hl = true;
+  });
+  const maxQ = plays.reduce((m, p) => Math.max(m, p.q), 4);
+  const quarters = [];
+  let prev = [0, 0];
+  for (let qi = 1; qi <= maxQ; qi++) {
+    const last = plays.filter(p => p.q === qi).pop();
+    const now = last ? last.score : prev;
+    quarters.push([now[0] - prev[0], now[1] - prev[1]]);
+    prev = now;
+  }
+  const lastScore = plays[plays.length - 1].score;
+  if (lastScore[0] !== score[0] || lastScore[1] !== score[1]) {
+    const L = quarters[quarters.length - 1];
+    L[0] += score[0] - lastScore[0];
+    L[1] += score[1] - lastScore[1];
+  }
+  const lineups = T.map(t => ['qb', 'rb', 'wr1', 'wr2', 'te', 'def'].map(k => ({
+    k,
+    name: t[k].name,
+    itemId: t[k].itemId,
+    pos: t[k].pos,
+    role: t[k].role,
+    ovr: t[k].ovr,
+    backup: !!t[k].backup
+  })));
+  return {
+    v: 'nfl',
+    kind: 'nfl',
+    plays,
+    score: [...score],
+    winner,
+    ot,
+    box,
+    lineups,
+    quarters,
+    et: ot > 0,
+    pens: null,
+    sudden: false,
+    events: []
+  };
+}
+const nflClock = s => Math.floor(s / 60) + ':' + String(s % 60).padStart(2, '0');
+const nflQName = q => q <= 4 ? 'Q' + q : q === 5 ? 'OT' : 'OT' + (q - 4);
 const CUTE_EMOJI = [['polar bear', '🐻‍❄️'], ['red panda', '🦊'], ['panda', '🐼'], ['fox', '🦊'], ['koala', '🐨'], ['sloth', '🦥'], ['otter', '🦦'], ['seal', '🦭'], ['sea lion', '🦭'], ['penguin', '🐧'], ['puffin', '🐧'], ['owl', '🦉'], ['bunny', '🐰'], ['rabbit', '🐰'], ['hamster', '🐹'], ['guinea pig', '🐹'], ['chinchilla', '🐭'], ['mouse', '🐭'], ['dormouse', '🐭'], ['jerboa', '🐭'], ['pika', '🐭'], ['hedgehog', '🦔'], ['chipmunk', '🐿️'], ['marmot', '🐿️'], ['squirrel', '🐿️'], ['lion', '🦁'], ['tiger', '🐯'], ['leopard', '🐆'], ['cat', '🐱'], ['kitten', '🐱'], ['puppy', '🐶'], ['dog', '🐶'], ['corgi', '🐶'], ['pug', '🐶'], ['samoyed', '🐶'], ['pomeranian', '🐶'], ['shiba', '🐶'], ['bulldog', '🐶'], ['elephant', '🐘'], ['hippo', '🦛'], ['giraffe', '🦒'], ['goat', '🐐'], ['lamb', '🐑'], ['alpaca', '🦙'], ['piglet', '🐷'], ['pig', '🐷'], ['calf', '🐮'], ['foal', '🐴'], ['pony', '🐴'], ['horse', '🐴'], ['fawn', '🦌'], ['duck', '🐥'], ['chick', '🐥'], ['tit', '🐦'], ['parrot', '🦜'], ['budgie', '🦜'], ['cockatiel', '🦜'], ['canary', '🐤'], ['octopus', '🐙'], ['beluga', '🐳'], ['whale', '🐳'], ['axolotl', '🦎'], ['gecko', '🦎'], ['dragon', '🦎'], ['capybara', '🦫'], ['meerkat', '🦦'], ['ermine', '🦦'], ['ferret', '🦦'], ['marmoset', '🐒'], ['loris', '🐒'], ['sugar glider', '🐿️'], ['wombat', '🐨'], ['turtle', '🐢'], ['snake', '🐍'], ['fish', '🐟'], ['koi', '🐟'], ['betta', '🐟'], ['crab', '🦀'], ['tarantula', '🕷️'], ['rat', '🐀'], ['gerbil', '🐭'], ['chicken', '🐔'], ['bear', '🐻']];
 function cuteEmoji(item, topic) {
   if (item.emoji) return item.emoji;
@@ -30462,7 +31260,7 @@ function TopicEditor({
   }, "Fun battles (Battles finale)"), React.createElement(Seg, {
     label: "Fun battle style",
     value: topic.battle || 'none',
-    options: [['none', 'Off'], ['fight', '⚔️ Fight'], ['powers', '💥 Powers'], ['survival', '🧟 Survival'], ['cute', '🥰 Puppy Bowl'], ['weird', '🤡 Silly'], ['combat', '🥊 Fight night'], ['f1', '🏎️ Grand Prix'], ['tennis', '🎾 Tennis'], ['basketball', '🏀 Basketball']],
+    options: [['none', 'Off'], ['fight', '⚔️ Fight'], ['powers', '💥 Powers'], ['survival', '🧟 Survival'], ['cute', '🥰 Puppy Bowl'], ['weird', '🤡 Silly'], ['combat', '🥊 Fight night'], ['f1', '🏎️ Grand Prix'], ['tennis', '🎾 Tennis'], ['nfl', '🏈 American football'], ['basketball', '🏀 Basketball']],
     onChange: v => set({
       battle: v === 'none' ? '' : v
     })
@@ -32618,6 +33416,9 @@ function ItemCard({
     item: item,
     topic: d.topic
   }) : battleKindId(d.topic) === 'tennis' ? React.createElement(TenChip, {
+    item: item,
+    topic: d.topic
+  }) : battleKindId(d.topic) === 'nfl' ? React.createElement(NFLChip, {
     item: item,
     topic: d.topic
   }) : hasBattle(d.topic) && React.createElement(StatChip, {
@@ -37405,7 +38206,13 @@ if (window.__DN_TEST__) window.__DN = {
     tennisScript,
     tennisFrame,
     tennisHighlights,
-    tenLine
+    tenLine,
+    simulateNFL,
+    nflRating,
+    nflScript,
+    nflFrame,
+    nflReport,
+    nflEraOf
   },
   simStats: {
     simulatePuppyBowl,
@@ -39524,6 +40331,12 @@ function MatchSummary({
   B,
   match
 }) {
+  if (match.v === 'nfl') return React.createElement(NFLSummary, {
+    d: d,
+    A: A,
+    B: B,
+    match: match
+  });
   if (match.v === 'tennis') return React.createElement(TennisSummary, {
     d: d,
     A: A,
@@ -41042,7 +41855,7 @@ function PitchMatch({
   }));
 }
 function MatchView(props) {
-  return props.match && props.match.v === 'tennis' ? React.createElement(TennisView, props) : props.match && props.match.v === 'gp' ? React.createElement(TrackView, props) : props.match && props.match.v === 'card' ? React.createElement(RingView, props) : props.match && props.match.v === 'hoops' ? React.createElement(CourtView, props) : props.match && props.match.v === 'show' ? React.createElement(ShowView, props) : props.match && props.match.v === 'mission' ? React.createElement(MissionView, props) : props.match && props.match.v === 'survival' ? React.createElement(SurvivalView, props) : props.match && props.match.v === 'arena' ? React.createElement(ArenaView, props) : props.match && props.match.v === 'battle' ? React.createElement(BattleView, props) : props.match && props.match.v === 2 ? React.createElement(PitchMatch, props) : React.createElement(MatchPlayer, props);
+  return props.match && props.match.v === 'nfl' ? React.createElement(GridironView, props) : props.match && props.match.v === 'tennis' ? React.createElement(TennisView, props) : props.match && props.match.v === 'gp' ? React.createElement(TrackView, props) : props.match && props.match.v === 'card' ? React.createElement(RingView, props) : props.match && props.match.v === 'hoops' ? React.createElement(CourtView, props) : props.match && props.match.v === 'show' ? React.createElement(ShowView, props) : props.match && props.match.v === 'mission' ? React.createElement(MissionView, props) : props.match && props.match.v === 'survival' ? React.createElement(SurvivalView, props) : props.match && props.match.v === 'arena' ? React.createElement(ArenaView, props) : props.match && props.match.v === 'battle' ? React.createElement(BattleView, props) : props.match && props.match.v === 2 ? React.createElement(PitchMatch, props) : React.createElement(MatchPlayer, props);
 }
 function matchReport(d, A, B, match) {
   const teams = [A, B];
@@ -41135,6 +41948,899 @@ function MatchReport({
   }, React.createElement("b", null, "\uD83D\uDCC9 Quiet day:"), " ", R.flop.name, " cost $", R.flop.price, " and didn\u2019t get on the scoresheet."), match.puppy && match.moments && match.moments.length > 0 && React.createElement("p", {
     className: "small"
   }, React.createElement("b", null, "\uD83D\uDC3E Cute moments:"), " ", match.moments.map(m => m.emoji + ' ' + m.player + ' (' + T(m.team).name + ') → ' + m.outcome).join(' · ')));
+}
+const GF = {
+  w: 120,
+  h: 53.3
+};
+const gx = (poss, on) => poss === 0 ? 10 + on : 110 - on;
+const lerpG = (a, b, u) => ({
+  x: a.x + (b.x - a.x) * Math.max(0, Math.min(1, u)),
+  y: a.y + (b.y - a.y) * Math.max(0, Math.min(1, u))
+});
+const PLAY_DUR = {
+  pass: 4.4,
+  inc: 3.6,
+  int: 4.6,
+  run: 3.8,
+  scramble: 3.8,
+  sack: 3.4,
+  fum: 3.8,
+  fg: 3.6,
+  punt: 3.2,
+  duel: 3,
+  ot: 2.4
+};
+function nflScript(match) {
+  const beats = [];
+  let t = 0;
+  const add = b => {
+    b.t0 = t;
+    t += b.dur;
+    beats.push(b);
+    return b;
+  };
+  add({
+    type: 'intro',
+    dur: 2.6
+  });
+  let roll = [];
+  const flush = () => {
+    if (!roll.length) return;
+    add({
+      type: 'drive',
+      dur: Math.min(2.6, 0.7 + roll.length * 0.16),
+      plays: roll
+    });
+    roll = [];
+  };
+  match.plays.forEach(p => {
+    if (p.type === 'qend' || p.type === 'half') {
+      flush();
+      add({
+        type: 'break',
+        dur: 2.2,
+        p
+      });
+      return;
+    }
+    if (p.type === 'kick') return;
+    if (p.hl) {
+      flush();
+      add({
+        type: 'play',
+        dur: (PLAY_DUR[p.type] || 3.6) + (p.td ? 1.6 : 0),
+        p
+      });
+    } else roll.push(p);
+  });
+  flush();
+  add({
+    type: 'final',
+    dur: 2.8
+  });
+  return {
+    beats,
+    total: t
+  };
+}
+const playEnd = p => p.type === 'int' || p.type === 'punt' || p.type === 'fg' ? p.on : Math.max(0, Math.min(100, p.on + (p.yds || 0)));
+function nflFrame(beat, u) {
+  const p = beat.p;
+  const o = p.poss;
+  const dir = o === 0 ? 1 : -1;
+  const L = gx(o, p.on);
+  const mid = GF.h / 2;
+  const at = (dx, y) => ({
+    x: L + dir * dx,
+    y
+  });
+  const off = {
+    qb: at(-5, mid),
+    rb: at(-7.5, mid + 2),
+    wr1: at(-1, 6),
+    wr2: at(-1, GF.h - 6),
+    te: at(-1, mid + 8),
+    ol: [-4, -2, 0, 2, 4].map(k => at(-1, mid + k))
+  };
+  const def = {
+    dl: [-3, -1, 1, 3].map(k => at(1, mid + k)),
+    lb: [-6, 0, 6].map(k => at(5, mid + k)),
+    cb: [at(7, 7), at(7, GF.h - 7)],
+    s: [at(13, mid - 9), at(13, mid + 9)]
+  };
+  const out = {
+    off,
+    def,
+    ball: {
+      ...at(0, mid),
+      h: 0
+    },
+    banner: null,
+    carrier: null,
+    flash: null
+  };
+  const snap = 0.6;
+  if (u < snap) {
+    out.ball = {
+      ...at(0, mid),
+      h: 0
+    };
+    return out;
+  }
+  const k = (a, b) => Math.max(0, Math.min(1, (u - a) / (b - a)));
+  const endX = gx(o, playEnd(p));
+  const chase = (target, s0) => {
+    const kk = easeC(k(s0, s0 + 1.6)) * 0.75;
+    ['dl', 'lb', 'cb', 's'].forEach(g => {
+      def[g] = def[g].map((d2, i) => lerpG(d2, {
+        x: target.x + (i - 1) * 1.4 * -dir,
+        y: target.y + (i - 1.5) * 2.2
+      }, kk));
+    });
+  };
+  if (p.type === 'fg' || p.type === 'duel') {
+    const hold = at(-7, mid);
+    off.qb = hold;
+    const posts = {
+      x: o === 0 ? 120 : 0,
+      y: mid
+    };
+    const kk = k(1.0, 2.4);
+    out.ball = kk <= 0 ? {
+      ...hold,
+      h: 0
+    } : {
+      ...lerpG(hold, {
+        x: posts.x,
+        y: p.good === false ? mid + (unit('fgw', p.i) < 0.5 ? -5 : 5) : mid
+      }, kk),
+      h: Math.sin(kk * Math.PI) * 9 + kk * 3
+    };
+    if (u > 2.4) out.banner = p.type === 'duel' ? 'IT’S GOOD!' : p.good ? 'GOOD!' : 'NO GOOD!';
+    return out;
+  }
+  if (p.type === 'punt') {
+    const punter = at(-14, mid);
+    off.qb = punter;
+    const kk = k(1.0, 2.6);
+    const land = {
+      x: L + dir * Math.min(p.yds || 40, 60),
+      y: mid + 6
+    };
+    out.ball = kk <= 0 ? {
+      ...lerpG(at(0, mid), punter, k(snap, 1.0)),
+      h: 0.5
+    } : {
+      ...lerpG(punter, land, kk),
+      h: Math.sin(kk * Math.PI) * 12
+    };
+    chase(land, 1.2);
+    return out;
+  }
+  if (p.type === 'run' || p.type === 'fum' && p.run) {
+    const hand = 0.95;
+    const rb0 = off.rb;
+    const hole = at(0.5, mid + (unit('hole', p.i) - 0.5) * 6);
+    const end = {
+      x: endX,
+      y: hole.y + (unit('cut', p.i) - 0.5) * 16
+    };
+    if (u < hand) {
+      out.ball = lerpG(at(0, mid), off.qb, k(snap, hand));
+    } else {
+      const kk = k(hand, beat.dur - 0.9);
+      off.rb = kk < 0.25 ? lerpG(rb0, hole, kk / 0.25) : lerpG(hole, end, easeC((kk - 0.25) / 0.75));
+      out.ball = {
+        ...off.rb,
+        h: 0.6
+      };
+      out.carrier = 'rb';
+    }
+    off.ol = off.ol.map(x => lerpG(x, at(1.5, x.y), k(snap, 1.2)));
+    chase(off.rb, 0.8);
+    if (u > beat.dur - 0.9) {
+      out.banner = p.td ? 'TOUCHDOWN!' : p.type === 'fum' ? 'FUMBLE!' : (p.yds || 0) >= 18 ? 'BREAKAWAY!' : (p.yds || 0) <= 0 ? 'STUFFED!' : null;
+      if (p.type === 'fum') out.flash = off.rb;
+    }
+    return out;
+  }
+  off.qb = lerpG(at(-5, mid), at(-8, mid), k(snap, 1.3));
+  out.ball = k(snap, 0.75) < 1 ? lerpG(at(0, mid), off.qb, k(snap, 0.75)) : {
+    ...off.qb,
+    h: 1
+  };
+  off.ol = off.ol.map(x => lerpG(x, at(-3, x.y), k(snap, 1.2)));
+  if (p.type === 'sack' || p.type === 'fum') {
+    const rush = def.dl[1];
+    def.dl[1] = lerpG(rush, off.qb, easeC(k(0.8, 1.7)));
+    if (u > 1.7) {
+      out.banner = p.type === 'fum' ? 'STRIP SACK!' : 'SACK!';
+      out.flash = off.qb;
+      out.qbDown = true;
+    }
+    return out;
+  }
+  if (p.type === 'scramble') {
+    const end = {
+      x: endX,
+      y: mid + (unit('scr', p.i) - 0.5) * 20
+    };
+    if (u > 1.5) {
+      off.qb = lerpG(off.qb, end, easeC(k(1.5, beat.dur - 0.9)));
+      out.ball = {
+        ...off.qb,
+        h: 1
+      };
+      out.carrier = 'qb';
+    }
+    chase(off.qb, 1.5);
+    if (u > beat.dur - 0.9) out.banner = p.td ? 'TOUCHDOWN!' : 'SCRAMBLE!';
+    return out;
+  }
+  const tk = p.tgtKey || 'wr1';
+  const catchPt = {
+    x: L + dir * Math.max(1, p.air || 6),
+    y: tk === 'wr1' ? 10 : tk === 'wr2' ? GF.h - 10 : tk === 'te' ? mid + 6 : mid - 4
+  };
+  const routeK = easeC(k(snap, 2.1));
+  ['wr1', 'wr2', 'te', 'rb'].forEach(key => {
+    const start = off[key];
+    const tgt = key === tk ? catchPt : {
+      x: L + dir * (6 + unit('rt', p.i, key) * 14),
+      y: start.y + (unit('rty', p.i, key) - 0.5) * 12
+    };
+    off[key] = lerpG(start, tgt, routeK);
+  });
+  def.cb = def.cb.map((c, i) => lerpG(c, i === 0 ? off.wr1 : off.wr2, routeK * 0.9));
+  def.s = def.s.map(c => lerpG(c, catchPt, routeK * 0.55));
+  const throwAt = 1.45,
+    catchAt = 2.15;
+  if (u >= throwAt) {
+    const kk = k(throwAt, catchAt);
+    if (kk < 1) out.ball = {
+      ...lerpG(off.qb, catchPt, kk),
+      h: Math.sin(kk * Math.PI) * (p.dz === 'deep' ? 7 : 3.5) + 1
+    };else if (p.type === 'inc') {
+      out.ball = {
+        x: catchPt.x + dir * 2,
+        y: catchPt.y + 1,
+        h: 0
+      };
+      out.banner = 'INCOMPLETE';
+    } else if (p.type === 'int') {
+      const picker = def.s[0];
+      const back = {
+        x: endX,
+        y: catchPt.y + 6
+      };
+      def.s[0] = lerpG(catchPt, back, easeC(k(catchAt, beat.dur - 0.8)));
+      out.ball = {
+        ...def.s[0],
+        h: 0.6
+      };
+      out.carrier = 'pick';
+      out.banner = 'INTERCEPTED!';
+      if (picker) out.flash = null;
+    } else {
+      const end = {
+        x: endX,
+        y: catchPt.y + (unit('yac', p.i) - 0.5) * 10
+      };
+      off[tk] = lerpG(catchPt, end, easeC(k(catchAt, beat.dur - (p.td ? 1.6 : 0.8))));
+      out.ball = {
+        ...off[tk],
+        h: 0.6
+      };
+      out.carrier = tk;
+      chase(off[tk], catchAt - 0.3);
+      if (u > catchAt + 0.1) out.banner = p.td && u > beat.dur - 1.7 ? 'TOUCHDOWN!' : (p.yds || 0) >= 20 && u < catchAt + 0.9 ? 'BIG PLAY!' : null;
+    }
+  }
+  return out;
+}
+function GridironView({
+  d,
+  A,
+  B,
+  match,
+  speed,
+  onDone,
+  label
+}) {
+  const script = useMemo(() => nflScript(match), [match]);
+  const base = speed === 'fast' ? 2 : 1;
+  const [t, setT] = useState(speed === 'instant' ? script.total : 0);
+  const [playing, setPlaying] = useState(speed !== 'instant');
+  const [mult, setMult] = useState(1);
+  const done = t >= script.total;
+  const fired = useRef(false);
+  useEffect(() => {
+    if (!playing || done) return undefined;
+    let raf;
+    let last = performance.now();
+    const tick = now => {
+      const dt = Math.min(0.1, (now - last) / 1000);
+      last = now;
+      setT(x => Math.min(script.total, x + dt * base * mult / Math.max(0.001, GAME_SPEED)));
+      raf = requestAnimationFrame(tick);
+    };
+    raf = requestAnimationFrame(tick);
+    return () => cancelAnimationFrame(raf);
+  }, [playing, done, mult, base]);
+  useEffect(() => {
+    if (done && !fired.current) {
+      fired.current = true;
+      audio.play('whistle');
+      onDone && onDone();
+    }
+  }, [done]);
+  const bi = Math.max(0, script.beats.findIndex(b => t < b.t0 + b.dur));
+  const beat = done ? script.beats[script.beats.length - 1] : script.beats[bi];
+  const u = done ? beat.dur : t - beat.t0;
+  const L = match.lineups;
+  const keyOf = (s, name) => {
+    const x = L[s].find(r => r.name === name);
+    return x ? x.k : null;
+  };
+  const pBeat = beat.type === 'play' ? {
+    ...beat,
+    p: {
+      ...beat.p,
+      tgtKey: keyOf(beat.p.poss, beat.p.tgt) || 'wr1'
+    }
+  } : null;
+  const fr = pBeat ? nflFrame(pBeat, u) : null;
+  let shown = null;
+  if (beat.type === 'play') shown = u > beat.dur - (beat.p.td ? 1.7 : 0.9) ? {
+    ...beat.p,
+    after: true
+  } : {
+    ...beat.p,
+    score: script.beats[bi - 1] && script.beats[bi - 1].type === 'drive' ? script.beats[bi - 1].plays[script.beats[bi - 1].plays.length - 1].score : prevScore(match, beat.p)
+  };else if (beat.type === 'drive') {
+    const n = beat.plays.length;
+    const j = Math.min(n - 1, Math.floor(u / beat.dur * n));
+    shown = beat.plays[j];
+  } else if (beat.type === 'break') shown = beat.p;
+  const score = done || beat.type === 'final' ? match.score : shown ? shown.score : [0, 0];
+  const qNow = shown ? shown.q : beat.type === 'final' || done ? match.ot ? 4 + match.ot : 4 : 1;
+  const status = done || beat.type === 'final' ? match.ot ? 'FINAL/OT' : 'FINAL' : beat.type === 'intro' ? 'KICKOFF' : beat.type === 'break' ? beat.p.type === 'half' ? 'HALFTIME' : 'END ' + nflQName(beat.p.q - 1) : nflQName(qNow) + ' ' + nflClock(shown ? shown.clk : 900);
+  const downTxt = shown && shown.down && beat.type !== 'break' ? NFL_ORD[shown.down] + ' & ' + (shown.togo >= 100 - shown.on ? 'Goal' : shown.togo) + ' · ' + nflYard(shown.on) : '';
+  const possName = shown && shown.poss != null ? (shown.poss === 0 ? A : B).name : '';
+  const colors = [A.color, B.color];
+  let driveBall = null;
+  if (beat.type === 'drive') {
+    const n = beat.plays.length;
+    const f = u / beat.dur * n;
+    const j = Math.min(n - 1, Math.floor(f));
+    const pl = beat.plays[j];
+    const x0 = gx(pl.poss, pl.on),
+      x1 = gx(pl.poss, playEnd(pl));
+    driveBall = {
+      x: x0 + (x1 - x0) * Math.min(1, f - j),
+      y: GF.h / 2
+    };
+  }
+  const banner = done ? null : beat.type === 'intro' ? 'KICKOFF' : beat.type === 'final' ? 'FINAL' : beat.type === 'break' ? beat.p.type === 'half' ? 'HALFTIME' : 'END OF ' + nflQName(beat.p.q - 1) : beat.type === 'drive' && u > beat.dur * 0.5 ? (() => {
+    const last = beat.plays[beat.plays.length - 1];
+    return last.type === 'fg' ? last.good ? 'FIELD GOAL' : 'MISSED FG' : last.type === 'punt' ? 'PUNT' : null;
+  })() : fr ? fr.banner : null;
+  const lastBeat = useRef(-1);
+  useEffect(() => {
+    if (!playing || done || bi === lastBeat.current) return;
+    lastBeat.current = bi;
+    if (beat.type === 'break' || beat.type === 'intro') audio.play('whistle');
+  }, [bi]);
+  const said = useRef({});
+  useEffect(() => {
+    if (!playing || done || beat.type !== 'play' || said.current[bi] || u < beat.dur - (beat.p.td ? 1.6 : 0.8)) return;
+    said.current[bi] = true;
+    const p = beat.p;
+    if (p.td) {
+      audio.play('cheer');
+      audio.say('Touchdown, ' + (p.poss === 0 ? A : B).name + '!', 2, d.id + ':' + label + ':td' + bi);
+    } else if (p.type === 'int' || p.type === 'fum') audio.play('buzzer');else if (p.type === 'sack') audio.play('card');else if (p.type === 'fg' && p.good) audio.play('bid');
+  }, [t]);
+  const feed = [];
+  script.beats.forEach((b, k) => {
+    if (!done && b.t0 + b.dur * 0.75 > t) return;
+    if (b.type === 'play') feed.push({
+      k,
+      q: b.p.q,
+      clk: b.p.clk,
+      team: b.p.poss,
+      big: b.p.td || b.p.big,
+      text: b.p.text + (b.p.after ? ' ' + b.p.after : '')
+    });else if (b.type === 'drive') {
+      const last = b.plays[b.plays.length - 1];
+      const first = b.plays[0];
+      const yd = b.plays.reduce((n, x) => n + (x.type === 'punt' || x.type === 'fg' ? 0 : x.yds || 0), 0);
+      if (last.type === 'fg' || last.type === 'punt' || b.plays.length >= 3) feed.push({
+        k,
+        q: last.q,
+        clk: last.clk,
+        team: first.poss,
+        text: (first.poss === 0 ? A : B).name + ': ' + b.plays.length + ' play' + (b.plays.length === 1 ? '' : 's') + ', ' + yd + ' yards — ' + last.text,
+        run: true,
+        big: last.type === 'fg' && last.good
+      });
+    } else if (b.type === 'break') feed.push({
+      k,
+      q: b.p.q,
+      clk: 0,
+      text: b.p.text,
+      half: true
+    });
+  });
+  const feedRef = useRef(null);
+  useEffect(() => {
+    const f = feedRef.current;
+    if (f) f.scrollTop = f.scrollHeight;
+  }, [feed.length]);
+  const short = n => {
+    const w = String(n || '').split(' ');
+    return w[w.length - 1].slice(0, 10);
+  };
+  const losX = shown && shown.on != null && beat.type !== 'break' ? gx(shown.poss, shown.on) : null;
+  const fdX = shown && shown.on != null && shown.togo && beat.type !== 'break' ? gx(shown.poss, Math.min(100, shown.on + shown.togo)) : null;
+  const Dot = ({
+    p,
+    c,
+    lab,
+    ring,
+    small
+  }) => p ? React.createElement("g", {
+    transform: 'translate(' + p.x.toFixed(2) + ' ' + p.y.toFixed(2) + ')'
+  }, React.createElement("circle", {
+    r: small ? 1.15 : 1.45,
+    fill: c,
+    stroke: ring ? '#fff' : 'rgba(0,0,0,.5)',
+    strokeWidth: ring ? 0.45 : 0.25
+  }), lab && React.createElement("text", {
+    y: "-2",
+    textAnchor: "middle",
+    fontSize: "2",
+    fontWeight: "800",
+    fill: "#fff",
+    stroke: "#0f0c21",
+    strokeWidth: "0.4",
+    paintOrder: "stroke"
+  }, lab)) : null;
+  return React.createElement("div", {
+    className: "matchview gridview"
+  }, React.createElement("div", {
+    className: "scoreboard"
+  }, React.createElement("div", {
+    className: "sb-team"
+  }, React.createElement(Badge, {
+    m: A
+  }), React.createElement("span", {
+    className: "sb-n"
+  }, A.name)), React.createElement("div", {
+    className: "sb-mid"
+  }, React.createElement("span", {
+    className: "sb-score num",
+    "aria-live": "polite"
+  }, score[0], "\u2013", score[1]), React.createElement("span", {
+    className: "sb-clock num"
+  }, status)), React.createElement("div", {
+    className: "sb-team"
+  }, React.createElement(Badge, {
+    m: B
+  }), React.createElement("span", {
+    className: "sb-n"
+  }, B.name))), React.createElement("div", {
+    className: "boutbar small"
+  }, possName ? React.createElement(React.Fragment, null, React.createElement("b", null, "\uD83C\uDFC8 ", possName), " ", React.createElement("span", {
+    className: "muted"
+  }, "\xB7 ", downTxt)) : React.createElement("span", {
+    className: "muted"
+  }, "Draft Night Bowl")), React.createElement("div", {
+    className: "pitchwrap"
+  }, React.createElement("svg", {
+    className: "pitchsvg gridsvg",
+    viewBox: '-2 -2 ' + (GF.w + 4) + ' ' + (GF.h + 4),
+    role: "img",
+    "aria-label": 'Football field: ' + A.name + ' ' + score[0] + ', ' + B.name + ' ' + score[1] + ', ' + status
+  }, React.createElement("rect", {
+    x: "-2",
+    y: "-2",
+    width: GF.w + 4,
+    height: GF.h + 4,
+    fill: "#2f6b2a"
+  }), Array.from({
+    length: 10
+  }, (_, i) => React.createElement("rect", {
+    key: i,
+    x: 10 + i * 10,
+    y: "0",
+    width: "10",
+    height: GF.h,
+    fill: i % 2 ? '#3f8a37' : '#47963e'
+  })), React.createElement("rect", {
+    x: "0",
+    y: "0",
+    width: "10",
+    height: GF.h,
+    fill: A.color,
+    opacity: ".55"
+  }), React.createElement("rect", {
+    x: "110",
+    y: "0",
+    width: "10",
+    height: GF.h,
+    fill: B.color,
+    opacity: ".55"
+  }), React.createElement("text", {
+    x: "5",
+    y: GF.h / 2,
+    textAnchor: "middle",
+    fontSize: "3.2",
+    fontWeight: "900",
+    fill: "#fff",
+    opacity: ".85",
+    transform: 'rotate(-90 5 ' + GF.h / 2 + ')'
+  }, A.name.toUpperCase().slice(0, 14)), React.createElement("text", {
+    x: "115",
+    y: GF.h / 2,
+    textAnchor: "middle",
+    fontSize: "3.2",
+    fontWeight: "900",
+    fill: "#fff",
+    opacity: ".85",
+    transform: 'rotate(90 115 ' + GF.h / 2 + ')'
+  }, B.name.toUpperCase().slice(0, 14)), React.createElement("g", {
+    stroke: "rgba(255,255,255,.75)",
+    strokeWidth: "0.3"
+  }, Array.from({
+    length: 11
+  }, (_, i) => React.createElement("line", {
+    key: i,
+    x1: 10 + i * 10,
+    y1: "0",
+    x2: 10 + i * 10,
+    y2: GF.h
+  })), React.createElement("rect", {
+    x: "0",
+    y: "0",
+    width: GF.w,
+    height: GF.h,
+    fill: "none"
+  })), Array.from({
+    length: 9
+  }, (_, i) => React.createElement("text", {
+    key: i,
+    x: 20 + i * 10,
+    y: "6",
+    textAnchor: "middle",
+    fontSize: "2.6",
+    fontWeight: "800",
+    fill: "rgba(255,255,255,.7)"
+  }, i < 4 ? (i + 1) * 10 : i === 4 ? 50 : (9 - i) * 10)), [0, 120].map(x => React.createElement("g", {
+    key: x
+  }, React.createElement("line", {
+    x1: x,
+    y1: GF.h / 2 - 3,
+    x2: x,
+    y2: GF.h / 2 + 3,
+    stroke: "#ffd23d",
+    strokeWidth: "0.7"
+  }))), losX != null && React.createElement("line", {
+    x1: losX,
+    y1: "0",
+    x2: losX,
+    y2: GF.h,
+    stroke: "#3d9bff",
+    strokeWidth: "0.45"
+  }), fdX != null && fdX !== losX && React.createElement("line", {
+    x1: fdX,
+    y1: "0",
+    x2: fdX,
+    y2: GF.h,
+    stroke: "#ffd23d",
+    strokeWidth: "0.45"
+  }), fr && (() => {
+    const o = beat.p.poss;
+    const oc = colors[o],
+      dc = colors[1 - o];
+    const lin = key => L[o].find(r => r.k === key);
+    const dstar = L[1 - o].find(r => r.k === 'def');
+    const role = dstar && dstar.role;
+    const starAt = role === 'DL' ? fr.def.dl[1] : role === 'CB' ? fr.def.cb[0] : role === 'S' ? fr.def.s[0] : fr.def.lb[1];
+    return React.createElement("g", null, ['dl', 'lb', 'cb', 's'].flatMap(g => fr.def[g].map((pp, i) => React.createElement(Dot, {
+      key: g + i,
+      p: pp,
+      c: dc,
+      small: true
+    }))), dstar && !dstar.backup && React.createElement(Dot, {
+      p: starAt,
+      c: dc,
+      lab: short(dstar.name),
+      ring: true
+    }), fr.off.ol.map((pp, i) => React.createElement(Dot, {
+      key: 'ol' + i,
+      p: pp,
+      c: oc,
+      small: true
+    })), ['wr1', 'wr2', 'te', 'rb'].map(key => React.createElement(Dot, {
+      key: key,
+      p: fr.off[key],
+      c: oc,
+      lab: fr.carrier === key || beat.p.tgtKey === key ? short(lin(key) && lin(key).name) : null,
+      ring: fr.carrier === key
+    })), !fr.qbDown && React.createElement(Dot, {
+      p: fr.off.qb,
+      c: oc,
+      lab: beat.p.type === 'fg' || beat.p.type === 'punt' ? null : short(lin('qb') && lin('qb').name),
+      ring: fr.carrier === 'qb'
+    }), fr.qbDown && React.createElement("g", {
+      transform: 'translate(' + fr.off.qb.x.toFixed(2) + ' ' + fr.off.qb.y.toFixed(2) + ')'
+    }, React.createElement("ellipse", {
+      rx: "2.2",
+      ry: "1",
+      fill: oc,
+      stroke: "rgba(0,0,0,.5)",
+      strokeWidth: ".25"
+    })), fr.flash && React.createElement("circle", {
+      cx: fr.flash.x,
+      cy: fr.flash.y,
+      r: "3.2",
+      fill: "none",
+      stroke: "#ffd23d",
+      strokeWidth: "0.5"
+    }));
+  })(), (() => {
+    const b = fr ? fr.ball : driveBall;
+    if (!b) return null;
+    return React.createElement("g", null, React.createElement("ellipse", {
+      cx: b.x,
+      cy: b.y + 0.3,
+      rx: "0.8",
+      ry: "0.4",
+      fill: "rgba(0,0,0,.3)"
+    }), React.createElement("ellipse", {
+      cx: b.x,
+      cy: b.y - (b.h || 0) * 0.45,
+      rx: 0.95 + (b.h || 0) * 0.03,
+      ry: "0.6",
+      fill: "#8a4a1f",
+      stroke: "#fff",
+      strokeWidth: "0.15"
+    }));
+  })(), (done || beat.type === 'final') && React.createElement("g", null, React.createElement("rect", {
+    x: "-2",
+    y: "-2",
+    width: GF.w + 4,
+    height: GF.h + 4,
+    fill: "rgba(15,12,33,.55)"
+  }), React.createElement("text", {
+    x: "60",
+    y: "24",
+    textAnchor: "middle",
+    fontSize: "4",
+    fontWeight: "800",
+    fill: "#fff"
+  }, "FINAL", match.ot ? ' / OT' : ''), React.createElement("text", {
+    x: "60",
+    y: "34",
+    textAnchor: "middle",
+    fontSize: "8",
+    fontWeight: "900",
+    fill: colors[match.winner],
+    stroke: "#0f0c21",
+    strokeWidth: "0.6",
+    paintOrder: "stroke"
+  }, (match.winner === 0 ? A : B).name.toUpperCase().slice(0, 16), " WIN"), React.createElement("text", {
+    x: "60",
+    y: "43",
+    textAnchor: "middle",
+    fontSize: "5.5",
+    fontWeight: "900",
+    fill: "#ffc83d"
+  }, match.score[0], "\u2013", match.score[1])), banner && React.createElement("text", {
+    x: "60",
+    y: "17",
+    textAnchor: "middle",
+    fontSize: banner.length > 12 ? 6.5 : 8.5,
+    fontWeight: "900",
+    fill: /TOUCHDOWN|INTERCEPT|SACK|FUMBLE|GOOD|BIG|BREAK/.test(banner) ? '#ffc83d' : '#fff',
+    stroke: "#0f0c21",
+    strokeWidth: "0.7",
+    paintOrder: "stroke",
+    className: "pbanner"
+  }, banner))), React.createElement("div", {
+    className: "mctrl",
+    role: "group",
+    "aria-label": "Game controls"
+  }, !done && React.createElement("button", {
+    className: "btn btn-sm",
+    onClick: () => setPlaying(x => !x),
+    "aria-label": playing ? 'Pause' : 'Play'
+  }, playing ? '⏸ Pause' : '▶ Play'), !done && [1, 2, 4].map(x => React.createElement("button", {
+    key: x,
+    className: 'btn btn-sm' + (mult === x ? ' btn-gold' : ''),
+    "aria-pressed": mult === x,
+    onClick: () => setMult(x)
+  }, x, "\xD7")), !done && React.createElement("button", {
+    className: "btn btn-sm btn-ghost",
+    onClick: () => setT(script.total)
+  }, "Skip to result"), done && React.createElement("button", {
+    className: "btn btn-sm",
+    onClick: () => {
+      fired.current = true;
+      said.current = {};
+      setT(0);
+      setPlaying(true);
+    }
+  }, "\u21BA Watch again")), React.createElement("div", {
+    className: "mfeed",
+    ref: feedRef,
+    "aria-live": "polite"
+  }, feed.map(e => React.createElement("p", {
+    key: e.k,
+    className: 'mev ' + (e.big ? 'goal' : e.half ? 'half' : '') + (e.team != null ? ' t' + e.team : '')
+  }, React.createElement("span", {
+    className: "mm num"
+  }, nflQName(e.q)), React.createElement("span", null, e.big ? '🏈 ' : e.run ? '➡️ ' : '', e.text, e.team != null ? React.createElement("small", null, " \xB7 ", (e.team === 0 ? A : B).name) : null)))), done && React.createElement(NFLSummary, {
+    d: d,
+    A: A,
+    B: B,
+    match: match
+  }));
+}
+function prevScore(match, p) {
+  const prev = match.plays[p.i - 1];
+  return prev ? prev.score : [0, 0];
+}
+function nflReport(d, A, B, match) {
+  const T = [A, B];
+  const rows = [0, 1].flatMap(s => Object.entries(match.box[s]).map(([name, b]) => ({
+    team: s,
+    name,
+    ...b,
+    gs: b.pass / 25 + b.ptd * 4 - b.int * 3 + b.rush / 10 + b.rtd * 6 + b.recY / 10 + b.rectd * 6 + b.sack * 3 + b.ints * 5 + b.ff * 3 + b.tkl * 0.5
+  })));
+  const mvp = rows.filter(r => r.team === match.winner).sort((x, y) => y.gs - x.gs)[0] || null;
+  let lead = 0,
+    turning = null;
+  match.plays.forEach(p => {
+    const l = Math.sign(p.score[0] - p.score[1]);
+    if (l && l !== lead) {
+      if ((l > 0 ? 0 : 1) === match.winner) turning = p;
+      lead = l;
+    }
+  });
+  const price = (s, name) => {
+    const e = T[s].team.find(x => x && d.items[x.itemId] && d.items[x.itemId].name === name);
+    return e ? e.price || 0 : 0;
+  };
+  const withPrice = rows.map(r => ({
+    ...r,
+    price: price(r.team, r.name)
+  })).filter(r => r.price > 0 || !/^Backup/.test(r.name));
+  const best = withPrice.filter(r => r.gs > 2 && r.price > 0).sort((x, y) => y.gs / y.price - x.gs / x.price)[0] || null;
+  const flop = withPrice.filter(r => r.price >= 3).sort((x, y) => x.gs / x.price - y.gs / y.price)[0] || null;
+  return {
+    rows,
+    mvp,
+    turning,
+    best,
+    flop
+  };
+}
+const nflLine = r => [r.att ? r.comp + '/' + r.att + ', ' + r.pass + ' yds' + (r.ptd ? ', ' + r.ptd + ' TD' : '') + (r.int ? ', ' + r.int + ' INT' : '') : '', r.car ? r.car + ' car, ' + r.rush + ' yds' + (r.rtd ? ', ' + r.rtd + ' TD' : '') : '', r.rec ? r.rec + ' rec, ' + r.recY + ' yds' + (r.rectd ? ', ' + r.rectd + ' TD' : '') : '', r.sack ? r.sack + ' sack' + (r.sack > 1 ? 's' : '') : '', r.ints ? r.ints + ' INT' : '', r.ff ? r.ff + ' forced fumble' : '', r.tkl ? r.tkl + ' tackles' : ''].filter(Boolean).join(' · ');
+function NFLSummary({
+  d,
+  A,
+  B,
+  match
+}) {
+  const R = nflReport(d, A, B, match);
+  const T = i => i === 0 ? A : B;
+  return React.createElement("div", {
+    className: "board msummary"
+  }, React.createElement("h3", null, "\uD83C\uDFC8 Box score"), React.createElement("p", {
+    className: "small",
+    style: {
+      margin: 0
+    }
+  }, React.createElement("b", null, A.name, " ", match.score[0], "\u2013", match.score[1], " ", B.name), match.ot ? ' · after overtime' : ''), React.createElement("table", {
+    className: "qtable small"
+  }, React.createElement("thead", null, React.createElement("tr", null, React.createElement("th", null), match.quarters.map((_, q) => React.createElement("th", {
+    key: q
+  }, nflQName(q + 1))), React.createElement("th", null, "T"))), React.createElement("tbody", null, [0, 1].map(s => React.createElement("tr", {
+    key: s
+  }, React.createElement("td", null, T(s).name), match.quarters.map((qq, q) => React.createElement("td", {
+    key: q,
+    className: "num"
+  }, qq[s])), React.createElement("td", {
+    className: "num"
+  }, React.createElement("b", null, match.score[s])))))), [0, 1].map(s => React.createElement("div", {
+    key: s,
+    className: "small",
+    style: {
+      margin: 0
+    }
+  }, React.createElement("b", null, T(s).emoji, " ", T(s).name), match.lineups[s].filter(x => !x.backup).map(x => {
+    const r = R.rows.find(y => y.team === s && y.name === x.name);
+    const ln = r ? nflLine(r) : '';
+    return React.createElement("div", {
+      key: x.k,
+      className: "muted"
+    }, x.pos === 'DEF' ? 'DEF' : x.pos, " ", x.name, ln ? ': ' + ln : ': quiet day');
+  }))), React.createElement("div", {
+    className: "mreport"
+  }, React.createElement("h4", null, "\uD83D\uDCCB Game report"), R.mvp && React.createElement("p", {
+    className: "small"
+  }, React.createElement("b", null, "\u2B50 MVP:"), " ", R.mvp.name, " (", T(R.mvp.team).name, ") \u2014 ", nflLine(R.mvp), "."), R.turning && React.createElement("p", {
+    className: "small"
+  }, React.createElement("b", null, "\uD83D\uDD04 Turning point:"), " ", nflQName(R.turning.q), " ", nflClock(R.turning.clk), ": ", R.turning.text), R.best && React.createElement("p", {
+    className: "small"
+  }, React.createElement("b", null, "\uD83D\uDCB0 Best buy:"), " ", R.best.name, " \u2014 $", R.best.price, ": ", nflLine(R.best), "."), R.flop && R.flop !== R.mvp && React.createElement("p", {
+    className: "small"
+  }, React.createElement("b", null, "\uD83D\uDCC9 Quiet day:"), " ", R.flop.name, " cost $", R.flop.price, nflLine(R.flop) ? ': ' + nflLine(R.flop) : ' and barely touched the ball', ".")), React.createElement("p", {
+    className: "hint",
+    style: {
+      margin: 0
+    }
+  }, "Every play simulated from Draft Night\u2019s estimated numbers (Now for current players, Prime for legends \u2014 not official ratings). The rest of each team is an average supporting cast; empty positions are filled by backups."));
+}
+function NFLChip({
+  item,
+  topic
+}) {
+  const [open, setOpen] = useState(false);
+  if (!numbersShown()) return null;
+  const r = nflRating(item, item.pos);
+  const era = nflEraOf(item, topic) === 'now' ? 'Now' : 'Prime';
+  return React.createElement(React.Fragment, null, React.createElement("button", {
+    type: "button",
+    className: "ratingchip",
+    onClick: () => setOpen(true),
+    "aria-label": era + ' ' + r.ovr + ', estimated. Show details'
+  }, era, " ", React.createElement("b", {
+    className: "num"
+  }, r.ovr), " est."), open && ReactDOM.createPortal(React.createElement(Sheet, {
+    center: true,
+    onClose: () => setOpen(false)
+  }, React.createElement("div", {
+    className: "ratingcard"
+  }, React.createElement("div", {
+    className: "rc-top"
+  }, React.createElement("span", {
+    className: "rc-ovr num"
+  }, React.createElement("small", {
+    className: "rc-era"
+  }, era), r.ovr), React.createElement("span", {
+    className: "rc-role"
+  }, r.pos === 'DEF' ? r.role : r.pos), React.createElement("span", {
+    className: "rc-name"
+  }, item.name)), React.createElement("div", {
+    className: "rc-attrs"
+  }, NFL_ATTRS[r.pos].map(a => React.createElement("div", {
+    key: a,
+    className: "rc-attr"
+  }, React.createElement("span", {
+    className: "k",
+    title: NFL_ATTR_NAMES[a]
+  }, a), React.createElement("span", {
+    className: "bar"
+  }, React.createElement("i", {
+    style: {
+      width: r.attrs[a] + '%'
+    }
+  })), React.createElement("span", {
+    className: "v num"
+  }, r.attrs[a])))), React.createElement("p", {
+    className: "hint",
+    style: {
+      margin: 0
+    }
+  }, era === 'Now' ? 'Now: how good they are today. ' : 'Prime: how good they were at their peak. ', NFL_ATTRS[r.pos].map(a => a + ' ' + NFL_ATTR_NAMES[a].toLowerCase()).join(' · '), ". Draft Night estimate, not an official rating.")), React.createElement("button", {
+    className: "btn btn-ghost",
+    onClick: () => setOpen(false)
+  }, "Close")), document.body));
 }
 function MissionCell({
   d,
