@@ -26,7 +26,7 @@ function folderList(topics, includeDefaults) {
   return [...names].sort((a, b) => { const ia = order.indexOf(a), ib = order.indexOf(b); return (ia < 0 ? 99 : ia) - (ib < 0 ? 99 : ib) || a.localeCompare(b); });
 }
 // Football numbers describe one moment: current players are shown as they are Now, legends at their Prime.
-const STARTER_ERA = { 't-cf': 'now', 't-pl': 'prime', 't-goat': 'prime', 't-ucl': 'prime', 't-wonder': 'now', 't-wfoot': 'prime', 't-nba': 'now', 't-nbal': 'prime' };
+const STARTER_ERA = { 't-cf': 'now', 't-pl': 'prime', 't-goat': 'prime', 't-ucl': 'prime', 't-wonder': 'now', 't-wfoot': 'prime', 't-nba': 'now', 't-nbal': 'prime', 't-mlb': 'now', 't-mlbl': 'prime' };
 // Fun-battle style for built-in topics (see 29-battles.js); copies and shared topics keep it.
 const STARTER_BATTLE = {
   't-ani': 'fight', 't-cats': 'fight', 't-sharks': 'fight', 't-raptors': 'fight', 't-reptiles': 'fight', 't-snakes': 'fight', 't-dinos': 'fight',
@@ -35,7 +35,7 @@ const STARTER_BATTLE = {
   't-pow': 'powers', 't-powercombos': 'powers', 't-worstpowers': 'weird',
   't-zomb': 'survival', 't-island': 'survival',
   't-cute': 'cute', 't-pet': 'cute', 't-dogbreeds': 'cute', 't-catbreeds': 'cute',
-  't-nba': 'basketball', 't-nbal': 'basketball', 't-fight': 'combat', 't-f1': 'f1', 't-ten': 'tennis', 't-nfl': 'nfl', 't-nhl': 'nhl', 't-crk': 'cricket',
+  't-nba': 'basketball', 't-nbal': 'basketball', 't-fight': 'combat', 't-f1': 'f1', 't-ten': 'tennis', 't-nfl': 'nfl', 't-nhl': 'nhl', 't-crk': 'cricket', 't-mlb': 'mlb', 't-mlbl': 'mlb',
 };
 function starterTopics() {
   const v3 = [...sportsTopicsV3(), ...foodTopicsV3(), ...entTopicsV3(), ...travelTopicsV3(), ...animalTopicsV3(), ...styleTopicsV3(), ...funTopicsV3()];

@@ -751,3 +751,7 @@ html[data-motion="reduce"] *,html[data-motion="reduce"] *::before,html[data-moti
 .overticker .ob{font-style:normal;min-width:20px;padding:0 4px;border-radius:999px;background:var(--panel);border:1px solid var(--line);font-family:var(--cond);font-weight:800;font-size:12px}
 .overticker .ob.b{background:var(--gold);color:var(--gold-ink);border-color:var(--gold)}
 .overticker .ob.w{background:#e2463b;color:#fff;border-color:#e2463b}
+/* Baseball */
+.outs{display:inline-flex;gap:3px;vertical-align:middle}
+.outs i{width:9px;height:9px;border-radius:50%;border:2px solid var(--muted);display:inline-block}
+.outs i.on{background:#e2463b;border-color:#e2463b}

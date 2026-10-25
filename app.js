@@ -1,4 +1,4 @@
-/* Draft Night 11d28cd7e9 — built from src/ by build.js. Edit src/, not this file. */
+/* Draft Night 286e770263 — built from src/ by build.js. Edit src/, not this file. */
 "use strict";
 (function(){
 function _extends() { return _extends = Object.assign ? Object.assign.bind() : function (n) { for (var e = 1; e < arguments.length; e++) { var t = arguments[e]; for (var r in t) ({}).hasOwnProperty.call(t, r) && (n[r] = t[r]); } return n; }, _extends.apply(null, arguments); }
@@ -624,7 +624,9 @@ const STARTER_ERA = {
   't-wonder': 'now',
   't-wfoot': 'prime',
   't-nba': 'now',
-  't-nbal': 'prime'
+  't-nbal': 'prime',
+  't-mlb': 'now',
+  't-mlbl': 'prime'
 };
 const STARTER_BATTLE = {
   't-ani': 'fight',
@@ -660,7 +662,9 @@ const STARTER_BATTLE = {
   't-ten': 'tennis',
   't-nfl': 'nfl',
   't-nhl': 'nhl',
-  't-crk': 'cricket'
+  't-crk': 'cricket',
+  't-mlb': 'mlb',
+  't-mlbl': 'mlb'
 };
 function starterTopics() {
   const v3 = [...sportsTopicsV3(), ...foodTopicsV3(), ...entTopicsV3(), ...travelTopicsV3(), ...animalTopicsV3(), ...styleTopicsV3(), ...funTopicsV3()];
@@ -23279,6 +23283,613 @@ const callLine = (k, vars) => {
   const l = ls[Math.floor(Math.random() * ls.length)];
   return l.replace(/\{(\w+)\}/g, (_, v) => vars && vars[v] != null ? vars[v] : '');
 };
+const MLB_PITCHERS = /Fried|Webb|Chris Sale|Crochet|Cease|Snell|Framber|Hunter Greene|Strider|Burnes|Logan Gilbert|Clase|Hader|Edwin Díaz|Sasaki|Cristopher Sánchez|Senga|Nolan Ryan|Koufax|Randy Johnson|Pedro Martínez|Rivera|Maddux|Cy Young|Walter Johnson|Seaver|Bob Gibson|Spahn|Mathewson|Satchel Paige|Fergie Jenkins|Halladay|Glavine|Smoltz|Eckersley|Hoffman|Steve Carlton|Bob Feller|Marichal|Yamamoto|Skenes|Skubal|Gerrit Cole|Wheeler|deGrom/;
+const MLB_RELIEVERS = /Rivera|Hoffman|Eckersley|Clase|Hader|Edwin Díaz/;
+const MLB_POWER = /Ruth|Aaron|Mays|Mantle|Gehrig|Bonds|Judge|Ohtani|Schwarber|Alonso|Stanton|McGwire|Sosa|Ortiz|Pujols|Thome|Killebrew|McCovey|Griffey|Harper|Trout|Yordan|Raleigh|Guerrero|Frank Thomas|Rooker|Olson|Schmidt|Reggie|Stargell|Cabrera|Banks|Manny|Rodriguez|Piazza|Bagwell/;
+const MLB_CONTACT = /Gwynn|Ichiro|Ty Cobb|Ted Williams|Boggs|Carew|Musial|Freeman|Arraez|Altuve|DiMaggio|Jeter|Hornsby|Wagner|Molitor|Puckett|Brett|Edgar|Soto|Betts|Clemente|Jackie Robinson|Ramírez/;
+const MLB_SPEED = /Rickey|Henderson|Ichiro|Acuña|Witt|De La Cruz|Carroll|Turner|Chisholm|Brock|Jackie Robinson|Mays|Cobb|Tatís|Abrams|Chourio|Ozzie|Raines/;
+const MLB_PROFILE_SRC = `
+Shohei Ohtani|98
+Aaron Judge|96
+Mookie Betts|92
+Juan Soto|94
+Mike Trout|93
+Bobby Witt Jr.|93
+Paul Skenes|94
+Tarik Skubal|95
+Gerrit Cole|91
+Jacob deGrom|93
+Yoshinobu Yamamoto|91
+Babe Ruth|99
+Hank Aaron|97
+Willie Mays|98
+Mickey Mantle|96
+Lou Gehrig|97
+Ted Williams|98
+Barry Bonds|98
+Ty Cobb|96
+Nolan Ryan|95
+Sandy Koufax|97
+Randy Johnson|97
+Pedro Martínez|98
+Mariano Rivera|97
+Greg Maddux|96
+Walter Johnson|97
+Cy Young|94`;
+const MLB_PROFILE = {};
+MLB_PROFILE_SRC.trim().split('\n').forEach(line => {
+  const [name, ovr] = line.split('|');
+  MLB_PROFILE[name.toLowerCase()] = {
+    ovr: +ovr
+  };
+});
+const MLB_ATTRS = {
+  H: ['CON', 'POW', 'EYE', 'SPD'],
+  P: ['STU', 'CTL', 'STA']
+};
+const MLB_ATTR_NAMES = {
+  CON: 'Contact',
+  POW: 'Power',
+  EYE: 'Plate discipline',
+  SPD: 'Speed',
+  STU: 'Stuff',
+  CTL: 'Control',
+  STA: 'Stamina'
+};
+function mlbRating(item) {
+  const n = String(item.name || '');
+  const prof = MLB_PROFILE[n.toLowerCase()];
+  const fixed = validRating(item.rating);
+  const ovr = fixed ? clamp(Math.round(+item.rating), 1, 99) : prof ? prof.ovr : clamp(Math.round(76 + itemFame(item) * 18 + (unit('mlbo', n) - 0.5) * 6), 68, 95);
+  const pitcher = MLB_PITCHERS.test(n) || /pitcher/i.test(item.desc || '');
+  const two = /Ohtani/.test(n) || /pitcher and hitter/i.test(item.desc || '');
+  const j = k => (unit('mlba', n, k) - 0.5) * 6;
+  const hit = {
+    CON: ovr + (MLB_CONTACT.test(n) ? 6 : MLB_POWER.test(n) ? -3 : 0) + j(1),
+    POW: ovr + (MLB_POWER.test(n) ? 7 : MLB_CONTACT.test(n) ? -6 : 0) + j(2),
+    EYE: ovr + j(3),
+    SPD: ovr - 6 + (MLB_SPEED.test(n) ? 14 : 0) + j(4)
+  };
+  const pit = {
+    STU: ovr + j(5),
+    CTL: ovr + (/Maddux|Halladay|Glavine|Mathewson|Rivera/.test(n) ? 6 : /Ryan|Feller|Randy/.test(n) ? -4 : 0) + j(6),
+    STA: (MLB_RELIEVERS.test(n) ? 45 : ovr) + j(7)
+  };
+  const attrs = {};
+  if (!pitcher || two) Object.entries(hit).forEach(([k, v]) => {
+    attrs[k] = clamp(Math.round(v), 35, 99);
+  });
+  if (pitcher || two) Object.entries(pit).forEach(([k, v]) => {
+    attrs[k] = clamp(Math.round(v), 30, 99);
+  });
+  if (pitcher && !two) Object.assign(attrs, {
+    CON: 35,
+    POW: 30,
+    EYE: 35,
+    SPD: 45
+  });
+  return {
+    ovr,
+    attrs,
+    pitcher,
+    two,
+    reliever: MLB_RELIEVERS.test(n),
+    estimated: !fixed
+  };
+}
+const mlbEraOf = topic => eraOf(topic);
+const MLB_AVG = 80;
+const mlbAvgHitter = k => ({
+  name: 'Lineup hitter ' + k,
+  itemId: null,
+  attrs: {
+    CON: MLB_AVG,
+    POW: MLB_AVG - 2,
+    EYE: MLB_AVG,
+    SPD: MLB_AVG - 4
+  },
+  avg: true
+});
+const mlbAvgPitcher = k => ({
+  name: k,
+  itemId: null,
+  attrs: {
+    STU: MLB_AVG,
+    CTL: MLB_AVG,
+    STA: k === 'Starter' ? 80 : 45
+  },
+  avg: true
+});
+function mlbTeam(d, m) {
+  const ps = m.team.map(x => {
+    const it = x && d.items[x.itemId];
+    return it ? {
+      name: it.name,
+      itemId: it.id,
+      price: x.price || 0,
+      ...mlbRating(it)
+    } : null;
+  }).filter(Boolean);
+  const hitters = ps.filter(p => !p.pitcher || p.two).sort((a, b) => b.attrs.CON + b.attrs.POW + b.attrs.EYE - (a.attrs.CON + a.attrs.POW + a.attrs.EYE));
+  const order = [];
+  const pool = hitters.slice();
+  const take = score => {
+    if (!pool.length) return null;
+    pool.sort((a, b) => score(b) - score(a));
+    return pool.shift();
+  };
+  const slots = [take(p => p.attrs.EYE + p.attrs.SPD + p.attrs.CON), take(p => p.attrs.CON + p.attrs.EYE), take(p => p.attrs.POW + p.attrs.CON), take(p => p.attrs.POW * 2), take(p => p.attrs.POW + p.attrs.CON)];
+  let k = 1;
+  for (let i = 0; i < 9; i++) order.push(i < 5 && slots[i] ? slots[i] : pool.shift() || mlbAvgHitter(k++));
+  const pitchers = ps.filter(p => p.pitcher || p.two);
+  const starters = pitchers.filter(p => !p.reliever).sort((a, b) => b.attrs.STU + b.attrs.CTL - a.attrs.STU - a.attrs.CTL);
+  const pens = pitchers.filter(p => !starters.includes(p) || starters.indexOf(p) > 0).sort((a, b) => b.reliever - a.reliever || b.attrs.STU - a.attrs.STU);
+  const starter = starters[0] || mlbAvgPitcher('Starter');
+  const closer = pens[0] || null;
+  const middle = pens.slice(1);
+  return {
+    order,
+    starter,
+    closer,
+    middle,
+    players: ps
+  };
+}
+const MLB_HIT_LINES = {
+  hr: ['{b} crushes it — GONE! Home run!', '{b} launches one deep… it’s OUTTA HERE!', 'See ya! {b} goes yard!'],
+  '3b': ['{b} rips it into the gap — he’s going for three… TRIPLE!', '{b} legs out a triple!'],
+  '2b': ['{b} lines a double down the line!', '{b} doubles into the gap!'],
+  '1b': ['{b} singles through the infield.', '{b} bloops one in for a hit.', '{b} lines a single to center.'],
+  k: ['{p} strikes out {b}!', 'Strike three! {p} gets {b}.', '{b} goes down swinging.'],
+  bb: ['{b} draws a walk.', 'Ball four to {b}.']
+};
+const mlbLine = (rng, k, v) => {
+  const ls = MLB_HIT_LINES[k];
+  return ls[Math.floor(rng() * ls.length)].replace('{b}', v.b || '').replace('{p}', v.p || '');
+};
+function simulateBaseball(d, A, B, key) {
+  const rng = seeded(d.seed, 'mlb', key, A.id, B.id);
+  const T = [mlbTeam(d, A), mlbTeam(d, B)];
+  const score = [0, 0];
+  const ev = [];
+  const line = [[], []];
+  const box = [0, 1].map(() => ({}));
+  const st = (s, name) => box[s][name] = box[s][name] || {
+    ab: 0,
+    h: 0,
+    hr: 0,
+    rbi: 0,
+    r: 0,
+    bb: 0,
+    k: 0,
+    sb: 0,
+    ip: 0,
+    pk: 0,
+    pbb: 0,
+    pr: 0,
+    ph: 0,
+    pc: 0
+  };
+  const pitching = [{
+    p: T[0].starter,
+    pc: 0,
+    used: []
+  }, {
+    p: T[1].starter,
+    pc: 0,
+    used: []
+  }];
+  const batIdx = [0, 0];
+  let inning = 1,
+    half = 0;
+  let done = false;
+  let walkoff = false;
+  const push = e => {
+    e.inn = inning;
+    e.half = half;
+    e.score = [...score];
+    e.i = ev.length;
+    ev.push(e);
+    return e;
+  };
+  const play = () => {
+    const bat = half;
+    const fld = 1 - half;
+    const P = pitching[fld];
+    let outs = 0;
+    let bases = [null, null, null];
+    let runs = 0;
+    if (inning >= 10) {
+      const prev = T[bat].order[(batIdx[bat] + 8) % 9];
+      bases[1] = prev.name;
+      push({
+        kind: 'ghost',
+        s: bat,
+        text: 'Extra innings: ' + prev.name + ' starts on second base.',
+        hl: false
+      });
+    }
+    const scoreRuns = (names, batter, how) => {
+      names.forEach(n => {
+        if (!n) return;
+        runs++;
+        score[bat]++;
+        st(bat, n).r++;
+        if (batter) st(bat, batter).rbi++;
+      });
+    };
+    while (outs < 3) {
+      const lead = score[fld] - score[bat];
+      const tired = P.pc > 70 + (P.p.attrs.STA - 70) * 1.2;
+      const wantCloser = inning >= 9 && lead > 0 && lead <= 3 && T[fld].closer && P.p !== T[fld].closer && !P.used.includes(T[fld].closer.name);
+      if (tired || wantCloser) {
+        const next = wantCloser ? T[fld].closer : T[fld].middle.find(x => !P.used.includes(x.name) && x !== P.p) || (P.p.avg && P.p.name === 'Bullpen' ? null : mlbAvgPitcher('Bullpen'));
+        if (next && next !== P.p) {
+          P.used.push(P.p.name);
+          push({
+            kind: 'pchange',
+            s: fld,
+            p: next.name,
+            out: P.p.name,
+            text: 'Pitching change: ' + (next.avg ? 'the bullpen' : next.name) + ' comes in' + (P.p.avg ? '' : ' for ' + P.p.name + ' (' + P.pc + ' pitches)') + '.',
+            hl: !next.avg && wantCloser
+          });
+          P.p = next;
+          P.pc = 0;
+        }
+      }
+      const pit = P.p;
+      const B2 = T[bat].order[batIdx[bat] % 9];
+      batIdx[bat]++;
+      const H = B2.attrs;
+      const Pa = pit.attrs;
+      const fat = Math.max(0, P.pc - (60 + (Pa.STA - 70))) / 120;
+      const edge = (H.CON - Pa.STU) / 100 - fat * 0.6;
+      if (bases[0] && !bases[1] && outs < 2) {
+        const run = T[bat].order.find(x => x.name === bases[0]);
+        if (run && run.attrs.SPD > 88 && rng() < (run.attrs.SPD - 85) / 40) {
+          const safe = rng() < 0.62 + (run.attrs.SPD - 88) / 60;
+          if (safe) {
+            st(bat, run.name).sb++;
+            bases[1] = bases[0];
+            bases[0] = null;
+            push({
+              kind: 'sb',
+              s: bat,
+              b: run.name,
+              text: run.name + ' steals second!',
+              hl: !run.avg,
+              outs,
+              bases: [...bases]
+            });
+          } else {
+            bases[0] = null;
+            outs++;
+            push({
+              kind: 'cs',
+              s: bat,
+              b: run.name,
+              text: run.name + ' is caught stealing!',
+              hl: !run.avg,
+              outs,
+              bases: [...bases]
+            });
+            if (outs >= 3) break;
+          }
+        }
+      }
+      let balls = 0,
+        strikes = 0,
+        res = null;
+      const pitches = [];
+      while (!res) {
+        P.pc++;
+        const zone = clamp(0.485 + (Pa.CTL - 80) / 220 - fat * 0.25, 0.32, 0.68);
+        const inZone = rng() < zone;
+        const swingP = inZone ? clamp(0.67 + (strikes === 2 ? 0.12 : 0) - (H.EYE - 80) / 500, 0.45, 0.88) : clamp(0.29 - (H.EYE - 80) / 220 + (strikes === 2 ? 0.1 : 0), 0.1, 0.45);
+        if (!inZone && rng() < 0.006) {
+          res = 'hbp';
+          pitches.push('H');
+          break;
+        }
+        if (rng() >= swingP) {
+          if (inZone) {
+            strikes++;
+            pitches.push('C');
+          } else {
+            balls++;
+            pitches.push('B');
+          }
+        } else {
+          const contact = clamp((inZone ? 0.82 : 0.58) + edge * 0.35, 0.45, 0.95);
+          if (rng() >= contact) {
+            strikes++;
+            pitches.push('S');
+          } else if (rng() < 0.42) {
+            if (strikes < 2) strikes++;
+            pitches.push('F');
+          } else {
+            res = 'inplay';
+            pitches.push('X');
+          }
+        }
+        if (balls >= 4) res = 'bb';else if (strikes >= 3) res = 'k';
+      }
+      const pcName = pit.name;
+      st(fld, pcName).pc = (st(fld, pcName).pc || 0) + pitches.length;
+      const base = {
+        s: bat,
+        b: B2.name,
+        p: pcName,
+        pitches: pitches.join(''),
+        outsBefore: outs,
+        basesBefore: [...bases]
+      };
+      if (res === 'k') {
+        outs++;
+        st(bat, B2.name).ab++;
+        st(bat, B2.name).k++;
+        st(fld, pcName).pk++;
+        push({
+          ...base,
+          kind: 'k',
+          swing: pitches[pitches.length - 1] === 'S',
+          text: mlbLine(rng, 'k', {
+            p: pit.avg ? 'The pitcher' : pcName,
+            b: B2.name
+          }),
+          outs,
+          bases: [...bases],
+          hl: !pit.avg && (bases[1] || bases[2]) != null && rng() < 0.6
+        });
+        continue;
+      }
+      if (res === 'bb' || res === 'hbp') {
+        st(bat, B2.name).bb++;
+        st(fld, pcName).pbb++;
+        const forced = [];
+        if (bases[0]) {
+          if (bases[1]) {
+            if (bases[2]) forced.push(bases[2]);
+            bases[2] = bases[1];
+          }
+          bases[1] = bases[0];
+        }
+        bases[0] = B2.name;
+        scoreRuns(forced, B2.name);
+        push({
+          ...base,
+          kind: res,
+          text: res === 'hbp' ? B2.name + ' is hit by the pitch.' : mlbLine(rng, 'bb', {
+            b: B2.name
+          }) + (forced.length ? ' A run walks in!' : ''),
+          outs,
+          bases: [...bases],
+          hl: forced.length > 0
+        });
+        continue;
+      }
+      st(bat, B2.name).ab++;
+      const pHit = clamp(0.318 + edge * 0.28 - fat * -0.12, 0.2, 0.42);
+      const power = (H.POW - Pa.STU * 0.6 - 30) / 100;
+      const x = rng();
+      if (x < pHit) {
+        const hrShare = clamp(0.135 + power * 0.42 + fat * 0.08, 0.02, 0.38);
+        const y = rng();
+        const kind = y < hrShare ? 'hr' : y < hrShare + 0.03 + (H.SPD - 80) / 600 ? '3b' : y < hrShare + 0.24 + power * 0.12 ? '2b' : '1b';
+        st(bat, B2.name).h++;
+        st(fld, pcName).ph++;
+        const run = n => T[bat].order.find(p => p.name === n);
+        const fast = n => {
+          const r = run(n);
+          return r ? r.attrs.SPD : 76;
+        };
+        let scored = [];
+        if (kind === 'hr') {
+          scored = [bases[2], bases[1], bases[0], B2.name].filter(Boolean);
+          bases = [null, null, null];
+          st(bat, B2.name).hr++;
+        } else if (kind === '3b') {
+          scored = bases.filter(Boolean);
+          bases = [null, null, B2.name];
+        } else if (kind === '2b') {
+          scored = [bases[2], bases[1]].filter(Boolean);
+          const r1 = bases[0];
+          bases = [null, B2.name, null];
+          if (r1) {
+            if (rng() < 0.35 + (fast(r1) - 80) / 60) scored.push(r1);else bases[2] = r1;
+          }
+        } else {
+          if (bases[2]) scored.push(bases[2]);
+          const r2 = bases[1],
+            r1 = bases[0];
+          bases = [B2.name, null, null];
+          if (r2) {
+            if (rng() < 0.55 + (fast(r2) - 80) / 60) scored.push(r2);else bases[2] = r2;
+          }
+          if (r1) {
+            if (!bases[2] && rng() < 0.28 + (fast(r1) - 80) / 80) bases[2] = r1;else bases[1] = r1;
+          }
+        }
+        scoreRuns(scored, B2.name);
+        const grand = kind === 'hr' && scored.length === 4;
+        const e = push({
+          ...base,
+          kind,
+          runs: scored.length,
+          text: (grand ? 'GRAND SLAM! ' : '') + mlbLine(rng, kind, {
+            b: B2.name
+          }) + (scored.length && kind !== 'hr' ? ' ' + scored.length + ' run' + (scored.length > 1 ? 's' : '') + ' score' + (scored.length > 1 ? '' : 's') + '!' : kind === 'hr' && scored.length > 1 ? ' ' + scored.length + '-run homer!' : ''),
+          outs,
+          bases: [...bases],
+          hl: kind === 'hr' || scored.length > 0 || kind === '3b',
+          big: kind === 'hr'
+        });
+        if (half === 1 && inning >= 9 && score[1] > score[0]) {
+          e.walkoff = true;
+          e.text = 'WALK-OFF! ' + e.text;
+          e.hl = true;
+          e.big = true;
+          walkoff = true;
+          return runs;
+        }
+        continue;
+      }
+      if (rng() < 0.014) {
+        const r3 = bases[2];
+        bases = [B2.name, bases[0], bases[1]];
+        if (r3) scoreRuns([r3], null);
+        push({
+          ...base,
+          kind: 'err',
+          text: 'Error! ' + B2.name + ' reaches on a fumbled grounder' + (r3 ? ' and a run scores.' : '.'),
+          outs,
+          bases: [...bases],
+          hl: !!r3
+        });
+        if (half === 1 && inning >= 9 && score[1] > score[0]) {
+          walkoff = true;
+          return runs;
+        }
+        continue;
+      }
+      const type = weighted(rng, [['gb', 0.44 - power * 0.2], ['fb', 0.3 + power * 0.2], ['ld', 0.12], ['pu', 0.1]], z => Math.max(0.02, z[1]))[0];
+      let text,
+        kind = 'out',
+        dp = false,
+        sac = false;
+      const scored = [];
+      if (type === 'gb' && bases[0] && outs < 2 && rng() < 0.42 - (H.SPD - 80) / 200) {
+        outs += 2;
+        dp = true;
+        bases[0] = null;
+        if (bases[2] && outs < 3) {
+          scored.push(bases[2]);
+          bases[2] = null;
+        }
+        if (bases[1] && outs < 3) {
+          bases[2] = bases[1];
+          bases[1] = null;
+        }
+        text = B2.name + ' grounds into a DOUBLE PLAY!';
+        kind = 'dp';
+      } else {
+        outs++;
+        if (type === 'fb' && bases[2] && outs < 3 && rng() < 0.6) {
+          scored.push(bases[2]);
+          bases[2] = null;
+          sac = true;
+        }
+        if (type === 'gb' && outs < 3) {
+          if (bases[2] && !bases[1] && rng() < 0.4) {
+            scored.push(bases[2]);
+            bases[2] = null;
+          }
+          if (bases[1] && !bases[2]) {
+            bases[2] = bases[1];
+            bases[1] = null;
+          }
+          if (bases[0] && !bases[1]) {
+            bases[1] = bases[0];
+            bases[0] = null;
+          }
+        }
+        text = B2.name + {
+          gb: ' grounds out',
+          fb: sac ? ' hits a sacrifice fly — a run scores' : ' flies out',
+          ld: ' lines out',
+          pu: ' pops up'
+        }[type] + '.';
+        if (type === 'ld' && rng() < 0.3) text = 'Diving catch! ' + B2.name + ' is robbed on a line drive.';
+      }
+      if (scored.length) scoreRuns(scored, dp ? null : B2.name);
+      if (sac) st(bat, B2.name).ab--;
+      const e = push({
+        ...base,
+        kind,
+        type,
+        dp,
+        sac,
+        runs: scored.length,
+        text,
+        outs: Math.min(3, outs),
+        bases: [...bases],
+        hl: dp || /Diving/.test(text) || scored.length > 0
+      });
+      if (half === 1 && inning >= 9 && score[1] > score[0]) {
+        e.walkoff = true;
+        e.text = 'WALK-OFF! ' + e.text;
+        e.hl = true;
+        walkoff = true;
+        return runs;
+      }
+    }
+    return runs;
+  };
+  while (!done) {
+    for (half = 0; half < 2; half++) {
+      if (half === 1 && inning >= 9 && score[1] > score[0]) {
+        line[1].push('X');
+        break;
+      }
+      const r = play();
+      line[half].push(r);
+      if (walkoff) break;
+      push({
+        kind: 'side',
+        s: half,
+        text: (half === 0 ? 'Top' : 'Bottom') + ' of the ' + inning + ordinalSuffix(inning) + ': ' + r + ' run' + (r === 1 ? '' : 's') + '. ' + score[0] + '–' + score[1] + '.',
+        hl: false
+      });
+    }
+    if (inning >= 9 && score[0] !== score[1]) done = true;
+    if (inning >= 15 && score[0] === score[1]) {
+      const w = rng() < 0.5 ? 0 : 1;
+      score[w]++;
+      line[w][line[w].length - 1] = (+line[w][line[w].length - 1] || 0) + 1;
+      push({
+        kind: 'end',
+        s: w,
+        text: 'A wild pitch brings home the winning run in the 15th!',
+        hl: true
+      });
+      done = true;
+    }
+    if (!done) inning++;
+  }
+  ev.forEach(e => {
+    if (e.inn >= 9 && Math.abs(e.score[0] - e.score[1]) <= 2 && ['k', 'out', '1b', '2b', '3b', 'hr', 'dp', 'bb'].includes(e.kind)) e.hl = true;
+  });
+  const winner = score[0] > score[1] ? 0 : 1;
+  const hits = [0, 1].map(s => ev.filter(e => e.s === s && ['1b', '2b', '3b', 'hr'].includes(e.kind)).length);
+  const lineups = T.map(t => ({
+    order: t.order.map(p => ({
+      name: p.name,
+      itemId: p.itemId,
+      avg: !!p.avg
+    })),
+    starter: t.starter.name,
+    pitchers: [t.starter, t.closer, ...t.middle].filter(Boolean).map(p => p.name)
+  }));
+  return {
+    v: 'mlb',
+    kind: 'mlb',
+    score: [...score],
+    winner,
+    innings: inning,
+    line,
+    hits,
+    plays: ev,
+    box,
+    lineups,
+    walkoff,
+    et: inning > 9,
+    pens: null,
+    sudden: false,
+    events: []
+  };
+}
+const ordinalSuffix = n => n % 100 >= 11 && n % 100 <= 13 ? 'th' : ['th', 'st', 'nd', 'rd'][n % 10] || 'th';
 const HOOPS_SHAPE = {
   G: {
     SHO: 0.98,
@@ -23696,6 +24307,15 @@ const BATTLE_KINDS = {
     upset: ['Who knew? {w} beats {l} when it counts!', 'Surprise hero: {w}!'],
     noshow: ['{w} wins the night — the other team had nothing.']
   },
+  mlb: {
+    name: 'Baseball game',
+    start: 'Play ball',
+    emoji: '⚾',
+    round: 'Inning',
+    win: [''],
+    upset: [''],
+    noshow: ['{w} wins by forfeit.']
+  },
   cricket: {
     name: 'T20 match',
     start: 'Toss the coin',
@@ -23789,6 +24409,7 @@ function simulateFor(d, A, B, key, opts) {
   if (k === 'nfl') return simulateNFL(d, A, B, key);
   if (k === 'nhl') return simulateHockey(d, A, B, key);
   if (k === 'cricket') return simulateCricket(d, A, B, key);
+  if (k === 'mlb') return simulateBaseball(d, A, B, key);
   if (k === 'survival') return simulateSurvival(d, A, B, key);
   if (k === 'powers' || k === 'weird') return simulateMissions(d, A, B, key);
   if (k === 'cute') return simulatePuppyBowl(d, A, B, key, opts && opts.knockout === false ? false : true);
@@ -23801,6 +24422,7 @@ function simWhy(w, mt) {
     const f = mt.final[mt.winner];
     return w.name + (f.rescued ? ' got rescued' : ' survived ' + ws + ' day' + (ws === 1 ? '' : 's')) + (ws !== ls ? ' (the others lasted ' + ls + ')' : mt.how === 'rescue' ? ', and got rescued first' : mt.how === 'shape' ? ', level on days but in better shape' : ' and won the last night') + '.';
   }
+  if (mt.v === 'mlb') return w.name + ' won ' + mt.score[mt.winner] + '–' + mt.score[1 - mt.winner] + (mt.walkoff ? ' on a walk-off' : '') + (mt.innings > 9 ? ' in ' + mt.innings + ' innings' : '') + '.';
   if (mt.v === 'cricket') return crkResultLine(mt, mt.winner === 0 ? w : {
     name: 'the others'
   }, mt.winner === 1 ? w : {
@@ -23825,7 +24447,7 @@ function simWhy(w, mt) {
   if (mt.v === 'mission') return w.name + ' won ' + mt.score[mt.winner] + ' of ' + mt.missions.length + ' missions.';
   return w.name + ' won the ' + (BATTLE_KINDS[mt.kind] || BATTLE_KINDS.fight).name.toLowerCase() + ' ' + mt.score[mt.winner] + '–' + mt.score[1 - mt.winner] + (mt.sudden ? ' in sudden death' : '') + '.';
 }
-const isSimResult = mt => !!mt && (mt.v === 'cricket' || mt.v === 'nhl' || mt.v === 'nfl' || mt.v === 'tennis' || mt.v === 'gp' || mt.v === 'card' || mt.v === 'hoops' || mt.v === 'battle' || mt.v === 'arena' || mt.v === 'survival' || mt.v === 'mission' || mt.v === 'show');
+const isSimResult = mt => !!mt && (mt.v === 'mlb' || mt.v === 'cricket' || mt.v === 'nhl' || mt.v === 'nfl' || mt.v === 'tennis' || mt.v === 'gp' || mt.v === 'card' || mt.v === 'hoops' || mt.v === 'battle' || mt.v === 'arena' || mt.v === 'survival' || mt.v === 'mission' || mt.v === 'show');
 function battleDuel(rng, kind, a, b, maxP) {
   const fill = (lines, w, l) => lines[Math.floor(rng() * lines.length)].replace('{w}', w).replace('{l}', l);
   if (!a || !b) {
@@ -32313,7 +32935,7 @@ function TopicEditor({
   }, "Fun battles (Battles finale)"), React.createElement(Seg, {
     label: "Fun battle style",
     value: topic.battle || 'none',
-    options: [['none', 'Off'], ['fight', '⚔️ Fight'], ['powers', '💥 Powers'], ['survival', '🧟 Survival'], ['cute', '🥰 Puppy Bowl'], ['weird', '🤡 Silly'], ['combat', '🥊 Fight night'], ['f1', '🏎️ Grand Prix'], ['tennis', '🎾 Tennis'], ['nfl', '🏈 American football'], ['nhl', '🏒 Ice hockey'], ['cricket', '🏏 Cricket'], ['basketball', '🏀 Basketball']],
+    options: [['none', 'Off'], ['fight', '⚔️ Fight'], ['powers', '💥 Powers'], ['survival', '🧟 Survival'], ['cute', '🥰 Puppy Bowl'], ['weird', '🤡 Silly'], ['combat', '🥊 Fight night'], ['f1', '🏎️ Grand Prix'], ['tennis', '🎾 Tennis'], ['nfl', '🏈 American football'], ['nhl', '🏒 Ice hockey'], ['cricket', '🏏 Cricket'], ['mlb', '⚾ Baseball'], ['basketball', '🏀 Basketball']],
     onChange: v => set({
       battle: v === 'none' ? '' : v
     })
@@ -34478,6 +35100,9 @@ function ItemCard({
     item: item,
     topic: d.topic
   }) : battleKindId(d.topic) === 'cricket' ? React.createElement(CrkChip, {
+    item: item,
+    topic: d.topic
+  }) : battleKindId(d.topic) === 'mlb' ? React.createElement(MLBChip, {
     item: item,
     topic: d.topic
   }) : hasBattle(d.topic) && React.createElement(StatChip, {
@@ -39282,7 +39907,12 @@ if (window.__DN_TEST__) window.__DN = {
     cricketScript,
     cricketFrame,
     cricketReport,
-    crkResultLine
+    crkResultLine,
+    simulateBaseball,
+    mlbRating,
+    mlbScript,
+    mlbFrame,
+    mlbReport
   },
   simStats: {
     simulatePuppyBowl,
@@ -41912,6 +42542,766 @@ function CrkChip({
     onClick: () => setOpen(false)
   }, "Close")), document.body));
 }
+const DM = {
+  home: {
+    x: 50,
+    y: 62
+  },
+  b1: {
+    x: 65,
+    y: 47
+  },
+  b2: {
+    x: 50,
+    y: 32
+  },
+  b3: {
+    x: 35,
+    y: 47
+  },
+  mound: {
+    x: 50,
+    y: 48.5
+  }
+};
+const DM_BASES = [DM.home, DM.b1, DM.b2, DM.b3, DM.home];
+const DM_FIELD = [{
+  x: 50,
+  y: 48.5
+}, {
+  x: 50,
+  y: 66
+}, {
+  x: 66,
+  y: 43
+}, {
+  x: 58,
+  y: 35
+}, {
+  x: 42,
+  y: 35
+}, {
+  x: 34,
+  y: 43
+}, {
+  x: 27,
+  y: 22
+}, {
+  x: 50,
+  y: 14
+}, {
+  x: 73,
+  y: 22
+}];
+const lerpD = (a, b, u) => ({
+  x: a.x + (b.x - a.x) * Math.max(0, Math.min(1, u)),
+  y: a.y + (b.y - a.y) * Math.max(0, Math.min(1, u))
+});
+const basePath = f => {
+  const i = Math.max(0, Math.min(3, Math.floor(f)));
+  return lerpD(DM_BASES[i], DM_BASES[i + 1], f - i);
+};
+const PA_KINDS = ['k', 'bb', 'hbp', '1b', '2b', '3b', 'hr', 'out', 'dp', 'err'];
+function mlbScript(match) {
+  const beats = [];
+  let t = 0;
+  const add = b => {
+    b.t0 = t;
+    t += b.dur;
+    beats.push(b);
+    return b;
+  };
+  add({
+    type: 'intro',
+    dur: 2.4
+  });
+  let roll = [];
+  let lastHalf = null;
+  const flush = () => {
+    if (!roll.length) return;
+    add({
+      type: 'roll',
+      dur: Math.min(2.2, 0.5 + roll.length * 0.14),
+      evs: roll
+    });
+    roll = [];
+  };
+  match.plays.forEach(e => {
+    const hk = e.inn + ':' + e.half;
+    if (hk !== lastHalf && e.kind !== 'side') {
+      flush();
+      add({
+        type: 'half',
+        dur: 1.6,
+        e
+      });
+      lastHalf = hk;
+    }
+    if (e.kind === 'side') {
+      flush();
+      add({
+        type: 'side',
+        dur: 1.4,
+        e
+      });
+      return;
+    }
+    if (e.hl && PA_KINDS.includes(e.kind)) {
+      flush();
+      const n = Math.min(6, (e.pitches || 'X').length);
+      add({
+        type: 'pa',
+        dur: 0.6 + n * 0.5 + (['k', 'bb', 'hbp'].includes(e.kind) ? 1.2 : 2.6),
+        e
+      });
+    } else if (e.hl) {
+      flush();
+      add({
+        type: 'note',
+        dur: 2,
+        e
+      });
+    } else roll.push(e);
+  });
+  flush();
+  add({
+    type: 'final',
+    dur: 2.8
+  });
+  return {
+    beats,
+    total: t
+  };
+}
+const shownPitches = e => {
+  const p = e.pitches || 'X';
+  return p.length > 6 ? p.slice(-6) : p;
+};
+function countAt(e, n) {
+  let b = 0,
+    s = 0;
+  const all = e.pitches || '';
+  const skip = all.length - shownPitches(e).length;
+  for (let i = 0; i < skip + n && i < all.length; i++) {
+    const c = all[i];
+    if (c === 'B') b++;else if (c === 'C' || c === 'S') s++;else if (c === 'F' && s < 2) s++;
+  }
+  return [Math.min(3, b), Math.min(2, s)];
+}
+function mlbFrame(beat, u) {
+  const out = {
+    F: DM_FIELD.map(p => ({
+      ...p
+    })),
+    ball: null,
+    banner: null,
+    runners: [],
+    batter: null,
+    count: null
+  };
+  if (beat.type !== 'pa') return out;
+  const e = beat.e;
+  const ps = shownPitches(e);
+  const n = ps.length;
+  const k = (a, b) => Math.max(0, Math.min(1, (u - a) / (b - a)));
+  const t0 = 0.6,
+    per = 0.5;
+  const pi = Math.min(n - 1, Math.floor((u - t0) / per));
+  out.count = countAt(e, Math.max(0, Math.min(n, Math.floor((u - t0) / per))));
+  const before = e.basesBefore || [null, null, null];
+  const after = e.bases || [null, null, null];
+  const endBase = name => {
+    const i = after.indexOf(name);
+    return i >= 0 ? i + 1 : 4;
+  };
+  const playT = t0 + n * per;
+  const runK = easeC(k(playT + 0.3, playT + 1.9));
+  before.forEach((name, i) => {
+    if (!name) return;
+    const tgt = e.kind === 'k' || e.kind === 'out' && !e.sac && !e.runs && after.includes(name) && after.indexOf(name) === i ? i + 1 : e.kind === 'dp' && i === 0 && !after.includes(name) ? 1.6 : endBase(name);
+    out.runners.push({
+      name,
+      p: basePath(i + 1 + (tgt - (i + 1)) * runK),
+      out: e.kind === 'dp' && i === 0 && runK > 0.6
+    });
+  });
+  if (u < playT) {
+    const f = (u - t0) / per;
+    const kk = f - Math.floor(f);
+    if (u > t0 && kk < 0.7) out.ball = {
+      ...lerpD(DM.mound, DM.home, kk / 0.7),
+      h: 0.6
+    };
+    out.batter = {
+      name: e.b,
+      p: {
+        x: 47.5,
+        y: 62
+      },
+      swing: ps[pi] === 'S' || ps[pi] === 'F' || ps[pi] === 'X' ? kk > 0.6 : false
+    };
+    if (ps[pi] === 'F' && kk > 0.7) out.ball = {
+      ...lerpD(DM.home, {
+        x: 30 + unit('foul', e.i, pi) * 40,
+        y: 72
+      }, (kk - 0.7) / 0.3),
+      h: 2
+    };
+    return out;
+  }
+  const last = ps[n - 1];
+  if (e.kind === 'k') {
+    out.banner = last === 'S' ? 'STRIKE THREE!' : 'STRUCK OUT LOOKING';
+    out.batter = {
+      name: e.b,
+      p: {
+        x: 47.5,
+        y: 62
+      }
+    };
+    out.count = [countAt(e, n)[0], 3];
+    return out;
+  }
+  if (e.kind === 'bb' || e.kind === 'hbp') {
+    out.banner = e.kind === 'bb' ? 'WALK' : 'HIT BY PITCH';
+    out.batter = {
+      name: e.b,
+      p: lerpD(DM.home, DM.b1, k(playT, playT + 1))
+    };
+    out.count = [4, countAt(e, n)[1]];
+    return out;
+  }
+  const ang = (unit('spray', e.i) - 0.5) * 1.5;
+  const dist = e.kind === 'hr' ? 62 : e.kind === '3b' ? 46 : e.kind === '2b' ? 42 : e.kind === '1b' ? 26 + unit('d1', e.i) * 8 : e.type === 'gb' || e.kind === 'dp' || e.kind === 'err' ? 20 : e.type === 'pu' ? 14 : e.type === 'ld' ? 30 : 40;
+  const land = {
+    x: DM.home.x + Math.sin(ang) * dist,
+    y: DM.home.y - Math.cos(ang) * dist
+  };
+  const fk = k(playT, playT + (e.kind === 'hr' ? 1.5 : 1.0));
+  const high = e.kind === 'hr' ? 16 : e.type === 'fb' || e.type === 'pu' ? 10 : e.type === 'ld' || e.kind === '2b' || e.kind === '3b' ? 3 : 0.5;
+  out.ball = {
+    ...lerpD(DM.home, land, fk),
+    h: Math.sin(fk * Math.PI) * high
+  };
+  const fi = out.F.reduce((b, p, i) => i > 1 && Math.hypot(p.x - land.x, p.y - land.y) < Math.hypot(out.F[b].x - land.x, out.F[b].y - land.y) ? i : b, 2);
+  if (e.kind !== 'hr') out.F[fi] = lerpD(out.F[fi], land, fk * (['1b', '2b', '3b'].includes(e.kind) ? 0.8 : 1));
+  if (fk >= 1 && e.kind !== 'hr' && !['1b', '2b', '3b'].includes(e.kind)) out.ball = {
+    ...out.F[fi],
+    h: 0.5
+  };
+  const bb2 = e.kind === 'hr' ? 4 : e.kind === '3b' ? 3 : e.kind === '2b' ? 2 : e.kind === '1b' || e.kind === 'err' ? 1 : 0.45;
+  out.batter = {
+    name: e.b,
+    p: basePath(bb2 * runK),
+    out: bb2 < 1 && runK > 0.8
+  };
+  if (fk > 0.5) out.banner = e.walkoff && u > playT + 1.3 ? 'WALK-OFF!' : e.kind === 'hr' ? e.runs === 4 ? 'GRAND SLAM!' : 'HOME RUN!' : e.kind === '3b' ? 'TRIPLE!' : e.kind === '2b' ? 'DOUBLE!' : e.kind === '1b' ? 'BASE HIT' : e.kind === 'dp' ? 'DOUBLE PLAY!' : e.kind === 'err' ? 'ERROR!' : e.sac ? 'SAC FLY' : /Diving/.test(e.text || '') ? 'DIVING CATCH!' : 'OUT';
+  return out;
+}
+function DiamondView({
+  d,
+  A,
+  B,
+  match,
+  speed,
+  onDone,
+  label
+}) {
+  const script = useMemo(() => mlbScript(match), [match]);
+  const base = speed === 'fast' ? 2 : 1;
+  const [t, setT] = useState(speed === 'instant' ? script.total : 0);
+  const [playing, setPlaying] = useState(speed !== 'instant');
+  const [mult, setMult] = useState(1);
+  const done = t >= script.total;
+  const fired = useRef(false);
+  useEffect(() => {
+    if (!playing || done) return undefined;
+    let raf;
+    let last = performance.now();
+    const tick = now => {
+      const dt = Math.min(0.1, (now - last) / 1000);
+      last = now;
+      setT(x => Math.min(script.total, x + dt * base * mult / Math.max(0.001, GAME_SPEED)));
+      raf = requestAnimationFrame(tick);
+    };
+    raf = requestAnimationFrame(tick);
+    return () => cancelAnimationFrame(raf);
+  }, [playing, done, mult, base]);
+  useEffect(() => {
+    if (done && !fired.current) {
+      fired.current = true;
+      audio.play('cheer');
+      onDone && onDone();
+    }
+  }, [done]);
+  const bi = Math.max(0, script.beats.findIndex(b => t < b.t0 + b.dur));
+  const beat = done ? script.beats[script.beats.length - 1] : script.beats[bi];
+  const u = done ? beat.dur : t - beat.t0;
+  const fr = mlbFrame(beat, u);
+  const evNow = beat.type === 'pa' || beat.type === 'note' || beat.type === 'half' || beat.type === 'side' ? beat.e : beat.type === 'roll' ? beat.evs[Math.min(beat.evs.length - 1, Math.floor(u / beat.dur * beat.evs.length))] : null;
+  const prev = e => {
+    const p = match.plays[e.i - 1];
+    return p ? p.score : [0, 0];
+  };
+  const resolved = beat.type !== 'pa' || u > beat.dur - 1.4;
+  const score = done || beat.type === 'final' ? match.score : evNow ? resolved ? evNow.score : prev(evNow) : [0, 0];
+  const outs = evNow ? beat.type === 'half' ? 0 : resolved ? evNow.outs || 0 : evNow.outsBefore || 0 : 0;
+  const bases = evNow ? beat.type === 'half' ? [null, null, null] : resolved ? evNow.bases || [null, null, null] : evNow.basesBefore || [null, null, null] : [null, null, null];
+  const status = done || beat.type === 'final' ? 'FINAL' + (match.innings > 9 ? '/' + match.innings : '') : beat.type === 'intro' ? 'PLAY BALL' : evNow ? (evNow.half === 0 ? '▲' : '▼') + ' ' + evNow.inn + ordinalSuffix(evNow.inn) : '';
+  const batting = evNow ? evNow.half : 0;
+  const colors = [A.color, B.color];
+  const short = n => {
+    if (/^Lineup hitter|^Bullpen|^Starter/.test(String(n || ''))) return '';
+    const w = String(n || '').split(' ');
+    return w[w.length - 1].slice(0, 10);
+  };
+  const banner = done ? null : beat.type === 'intro' ? 'PLAY BALL!' : beat.type === 'half' ? (beat.e.half === 0 ? 'TOP ' : 'BOTTOM ') + beat.e.inn + ordinalSuffix(beat.e.inn).toUpperCase() : beat.type === 'final' ? 'FINAL' : beat.type === 'note' ? beat.e.kind === 'sb' ? 'STOLEN BASE!' : beat.e.kind === 'cs' ? 'CAUGHT STEALING' : beat.e.kind === 'pchange' ? 'PITCHING CHANGE' : null : fr.banner;
+  const lastBeat = useRef(-1);
+  useEffect(() => {
+    if (!playing || done || bi === lastBeat.current) return;
+    lastBeat.current = bi;
+    if (beat.type === 'half') audio.play('whistle');
+  }, [bi]);
+  const said = useRef({});
+  useEffect(() => {
+    if (!playing || done || beat.type !== 'pa' || said.current[bi] || u < beat.dur - 1.6) return;
+    said.current[bi] = true;
+    const e = beat.e;
+    if (e.kind === 'hr') {
+      audio.play('cheer');
+      audio.say((e.walkoff ? 'Walk-off! ' : '') + e.b + ', home run!', 2, d.id + ':' + label + ':hr' + bi);
+    } else if (e.kind === 'k') audio.play('card');else if (['1b', '2b', '3b'].includes(e.kind)) audio.play('bid');else if (e.kind === 'dp') audio.play('buzzer');
+  }, [t]);
+  const feed = [];
+  script.beats.forEach((b, k2) => {
+    if (!done && b.t0 + b.dur * 0.8 > t) return;
+    if (b.type === 'pa' || b.type === 'note') feed.push({
+      k: k2,
+      tag: (b.e.half === 0 ? '▲' : '▼') + b.e.inn,
+      team: b.e.s,
+      big: b.e.kind === 'hr' || b.e.walkoff,
+      text: b.e.text
+    });else if (b.type === 'side' && b.e.text) feed.push({
+      k: k2,
+      tag: (b.e.half === 0 ? '▲' : '▼') + b.e.inn,
+      text: b.e.text,
+      half: true
+    });
+  });
+  const feedRef = useRef(null);
+  useEffect(() => {
+    const f = feedRef.current;
+    if (f) f.scrollTop = f.scrollHeight;
+  }, [feed.length]);
+  const L = match.lineups;
+  return React.createElement("div", {
+    className: "matchview diamondview"
+  }, React.createElement("div", {
+    className: "scoreboard"
+  }, React.createElement("div", {
+    className: "sb-team"
+  }, React.createElement(Badge, {
+    m: A
+  }), React.createElement("span", {
+    className: "sb-n"
+  }, A.name)), React.createElement("div", {
+    className: "sb-mid"
+  }, React.createElement("span", {
+    className: "sb-score num",
+    "aria-live": "polite"
+  }, score[0], "\u2013", score[1]), React.createElement("span", {
+    className: "sb-clock num"
+  }, status)), React.createElement("div", {
+    className: "sb-team"
+  }, React.createElement(Badge, {
+    m: B
+  }), React.createElement("span", {
+    className: "sb-n"
+  }, B.name))), React.createElement("div", {
+    className: "boutbar small"
+  }, React.createElement("span", {
+    className: "muted"
+  }, "Outs"), " ", React.createElement("b", {
+    className: "outs"
+  }, [0, 1, 2].map(i => React.createElement("i", {
+    key: i,
+    className: i < outs ? 'on' : ''
+  }))), fr.count && React.createElement("span", {
+    className: "muted"
+  }, " \xB7 Count ", React.createElement("b", {
+    className: "num"
+  }, fr.count[0], "\u2013", fr.count[1])), beat.type === 'pa' && React.createElement("span", {
+    className: "boutstats"
+  }, "\uD83E\uDDE2 ", beat.e.b, " vs \u26BE ", beat.e.p)), React.createElement("div", {
+    className: "pitchwrap"
+  }, React.createElement("svg", {
+    className: "pitchsvg diamondsvg",
+    viewBox: "0 0 100 72",
+    role: "img",
+    "aria-label": 'Baseball: ' + A.name + ' ' + score[0] + ', ' + B.name + ' ' + score[1] + ', ' + status + ', ' + outs + ' out'
+  }, React.createElement("rect", {
+    x: "0",
+    y: "0",
+    width: "100",
+    height: "72",
+    fill: "#1f5a26"
+  }), React.createElement("path", {
+    d: 'M50 62 L' + (50 - 52 * Math.sin(0.79)) + ' ' + (62 - 52 * Math.cos(0.79)) + ' A52 52 0 0 1 ' + (50 + 52 * Math.sin(0.79)) + ' ' + (62 - 52 * Math.cos(0.79)) + ' Z',
+    fill: "#3f8d38"
+  }), React.createElement("path", {
+    d: 'M' + (50 - 52 * Math.sin(0.79)) + ' ' + (62 - 52 * Math.cos(0.79)) + ' A52 52 0 0 1 ' + (50 + 52 * Math.sin(0.79)) + ' ' + (62 - 52 * Math.cos(0.79)),
+    fill: "none",
+    stroke: "#f2c14e",
+    strokeWidth: "0.8"
+  }), React.createElement("path", {
+    d: "M50 66 L68 47 L50 28.5 L32 47 Z",
+    fill: "#c9905a"
+  }), React.createElement("path", {
+    d: "M50 62 L62.5 49.5 L50 37 L37.5 49.5 Z",
+    fill: "#3f8d38"
+  }), React.createElement("circle", {
+    cx: DM.mound.x,
+    cy: DM.mound.y,
+    r: "2",
+    fill: "#c9905a"
+  }), React.createElement("line", {
+    x1: "50",
+    y1: "62",
+    x2: "10",
+    y2: "22",
+    stroke: "#fff",
+    strokeWidth: "0.3"
+  }), React.createElement("line", {
+    x1: "50",
+    y1: "62",
+    x2: "90",
+    y2: "22",
+    stroke: "#fff",
+    strokeWidth: "0.3"
+  }), [DM.b1, DM.b2, DM.b3].map((p, i) => React.createElement("rect", {
+    key: i,
+    x: p.x - 1,
+    y: p.y - 1,
+    width: "2",
+    height: "2",
+    fill: bases[i] ? '#ffd23d' : '#fff',
+    transform: 'rotate(45 ' + p.x + ' ' + p.y + ')'
+  })), React.createElement("path", {
+    d: "M48.8 61.6 L51.2 61.6 L51.2 62.6 L50 63.6 L48.8 62.6 Z",
+    fill: "#fff"
+  }), beat.type !== 'intro' && fr.F.map((p, i) => React.createElement("circle", {
+    key: i,
+    cx: p.x,
+    cy: p.y,
+    r: "1.25",
+    fill: colors[1 - batting],
+    stroke: "rgba(0,0,0,.5)",
+    strokeWidth: "0.25"
+  })), beat.type === 'pa' && React.createElement("text", {
+    x: DM.mound.x,
+    y: DM.mound.y - 2,
+    textAnchor: "middle",
+    fontSize: "1.9",
+    fontWeight: "800",
+    fill: "#fff",
+    stroke: "#0f0c21",
+    strokeWidth: "0.4",
+    paintOrder: "stroke"
+  }, short(beat.e.p)), beat.type !== 'pa' && bases.map((n, i) => n ? React.createElement("g", {
+    key: 'b' + i
+  }, React.createElement("circle", {
+    cx: DM_BASES[i + 1].x,
+    cy: DM_BASES[i + 1].y - 1.6,
+    r: "1.2",
+    fill: colors[batting],
+    stroke: "#fff",
+    strokeWidth: "0.3"
+  }), short(n) && React.createElement("text", {
+    x: DM_BASES[i + 1].x,
+    y: DM_BASES[i + 1].y - 3.4,
+    textAnchor: "middle",
+    fontSize: "1.8",
+    fontWeight: "800",
+    fill: "#fff",
+    stroke: "#0f0c21",
+    strokeWidth: "0.4",
+    paintOrder: "stroke"
+  }, short(n))) : null), fr.runners.map(r => React.createElement("g", {
+    key: r.name,
+    transform: 'translate(' + r.p.x.toFixed(2) + ' ' + (r.p.y - 1.6).toFixed(2) + ')',
+    opacity: r.out ? 0.4 : 1
+  }, React.createElement("circle", {
+    r: "1.2",
+    fill: colors[batting],
+    stroke: "#fff",
+    strokeWidth: "0.3"
+  }), short(r.name) && React.createElement("text", {
+    y: "-1.8",
+    textAnchor: "middle",
+    fontSize: "1.8",
+    fontWeight: "800",
+    fill: "#fff",
+    stroke: "#0f0c21",
+    strokeWidth: "0.4",
+    paintOrder: "stroke"
+  }, short(r.name)))), fr.batter && React.createElement("g", {
+    transform: 'translate(' + fr.batter.p.x.toFixed(2) + ' ' + fr.batter.p.y.toFixed(2) + ')',
+    opacity: fr.batter.out ? 0.45 : 1
+  }, React.createElement("circle", {
+    r: "1.35",
+    fill: colors[batting],
+    stroke: "#fff",
+    strokeWidth: "0.4"
+  }), React.createElement("line", {
+    x1: "0.6",
+    y1: "-0.4",
+    x2: fr.batter.swing ? 3.4 : 1.2,
+    y2: fr.batter.swing ? -0.6 : -3,
+    stroke: "#d9b98a",
+    strokeWidth: "0.55",
+    strokeLinecap: "round"
+  }), React.createElement("text", {
+    y: "3.4",
+    textAnchor: "middle",
+    fontSize: "1.9",
+    fontWeight: "800",
+    fill: "#fff",
+    stroke: "#0f0c21",
+    strokeWidth: "0.4",
+    paintOrder: "stroke"
+  }, short(fr.batter.name))), fr.ball && React.createElement("g", null, React.createElement("ellipse", {
+    cx: fr.ball.x,
+    cy: fr.ball.y + 0.3,
+    rx: "0.5",
+    ry: "0.28",
+    fill: "rgba(0,0,0,.3)"
+  }), React.createElement("circle", {
+    cx: fr.ball.x,
+    cy: fr.ball.y - (fr.ball.h || 0) * 0.45,
+    r: 0.5 + (fr.ball.h || 0) * 0.035,
+    fill: "#fff",
+    stroke: "#c0272d",
+    strokeWidth: "0.12"
+  })), (done || beat.type === 'final') && React.createElement("g", null, React.createElement("rect", {
+    x: "0",
+    y: "0",
+    width: "100",
+    height: "72",
+    fill: "rgba(15,12,33,.6)"
+  }), React.createElement("text", {
+    x: "50",
+    y: "28",
+    textAnchor: "middle",
+    fontSize: "7",
+    fontWeight: "900",
+    fill: colors[match.winner],
+    stroke: "#0f0c21",
+    strokeWidth: "0.6",
+    paintOrder: "stroke"
+  }, (match.winner === 0 ? A : B).name.toUpperCase().slice(0, 16), " WIN"), React.createElement("text", {
+    x: "50",
+    y: "37",
+    textAnchor: "middle",
+    fontSize: "5",
+    fontWeight: "900",
+    fill: "#ffc83d"
+  }, match.score[0], "\u2013", match.score[1], match.walkoff ? ' · walk-off' : '')), banner && React.createElement("text", {
+    x: "50",
+    y: "9",
+    textAnchor: "middle",
+    fontSize: banner.length > 14 ? 5 : 6.5,
+    fontWeight: "900",
+    fill: /HOME RUN|SLAM|WALK-OFF|TRIPLE|DOUBLE|STRIKE|DIVING|STOLEN/.test(banner) ? '#ffc83d' : '#fff',
+    stroke: "#0f0c21",
+    strokeWidth: "0.6",
+    paintOrder: "stroke",
+    className: "pbanner"
+  }, banner))), React.createElement("div", {
+    className: "mctrl",
+    role: "group",
+    "aria-label": "Game controls"
+  }, !done && React.createElement("button", {
+    className: "btn btn-sm",
+    onClick: () => setPlaying(x => !x),
+    "aria-label": playing ? 'Pause' : 'Play'
+  }, playing ? '⏸ Pause' : '▶ Play'), !done && [1, 2, 4].map(x => React.createElement("button", {
+    key: x,
+    className: 'btn btn-sm' + (mult === x ? ' btn-gold' : ''),
+    "aria-pressed": mult === x,
+    onClick: () => setMult(x)
+  }, x, "\xD7")), !done && React.createElement("button", {
+    className: "btn btn-sm btn-ghost",
+    onClick: () => setT(script.total)
+  }, "Skip to result"), done && React.createElement("button", {
+    className: "btn btn-sm",
+    onClick: () => {
+      fired.current = true;
+      said.current = {};
+      setT(0);
+      setPlaying(true);
+    }
+  }, "\u21BA Watch again")), React.createElement("div", {
+    className: "mfeed",
+    ref: feedRef,
+    "aria-live": "polite"
+  }, feed.map(e => React.createElement("p", {
+    key: e.k,
+    className: 'mev ' + (e.big ? 'goal' : e.half ? 'half' : '') + (e.team != null ? ' t' + e.team : '')
+  }, React.createElement("span", {
+    className: "mm num"
+  }, e.tag), React.createElement("span", null, e.big ? '⚾ ' : '', e.text)))), done && React.createElement(MLBSummary, {
+    d: d,
+    A: A,
+    B: B,
+    match: match
+  }));
+}
+function mlbReport(d, A, B, match) {
+  const T = [A, B];
+  const rows = [0, 1].flatMap(s => Object.entries(match.box[s]).map(([name, b]) => ({
+    team: s,
+    name,
+    ...b,
+    gs: b.h * 2 + b.hr * 4 + b.rbi * 2 + b.r + b.bb + b.sb * 1.5 + b.pk * 1.2 - b.ph * 0.8 - b.pbb * 0.6 + (b.pc ? b.pc / 15 : 0)
+  })));
+  const real = rows.filter(r => !/^Lineup hitter|^Bullpen|^Starter/.test(r.name));
+  const mvp = real.filter(r => r.team === match.winner).sort((x, y) => y.gs - x.gs)[0] || null;
+  const price = (s, name) => {
+    const e = T[s].team.find(x => x && d.items[x.itemId] && d.items[x.itemId].name === name);
+    return e ? e.price || 0 : 0;
+  };
+  const wp = real.map(r => ({
+    ...r,
+    price: price(r.team, r.name)
+  }));
+  const best = wp.filter(r => r.gs > 3 && r.price > 0).sort((x, y) => y.gs / y.price - x.gs / x.price)[0] || null;
+  const flop = wp.filter(r => r.price >= 3).sort((x, y) => x.gs / x.price - y.gs / y.price)[0] || null;
+  let lead = 0,
+    gw = null;
+  match.plays.forEach(e => {
+    const l = Math.sign(e.score[0] - e.score[1]);
+    if (l !== lead) {
+      if (l === (match.winner === 0 ? 1 : -1)) gw = e;
+      lead = l;
+    }
+  });
+  return {
+    rows: real,
+    mvp,
+    best,
+    flop,
+    gw
+  };
+}
+const mlbStat = r => [r.ab || r.h ? r.h + '-for-' + r.ab : '', r.hr ? r.hr + ' HR' : '', r.rbi ? r.rbi + ' RBI' : '', r.bb ? r.bb + ' BB' : '', r.sb ? r.sb + ' SB' : '', r.pc ? r.pk + ' K, ' + r.ph + ' H, ' + r.pbb + ' BB, ' + r.pc + ' pitches' : ''].filter(Boolean).join(', ');
+function MLBSummary({
+  d,
+  A,
+  B,
+  match
+}) {
+  const R = mlbReport(d, A, B, match);
+  const T = i => i === 0 ? A : B;
+  const n = Math.max(match.line[0].length, match.line[1].length);
+  return React.createElement("div", {
+    className: "board msummary"
+  }, React.createElement("h3", null, "\u26BE Line score"), React.createElement("table", {
+    className: "qtable small"
+  }, React.createElement("thead", null, React.createElement("tr", null, React.createElement("th", null), Array.from({
+    length: n
+  }, (_, i) => React.createElement("th", {
+    key: i
+  }, i + 1)), React.createElement("th", null, "R"), React.createElement("th", null, "H"))), React.createElement("tbody", null, [0, 1].map(s => React.createElement("tr", {
+    key: s
+  }, React.createElement("td", null, T(s).name), Array.from({
+    length: n
+  }, (_, i) => React.createElement("td", {
+    key: i,
+    className: "num"
+  }, match.line[s][i] != null ? match.line[s][i] : '')), React.createElement("td", {
+    className: "num"
+  }, React.createElement("b", null, match.score[s])), React.createElement("td", {
+    className: "num"
+  }, match.hits[s]))))), [0, 1].map(s => React.createElement("p", {
+    key: s,
+    className: "small",
+    style: {
+      margin: 0
+    }
+  }, React.createElement("b", null, T(s).name, ":"), " ", R.rows.filter(r => r.team === s).map(r => r.name + ' ' + mlbStat(r)).join(' · '))), React.createElement("div", {
+    className: "mreport"
+  }, React.createElement("h4", null, "\uD83D\uDCCB Game report"), R.mvp && React.createElement("p", {
+    className: "small"
+  }, React.createElement("b", null, "\u2B50 Player of the game:"), " ", R.mvp.name, " (", T(R.mvp.team).name, ") \u2014 ", mlbStat(R.mvp), "."), R.gw && React.createElement("p", {
+    className: "small"
+  }, React.createElement("b", null, "\uD83D\uDD04 Go-ahead moment:"), " ", R.gw.half === 0 ? 'top' : 'bottom', " of the ", R.gw.inn, ordinalSuffix(R.gw.inn), ": ", R.gw.text), R.best && R.best !== R.mvp && React.createElement("p", {
+    className: "small"
+  }, React.createElement("b", null, "\uD83D\uDCB0 Best buy:"), " ", R.best.name, " \u2014 $", R.best.price, ": ", mlbStat(R.best), "."), R.flop && React.createElement("p", {
+    className: "small"
+  }, React.createElement("b", null, "\uD83D\uDCC9 Quiet day:"), " ", R.flop.name, " cost $", R.flop.price, ": ", mlbStat(R.flop) || 'barely got involved', ".")), React.createElement("p", {
+    className: "hint",
+    style: {
+      margin: 0
+    }
+  }, "Every pitch simulated from Draft Night\u2019s estimated ", eraWord(d.topic), " numbers (not official ratings). Your hitters bat at the top of the order; the rest of the lineup and bullpen are average players."));
+}
+function MLBChip({
+  item,
+  topic
+}) {
+  const [open, setOpen] = useState(false);
+  if (!numbersShown()) return null;
+  const r = mlbRating(item);
+  const era = eraWord(topic);
+  const keys = r.pitcher && !r.two ? MLB_ATTRS.P : r.two ? [...MLB_ATTRS.H, ...MLB_ATTRS.P] : MLB_ATTRS.H;
+  return React.createElement(React.Fragment, null, React.createElement("button", {
+    type: "button",
+    className: "ratingchip",
+    onClick: () => setOpen(true),
+    "aria-label": era + ' ' + r.ovr + ', estimated. Show details'
+  }, era, " ", React.createElement("b", {
+    className: "num"
+  }, r.ovr), " est."), open && ReactDOM.createPortal(React.createElement(Sheet, {
+    center: true,
+    onClose: () => setOpen(false)
+  }, React.createElement("div", {
+    className: "ratingcard"
+  }, React.createElement("div", {
+    className: "rc-top"
+  }, React.createElement("span", {
+    className: "rc-ovr num"
+  }, React.createElement("small", {
+    className: "rc-era"
+  }, era), r.ovr), React.createElement("span", {
+    className: "rc-role"
+  }, r.two ? 'TWO-WAY' : r.pitcher ? r.reliever ? 'RP' : 'SP' : 'BAT'), React.createElement("span", {
+    className: "rc-name"
+  }, item.name)), React.createElement("div", {
+    className: "rc-attrs"
+  }, keys.map(a => React.createElement("div", {
+    key: a,
+    className: "rc-attr"
+  }, React.createElement("span", {
+    className: "k",
+    title: MLB_ATTR_NAMES[a]
+  }, a), React.createElement("span", {
+    className: "bar"
+  }, React.createElement("i", {
+    style: {
+      width: r.attrs[a] + '%'
+    }
+  })), React.createElement("span", {
+    className: "v num"
+  }, r.attrs[a])))), React.createElement("p", {
+    className: "hint",
+    style: {
+      margin: 0
+    }
+  }, era === 'Now' ? 'Now: how good they are today. ' : 'Prime: how good they were at their peak. ', keys.map(a => a + ' ' + MLB_ATTR_NAMES[a].toLowerCase()).join(' · '), ". Draft Night estimate, not an official rating.")), React.createElement("button", {
+    className: "btn btn-ghost",
+    onClick: () => setOpen(false)
+  }, "Close")), document.body));
+}
 const EST_LABEL = 'Estimated by Draft Night · not official EA Sports FC / FIFA numbers';
 const ATTR_NAMES = {
   PAC: 'Pace',
@@ -42289,6 +43679,12 @@ function MatchSummary({
   B,
   match
 }) {
+  if (match.v === 'mlb') return React.createElement(MLBSummary, {
+    d: d,
+    A: A,
+    B: B,
+    match: match
+  });
   if (match.v === 'cricket') return React.createElement(CricketSummary, {
     d: d,
     A: A,
@@ -43825,7 +45221,7 @@ function PitchMatch({
   }));
 }
 function MatchView(props) {
-  return props.match && props.match.v === 'cricket' ? React.createElement(CricketView, props) : props.match && props.match.v === 'nhl' ? React.createElement(RinkView, props) : props.match && props.match.v === 'nfl' ? React.createElement(GridironView, props) : props.match && props.match.v === 'tennis' ? React.createElement(TennisView, props) : props.match && props.match.v === 'gp' ? React.createElement(TrackView, props) : props.match && props.match.v === 'card' ? React.createElement(RingView, props) : props.match && props.match.v === 'hoops' ? React.createElement(CourtView, props) : props.match && props.match.v === 'show' ? React.createElement(ShowView, props) : props.match && props.match.v === 'mission' ? React.createElement(MissionView, props) : props.match && props.match.v === 'survival' ? React.createElement(SurvivalView, props) : props.match && props.match.v === 'arena' ? React.createElement(ArenaView, props) : props.match && props.match.v === 'battle' ? React.createElement(BattleView, props) : props.match && props.match.v === 2 ? React.createElement(PitchMatch, props) : React.createElement(MatchPlayer, props);
+  return props.match && props.match.v === 'mlb' ? React.createElement(DiamondView, props) : props.match && props.match.v === 'cricket' ? React.createElement(CricketView, props) : props.match && props.match.v === 'nhl' ? React.createElement(RinkView, props) : props.match && props.match.v === 'nfl' ? React.createElement(GridironView, props) : props.match && props.match.v === 'tennis' ? React.createElement(TennisView, props) : props.match && props.match.v === 'gp' ? React.createElement(TrackView, props) : props.match && props.match.v === 'card' ? React.createElement(RingView, props) : props.match && props.match.v === 'hoops' ? React.createElement(CourtView, props) : props.match && props.match.v === 'show' ? React.createElement(ShowView, props) : props.match && props.match.v === 'mission' ? React.createElement(MissionView, props) : props.match && props.match.v === 'survival' ? React.createElement(SurvivalView, props) : props.match && props.match.v === 'arena' ? React.createElement(ArenaView, props) : props.match && props.match.v === 'battle' ? React.createElement(BattleView, props) : props.match && props.match.v === 2 ? React.createElement(PitchMatch, props) : React.createElement(MatchPlayer, props);
 }
 function matchReport(d, A, B, match) {
   const teams = [A, B];

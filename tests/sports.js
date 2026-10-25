@@ -279,5 +279,38 @@ module.exports = async function sportsTests({ ok, boot, btn, click, sleep }) {
     ok(live && /Scorecard/.test(X.d.body.textContent) && /Player of the Match/.test(X.d.body.textContent), 'the ground plays the match and ends with a scorecard and Player of the Match');
     X.w.close();
   }
+  // Baseball.
+  {
+    const S = DN.sports; const t = T('t-mlb'); const tl = T('t-mlbl'); const d = dOf(t);
+    const pickT = (id, names) => ({ id, name: id, team: names.map((n) => ({ itemId: t.items.find((i) => i.name === n).id, price: 4 })) });
+    const stars = pickT('A', ['Shohei Ohtani', 'Aaron Judge', 'Juan Soto', 'Tarik Skubal', 'Emmanuel Clase']);
+    const mid = pickT('B', ['Ozzie Albies', 'Matt Olson', 'Austin Riley', 'Logan Webb', 'Josh Hader']);
+    const g = S.simulateBaseball(d, stars, mid, 'b1');
+    ok(F.battleKind(t).name === 'Baseball game' && F.battleKind(tl).name === 'Baseball game' && g.v === 'mlb' && JSON.stringify(g) === JSON.stringify(S.simulateBaseball(d, stars, mid, 'b1')) && g.score[0] !== g.score[1], 'MLB Players and MLB Legends play a baseball game that always has a winner and replays exactly (' + g.score.join('–') + ')');
+    let runs = 0, hits = 0, hr = 0, k = 0, n = 150, legal = true, kinds = new Set(), extra = 0, wo = 0, wins = 0;
+    for (let q = 0; q < n; q++) {
+      const m = S.simulateBaseball({ ...d, seed: 'bb' + q }, mid, mid, 'k'); runs += m.score[0] + m.score[1]; hits += m.hits[0] + m.hits[1]; if (m.innings > 9) extra++; if (m.walkoff) wo++;
+      m.plays.forEach((e) => { kinds.add(e.kind); if (e.kind === 'hr') hr++; if (e.kind === 'k') k++; if (e.outs != null && (e.outs < 0 || e.outs > 3)) legal = false; if (e.pitches && (e.pitches.split('').filter((c) => c === 'B').length > 4)) legal = false; });
+      const ls = [0, 1].map((s2) => m.line[s2].reduce((x, v) => x + (v === 'X' ? 0 : +v), 0)); if (ls[0] !== m.score[0] || ls[1] !== m.score[1]) legal = false;
+      if (m.line[0].length < 9) legal = false;
+    }
+    for (let q = 0; q < 80; q++) if (S.simulateBaseball({ ...d, seed: 'bw' + q }, stars, mid, 'k').winner === 0) wins++;
+    ok(runs / n / 2 > 2.8 && runs / n / 2 < 6 && hits / n / 2 > 6 && hits / n / 2 < 10.5 && k / n / 2 > 6 && hr / n / 2 > 0.6, 'games look like MLB (' + (runs / n / 2).toFixed(1) + ' runs, ' + (hits / n / 2).toFixed(1) + ' hits, ' + (k / n / 2).toFixed(1) + ' strikeouts and ' + (hr / n / 2).toFixed(1) + ' home runs a team)');
+    ok(['k', 'bb', 'hbp', '1b', '2b', '3b', 'hr', 'out', 'dp', 'err', 'sb', 'pchange'].every((x) => kinds.has(x)) && extra > 3 && wo > 3, 'games have strikeouts, walks, every kind of hit, double plays, errors, steals, pitching changes, extra innings and walk-offs');
+    ok(legal, 'the rules hold: three outs an inning, four balls a walk, at least nine innings, and the line score adds up');
+    ok(wins > 45 && wins < 76, 'the stronger team usually wins, but baseball is baseball (' + Math.round(wins / 0.8) + '%)');
+    const oh = S.mlbRating(t.items.find((i) => i.name === 'Shohei Ohtani')); const mr = S.mlbRating(tl.items.find((i) => i.name === 'Mariano Rivera'));
+    ok(oh.two && oh.attrs.POW && oh.attrs.STU && mr.pitcher && mr.reliever && F.eraWord(t) === 'Now' && F.eraWord(tl) === 'Prime', 'Ohtani hits and pitches, Rivera closes, MLB Players show Now and Legends show Prime');
+    let framesOK = true; S.mlbScript(g).beats.filter((b) => b.type === 'pa').forEach((b) => { for (let u = 0; u < b.dur; u += 0.25) { const f = S.mlbFrame(b, u); if (!f || (f.ball && (!isFinite(f.ball.x) || !isFinite(f.ball.y)))) framesOK = false; } });
+    ok(framesOK, 'every highlight at-bat animates without errors');
+    const fill = (topic, n2, seed) => { const ms = [...Array(n2)].map((_, i) => ({ id: 'm' + i, name: ['Lions', 'Sharks', 'Owls'][i], color: DN.COLORS[i], emoji: 'x', human: true })); let dd = DN.createDraft(topic, ms, { ...DN.DEFAULT_RULES, slots: topic.slots, finale: { mode: 'sim', speed: 'normal' } }, { seed }); let gg = 0, rr = 0; while (!DN.isDraftOver(dd) && gg++ < 800) { if (dd.phase === 'auction') { const m = dd.managers.find((x, kk) => (kk + rr++) % 2 === 0 && DN.canBid(dd, x, DN.nextAmount(dd))) || dd.managers.find((x) => DN.canBid(dd, x, DN.nextAmount(dd))); dd = m ? DN.sell(DN.placeBid(dd, m.id, DN.nextAmount(dd))) : DN.skipItem(dd); } else if (dd.phase === 'freepick') { const cp = DN.currentPicker(dd); dd = DN.freePick(dd, dd.leftover.find((x) => DN.canTake(dd, cp.m, x))); } else break; } return dd; };
+    const raw = { ...fill(tl, 3, 'mlbui'), mode: 'local', createdAt: Date.now(), history: [] };
+    const X = await boot({ idb: false, speed: 0.05, storage: { dn_current_v1: JSON.stringify(raw) } });
+    await click(X.w, btn(X.d, 'Resume draft')); await click(X.w, btn(X.d, 'Start the finale')); await click(X.w, btn(X.d, 'Play ball')); await sleep(500);
+    const live = !!X.d.querySelector('.diamondsvg');
+    await click(X.w, btn(X.d, 'Skip to result')); await sleep(150);
+    ok(live && /Line score/.test(X.d.body.textContent) && /Player of the game/.test(X.d.body.textContent), 'the diamond plays the game and ends with a line score and the player of the game');
+    X.w.close();
+  }
   P.w.close();
 };
