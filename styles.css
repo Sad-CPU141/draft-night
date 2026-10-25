@@ -1,4 +1,4 @@
-/* Draft Night f8433c0cd3 — built from src/styles.css */
+/* Draft Night aea80a2297 — built from src/styles.css */
 /* Layout: one phone-width column, a stage-lit backdrop, the auction screen as a full-height console with a sticky gavel bar. */
 :root{
   --ink:#0f0c21; --stage:#19153a; --panel:#221d47; --panel2:#2c2659; --line:#3d3672;
@@ -728,3 +728,14 @@ html[data-motion="reduce"] *,html[data-motion="reduce"] *::before,html[data-moti
 .fc-row.main{border-color:var(--gold)}
 .fc-tag{font-family:var(--cond);font-weight:800;font-size:12px;letter-spacing:.06em;text-transform:uppercase;color:var(--muted)}
 .rc-name small{font-weight:600;opacity:.75}
+/* Grand Prix */
+.tracksvg{background:#4f8a3c}
+.tower{display:grid;grid-template-columns:1fr 1fr;gap:2px 8px;background:var(--panel);border:2px solid var(--line);border-radius:14px;padding:6px 8px;font-family:var(--cond);font-weight:800;font-size:13px}
+.gprow{display:flex;align-items:center;gap:5px;min-width:0;opacity:.62}
+.gprow.team{opacity:1}
+.gprow.out{opacity:.35;text-decoration:line-through}
+.gprow .tp{width:18px;text-align:right;color:var(--muted)}
+.tc{display:inline-block;width:4px;height:13px;border-radius:2px;flex:none}
+.gprow .tn{flex:1;letter-spacing:.04em}
+.gprow .tt{width:24px;text-align:center;font-size:11px}
+.gprow .tg{min-width:44px;text-align:right;color:var(--muted);font-size:12px}

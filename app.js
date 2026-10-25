@@ -1,4 +1,4 @@
-/* Draft Night f8433c0cd3 — built from src/ by build.js. Edit src/, not this file. */
+/* Draft Night aea80a2297 — built from src/ by build.js. Edit src/, not this file. */
 "use strict";
 (function(){
 function _extends() { return _extends = Object.assign ? Object.assign.bind() : function (n) { for (var e = 1; e < arguments.length; e++) { var t = arguments[e]; for (var r in t) ({}).hasOwnProperty.call(t, r) && (n[r] = t[r]); } return n; }, _extends.apply(null, arguments); }
@@ -655,7 +655,8 @@ const STARTER_BATTLE = {
   't-catbreeds': 'cute',
   't-nba': 'basketball',
   't-nbal': 'basketball',
-  't-fight': 'combat'
+  't-fight': 'combat',
+  't-f1': 'f1'
 };
 function starterTopics() {
   const v3 = [...sportsTopicsV3(), ...foodTopicsV3(), ...entTopicsV3(), ...travelTopicsV3(), ...animalTopicsV3(), ...styleTopicsV3(), ...funTopicsV3()];
@@ -23691,6 +23692,15 @@ const BATTLE_KINDS = {
     upset: ['Who knew? {w} beats {l} when it counts!', 'Surprise hero: {w}!'],
     noshow: ['{w} wins the night — the other team had nothing.']
   },
+  f1: {
+    name: 'Grand Prix',
+    start: 'Lights out',
+    emoji: '🏎️',
+    round: 'Lap',
+    win: [''],
+    upset: [''],
+    noshow: ['{w} wins — the other team had no drivers.']
+  },
   combat: {
     name: 'Fight night',
     start: 'Ring the bell',
@@ -23734,6 +23744,7 @@ function simulateFor(d, A, B, key, opts) {
   if (k === 'fight') return simulateArena(d, A, B, key);
   if (k === 'basketball') return simulateBasketball(d, A, B, key);
   if (k === 'combat') return simulateFightCard(d, A, B, key);
+  if (k === 'f1') return simulateGrandPrix(d, A, B, key);
   if (k === 'survival') return simulateSurvival(d, A, B, key);
   if (k === 'powers' || k === 'weird') return simulateMissions(d, A, B, key);
   if (k === 'cute') return simulatePuppyBowl(d, A, B, key, opts && opts.knockout === false ? false : true);
@@ -23746,6 +23757,12 @@ function simWhy(w, mt) {
     const f = mt.final[mt.winner];
     return w.name + (f.rescued ? ' got rescued' : ' survived ' + ws + ' day' + (ws === 1 ? '' : 's')) + (ws !== ls ? ' (the others lasted ' + ls + ')' : mt.how === 'rescue' ? ', and got rescued first' : mt.how === 'shape' ? ', level on days but in better shape' : ' and won the last night') + '.';
   }
+  if (mt.v === 'gp') {
+    if (mt.forfeit) return w.name + ' won — the other team had no drivers.';
+    const geo = F1_TRACKS.find(x => x.id === mt.track);
+    const best = mt.result.find(r => mt.cars[r.car].team === mt.winner && r.pos != null);
+    return w.name + ' won the ' + (geo ? geo.name : 'Grand Prix') + ' ' + mt.score[mt.winner] + '–' + mt.score[1 - mt.winner] + ' on points' + (best ? ' (' + mt.cars[best.car].name + ' P' + best.pos + ')' : '') + (mt.how === 'best' ? ', level on points but with the best finish' : '') + '.';
+  }
   if (mt.v === 'card') {
     const ws = mt.score[mt.winner],
       ls = mt.score[1 - mt.winner];
@@ -23756,7 +23773,7 @@ function simWhy(w, mt) {
   if (mt.v === 'mission') return w.name + ' won ' + mt.score[mt.winner] + ' of ' + mt.missions.length + ' missions.';
   return w.name + ' won the ' + (BATTLE_KINDS[mt.kind] || BATTLE_KINDS.fight).name.toLowerCase() + ' ' + mt.score[mt.winner] + '–' + mt.score[1 - mt.winner] + (mt.sudden ? ' in sudden death' : '') + '.';
 }
-const isSimResult = mt => !!mt && (mt.v === 'card' || mt.v === 'hoops' || mt.v === 'battle' || mt.v === 'arena' || mt.v === 'survival' || mt.v === 'mission' || mt.v === 'show');
+const isSimResult = mt => !!mt && (mt.v === 'gp' || mt.v === 'card' || mt.v === 'hoops' || mt.v === 'battle' || mt.v === 'arena' || mt.v === 'survival' || mt.v === 'mission' || mt.v === 'show');
 function battleDuel(rng, kind, a, b, maxP) {
   const fill = (lines, w, l) => lines[Math.floor(rng() * lines.length)].replace('{w}', w).replace('{l}', l);
   if (!a || !b) {
@@ -24982,6 +24999,588 @@ function simulateFightCard(d, A, B, key) {
     events: []
   };
 }
+const F1_ATTRS = ['PAC', 'RAC', 'OVT', 'DEF', 'TYR', 'WET', 'CON'];
+const F1_ATTR_NAMES = {
+  PAC: 'Qualifying pace',
+  RAC: 'Race pace',
+  OVT: 'Overtaking',
+  DEF: 'Defending',
+  TYR: 'Tyre care',
+  WET: 'Wet weather',
+  CON: 'Consistency'
+};
+const F1_PROFILE_SRC = `
+Max Verstappen|96|WET+5 OVT+3 DEF+3
+Lewis Hamilton|94|WET+3 TYR+3
+Charles Leclerc|91|PAC+4 TYR-3
+Lando Norris|91|PAC+2
+Oscar Piastri|90|CON+3
+George Russell|89|PAC+3
+Fernando Alonso|91|OVT+4 DEF+5 TYR+3
+Carlos Sainz|87|CON+2
+Lance Stroll|79|WET+4
+Pierre Gasly|84|
+Esteban Ocon|83|DEF+3
+Kimi Antonelli|85|PAC+2 CON-4
+Oliver Bearman|82|
+Alex Albon|85|DEF+2
+Yuki Tsunoda|83|PAC+2 CON-2
+Nico Hülkenberg|84|PAC+2
+Liam Lawson|81|OVT+2
+Isack Hadjar|82|
+Gabriel Bortoleto|81|
+Franco Colapinto|79|CON-4
+Sergio Pérez|85|TYR+4 PAC-3
+Valtteri Bottas|85|PAC+3 OVT-4
+Michael Schumacher|97|WET+4 CON+3
+Ayrton Senna|98|PAC+5 WET+6
+Alain Prost|95|TYR+6 CON+5 PAC-2
+Niki Lauda|93|CON+4
+Sebastian Vettel|93|PAC+2
+Kimi Räikkönen|91|PAC+1
+Jenson Button|89|WET+6 TYR+4
+Nigel Mansell|91|OVT+5
+Mika Häkkinen|93|PAC+3
+Juan Manuel Fangio|97|CON+3
+Jackie Stewart|94|WET+5
+Nico Rosberg|89|PAC+3
+Jacques Villeneuve|87|
+Gilles Villeneuve|90|OVT+6 CON-8
+Jim Clark|97|PAC+4
+Graham Hill|89|CON+2
+Damon Hill|87|
+Emerson Fittipaldi|90|
+Nelson Piquet|91|
+Jochen Rindt|91|PAC+2
+James Hunt|89|OVT+3 CON-4
+Jack Brabham|91|TYR+2
+Alberto Ascari|93|
+Stirling Moss|94|OVT+2
+Mario Andretti|89|
+Keke Rosberg|87|PAC+2
+Rubens Barrichello|86|WET+2
+Mark Webber|86|
+David Coulthard|86|
+Felipe Massa|86|
+Gerhard Berger|87|
+Jody Scheckter|88|`;
+const F1_PROFILE = {};
+F1_PROFILE_SRC.trim().split('\n').forEach(line => {
+  const [name, ovr, tw] = line.split('|');
+  const tweak = {};
+  (tw || '').split(' ').filter(Boolean).forEach(t => {
+    const m = t.match(/^([A-Z]+)([+-]\d+)$/);
+    if (m) tweak[m[1]] = +m[2];
+  });
+  F1_PROFILE[name.toLowerCase()] = {
+    ovr: +ovr,
+    tweak
+  };
+});
+const f1EraOf = (item, topic) => /LEGEND/.test(norm(item && item.pos)) ? 'prime' : /CURRENT|NOW/.test(norm(item && item.pos)) ? 'now' : eraOf(topic);
+function f1Rating(item) {
+  const prof = F1_PROFILE[String(item.name || '').toLowerCase()];
+  const fixed = validRating(item.rating);
+  const ovr = fixed ? clamp(Math.round(+item.rating), 1, 99) : prof ? prof.ovr : clamp(Math.round(74 + itemFame(item) * 22 + (unit('f1o', item.name) - 0.5) * 6), 65, 95);
+  const tw = prof ? prof.tweak : {};
+  const attrs = {};
+  F1_ATTRS.forEach(a => {
+    attrs[a] = clamp(Math.round(ovr + (tw[a] || 0) + (unit('f1a', item.name, a) - 0.5) * 7), 40, 99);
+  });
+  return {
+    ovr,
+    attrs,
+    estimated: !fixed
+  };
+}
+const F1_TRACKS = [{
+  id: 'monaco',
+  name: 'Monaco Grand Prix',
+  laps: 26,
+  hard: 0.8,
+  rain: 0.14,
+  pts: [[10, 40], [30, 46], [52, 48], [70, 44], [84, 36], [90, 26], [82, 18], [70, 22], [62, 14], [50, 10], [40, 18], [30, 16], [20, 22], [12, 30]]
+}, {
+  id: 'silverstone',
+  name: 'British Grand Prix',
+  laps: 28,
+  hard: 0.35,
+  rain: 0.32,
+  pts: [[15, 40], [30, 50], [50, 52], [66, 46], [80, 50], [92, 40], [86, 28], [72, 24], [62, 12], [44, 10], [34, 20], [22, 18], [10, 26]]
+}, {
+  id: 'monza',
+  name: 'Italian Grand Prix',
+  laps: 30,
+  hard: 0.2,
+  rain: 0.1,
+  pts: [[10, 42], [50, 46], [85, 44], [92, 36], [88, 22], [70, 12], [40, 10], [22, 14], [14, 22], [20, 30], [12, 34]]
+}, {
+  id: 'spa',
+  name: 'Belgian Grand Prix',
+  laps: 24,
+  hard: 0.3,
+  rain: 0.42,
+  pts: [[10, 30], [18, 44], [34, 50], [50, 44], [62, 50], [80, 48], [92, 36], [84, 24], [66, 18], [50, 8], [34, 12], [22, 20]]
+}, {
+  id: 'suzuka',
+  name: 'Japanese Grand Prix',
+  laps: 26,
+  hard: 0.5,
+  rain: 0.26,
+  pts: [[12, 44], [30, 50], [46, 40], [56, 24], [70, 14], [86, 16], [90, 28], [78, 40], [60, 44], [44, 26], [32, 14], [18, 18], [10, 30]]
+}, {
+  id: 'interlagos',
+  name: 'São Paulo Grand Prix',
+  laps: 30,
+  hard: 0.3,
+  rain: 0.36,
+  pts: [[20, 12], [50, 8], [80, 14], [90, 28], [78, 36], [60, 30], [48, 40], [62, 50], [40, 52], [22, 44], [12, 30]]
+}];
+const F1_POINTS = [25, 18, 15, 12, 10, 8, 6, 4, 2, 1];
+const TYRES = {
+  S: {
+    name: 'soft',
+    off: -0.6,
+    deg: 0.11,
+    life: 9
+  },
+  M: {
+    name: 'medium',
+    off: 0,
+    deg: 0.06,
+    life: 15
+  },
+  H: {
+    name: 'hard',
+    off: 0.4,
+    deg: 0.035,
+    life: 22
+  },
+  I: {
+    name: 'intermediate',
+    off: 0,
+    deg: 0.05,
+    life: 30
+  }
+};
+const f1Short = n => {
+  const w = String(n || '').split(' ');
+  return w[w.length - 1].slice(0, 3).toUpperCase();
+};
+function simulateGrandPrix(d, A, B, key) {
+  const rng = seeded(d.seed, 'gp', key, A.id, B.id);
+  const gauss = () => {
+    let u = 0;
+    for (let i = 0; i < 4; i++) u += rng();
+    return (u - 2) / 0.58;
+  };
+  const track = F1_TRACKS[Math.floor(rng() * F1_TRACKS.length)];
+  const laps = track.laps;
+  const drafted = new Set();
+  (d.managers || []).forEach(m => m.team.forEach(x => {
+    if (x) drafted.add(x.itemId);
+  }));
+  [A, B].forEach(m => m.team.forEach(x => {
+    if (x) drafted.add(x.itemId);
+  }));
+  const cars = [];
+  [A, B].forEach((m, team) => m.team.forEach((x, k) => {
+    const it = x && d.items[x.itemId];
+    if (it) cars.push({
+      name: it.name,
+      itemId: it.id,
+      team,
+      price: x.price || 0,
+      slot: d.rules.slots[k],
+      ...f1Rating(it)
+    });
+  }));
+  if (!cars.some(c => c.team === 0) || !cars.some(c => c.team === 1)) {
+    const w = cars.some(c => c.team === 0) ? 0 : 1;
+    return {
+      v: 'gp',
+      kind: 'f1',
+      forfeit: true,
+      track: track.id,
+      laps: 0,
+      cars: [],
+      events: [],
+      result: [],
+      score: w === 0 ? [1, 0] : [0, 1],
+      winner: w,
+      weather: [],
+      et: false,
+      pens: null,
+      sudden: false
+    };
+  }
+  const field = Object.values(d.items).filter(it => !drafted.has(it.id)).sort((x, y) => f1Rating(x).ovr - f1Rating(y).ovr || unit('field', d.seed, key, x.name) - unit('field', d.seed, key, y.name)).slice(0, Math.max(0, 20 - cars.length));
+  field.forEach(it => cars.push({
+    name: it.name,
+    itemId: it.id,
+    team: null,
+    price: 0,
+    ...f1Rating(it)
+  }));
+  cars.forEach((c, i) => {
+    c.i = i;
+    c.form = gauss() * 0.12;
+  });
+  const weather = Array(laps + 1).fill(0);
+  let rainFrom = null,
+    rainTo = null;
+  if (rng() < track.rain) {
+    rainFrom = 3 + Math.floor(rng() * (laps - 8));
+    rainTo = Math.min(laps, rainFrom + 4 + Math.floor(rng() * 10));
+    for (let L = rainFrom; L <= rainTo; L++) weather[L] = 1;
+  }
+  const q = cars.map(c => ({
+    c,
+    t: 80 - (c.attrs.PAC - 80) * 0.05 + gauss() * 0.12 * (1.4 - c.attrs.CON / 100) + c.form * 0.5
+  }));
+  q.sort((x, y) => x.t - y.t);
+  const grid = q.map(x => x.c.i);
+  const pole = q[0];
+  const st = cars.map(c => ({
+    stints: [],
+    cum: [0],
+    tyre: null,
+    age: 0,
+    stops: 0,
+    dnf: null,
+    damage: 0,
+    best: Infinity,
+    bestLap: 0,
+    passes: 0,
+    pits: [],
+    lapT: []
+  }));
+  grid.forEach((ci, gi) => {
+    st[ci].cum[0] = gi * 0.25;
+    st[ci].tyre = gi < 10 ? rng() < 0.6 ? 'S' : 'M' : rng() < 0.5 ? 'M' : 'H';
+    st[ci].stints.push([0, st[ci].tyre]);
+  });
+  const events = [];
+  const push = e => {
+    events.push(e);
+    return e;
+  };
+  const nm = i => cars[i].name;
+  const isTeam = i => cars[i].team != null;
+  let order = [...grid];
+  let sc = 0;
+  let restart = false;
+  let scCount = 0;
+  const posOf = i => order.indexOf(i) + 1;
+  push({
+    lap: 0,
+    kind: 'grid',
+    car: grid[0],
+    text: nm(grid[0]) + ' takes pole position for the ' + track.name + '.',
+    hl: false
+  });
+  for (let L = 1; L <= laps; L++) {
+    const wet = weather[L];
+    const lapsLeft = laps - L;
+    const running = order.filter(i => st[i].dnf == null);
+    const lt = {};
+    const pitting = {};
+    running.forEach(i => {
+      const c = cars[i],
+        s = st[i],
+        A2 = c.attrs;
+      let pit = null;
+      const wrongTyres = wet && s.tyre !== 'I' || !wet && s.tyre === 'I' && L > (rainTo || 0) + 1;
+      if (wrongTyres && rng() < (wet ? 0.55 + (A2.WET - 80) / 100 : 0.6)) pit = wet ? 'I' : lapsLeft > 12 ? 'M' : 'S';else if (!wet && s.tyre !== 'I' && lapsLeft > 2 && s.age >= TYRES[s.tyre].life * (1.4 - A2.TYR / 100 * 0.5) - rng() * 2) pit = lapsLeft > TYRES.H.life * 0.8 ? 'H' : lapsLeft > TYRES.M.life * 0.7 ? 'M' : 'S';else if (sc && !wet && s.age > 5 && lapsLeft > 6 && rng() < 0.55) pit = lapsLeft > 14 ? 'H' : 'M';
+      if (s.damage > 0.5 && !pit) pit = s.tyre === 'I' ? 'I' : 'M';
+      const T = TYRES[s.tyre];
+      let t = 90 + T.off + T.deg * s.age * (1.4 - A2.TYR / 100) + Math.max(0, s.age - T.life) * 0.35 - L * 0.04 - (A2.RAC - 80) * 0.05 + c.form + gauss() * 0.22 * (1.35 - A2.CON / 100);
+      if (wet) t += (s.tyre === 'I' ? 3.5 : 8.5) - (A2.WET - 80) * 0.07;else if (s.tyre === 'I') t += 2.5 + s.age * 0.1;
+      if (L === 1) t += 2 + gauss() * 0.7 * (1.3 - A2.CON / 100);
+      t += s.damage;
+      if (pit) {
+        const stop = rng() < 0.06 ? 5 + rng() * 6 : 2.1 + rng() * 1.2;
+        t += (sc ? 11 : 20) + stop;
+        pitting[i] = {
+          to: pit,
+          stop: Math.round(stop * 10) / 10,
+          from: s.tyre
+        };
+      }
+      lt[i] = t;
+    });
+    running.forEach(i => {
+      const c = cars[i],
+        s = st[i];
+      if (st[i].dnf != null) return;
+      const spinP = 0.0035 * (1.7 - c.attrs.CON / 100) * (wet && s.tyre !== 'I' ? 6 : wet ? 2.2 : 1) * (L === 1 ? 3 : 1);
+      if (rng() < spinP) {
+        if (rng() < 0.22) {
+          s.dnf = L;
+          push({
+            lap: L,
+            kind: 'crash',
+            car: i,
+            text: nm(i) + ' crashes out' + (wet ? ' in the rain' : '') + '!',
+            hl: true
+          });
+          if (!sc) {
+            sc = 2 + Math.floor(rng() * 2);
+            scCount++;
+            push({
+              lap: L,
+              kind: 'sc',
+              text: 'Safety car! The field bunches up.',
+              hl: true
+            });
+          }
+        } else {
+          lt[i] += 6 + rng() * 6;
+          push({
+            lap: L,
+            kind: 'spin',
+            car: i,
+            text: nm(i) + ' spins' + (wet ? ' on the wet track' : '') + ' but keeps going.',
+            hl: isTeam(i)
+          });
+        }
+      } else if (rng() < 0.0016) {
+        s.dnf = L;
+        push({
+          lap: L,
+          kind: 'dnf',
+          car: i,
+          text: 'Smoke! ' + nm(i) + '’s engine has gone — out of the race.',
+          hl: isTeam(i)
+        });
+      }
+    });
+    const runners = order.filter(i => st[i].dnf == null);
+    const nc = {};
+    runners.forEach(i => {
+      nc[i] = st[i].cum[L - 1] + lt[i];
+    });
+    if (sc) {
+      const lead = runners[0];
+      const base = st[lead].cum[L - 1] + 118;
+      runners.forEach((i, k) => {
+        nc[i] = Math.max(base + k * 0.8, pitting[i] ? st[i].cum[L - 1] + 118 + 11 : 0);
+      });
+    } else {
+      for (let k = 1; k < runners.length; k++) {
+        const b = runners[k],
+          f = runners[k - 1];
+        if (pitting[b] || pitting[f]) continue;
+        const g0 = st[b].cum[L - 1] - st[f].cum[L - 1];
+        if (nc[b] >= nc[f] + 0.25 || g0 > 2.2) {
+          if (nc[b] < nc[f] + 0.25) nc[b] = nc[f] + 0.25 + rng() * 0.3;
+          continue;
+        }
+        const B2 = cars[b].attrs,
+          F2 = cars[f].attrs;
+        const p = clamp(0.3 + (B2.OVT - F2.DEF) / 110 + (nc[f] - nc[b]) * 0.2 - track.hard * 0.62 + (g0 < 1 ? 0.12 : 0) + (restart ? 0.12 : 0) + (wet ? 0.08 : 0) + (L === 1 ? 0.1 : 0), 0.03, 0.85);
+        if (rng() < p) {
+          nc[b] = Math.min(nc[b], nc[f] - 0.15 - rng() * 0.3);
+          [runners[k - 1], runners[k]] = [runners[k], runners[k - 1]];
+          st[b].passes++;
+          const pos = k;
+          push({
+            lap: L,
+            kind: 'pass',
+            car: b,
+            other: f,
+            pos,
+            text: nm(b) + ' passes ' + nm(f) + ' for P' + pos + (wet ? ' in the rain!' : track.hard > 0.6 ? ' — on this track!' : '!'),
+            hl: isTeam(b) || isTeam(f) ? true : pos <= 3
+          });
+        } else {
+          nc[b] = nc[f] + 0.3 + rng() * 0.4;
+          const touch = 0.012 * (2.1 - (B2.CON + F2.CON) / 100) * (1 + track.hard) * (L === 1 ? 2.5 : 1);
+          if (rng() < touch) {
+            const out = rng() < 0.55 ? b : f;
+            const other = out === b ? f : b;
+            if (rng() < 0.45) {
+              st[out].dnf = L;
+              push({
+                lap: L,
+                kind: 'crash',
+                car: out,
+                other,
+                text: nm(b) + ' and ' + nm(f) + ' touch! ' + nm(out) + ' is out!',
+                hl: true
+              });
+              if (!sc) {
+                sc = 2 + Math.floor(rng() * 2);
+                scCount++;
+                push({
+                  lap: L,
+                  kind: 'sc',
+                  text: 'Safety car!',
+                  hl: true
+                });
+              }
+            } else {
+              st[out].damage = 1.4;
+              push({
+                lap: L,
+                kind: 'contact',
+                car: out,
+                other,
+                text: nm(b) + ' and ' + nm(f) + ' make contact — ' + nm(out) + ' has a damaged wing.',
+                hl: isTeam(out) || isTeam(other)
+              });
+            }
+          }
+        }
+      }
+    }
+    runners.forEach(i => {
+      const s = st[i];
+      if (s.dnf != null) return;
+      s.cum[L] = Math.round(nc[i] * 100) / 100;
+      const lapTime = s.cum[L] - s.cum[L - 1];
+      if (!pitting[i] && !sc && L > 1 && lapTime < s.best) {
+        s.best = lapTime;
+        s.bestLap = L;
+      }
+      if (pitting[i]) {
+        const p = pitting[i];
+        s.stops++;
+        s.pits.push(L);
+        s.stints.push([L, p.to]);
+        s.tyre = p.to;
+        s.age = 0;
+        s.damage = 0;
+        push({
+          lap: L,
+          kind: 'pit',
+          car: i,
+          stop: p.stop,
+          to: p.to,
+          text: nm(i) + ' pits for ' + TYRES[p.to].name + 's (' + p.stop.toFixed(1) + 's stop' + (p.stop > 4.5 ? ' — slow one!' : '') + ').',
+          hl: isTeam(i) && (p.stop > 4.5 || rng() < 0.5)
+        });
+      } else s.age++;
+    });
+    if (rainFrom === L) push({
+      lap: L,
+      kind: 'rain',
+      text: 'Rain is falling! Who gambles on intermediates?',
+      hl: true
+    });
+    if (rainTo === L && L < laps) push({
+      lap: L,
+      kind: 'dry',
+      text: 'The rain stops and a dry line appears.',
+      hl: false
+    });
+    if (sc) {
+      sc--;
+      if (!sc) {
+        restart = true;
+        push({
+          lap: L,
+          kind: 'scend',
+          text: 'Safety car in this lap — restart!',
+          hl: true
+        });
+      } else restart = false;
+    } else restart = false;
+    order = order.filter(i => st[i].dnf == null).sort((x, y) => st[x].cum[L] - st[y].cum[L]).concat(order.filter(i => st[i].dnf != null));
+    if (L === 1) {
+      const moves = cars.map((c, i) => ({
+        i,
+        d: grid.indexOf(i) + 1 - posOf(i)
+      })).filter(m => isTeam(m.i) && st[m.i].dnf == null && Math.abs(m.d) >= 2).sort((x, y) => y.d - x.d);
+      push({
+        lap: 1,
+        kind: 'start',
+        text: 'Lights out and away we go! ' + nm(order[0]) + ' leads after lap 1' + (moves.length ? '. ' + moves.slice(0, 2).map(m => nm(m.i) + (m.d > 0 ? ' gains ' + m.d : ' loses ' + -m.d)).join(', ') + ' places' : '') + '.',
+        hl: true
+      });
+    }
+  }
+  const finished = order.filter(i => st[i].dnf == null);
+  const out = order.filter(i => st[i].dnf != null).sort((x, y) => st[y].dnf - st[x].dnf);
+  const fl = finished.reduce((b, i) => st[i].best < (b == null ? Infinity : st[b].best) ? i : b, null);
+  const result = [...finished, ...out].map((i, k) => {
+    const pts = st[i].dnf == null && k < 10 ? F1_POINTS[k] + (i === fl ? 1 : 0) : 0;
+    return {
+      car: i,
+      pos: st[i].dnf == null ? k + 1 : null,
+      pts,
+      grid: grid.indexOf(i) + 1,
+      dnf: st[i].dnf,
+      stops: st[i].stops,
+      passes: st[i].passes,
+      time: st[i].dnf == null ? st[i].cum[laps] : null
+    };
+  });
+  const winT = st[finished[0]].cum[laps];
+  result.forEach(r => {
+    if (r.time != null) r.gap = Math.round((r.time - winT) * 10) / 10;
+  });
+  if (fl != null) push({
+    lap: st[fl].bestLap,
+    kind: 'fastest',
+    car: fl,
+    text: nm(fl) + ' sets the fastest lap: ' + f1LapTime(st[fl].best) + (result.find(r => r.car === fl).pos <= 10 ? ' (+1 point)' : '') + '.',
+    hl: false
+  });
+  push({
+    lap: laps,
+    kind: 'flag',
+    car: finished[0],
+    text: 'Chequered flag! ' + nm(finished[0]) + ' wins the ' + track.name + '!',
+    hl: true
+  });
+  const ko = e => e.kind === 'start' ? -1 : e.kind === 'flag' ? 2 : e.kind === 'fastest' ? 1 : 0;
+  events.sort((x, y) => x.lap - y.lap || ko(x) - ko(y));
+  const score = [0, 0];
+  result.forEach(r => {
+    const t = cars[r.car].team;
+    if (t != null) score[t] += r.pts;
+  });
+  let winner,
+    how = 'points';
+  if (score[0] !== score[1]) winner = score[0] > score[1] ? 0 : 1;else {
+    const best = result.find(r => cars[r.car].team != null && r.pos != null);
+    winner = best ? cars[best.car].team : rng() < 0.5 ? 0 : 1;
+    how = 'best';
+  }
+  return {
+    v: 'gp',
+    kind: 'f1',
+    track: track.id,
+    laps,
+    weather,
+    rain: rainFrom != null ? [rainFrom, rainTo] : null,
+    sc: scCount,
+    cars: cars.map(c => ({
+      name: c.name,
+      itemId: c.itemId,
+      team: c.team,
+      ovr: c.ovr,
+      price: c.price
+    })),
+    grid,
+    cum: st.map(s => s.cum),
+    pits: st.map(s => s.pits),
+    stints: st.map(s => s.stints),
+    dnf: st.map(s => s.dnf),
+    events,
+    result,
+    fastest: fl,
+    pole: grid[0],
+    score,
+    winner,
+    how,
+    et: false,
+    pens: null,
+    sudden: false
+  };
+}
+const f1LapTime = s => Math.floor(s / 60) + ':' + (s % 60).toFixed(3).padStart(6, '0');
 const isFootball = topic => !!topic && (topic.layout === 'pitch' || topic.sport === 'football');
 const ATTRS = ['PAC', 'SHO', 'PAS', 'DRI', 'DEF', 'PHY'];
 const ROLE_SHAPE = {
@@ -29334,7 +29933,7 @@ function TopicEditor({
   }, "Fun battles (Battles finale)"), React.createElement(Seg, {
     label: "Fun battle style",
     value: topic.battle || 'none',
-    options: [['none', 'Off'], ['fight', '⚔️ Fight'], ['powers', '💥 Powers'], ['survival', '🧟 Survival'], ['cute', '🥰 Puppy Bowl'], ['weird', '🤡 Silly'], ['combat', '🥊 Fight night'], ['basketball', '🏀 Basketball']],
+    options: [['none', 'Off'], ['fight', '⚔️ Fight'], ['powers', '💥 Powers'], ['survival', '🧟 Survival'], ['cute', '🥰 Puppy Bowl'], ['weird', '🤡 Silly'], ['combat', '🥊 Fight night'], ['f1', '🏎️ Grand Prix'], ['basketball', '🏀 Basketball']],
     onChange: v => set({
       battle: v === 'none' ? '' : v
     })
@@ -31484,6 +32083,9 @@ function ItemCard({
     item: item,
     topic: d.topic
   }) : battleKindId(d.topic) === 'combat' ? React.createElement(FightChip, {
+    item: item,
+    topic: d.topic
+  }) : battleKindId(d.topic) === 'f1' ? React.createElement(F1Chip, {
     item: item,
     topic: d.topic
   }) : hasBattle(d.topic) && React.createElement(StatChip, {
@@ -36254,7 +36856,16 @@ if (window.__DN_TEST__) window.__DN = {
     fightScript,
     fightFrame,
     boutLine,
-    fightReport
+    fightReport,
+    simulateGrandPrix,
+    f1Rating,
+    gpScript,
+    gpRaceTime,
+    gpDist,
+    trackGeo,
+    gpReport,
+    F1_TRACKS,
+    f1EraOf
   },
   simStats: {
     simulatePuppyBowl,
@@ -38373,6 +38984,12 @@ function MatchSummary({
   B,
   match
 }) {
+  if (match.v === 'gp') return React.createElement(GPSummary, {
+    d: d,
+    A: A,
+    B: B,
+    match: match
+  });
   if (match.v === 'card') return React.createElement(FightSummary, {
     d: d,
     A: A,
@@ -39879,7 +40496,7 @@ function PitchMatch({
   }));
 }
 function MatchView(props) {
-  return props.match && props.match.v === 'card' ? React.createElement(RingView, props) : props.match && props.match.v === 'hoops' ? React.createElement(CourtView, props) : props.match && props.match.v === 'show' ? React.createElement(ShowView, props) : props.match && props.match.v === 'mission' ? React.createElement(MissionView, props) : props.match && props.match.v === 'survival' ? React.createElement(SurvivalView, props) : props.match && props.match.v === 'arena' ? React.createElement(ArenaView, props) : props.match && props.match.v === 'battle' ? React.createElement(BattleView, props) : props.match && props.match.v === 2 ? React.createElement(PitchMatch, props) : React.createElement(MatchPlayer, props);
+  return props.match && props.match.v === 'gp' ? React.createElement(TrackView, props) : props.match && props.match.v === 'card' ? React.createElement(RingView, props) : props.match && props.match.v === 'hoops' ? React.createElement(CourtView, props) : props.match && props.match.v === 'show' ? React.createElement(ShowView, props) : props.match && props.match.v === 'mission' ? React.createElement(MissionView, props) : props.match && props.match.v === 'survival' ? React.createElement(SurvivalView, props) : props.match && props.match.v === 'arena' ? React.createElement(ArenaView, props) : props.match && props.match.v === 'battle' ? React.createElement(BattleView, props) : props.match && props.match.v === 2 ? React.createElement(PitchMatch, props) : React.createElement(MatchPlayer, props);
 }
 function matchReport(d, A, B, match) {
   const teams = [A, B];
@@ -42026,6 +42643,666 @@ function SurvivalSummary({
       margin: 0
     }
   }, "Both teams face the same days. Each event needs certain kit; the best matching item\u2019s usefulness (a Draft Night estimate) sets the odds. Just for fun."));
+}
+const TYRE_COL = {
+  S: '#e2463b',
+  M: '#f2c14e',
+  H: '#f4f1ea',
+  I: '#3fbf5f'
+};
+const TRACK_CACHE = {};
+function trackGeo(id) {
+  const cache = TRACK_CACHE;
+  {
+    if (cache[id]) return cache[id];
+    const t = F1_TRACKS.find(x => x.id === id) || F1_TRACKS[0];
+    const P = t.pts.map(([x, y]) => ({
+      x,
+      y
+    }));
+    const n = P.length;
+    const pts = [];
+    for (let i = 0; i < n; i++) {
+      const p0 = P[(i - 1 + n) % n],
+        p1 = P[i],
+        p2 = P[(i + 1) % n],
+        p3 = P[(i + 2) % n];
+      for (let k = 0; k < 24; k++) {
+        const u = k / 24,
+          u2 = u * u,
+          u3 = u2 * u;
+        const f = (a, b, c, d2) => 0.5 * (2 * b + (-a + c) * u + (2 * a - 5 * b + 4 * c - d2) * u2 + (-a + 3 * b - 3 * c + d2) * u3);
+        pts.push({
+          x: f(p0.x, p1.x, p2.x, p3.x),
+          y: f(p0.y, p1.y, p2.y, p3.y)
+        });
+      }
+    }
+    const len = [0];
+    for (let i = 1; i <= pts.length; i++) {
+      const a = pts[i - 1],
+        b = pts[i % pts.length];
+      len.push(len[i - 1] + Math.hypot(b.x - a.x, b.y - a.y));
+    }
+    const total = len[len.length - 1];
+    const d = 'M' + pts.map(p => p.x.toFixed(2) + ' ' + p.y.toFixed(2)).join(' L') + ' Z';
+    const at = frac => {
+      const f = (frac % 1 + 1) % 1;
+      const target = f * total;
+      let lo = 0,
+        hi = len.length - 1;
+      while (hi - lo > 1) {
+        const mid = lo + hi >> 1;
+        if (len[mid] <= target) lo = mid;else hi = mid;
+      }
+      const a = pts[lo % pts.length],
+        b = pts[hi % pts.length];
+      const seg = len[hi] - len[lo] || 1;
+      const u = (target - len[lo]) / seg;
+      return {
+        x: a.x + (b.x - a.x) * u,
+        y: a.y + (b.y - a.y) * u,
+        ang: Math.atan2(b.y - a.y, b.x - a.x)
+      };
+    };
+    return cache[id] = {
+      t,
+      d,
+      at,
+      total
+    };
+  }
+}
+function gpScript(match) {
+  const beats = [];
+  let t = 0;
+  const add = b => {
+    b.t0 = t;
+    t += b.dur;
+    beats.push(b);
+    return b;
+  };
+  add({
+    type: 'lights',
+    dur: 4.6
+  });
+  const hlLap = new Set(match.events.filter(e => e.hl).map(e => e.lap));
+  for (let L = 1; L <= match.laps; L++) add({
+    type: 'lap',
+    lap: L,
+    dur: L === 1 ? 4 : L === match.laps ? 3.6 : hlLap.has(L) ? 3 : 1.9
+  });
+  add({
+    type: 'flag',
+    dur: 3.4
+  });
+  return {
+    beats,
+    total: t
+  };
+}
+function gpRaceTime(match, beat, u) {
+  if (beat.type === 'lights') return 0;
+  const lead = L => Math.min(...match.cum.map(c => c[L] != null ? c[L] : Infinity));
+  if (beat.type === 'flag') return lead(match.laps) + 2 + u * 3;
+  const a = beat.lap === 1 ? 0 : lead(beat.lap - 1),
+    b = lead(beat.lap);
+  return a + (b - a) * Math.min(1, u / beat.dur);
+}
+function gpDist(cum, T) {
+  if (T <= cum[0]) return -(cum[0] - T) / 90 - 0.004;
+  for (let j = 0; j < cum.length - 1; j++) if (T < cum[j + 1]) return j + (T - cum[j]) / (cum[j + 1] - cum[j]);
+  return cum.length - 1;
+}
+const gpTimeAt = (cum, x) => {
+  const j = Math.max(0, Math.min(cum.length - 2, Math.floor(x)));
+  return cum[j] + (x - j) * (cum[j + 1] - cum[j]);
+};
+const tyreAt = (stints, lap) => {
+  let c = stints[0] ? stints[0][1] : 'M';
+  stints.forEach(([L, k]) => {
+    if (L < lap) c = k;
+  });
+  return c;
+};
+function gpBanner(e, cars) {
+  const s = i => f1Short(cars[i].name);
+  if (e.kind === 'pass') return e.pos === 1 ? 'NEW LEADER! ' + s(e.car) : 'OVERTAKE! ' + s(e.car) + ' P' + e.pos;
+  if (e.kind === 'pit') return 'PIT STOP · ' + s(e.car) + ' ' + e.stop.toFixed(1) + 's';
+  if (e.kind === 'crash') return 'CRASH! ' + s(e.car) + ' OUT';
+  if (e.kind === 'contact') return 'CONTACT!';
+  if (e.kind === 'spin') return 'SPIN! ' + s(e.car);
+  if (e.kind === 'dnf') return 'ENGINE FAILURE';
+  if (e.kind === 'sc') return 'SAFETY CAR';
+  if (e.kind === 'scend') return 'GREEN FLAG!';
+  if (e.kind === 'rain') return 'RAIN!';
+  if (e.kind === 'start') return 'LIGHTS OUT!';
+  if (e.kind === 'flag') return 'CHEQUERED FLAG';
+  return null;
+}
+function TrackView({
+  d,
+  A,
+  B,
+  match,
+  speed,
+  onDone,
+  label
+}) {
+  const geo = trackGeo(match.track);
+  const script = useMemo(() => gpScript(match), [match]);
+  const base = speed === 'fast' ? 2 : 1;
+  const [t, setT] = useState(speed === 'instant' ? script.total : 0);
+  const [playing, setPlaying] = useState(speed !== 'instant');
+  const [mult, setMult] = useState(1);
+  const done = t >= script.total;
+  const fired = useRef(false);
+  useEffect(() => {
+    if (!playing || done) return undefined;
+    let raf;
+    let last = performance.now();
+    const tick = now => {
+      const dt = Math.min(0.1, (now - last) / 1000);
+      last = now;
+      setT(x => Math.min(script.total, x + dt * base * mult / Math.max(0.001, GAME_SPEED)));
+      raf = requestAnimationFrame(tick);
+    };
+    raf = requestAnimationFrame(tick);
+    return () => cancelAnimationFrame(raf);
+  }, [playing, done, mult, base]);
+  useEffect(() => {
+    if (done && !fired.current) {
+      fired.current = true;
+      audio.play('fanfare');
+      onDone && onDone();
+    }
+  }, [done]);
+  const bi = Math.max(0, script.beats.findIndex(b => t < b.t0 + b.dur));
+  const beat = done ? script.beats[script.beats.length - 1] : script.beats[bi];
+  const u = done ? beat.dur : t - beat.t0;
+  const T = done ? Infinity : gpRaceTime(match, beat, u);
+  const lap = beat.type === 'lights' ? 0 : beat.type === 'flag' || done ? match.laps : beat.lap;
+  const scLaps = useMemo(() => {
+    const s2 = new Set();
+    let on = null;
+    match.events.forEach(e => {
+      if (e.kind === 'sc') on = e.lap + 1;
+      if (e.kind === 'scend' && on != null) {
+        for (let L = on; L <= e.lap; L++) s2.add(L);
+        on = null;
+      }
+    });
+    return s2;
+  }, [match]);
+  const cars = match.cars;
+  const dist = cars.map((c, i) => {
+    if (done) return match.laps + (match.dnf[i] != null ? -99 : 0);
+    const x = gpDist(match.cum[i], T);
+    return match.dnf[i] != null && x >= match.cum[i].length - 1 ? match.cum[i].length - 1 + 0.45 : x;
+  });
+  const out = cars.map((c, i) => match.dnf[i] != null && (done || lap >= match.dnf[i] && dist[i] >= match.cum[i].length - 1.001));
+  const ordered = cars.map((c, i) => i).sort((x, y) => out[x] - out[y] || (done ? match.result.findIndex(r => r.car === x) - match.result.findIndex(r => r.car === y) : dist[y] - dist[x]));
+  const leader = ordered[0];
+  const colors = i => cars[i].team === 0 ? A.color : cars[i].team === 1 ? B.color : '#8a8fa3';
+  const wet = !!match.weather[Math.max(1, Math.min(match.laps, lap))] && beat.type !== 'lights';
+  const lapEv = match.events.filter(e => e.hl && e.lap === lap && beat.type === 'lap');
+  const banner = done ? null : beat.type === 'lights' ? null : beat.type === 'flag' ? 'CHEQUERED FLAG' : lapEv.length ? gpBanner(lapEv[Math.min(lapEv.length - 1, Math.floor(u / beat.dur * lapEv.length))], cars) : null;
+  const sc = scLaps.has(lap) && beat.type === 'lap';
+  const lastBeat = useRef(-1);
+  useEffect(() => {
+    if (!playing || done || bi === lastBeat.current) return;
+    lastBeat.current = bi;
+    if (beat.type === 'lap' && beat.lap === 1) audio.play('buzzer');
+    if (beat.type === 'flag') {
+      audio.play('cheer');
+      const w = cars[match.result[0].car];
+      audio.say(w.name + ' wins the ' + geo.t.name + '!', 2, d.id + ':' + label + ':gp');
+    }
+    if (beat.type === 'lap' && lapEv.some(e => e.kind === 'pass' && cars[e.car].team != null)) audio.play('bid');
+    if (beat.type === 'lap' && lapEv.some(e => e.kind === 'crash' || e.kind === 'sc')) audio.play('card');
+  }, [bi]);
+  const feed = [];
+  match.events.forEach((e, k) => {
+    if (!e.hl && e.kind !== 'fastest') return;
+    if (!done && (e.lap > lap || e.lap === lap && beat.type === 'lap' && u < beat.dur * 0.4)) return;
+    feed.push({
+      k,
+      e
+    });
+  });
+  const feedRef = useRef(null);
+  useEffect(() => {
+    const f = feedRef.current;
+    if (f) f.scrollTop = f.scrollHeight;
+  }, [feed.length]);
+  const lightsOn = beat.type === 'lights' ? Math.min(5, Math.floor(u / 0.7)) : 0;
+  const gap = i => {
+    if (i === leader) return 'Leader';
+    if (out[i]) return 'OUT';
+    if (done) {
+      const r = match.result.find(x => x.car === i);
+      return r && r.gap != null ? '+' + r.gap.toFixed(1) : 'OUT';
+    }
+    const g = T - gpTimeAt(match.cum[leader], Math.max(0, dist[i]));
+    return dist[i] < 0 ? 'Grid' : '+' + Math.max(0, g).toFixed(1);
+  };
+  const pitNow = i => !done && match.pits[i].includes(lap) && beat.type === 'lap';
+  const status = done ? 'FINAL' : beat.type === 'lights' ? 'FORMATION' : beat.type === 'flag' ? 'FLAG' : 'LAP ' + lap + '/' + match.laps;
+  return React.createElement("div", {
+    className: "matchview trackview"
+  }, React.createElement("div", {
+    className: "scoreboard"
+  }, React.createElement("div", {
+    className: "sb-team"
+  }, React.createElement(Badge, {
+    m: A
+  }), React.createElement("span", {
+    className: "sb-n"
+  }, A.name)), React.createElement("div", {
+    className: "sb-mid"
+  }, React.createElement("span", {
+    className: "sb-score num",
+    "aria-live": "polite"
+  }, done || beat.type === 'flag' ? match.score[0] + '–' + match.score[1] : 'P' + (ordered.findIndex(i => cars[i].team === 0) + 1) + ' · P' + (ordered.findIndex(i => cars[i].team === 1) + 1)), React.createElement("span", {
+    className: "sb-clock num"
+  }, status)), React.createElement("div", {
+    className: "sb-team"
+  }, React.createElement(Badge, {
+    m: B
+  }), React.createElement("span", {
+    className: "sb-n"
+  }, B.name))), React.createElement("div", {
+    className: "boutbar small"
+  }, React.createElement("b", null, geo.t.name), " ", React.createElement("span", {
+    className: "muted"
+  }, "\xB7 ", match.laps, " laps", wet ? ' · 🌧️ wet' : '', sc ? ' · 🟨 safety car' : '')), React.createElement("div", {
+    className: "pitchwrap"
+  }, React.createElement("svg", {
+    className: "pitchsvg tracksvg",
+    viewBox: "0 0 100 60",
+    role: "img",
+    "aria-label": geo.t.name + ', ' + status + ', leader ' + cars[leader].name
+  }, React.createElement("rect", {
+    x: "0",
+    y: "0",
+    width: "100",
+    height: "60",
+    fill: wet ? '#3b5a3a' : '#4f8a3c'
+  }), Array.from({
+    length: 8
+  }, (_, i) => React.createElement("rect", {
+    key: i,
+    x: "0",
+    y: i * 7.5,
+    width: "100",
+    height: "3.75",
+    fill: "rgba(255,255,255,.035)"
+  })), React.createElement("path", {
+    d: geo.d,
+    fill: "none",
+    stroke: "#e9e4d8",
+    strokeWidth: "6.4",
+    strokeLinejoin: "round"
+  }), React.createElement("path", {
+    d: geo.d,
+    fill: "none",
+    stroke: wet ? '#3c4048' : '#4a4d55',
+    strokeWidth: "5",
+    strokeLinejoin: "round"
+  }), React.createElement("path", {
+    d: geo.d,
+    fill: "none",
+    stroke: "rgba(255,255,255,.25)",
+    strokeWidth: "0.25",
+    strokeDasharray: "1.5 2"
+  }), (() => {
+    const p = geo.at(0);
+    const nx = -Math.sin(p.ang),
+      ny = Math.cos(p.ang);
+    return React.createElement("g", null, React.createElement("line", {
+      x1: p.x - nx * 2.6,
+      y1: p.y - ny * 2.6,
+      x2: p.x + nx * 2.6,
+      y2: p.y + ny * 2.6,
+      stroke: "#fff",
+      strokeWidth: "0.9",
+      strokeDasharray: "0.45 0.45"
+    }), React.createElement("line", {
+      x1: p.x - nx * 2.6,
+      y1: p.y - ny * 2.6,
+      x2: p.x + nx * 2.6,
+      y2: p.y + ny * 2.6,
+      stroke: "#111",
+      strokeWidth: "0.9",
+      strokeDasharray: "0.45 0.45",
+      strokeDashoffset: "0.45",
+      opacity: ".9"
+    }));
+  })(), sc && (() => {
+    const p = geo.at(dist[leader] + 0.012);
+    return React.createElement("g", {
+      transform: 'translate(' + p.x.toFixed(2) + ' ' + p.y.toFixed(2) + ')'
+    }, React.createElement("circle", {
+      r: "1.6",
+      fill: "#ffd23d",
+      stroke: "#0f0c21",
+      strokeWidth: ".35"
+    }), React.createElement("text", {
+      y: "0.6",
+      textAnchor: "middle",
+      fontSize: "1.6",
+      fontWeight: "900",
+      fill: "#0f0c21"
+    }, "SC"));
+  })(), ordered.slice().reverse().map(i => {
+    if (out[i] && done) return null;
+    const p = geo.at(dist[i]);
+    const team = cars[i].team != null;
+    return React.createElement("g", {
+      key: i,
+      transform: 'translate(' + p.x.toFixed(2) + ' ' + p.y.toFixed(2) + ')',
+      opacity: out[i] ? 0.35 : 1
+    }, React.createElement("circle", {
+      r: team ? 1.55 : 1.15,
+      fill: colors(i),
+      stroke: i === leader ? '#ffd23d' : '#0f0c21',
+      strokeWidth: i === leader ? 0.5 : 0.3
+    }), team && React.createElement("text", {
+      y: "-2.1",
+      textAnchor: "middle",
+      fontSize: "1.9",
+      fontWeight: "900",
+      fill: "#fff",
+      stroke: "#0f0c21",
+      strokeWidth: "0.4",
+      paintOrder: "stroke"
+    }, f1Short(cars[i].name)));
+  }), wet && Array.from({
+    length: 40
+  }, (_, i) => {
+    const x = (unit('rx', i) * 110 + t * 9) % 105 - 3,
+      y = (unit('ry', i) * 64 + t * 30 + i) % 64 - 2;
+    return React.createElement("line", {
+      key: i,
+      x1: x,
+      y1: y,
+      x2: x - 0.6,
+      y2: y + 2,
+      stroke: "rgba(200,220,255,.5)",
+      strokeWidth: "0.25"
+    });
+  }), beat.type === 'lights' && React.createElement("g", null, React.createElement("rect", {
+    x: "31",
+    y: "6",
+    width: "38",
+    height: "9",
+    rx: "2",
+    fill: "#141026",
+    stroke: "#000",
+    strokeWidth: ".4"
+  }), [0, 1, 2, 3, 4].map(k => React.createElement("circle", {
+    key: k,
+    cx: 36 + k * 7,
+    cy: "10.5",
+    r: "2.4",
+    fill: k < lightsOn && u < 4.0 ? '#ff2a2a' : '#3a2f3f'
+  }))), beat.type === 'flag' && React.createElement("g", {
+    transform: "translate(50 14)"
+  }, Array.from({
+    length: 24
+  }, (_, k) => React.createElement("rect", {
+    key: k,
+    x: -12 + k % 6 * 4,
+    y: -6 + Math.floor(k / 6) * 3,
+    width: "4",
+    height: "3",
+    fill: (k + Math.floor(k / 6)) % 2 ? '#fff' : '#111',
+    transform: 'translate(0 ' + (Math.sin(u * 6 + k * 0.5) * 0.6).toFixed(2) + ')'
+  }))), banner && React.createElement("text", {
+    x: "50",
+    y: beat.type === 'flag' ? 32 : 31,
+    textAnchor: "middle",
+    fontSize: banner.length > 15 ? 5 : 6.5,
+    fontWeight: "900",
+    fill: /CRASH|SAFETY|RAIN|ENGINE|OVERTAKE/.test(banner) ? '#ffc83d' : '#fff',
+    stroke: "#0f0c21",
+    strokeWidth: "0.6",
+    paintOrder: "stroke",
+    className: "pbanner"
+  }, banner), done && React.createElement("g", null, React.createElement("rect", {
+    x: "0",
+    y: "0",
+    width: "100",
+    height: "60",
+    fill: "rgba(15,12,33,.55)"
+  }), React.createElement("text", {
+    x: "50",
+    y: "24",
+    textAnchor: "middle",
+    fontSize: "3.4",
+    fontWeight: "800",
+    fill: "#fff"
+  }, geo.t.name.toUpperCase()), React.createElement("text", {
+    x: "50",
+    y: "34",
+    textAnchor: "middle",
+    fontSize: "6.5",
+    fontWeight: "900",
+    fill: match.winner === 0 ? A.color : B.color,
+    stroke: "#0f0c21",
+    strokeWidth: "0.6",
+    paintOrder: "stroke"
+  }, (match.winner === 0 ? A : B).name.toUpperCase().slice(0, 16), " WIN"), React.createElement("text", {
+    x: "50",
+    y: "42",
+    textAnchor: "middle",
+    fontSize: "4.4",
+    fontWeight: "900",
+    fill: "#ffc83d"
+  }, match.score[0], "\u2013", match.score[1], " points")))), React.createElement("div", {
+    className: "tower",
+    role: "list",
+    "aria-label": "Timing tower"
+  }, ordered.map((i, k) => React.createElement("div", {
+    key: i,
+    role: "listitem",
+    className: 'gprow' + (cars[i].team != null ? ' team' : '') + (out[i] ? ' out' : '')
+  }, React.createElement("span", {
+    className: "tp num"
+  }, out[i] ? '–' : k + 1), React.createElement("span", {
+    className: "tc",
+    style: {
+      background: colors(i)
+    }
+  }), React.createElement("span", {
+    className: "tn"
+  }, f1Short(cars[i].name)), React.createElement("span", {
+    className: "tt",
+    style: {
+      color: TYRE_COL[tyreAt(match.stints[i], Math.max(1, lap))]
+    }
+  }, pitNow(i) ? 'PIT' : tyreAt(match.stints[i], Math.max(1, lap))), React.createElement("span", {
+    className: "tg num"
+  }, gap(i))))), React.createElement("div", {
+    className: "mctrl",
+    role: "group",
+    "aria-label": "Race controls"
+  }, !done && React.createElement("button", {
+    className: "btn btn-sm",
+    onClick: () => setPlaying(x => !x),
+    "aria-label": playing ? 'Pause' : 'Play'
+  }, playing ? '⏸ Pause' : '▶ Play'), !done && [1, 2, 4].map(x => React.createElement("button", {
+    key: x,
+    className: 'btn btn-sm' + (mult === x ? ' btn-gold' : ''),
+    "aria-pressed": mult === x,
+    onClick: () => setMult(x)
+  }, x, "\xD7")), !done && React.createElement("button", {
+    className: "btn btn-sm btn-ghost",
+    onClick: () => setT(script.total)
+  }, "Skip to result"), done && React.createElement("button", {
+    className: "btn btn-sm",
+    onClick: () => {
+      fired.current = true;
+      setT(0);
+      setPlaying(true);
+    }
+  }, "\u21BA Watch again")), React.createElement("div", {
+    className: "mfeed",
+    ref: feedRef,
+    "aria-live": "polite"
+  }, feed.map(({
+    k,
+    e
+  }) => React.createElement("p", {
+    key: k,
+    className: 'mev ' + (e.kind === 'flag' || e.kind === 'crash' || e.kind === 'sc' ? 'goal' : e.kind === 'start' || e.kind === 'rain' ? 'half' : '') + (e.car != null && cars[e.car].team != null ? ' t' + cars[e.car].team : '')
+  }, React.createElement("span", {
+    className: "mm num"
+  }, e.lap ? 'L' + e.lap : '—'), React.createElement("span", null, e.kind === 'pass' ? '🏎️ ' : e.kind === 'pit' ? '🔧 ' : e.kind === 'crash' ? '💥 ' : e.kind === 'sc' ? '🟨 ' : e.kind === 'rain' ? '🌧️ ' : e.kind === 'flag' ? '🏁 ' : e.kind === 'fastest' ? '⏱️ ' : '', e.text, e.car != null && cars[e.car].team != null ? React.createElement("small", null, " \xB7 ", (cars[e.car].team === 0 ? A : B).name) : null)))), done && React.createElement(GPSummary, {
+    d: d,
+    A: A,
+    B: B,
+    match: match
+  }));
+}
+function gpReport(d, A, B, match) {
+  const rows = match.result.map(r => ({
+    ...r,
+    ...match.cars[r.car],
+    gained: r.pos != null ? r.grid - r.pos : null
+  }));
+  const team = rows.filter(r => r.team != null);
+  const dotd = team.filter(r => r.pos != null).sort((x, y) => y.gained * 2 + y.pts / 5 - (x.gained * 2 + x.pts / 5))[0] || null;
+  const best = team.filter(r => r.pts > 0).sort((x, y) => y.pts / Math.max(1, y.price) - x.pts / Math.max(1, x.price))[0] || null;
+  const flop = team.filter(r => r.price >= 3 && r.pts === 0).sort((x, y) => y.price - x.price)[0] || null;
+  return {
+    rows,
+    team,
+    dotd,
+    best,
+    flop
+  };
+}
+function GPSummary({
+  d,
+  A,
+  B,
+  match
+}) {
+  if (match.forfeit) return React.createElement("div", {
+    className: "board msummary"
+  }, React.createElement("h3", null, "\uD83C\uDFC1 Race"), React.createElement("p", {
+    className: "small"
+  }, (match.winner === 0 ? A : B).name, " wins \u2014 the other team had no drivers."));
+  const R = gpReport(d, A, B, match);
+  const geo = trackGeo(match.track);
+  const T = i => i === 0 ? A : B;
+  const pos = r => r.pos != null ? 'P' + r.pos : 'DNF';
+  const era = r => {
+    const it = d.items[r.itemId];
+    return it ? f1EraOf(it, d.topic) === 'now' ? 'Now' : 'Prime' : '';
+  };
+  return React.createElement("div", {
+    className: "board msummary"
+  }, React.createElement("h3", null, "\uD83C\uDFC1 Race result"), React.createElement("p", {
+    className: "small",
+    style: {
+      margin: 0
+    }
+  }, React.createElement("b", null, A.name, " ", match.score[0], "\u2013", match.score[1], " ", B.name), " on points \xB7 ", geo.t.name, match.how === 'best' ? ' · level on points, decided by the best finish' : ''), React.createElement("p", {
+    className: "small",
+    style: {
+      margin: 0
+    }
+  }, "\uD83C\uDFC6 Podium: ", R.rows.slice(0, 3).map(r => r.name + (r.team != null ? ' (' + T(r.team).name + ')' : '')).join(' · ')), React.createElement("table", {
+    className: "qtable small"
+  }, React.createElement("thead", null, React.createElement("tr", null, React.createElement("th", null, "Driver"), React.createElement("th", null, "Grid"), React.createElement("th", null, "Finish"), React.createElement("th", null, "Pts"))), React.createElement("tbody", null, R.team.map(r => React.createElement("tr", {
+    key: r.car
+  }, React.createElement("td", null, React.createElement("span", {
+    className: "tc",
+    style: {
+      background: T(r.team).color
+    }
+  }), " ", r.name), React.createElement("td", {
+    className: "num"
+  }, r.grid), React.createElement("td", {
+    className: "num"
+  }, pos(r)), React.createElement("td", {
+    className: "num"
+  }, React.createElement("b", null, r.pts)))))), React.createElement("div", {
+    className: "mreport"
+  }, React.createElement("h4", null, "\uD83D\uDCCB Race report"), R.dotd && React.createElement("p", {
+    className: "small"
+  }, React.createElement("b", null, "\u2B50 Driver of the Day:"), " ", R.dotd.name, " \u2014 from P", R.dotd.grid, " to ", pos(R.dotd), R.dotd.passes ? ', ' + R.dotd.passes + ' overtake' + (R.dotd.passes === 1 ? '' : 's') : '', " (", era(R.dotd), " ", R.dotd.ovr, " est.)."), match.fastest != null && React.createElement("p", {
+    className: "small"
+  }, React.createElement("b", null, "\u23F1\uFE0F Fastest lap:"), " ", match.cars[match.fastest].name, "."), R.best && React.createElement("p", {
+    className: "small"
+  }, React.createElement("b", null, "\uD83D\uDCB0 Best buy:"), " ", R.best.name, " \u2014 $", R.best.price, " for ", R.best.pts, " points."), R.flop && React.createElement("p", {
+    className: "small"
+  }, React.createElement("b", null, "\uD83D\uDCC9 Tough day:"), " ", R.flop.name, " cost $", R.flop.price, " and scored nothing", R.flop.dnf ? ' (out on lap ' + R.flop.dnf + ')' : '', "."), React.createElement("p", {
+    className: "small"
+  }, React.createElement("b", null, "\uD83D\uDD0E The race:"), " ", match.rain ? 'Rain from lap ' + match.rain[0] + ' to ' + match.rain[1] + '. ' : 'Dry all race. ', match.sc ? match.sc + ' safety car' + (match.sc === 1 ? '' : 's') + '. ' : '', match.events.filter(e => e.kind === 'pass').length, " overtakes, ", match.dnf.filter(x => x != null).length, " retirements.")), React.createElement("p", {
+    className: "hint",
+    style: {
+      margin: 0
+    }
+  }, "Everyone drives the same car. Grey cars are undrafted drivers filling the grid (the weakest ones left; they score for nobody). Driver numbers are Draft Night estimates \u2014 Now for current drivers, Prime for legends \u2014 not official ratings. Races are shortened."));
+}
+function F1Chip({
+  item,
+  topic
+}) {
+  const [open, setOpen] = useState(false);
+  if (!numbersShown()) return null;
+  const r = f1Rating(item);
+  const era = f1EraOf(item, topic) === 'now' ? 'Now' : 'Prime';
+  return React.createElement(React.Fragment, null, React.createElement("button", {
+    type: "button",
+    className: "ratingchip",
+    onClick: () => setOpen(true),
+    "aria-label": era + ' ' + r.ovr + ', estimated. Show details'
+  }, era, " ", React.createElement("b", {
+    className: "num"
+  }, r.ovr), " est."), open && ReactDOM.createPortal(React.createElement(Sheet, {
+    center: true,
+    onClose: () => setOpen(false)
+  }, React.createElement("div", {
+    className: "ratingcard"
+  }, React.createElement("div", {
+    className: "rc-top"
+  }, React.createElement("span", {
+    className: "rc-ovr num"
+  }, React.createElement("small", {
+    className: "rc-era"
+  }, era), r.ovr), React.createElement("span", {
+    className: "rc-role"
+  }, "F1"), React.createElement("span", {
+    className: "rc-name"
+  }, item.name)), React.createElement("div", {
+    className: "rc-attrs"
+  }, F1_ATTRS.map(a => React.createElement("div", {
+    key: a,
+    className: "rc-attr"
+  }, React.createElement("span", {
+    className: "k",
+    title: F1_ATTR_NAMES[a]
+  }, a), React.createElement("span", {
+    className: "bar"
+  }, React.createElement("i", {
+    style: {
+      width: r.attrs[a] + '%'
+    }
+  })), React.createElement("span", {
+    className: "v num"
+  }, r.attrs[a])))), React.createElement("p", {
+    className: "hint",
+    style: {
+      margin: 0
+    }
+  }, era === 'Now' ? 'Now: how good they are today. ' : 'Prime: how good they were at their peak. ', "PAC qualifying pace \xB7 RAC race pace \xB7 OVT overtaking \xB7 DEF defending \xB7 TYR tyre care \xB7 WET wet weather \xB7 CON consistency. Draft Night estimate from titles and reputation, not an official rating.")), React.createElement("button", {
+    className: "btn btn-ghost",
+    onClick: () => setOpen(false)
+  }, "Close")), document.body));
 }
 const FB_CONFIG = {
   apiKey: 'AIzaSyCjw0jMkbljpMKol013HCe_l_h8nzNLtCY',

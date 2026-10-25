@@ -186,6 +186,7 @@ function MatchPlayer({ d, A, B, match, speed, commentary, onDone, label }) {
 }
 
 function MatchSummary({ d, A, B, match }) {
+  if (match.v === 'gp') return <GPSummary d={d} A={A} B={B} match={match} />;
   if (match.v === 'card') return <FightSummary d={d} A={A} B={B} match={match} />;
   if (match.v === 'hoops') return <HoopsSummary d={d} A={A} B={B} match={match} era={eraWord(d.topic)} />;
   if (match.v === 'show') return <ShowSummary d={d} A={A} B={B} match={match} />;
@@ -760,7 +761,7 @@ function PitchMatch({ d, A, B, match, speed, commentary, onDone, label }) {
   );
 }
 // Old saved matches (before the pitch) keep their text-only replay.
-function MatchView(props) { return props.match && props.match.v === 'card' ? <RingView {...props} /> : props.match && props.match.v === 'hoops' ? <CourtView {...props} /> : props.match && props.match.v === 'show' ? <ShowView {...props} /> : props.match && props.match.v === 'mission' ? <MissionView {...props} /> : props.match && props.match.v === 'survival' ? <SurvivalView {...props} /> : props.match && props.match.v === 'arena' ? <ArenaView {...props} /> : props.match && props.match.v === 'battle' ? <BattleView {...props} /> : props.match && props.match.v === 2 ? <PitchMatch {...props} /> : <MatchPlayer {...props} />; }
+function MatchView(props) { return props.match && props.match.v === 'gp' ? <TrackView {...props} /> : props.match && props.match.v === 'card' ? <RingView {...props} /> : props.match && props.match.v === 'hoops' ? <CourtView {...props} /> : props.match && props.match.v === 'show' ? <ShowView {...props} /> : props.match && props.match.v === 'mission' ? <MissionView {...props} /> : props.match && props.match.v === 'survival' ? <SurvivalView {...props} /> : props.match && props.match.v === 'arena' ? <ArenaView {...props} /> : props.match && props.match.v === 'battle' ? <BattleView {...props} /> : props.match && props.match.v === 2 ? <PitchMatch {...props} /> : <MatchPlayer {...props} />; }
 
 /* ---------- match report (football and Puppy Bowl), built only from the recorded events ---------- */
 function matchReport(d, A, B, match) {

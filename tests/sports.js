@@ -89,5 +89,43 @@ module.exports = async function sportsTests({ ok, boot, btn, click, sleep }) {
     ok(framesOK && all.length > 15, 'every kind of fight moment (' + all.length + ') animates without errors');
     X.w.close();
   }
+  // Grand Prix (F1 Drivers).
+  {
+    const S = DN.sports; const t = T('t-f1'); const d = dOf(t);
+    const pickT = (id, names) => ({ id, name: id, team: names.map((n) => ({ itemId: t.items.find((i) => i.name === n).id, price: 4 })) });
+    const fast = pickT('A', ['Max Verstappen', 'Lewis Hamilton', 'Ayrton Senna']);
+    const slow = pickT('B', ['Lance Stroll', 'Franco Colapinto', 'Damon Hill']);
+    const g = S.simulateGrandPrix(d, fast, slow, 'r1');
+    ok(F.battleKind(t).name === 'Grand Prix' && g.v === 'gp' && JSON.stringify(g) === JSON.stringify(S.simulateGrandPrix(d, fast, slow, 'r1')) && g.score[0] !== g.score[1] && g.cars.length === 20, 'F1 Drivers race a full 20-car Grand Prix that always has a winner and replays exactly (' + g.score.join('–') + ' points)');
+    const pts = g.result.reduce((n, r) => n + r.pts, 0); const teamPts = [0, 1].map((k) => g.result.filter((r) => g.cars[r.car].team === k).reduce((n, r) => n + r.pts, 0));
+    ok((pts === 101 || pts === 102) && teamPts[0] === g.score[0] && teamPts[1] === g.score[1] && g.result.filter((r) => r.pos != null).every((r, k) => r.pos === k + 1), 'points go 25-18-15-12-10-8-6-4-2-1 plus the fastest lap, and the team scores add up');
+    const mid = pickT('C', ['Lando Norris', 'Charles Leclerc', 'Michael Schumacher']);
+    let wins = 0, kinds = new Set(), rain = 0, sc = 0, stops = 0, n = 200, ordered = true;
+    for (let k = 0; k < n; k++) {
+      const m = S.simulateGrandPrix({ ...d, seed: 'gp' + k }, fast, mid, 'k'); if (m.winner === 0) wins++; if (m.rain) rain++; if (m.sc) sc++;
+      m.events.forEach((e) => kinds.add(e.kind)); stops += m.pits.reduce((a, p) => a + p.length, 0) / m.cars.length;
+      const fin = m.result.filter((r) => r.pos != null); for (let j = 1; j < fin.length; j++) if (fin[j].time < fin[j - 1].time) ordered = false;
+      m.cum.forEach((c) => { for (let j = 1; j < c.length; j++) if (!(c[j] > c[j - 1])) ordered = false; });
+    }
+    ok(wins > 110 && wins < 195, 'faster drivers usually win, but not always (' + Math.round(wins / 2) + '% against a close line-up)');
+    ok(['pass', 'pit', 'crash', 'sc', 'scend', 'rain', 'spin', 'start', 'flag', 'fastest'].every((x) => kinds.has(x)) && rain > 20 && sc > 30 && stops / n > 0.9 && stops / n < 2.5, 'races have overtakes, pit stops (about ' + (stops / n).toFixed(1) + ' a car), rain, crashes and safety cars');
+    ok(ordered, 'the finishing order matches the recorded race times, lap by lap');
+    const monaco = [], monza = []; for (let k = 0; k < 120; k++) { const m = S.simulateGrandPrix({ ...d, seed: 'tr' + k }, fast, slow, 'k'); const p = m.events.filter((e) => e.kind === 'pass').length; if (m.track === 'monaco') monaco.push(p); if (m.track === 'monza') monza.push(p); }
+    const avg = (a) => a.reduce((x, y) => x + y, 0) / Math.max(1, a.length);
+    ok(monaco.length && monza.length && avg(monaco) < avg(monza) * 0.6, 'overtaking is much harder at Monaco than Monza (' + avg(monaco).toFixed(0) + ' vs ' + avg(monza).toFixed(0) + ' passes)');
+    const leg = t.items.find((i) => i.name === 'Ayrton Senna'), cur = t.items.find((i) => i.name === 'Lando Norris');
+    ok(S.f1Rating(leg).attrs.WET > S.f1Rating(cur).attrs.WET && S.f1EraOf(leg, t) === 'prime' && S.f1EraOf(cur, t) === 'now', 'drivers get estimated numbers: legends at their Prime, current drivers Now (Senna is stronger in the wet)');
+    // Every car's position on the map is a real number at every moment.
+    const sc2 = S.gpScript(g); let posOK = true; sc2.beats.forEach((b) => { for (let u = 0; u < b.dur; u += 0.5) { const T2 = S.gpRaceTime(g, b, u); g.cum.forEach((c) => { const x = S.gpDist(c, T2); const p = S.trackGeo(g.track).at(x); if (!isFinite(p.x) || !isFinite(p.y)) posOK = false; }); } });
+    ok(posOK, 'every car has a place on the track map at every moment of the race');
+    const fill = (topic, n2, seed) => { const ms = [...Array(n2)].map((_, i) => ({ id: 'm' + i, name: ['Lions', 'Sharks', 'Owls'][i], color: DN.COLORS[i], emoji: 'x', human: true })); let dd = DN.createDraft(topic, ms, { ...DN.DEFAULT_RULES, slots: topic.slots, finale: { mode: 'sim', speed: 'normal' } }, { seed }); let gg = 0, rr = 0; while (!DN.isDraftOver(dd) && gg++ < 800) { if (dd.phase === 'auction') { const m = dd.managers.find((x, k) => (k + rr++) % 2 === 0 && DN.canBid(dd, x, DN.nextAmount(dd))) || dd.managers.find((x) => DN.canBid(dd, x, DN.nextAmount(dd))); dd = m ? DN.sell(DN.placeBid(dd, m.id, DN.nextAmount(dd))) : DN.skipItem(dd); } else if (dd.phase === 'freepick') { const cp = DN.currentPicker(dd); dd = DN.freePick(dd, dd.leftover.find((x) => DN.canTake(dd, cp.m, x))); } else break; } return dd; };
+    const raw = { ...fill(t, 3, 'gpui'), mode: 'local', createdAt: Date.now(), history: [] };
+    const X = await boot({ idb: false, speed: 0.05, storage: { dn_current_v1: JSON.stringify(raw) } });
+    await click(X.w, btn(X.d, 'Resume draft')); await click(X.w, btn(X.d, 'Start the finale')); await click(X.w, btn(X.d, 'Lights out')); await sleep(500);
+    const live = !!X.d.querySelector('.tracksvg') && X.d.querySelectorAll('.gprow').length === 20 && /LAP|FORMATION/.test(X.d.querySelector('.sb-clock').textContent);
+    await click(X.w, btn(X.d, 'Skip to result')); await sleep(150);
+    ok(live && /Race result/.test(X.d.body.textContent) && /Driver of the Day/.test(X.d.body.textContent) && /Podium/.test(X.d.body.textContent), 'the track map shows all 20 cars with a timing tower and ends with the race result and report');
+    X.w.close();
+  }
   P.w.close();
 };
