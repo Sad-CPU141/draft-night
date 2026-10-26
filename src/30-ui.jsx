@@ -574,14 +574,19 @@ function TeamsSheet({ d, onClose }) {
 /* ============================================================
    HOME
    ============================================================ */
-function Home({ draft, past, onNew, onSolo, onOnline, onResume, onTopics, onPast, onAbandon, onSettings, onPlayers, showInstall, onDismissInstall }) {
+function Home({ draft, past, onNew, onSolo, onOnline, onResume, onTopics, onPast, onAbandon, onSettings, onPlayers, showInstall, onDismissInstall, onDev }) {
   const [ask, setAsk] = useState(null);
+  // Hidden developer menu: tap the tag 7 times, or hold the logo for 3 seconds.
+  const [devAsk, setDevAsk] = useState(false);
+  const openDev = () => { if (!onDev) return; if (devUnlocked()) onDev(); else setDevAsk(true); };
+  const tagTaps = useSecretTaps(7, openDev); const logoHold = useLongPress(3000, openDev);
   const status = draft && (draft.phase === 'auction' ? 'Item ' + (draft.processed + 1) + ' of ' + (draft.processed + draft.queue.length) : draft.phase === 'nominate' ? 'Nominating' : draft.phase === 'forcepick' ? 'Forced pick' : draft.phase === 'trade' ? 'Trade window' : draft.phase === 'freepick' ? 'Free picks' : 'Results & voting');
   return (
     <div className="app">
       <div className="hero">
-        <span className="tag"><i />$20 AUCTION</span>
-        <h1 className="display logo">Draft<span>Night</span></h1>
+        <span className="tag" onClick={tagTaps}><i />$20 AUCTION</span>
+        <h1 className="display logo" {...logoHold} style={{ userSelect: 'none', WebkitUserSelect: 'none', WebkitTouchCallout: 'none' }}>Draft<span>Night</span></h1>
+        {devAsk && <DevPassword onClose={() => setDevAsk(false)} onOk={() => { setDevAsk(false); onDev(); }} />}
         <p className="muted" style={{ margin: 0, maxWidth: 300 }}>One phone, one auctioneer, everyone shouting bids. Build the best team for the money.</p>
       </div>
       {draft && (
@@ -3396,6 +3401,9 @@ function App() {
     case 'shame':
       view = <ShameScreen past={past} settings={settings} onBack={() => go('players')} />;
       break;
+    case 'dev':
+      view = <DevScreen onBack={() => go('home')} topics={topics} draft={draft} setDraft={setDraft} goDraft={() => go('draft')} settings={settings} setSettings={setSettings} />;
+      break;
     case 'settings':
       view = <SettingsScreen onBack={() => go('home')} state={{ topics, past, draft, managers, settings }} settings={settings} setSettings={setSettings} rulePrefs={rulePrefs} saveRulePrefs={saveRulePrefs}
         onRestore={(data, mode) => {
@@ -3411,7 +3419,7 @@ function App() {
         }} />;
       break;
     default:
-      view = <Home draft={draft} past={past} onSettings={() => go('settings')}
+      view = <Home draft={draft} past={past} onSettings={() => go('settings')} onDev={() => go('dev')}
         showInstall={!app.standalone && !settings.installDismissed && (app.canPrompt || isIOS())} onDismissInstall={() => setSettings((x) => ({ ...x, installDismissed: true }))}
         onNew={() => { setDraft(null); setRules({ ...rulePrefs(), slots: [] }); go('setup-managers'); }}
         onSolo={() => { setDraft(null); go('solo-setup'); }}

@@ -245,5 +245,6 @@ function usePwa() { const [, f] = useState(0); useEffect(() => pwa.subscribe(() 
 const isIOS = () => /iphone|ipad|ipod/i.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
 
 // Game pacing. Tests set window.__DN_TEST_SPEED to run timers faster; players always get 1.
-const GAME_SPEED = (typeof window !== 'undefined' && window.__DN_TEST_SPEED) || 1;
+// Animation/timer speed factor (smaller = faster). The developer menu can change it.
+let GAME_SPEED = (typeof window !== 'undefined' && window.__DN_TEST_SPEED) || 1;
 const ms = (n) => Math.max(1, Math.round(n * GAME_SPEED));
